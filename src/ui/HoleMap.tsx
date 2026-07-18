@@ -4,6 +4,10 @@ import { fnv1a, mulberry32 } from '../engine/rng'
 
 const W = 360
 const H = 520
+/** screen anchors for the camera window: view start / view end along the centerline */
+const Y_BOTTOM = 472
+const Y_TOP = 88
+const SPAN = Y_BOTTOM - Y_TOP
 
 interface Pt {
   x: number
@@ -18,12 +22,29 @@ interface ZonePlace {
   kind: HazardZone['kind']
 }
 
-/** Sampled centerline with arc-length parametrization + per-hole zoom. */
-function useGeometry(layout: HoleLayout) {
+/**
+ * Camera window in yards. From the tee you see the whole hole; after that the
+ * view runs from just behind the ball to just past the green — ball low, green
+ * high — so the scale grows as you close in. Never tighter than ~90 yards back
+ * from the pin, so short-game views keep the green and its surrounds in frame.
+ */
+function viewWindow(layout: HoleLayout, ball: BallState): [number, number] {
+  const L = layout.length
+  const past = 22
+  if (ball.pos <= 0) return [0, L + past]
+  return [Math.max(0, Math.min(ball.pos - 15, L - 90)), L + past]
+}
+
+/**
+ * Sampled centerline with arc-length parametrization plus a similarity
+ * transform that maps the camera window onto the screen. Everything downstream
+ * works in *yards* and converts via uPerYd, so drawn sizes are honest at every
+ * zoom level — the green included.
+ */
+function useGeometry(layout: HoleLayout, view: [number, number]) {
   return useMemo(() => {
     const { dogleg } = layout.spec
-    // shorter holes render "zoomed in": bigger green, wider features
-    const zoom = Math.min(1.45, Math.max(1, Math.sqrt(560 / Math.max(layout.length, 140))))
+    const L = layout.length
     const bendDir = dogleg === 'L' ? -1 : dogleg === 'R' ? 1 : 0
     const tee: Pt = { x: 180 - bendDir * 26, y: 474 }
     const green: Pt = { x: 180 + bendDir * 30, y: 92 }
@@ -44,8 +65,18 @@ function useGeometry(layout: HoleLayout) {
       cum.push(cum[i - 1] + Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y))
     }
     const total = cum[N]
-    const at = (yards: number): Pt => {
-      const target = Math.max(0, Math.min(1, yards / layout.length)) * total
+    const worldPerYd = total / L
+    const endDir = (() => {
+      const dx = pts[N].x - pts[N - 1].x
+      const dy = pts[N].y - pts[N - 1].y
+      const len = Math.hypot(dx, dy) || 1
+      return { x: dx / len, y: dy / len }
+    })()
+    const worldAt = (yards: number): Pt => {
+      if (yards > L) {
+        return { x: pts[N].x + endDir.x * (yards - L) * worldPerYd, y: pts[N].y + endDir.y * (yards - L) * worldPerYd }
+      }
+      const target = Math.max(0, yards / L) * total
       let i = 1
       while (i < N && cum[i] < target) i++
       const seg = cum[i] - cum[i - 1] || 1
@@ -55,25 +86,47 @@ function useGeometry(layout: HoleLayout) {
         y: pts[i - 1].y + (pts[i].y - pts[i - 1].y) * f,
       }
     }
-    /** golfer-left unit normal at yards */
+
+    // camera: rotate + scale the window chord onto the vertical screen axis
+    const [vFrom, vTo] = view
+    const P0 = worldAt(vFrom)
+    const P1 = worldAt(vTo)
+    const c = Math.hypot(P1.x - P0.x, P1.y - P0.y) || 1
+    const ux = (P1.x - P0.x) / c
+    const uy = (P1.y - P0.y) / c
+    const s = SPAN / c
+    const uPerYd = s * worldPerYd
+
+    const at = (yards: number): Pt => {
+      const w = worldAt(yards)
+      const dx = w.x - P0.x
+      const dy = w.y - P0.y
+      return { x: 180 + s * (-uy * dx + ux * dy), y: Y_BOTTOM + s * (-ux * dx - uy * dy) }
+    }
+    /** golfer-left unit normal at yards, in screen space */
     const normalAt = (yards: number): Pt => {
-      const a = at(Math.max(0, yards - 6))
-      const b = at(yards + 6)
+      const a = worldAt(Math.max(0, yards - 6))
+      const b = worldAt(yards + 6)
       const dx = b.x - a.x
       const dy = b.y - a.y
       const len = Math.hypot(dx, dy) || 1
-      return { x: dy / len, y: -dx / len }
+      const nx = dy / len
+      const ny = -dx / len
+      return { x: -uy * nx + ux * ny, y: -ux * nx - uy * ny }
     }
+
+    // honest green: sized from the hole's real green depth, slightly wider than deep
     const rng = mulberry32(fnv1a(`${layout.spec.number}:${layout.length}:shape`))
-    const greenRx = (40 + rng() * 10) * zoom
-    const greenRy = (30 + rng() * 8) * zoom
-    return { at, normalAt, tee, green, zoom, greenRx, greenRy }
-  }, [layout])
+    const greenRy = Math.max(7, (layout.greenDepth / 2) * uPerYd)
+    const greenRx = greenRy * (1.3 + rng() * 0.3)
+
+    return { at, normalAt, view, uPerYd, greenRx, greenRy }
+  }, [layout, view[0], view[1]]) // eslint-disable-line react-hooks/exhaustive-deps
 }
 
 type Geo = ReturnType<typeof useGeometry>
 
-function ribbonPath(geo: Geo, from: number, to: number, width: (t: number) => number): string {
+function ribbonPath(geo: Geo, from: number, to: number, widthYd: (t: number) => number): string {
   const STEPS = 26
   const leftPts: string[] = []
   const rightPts: string[] = []
@@ -82,7 +135,7 @@ function ribbonPath(geo: Geo, from: number, to: number, width: (t: number) => nu
     const yards = from + (to - from) * t
     const p = geo.at(yards)
     const n = geo.normalAt(yards)
-    const w = width(t)
+    const w = widthYd(t) * geo.uPerYd
     leftPts.push(`${(p.x + n.x * w).toFixed(1)},${(p.y + n.y * w).toFixed(1)}`)
     rightPts.unshift(`${(p.x - n.x * w).toFixed(1)},${(p.y - n.y * w).toFixed(1)}`)
   }
@@ -105,31 +158,42 @@ function Tree({ x, y, s, tone = 0 }: { x: number; y: number; s: number; tone?: n
   )
 }
 
-/** Compute drawable placement + ball anchor for every zone. Single source for map & ball. */
+/** clamp a yard-based size into a readable on-screen range */
+const clampPx = (px: number, min: number, max: number) => Math.max(min, Math.min(max, px))
+
+/**
+ * Compute drawable placement + ball anchor for every zone. Single source for
+ * map & ball. All placements are at the zone's true yardage; lateral offsets
+ * are in yards from the centerline, past the real fairway/green footprint —
+ * so nothing near the green can hide underneath it.
+ */
 function placeZones(layout: HoleLayout, geo: Geo): Map<string, ZonePlace> {
   const L = layout.length
+  const u = geo.uPerYd
   const out = new Map<string, ZonePlace>()
   const rng = mulberry32(fnv1a(`${layout.spec.number}:${L}:zoneplace`))
-  const greenPt = geo.at(L)
+  const greenRxYd = geo.greenRx / u
+  const greenFrom = L - layout.greenDepth / 2 - 2
 
   for (const z of layout.zones) {
     const mid = (z.from + z.to) / 2
     const span = Math.max(10, z.to - z.from)
     const sideSign = z.side === 'left' ? 1 : -1 // golfer-left normal
-    // greenside = the zone's center sits within a chip of the pin
-    const nearGreen = mid > L - 34
     const p = geo.at(mid)
     const n = geo.normalAt(Math.min(mid, L - 1))
+    // corridor half-width at this yardage: green footprint near the pin, fairway otherwise
+    const corridorYd = mid > greenFrom ? greenRxYd : 15
 
     if (z.kind === 'ocean' || (z.kind === 'water' && z.side === 'cross')) {
       // drawn specially (flank / band); anchor for a dropped ball is never needed here
-      out.set(z.id, { anchor: { x: p.x + n.x * sideSign * 60, y: p.y + n.y * sideSign * 60 }, ellipses: [], kind: z.kind })
+      out.set(z.id, { anchor: { x: p.x + n.x * sideSign * 40 * u, y: p.y + n.y * sideSign * 40 * u }, ellipses: [], kind: z.kind })
       continue
     }
 
     if (z.kind === 'trees' || z.kind === 'deeprough') {
+      const off = (corridorYd + 11) * u
       out.set(z.id, {
-        anchor: { x: p.x + n.x * sideSign * 58 * geo.zoom, y: p.y + n.y * sideSign * 58 * geo.zoom },
+        anchor: { x: p.x + n.x * sideSign * off, y: p.y + n.y * sideSign * off },
         ellipses: [],
         kind: z.kind,
       })
@@ -137,55 +201,36 @@ function placeZones(layout: HoleLayout, geo: Geo): Map<string, ZonePlace> {
     }
 
     if (z.kind === 'bunker' && z.side === 'cross') {
-      // a string of pots across the fairway
+      // a string of pots across the corridor, at their true yardage — in front
+      // of the green when the zone is greenside, never underneath it
       const count = 2 + (span > 22 ? 1 : 0)
+      const potRx = clampPx(Math.min(8, 3 + span * 0.2) * u, 7, 26)
       const ellipses = []
       for (let i = 0; i < count; i++) {
-        const off = (i - (count - 1) / 2) * 26 * geo.zoom
-        const yy = z.from + span * (0.3 + rng() * 0.4)
+        const off = (i - (count - 1) / 2) * potRx * 2.3
+        const yy = Math.min(z.from + span * (0.3 + rng() * 0.4), greenFrom - 4)
         const pp = geo.at(yy)
         const nn = geo.normalAt(yy)
         ellipses.push({
           cx: pp.x + nn.x * off,
           cy: pp.y + nn.y * off,
-          rx: (11 + rng() * 5) * geo.zoom,
-          ry: (7 + rng() * 3) * geo.zoom,
+          rx: potRx,
+          ry: potRx * 0.62,
         })
       }
       out.set(z.id, { anchor: { x: ellipses[0].cx, y: ellipses[0].cy }, ellipses, kind: z.kind })
       continue
     }
 
-    if (nearGreen) {
-      // greenside features hug the green instead of floating in space
-      const gDir = { x: greenPt.x - geo.at(L - 30).x, y: greenPt.y - geo.at(L - 30).y }
-      const gLen = Math.hypot(gDir.x, gDir.y) || 1
-      const fwd = { x: gDir.x / gLen, y: gDir.y / gLen } // toward/past the pin
-      const lat = { x: n.x * sideSign, y: n.y * sideSign }
-      // pin-high-ness: how deep along the green this zone sits
-      const depth = Math.max(-1, Math.min(0.6, (mid - L) / 30 + 0.35))
-      if (z.kind === 'water') {
-        const cx = greenPt.x + lat.x * (geo.greenRx + 30 * geo.zoom) + fwd.x * depth * 24
-        const cy = greenPt.y + lat.y * (geo.greenRx + 30 * geo.zoom) + fwd.y * depth * 24
-        const ell = { cx, cy, rx: (34 + span * 0.25) * geo.zoom, ry: (24 + span * 0.2) * geo.zoom }
-        out.set(z.id, { anchor: { x: cx, y: cy }, ellipses: [ell], kind: z.kind })
-      } else {
-        const cx = greenPt.x + lat.x * (geo.greenRx + 13 * geo.zoom) + fwd.x * depth * 20
-        const cy = greenPt.y + lat.y * (geo.greenRx + 13 * geo.zoom) + fwd.y * depth * 20
-        const ell = { cx, cy, rx: (14 + rng() * 5) * geo.zoom, ry: (9 + rng() * 4) * geo.zoom }
-        out.set(z.id, { anchor: { x: cx, y: cy }, ellipses: [ell], kind: z.kind })
-      }
-      continue
-    }
-
-    // fairway-side features
-    const dist = (z.kind === 'bunker' ? 42 : 56) * geo.zoom
-    const cx = p.x + n.x * sideSign * dist
-    const cy = p.y + n.y * sideSign * dist
+    // side bunkers & ponds: true yardage, just past the corridor edge
+    const rxYd = z.kind === 'bunker' ? Math.min(10, 4 + span * 0.25) : Math.min(22, 9 + span * 0.35)
+    const offYd = corridorYd + rxYd * 0.75 + 2
+    const cx = p.x + n.x * sideSign * offYd * u
+    const cy = p.y + n.y * sideSign * offYd * u
     const ell =
       z.kind === 'bunker'
-        ? { cx, cy, rx: Math.min(24, 9 + span * 0.3) * geo.zoom, ry: Math.min(15, 8 + span * 0.18) * geo.zoom }
-        : { cx, cy, rx: Math.min(40, 14 + span * 0.28) * geo.zoom, ry: Math.min(30, 15 + span * 0.35) * geo.zoom }
+        ? { cx, cy, rx: clampPx(rxYd * u, 8, 30), ry: clampPx(rxYd * 0.62 * u, 5, 19) }
+        : { cx, cy, rx: clampPx(rxYd * u, 14, 48), ry: clampPx(rxYd * 0.7 * u, 10, 34) }
     out.set(z.id, { anchor: { x: cx, y: cy }, ellipses: [ell], kind: z.kind })
   }
   return out
@@ -200,32 +245,32 @@ export function HoleMap(props: {
   previewChoice: Choice | null
 }) {
   const { layout, ball } = props
-  const geo = useGeometry(layout)
-  const { at, normalAt, tee, zoom, greenRx, greenRy } = geo
+  const view = viewWindow(layout, ball)
+  const geo = useGeometry(layout, view)
+  const { at, normalAt, uPerYd, greenRx, greenRy } = geo
   const L = layout.length
   const par3 = layout.spec.par === 3
   const greenPt = at(L)
+  const vFrom = view[0]
   const places = useMemo(() => placeZones(layout, geo), [layout, geo])
+  const treeSize = (base: number) => clampPx(base * uPerYd, 7, 22)
 
-  // decorative groves along the map edges, kept clear of the playing corridor
+  // decorative groves flanking the corridor, anchored in world yards so they
+  // track the camera; sizes clamp so zoomed views don't grow monster trees
   const deco = useMemo(() => {
     const rng = mulberry32(fnv1a(`${layout.spec.number}:${layout.length}:deco`))
-    const corridor: Pt[] = []
-    for (let i = 0; i <= 10; i++) corridor.push(at((layout.length * i) / 10))
-    const groves: { x: number; y: number; s: number; tone: number }[] = []
-    for (let i = 0; i < 14 && groves.length < 8; i++) {
+    const groves: { yards: number; lat: number; size: number; tone: number }[] = []
+    for (let i = 0; i < 10; i++) {
       const side = i % 2 === 0 ? 1 : -1
-      const g = {
-        x: 180 + side * (135 + rng() * 60),
-        y: 46 + rng() * 440,
-        s: 9 + rng() * 8,
+      groves.push({
+        yards: rng() * (layout.length + 30),
+        lat: side * (36 + rng() * 26),
+        size: 8 + rng() * 5,
         tone: rng() < 0.5 ? 0 : 1,
-      }
-      const clear = corridor.every((p) => Math.hypot(p.x - g.x, p.y - g.y) > 96)
-      if (clear) groves.push(g)
+      })
     }
     return groves
-  }, [layout, at])
+  }, [layout])
 
   // ---- ball position (truth-anchored) ----
   const ballPt: Pt = (() => {
@@ -235,17 +280,17 @@ export function HoleMap(props: {
     if (ball.pos > L) {
       // across the green — long side
       const sideX = ball.side === 'left' ? -1 : ball.side === 'right' ? 1 : 0.6
-      return { x: greenPt.x + sideX * greenRx * 0.5, y: greenPt.y - greenRy - 9 }
+      return { x: greenPt.x + sideX * greenRx * 0.5, y: greenPt.y - greenRy - 4 * uPerYd }
     }
     if ((ball.lie === 'fringe' || ball.lie === 'sand') && ball.pos > L - 42) {
       // greenside but not in a mapped zone: sit just off the green edge
       const sideX = ball.side === 'left' ? -1 : 1
-      return { x: greenPt.x + sideX * (greenRx + 9), y: greenPt.y + greenRy * 0.45 }
+      return { x: greenPt.x + sideX * (greenRx + 4 * uPerYd), y: greenPt.y + greenRy * 0.45 }
     }
-    const off = (ball.side === 'left' ? 15 : ball.side === 'right' ? -15 : 0) * (ball.lie === 'rough' || ball.lie === 'trees' ? 1.9 : 1)
+    const offYd = (ball.side === 'left' ? 1 : ball.side === 'right' ? -1 : 0) * (ball.lie === 'rough' || ball.lie === 'trees' ? 20 : 10)
     const bn = normalAt(Math.min(ball.pos, L - 1))
     const p = at(ball.pos)
-    return { x: p.x + bn.x * off, y: p.y + bn.y * off }
+    return { x: p.x + bn.x * offYd * uPerYd, y: p.y + bn.y * offYd * uPerYd }
   })()
 
   // ---- zones ----
@@ -258,7 +303,7 @@ export function HoleMap(props: {
       return (
         <path
           key={z.id}
-          d={ribbonPath(geo, z.from, z.to, () => 64 * zoom)}
+          d={ribbonPath(geo, z.from, z.to, () => 28)}
           fill="url(#water)"
           stroke="#3a6d86"
           strokeWidth={1.5}
@@ -273,7 +318,7 @@ export function HoleMap(props: {
         const yy = z.from + ((z.to - z.from) * i) / STEPS
         const pp = at(Math.min(yy, L + 20))
         const nn = normalAt(Math.min(yy, L - 1))
-        pts.push(`${(pp.x + nn.x * sideSign * 52).toFixed(1)},${(pp.y + nn.y * sideSign * 52).toFixed(1)}`)
+        pts.push(`${(pp.x + nn.x * sideSign * 30 * uPerYd).toFixed(1)},${(pp.y + nn.y * sideSign * 30 * uPerYd).toFixed(1)}`)
       }
       const n = normalAt(Math.min((z.from + z.to) / 2, L - 1))
       const cornerX = sideSign > 0 ? (n.x > 0 ? W + 40 : -40) : n.x < 0 ? W + 40 : -40
@@ -288,21 +333,26 @@ export function HoleMap(props: {
     }
     if (z.kind === 'trees') {
       const trees = []
-      const count = Math.max(2, Math.round(span / 48))
-      for (let i = 0; i < count; i++) {
-        const yy = z.from + ((z.to - z.from) * (i + 0.5)) / count
-        const pp = at(yy)
-        const nn = normalAt(yy)
-        const wobble = ((i * 37) % 17) - 8
-        trees.push(
-          <Tree
-            key={`${z.id}-${i}`}
-            x={pp.x + nn.x * sideSign * (62 * zoom + wobble * 0.6)}
-            y={pp.y + nn.y * sideSign * (62 * zoom + wobble * 0.6) + wobble * 0.4}
-            s={(10 + ((i * 13) % 5)) * Math.min(zoom, 1.2)}
-            tone={i % 2}
-          />,
-        )
+      const from = Math.max(z.from, vFrom - 10)
+      if (z.to > from) {
+        const visSpan = z.to - from
+        const count = Math.max(2, Math.round((visSpan / span) * Math.max(2, Math.round(span / 48))))
+        for (let i = 0; i < count; i++) {
+          const yy = from + (visSpan * (i + 0.5)) / count
+          const pp = at(yy)
+          const nn = normalAt(yy)
+          const wobble = ((i * 37) % 17) - 8
+          const offYd = (yy > L - layout.greenDepth ? geo.greenRx / uPerYd : 15) + 11 + wobble * 0.5
+          trees.push(
+            <Tree
+              key={`${z.id}-${i}`}
+              x={pp.x + nn.x * sideSign * offYd * uPerYd}
+              y={pp.y + nn.y * sideSign * offYd * uPerYd + wobble * 0.4}
+              s={treeSize(9 + ((i * 13) % 4))}
+              tone={i % 2}
+            />,
+          )
+        }
       }
       return <g key={z.id}>{trees}</g>
     }
@@ -310,8 +360,8 @@ export function HoleMap(props: {
       const pp = place.anchor
       return (
         <g key={z.id} opacity={0.5}>
-          <ellipse cx={pp.x} cy={pp.y} rx={30 * zoom} ry={20 * zoom} fill="#28502f" />
-          <ellipse cx={pp.x - 14} cy={pp.y + 10} rx={18 * zoom} ry={12 * zoom} fill="#2b5433" />
+          <ellipse cx={pp.x} cy={pp.y} rx={clampPx(14 * uPerYd, 12, 40)} ry={clampPx(9 * uPerYd, 8, 27)} fill="#28502f" />
+          <ellipse cx={pp.x - 14} cy={pp.y + 10} rx={clampPx(8 * uPerYd, 8, 24)} ry={clampPx(5 * uPerYd, 5, 16)} fill="#2b5433" />
         </g>
       )
     }
@@ -337,7 +387,7 @@ export function HoleMap(props: {
   const preview =
     props.previewWindow && props.previewChoice ? (
       <path
-        d={ribbonPath(geo, props.previewWindow[0], Math.min(props.previewWindow[1], L), () => 34)}
+        d={ribbonPath(geo, Math.max(props.previewWindow[0], vFrom), Math.min(props.previewWindow[1], L), () => 14)}
         fill={previewColor(props.previewChoice)}
         opacity={0.32}
         stroke="#f4efe3"
@@ -350,7 +400,7 @@ export function HoleMap(props: {
   // the choice's real missed-green odds — the ball can finish anywhere inside it.
   const missRing = (() => {
     if (props.previewMiss == null || !props.previewChoice) return null
-    const spread = (6 + props.previewMiss * 95) * Math.min(zoom, 1.2)
+    const spread = (3 + props.previewMiss * 32) * uPerYd
     return (
       <ellipse
         cx={greenPt.x}
@@ -368,6 +418,8 @@ export function HoleMap(props: {
 
   const yardsLeft = Math.max(0, Math.round(L - ball.pos))
   const labelPt = at(Math.min(ball.pos + (L - ball.pos) / 2, L - 20))
+  const teePt = at(0)
+  const ballR = clampPx(5 * Math.sqrt(uPerYd), 4.5, 8)
 
   return (
     <svg className="holemap" viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`Hole ${layout.spec.number} map, ${yardsLeft} yards to the pin`}>
@@ -391,23 +443,25 @@ export function HoleMap(props: {
       {/* fairway / apron */}
       {!par3 && (
         <path
-          d={ribbonPath(geo, Math.max(30, layout.fairwayFrom - 60), layout.fairwayTo, (t) => (20 + 18 * Math.sin(Math.min(1, t * 1.15) * Math.PI)) * Math.min(zoom, 1.15))}
+          d={ribbonPath(geo, Math.max(Math.max(30, layout.fairwayFrom - 60), vFrom - 10), layout.fairwayTo, (t) => 13 + 8 * Math.sin(Math.min(1, t * 1.15) * Math.PI))}
           fill="#4f7d45"
           stroke="#456f3d"
           strokeWidth={2}
         />
       )}
-      {par3 && <path d={ribbonPath(geo, L * 0.62, L - 8, (t) => (10 + 10 * t) * zoom)} fill="#47713f" opacity={0.85} />}
+      {par3 && <path d={ribbonPath(geo, Math.max(L * 0.62, vFrom), L - layout.greenDepth / 2, (t) => 7 + 7 * t)} fill="#47713f" opacity={0.85} />}
 
       {/* decorative groves (behind features) */}
-      {deco.map((g, i) => (
-        <Tree key={i} x={g.x} y={g.y} s={g.s} tone={g.tone} />
-      ))}
+      {deco.map((g, i) => {
+        const p = at(g.yards)
+        const n = normalAt(Math.min(g.yards, L - 1))
+        return <Tree key={i} x={p.x + n.x * g.lat * uPerYd} y={p.y + n.y * g.lat * uPerYd} s={treeSize(g.size)} tone={g.tone} />
+      })}
 
       {zoneEls}
 
-      {/* green + fringe */}
-      <ellipse cx={greenPt.x} cy={greenPt.y} rx={greenRx + 9} ry={greenRy + 8} fill="#8fbc74" opacity={0.55} />
+      {/* green + fringe, at true scale */}
+      <ellipse cx={greenPt.x} cy={greenPt.y} rx={greenRx + clampPx(3.5 * uPerYd, 4, 12)} ry={greenRy + clampPx(3 * uPerYd, 4, 10)} fill="#8fbc74" opacity={0.55} />
       <ellipse cx={greenPt.x} cy={greenPt.y} rx={greenRx} ry={greenRy} fill="url(#mow)" stroke="#5d9049" strokeWidth={2} />
 
       {preview}
@@ -415,7 +469,7 @@ export function HoleMap(props: {
 
       {/* aim line */}
       <path
-        d={`M${ballPt.x},${ballPt.y} L${greenPt.x + 6},${greenPt.y - 2}`}
+        d={`M${ballPt.x},${ballPt.y} L${greenPt.x},${greenPt.y - 2}`}
         stroke="#e8d9a0"
         strokeWidth={1.6}
         strokeDasharray="1 7"
@@ -424,30 +478,39 @@ export function HoleMap(props: {
       />
 
       {/* flag */}
-      <g transform={`translate(${greenPt.x + 6}, ${greenPt.y - 2})`}>
+      <g transform={`translate(${greenPt.x}, ${greenPt.y - 2})`}>
         <line x1="0" y1="0" x2="0" y2="-30" stroke="#26301f" strokeWidth={2.4} />
         <path d="M0,-30 L18,-24 L0,-18 Z" fill="#c05b4d" />
         <ellipse cx="0" cy="1.5" rx="4.5" ry="2" fill="#1d2b20" opacity={0.7} />
       </g>
 
-      {/* tee box */}
-      <g opacity={0.95}>
-        <rect x={tee.x - 16} y={tee.y - 8} width={32} height={18} rx={5} fill="#3f6a3e" stroke="#345c35" />
-        <circle cx={tee.x - 7} cy={tee.y + 1} r={3.2} fill="#e8e2cf" stroke="#3c5a41" />
-        <circle cx={tee.x + 7} cy={tee.y + 1} r={3.2} fill="#e8e2cf" stroke="#3c5a41" />
-      </g>
+      {/* tee box, only while it's in frame */}
+      {vFrom < 8 && (
+        <g opacity={0.95}>
+          <rect x={teePt.x - 16} y={teePt.y - 10} width={32} height={18} rx={5} fill="#3f6a3e" stroke="#345c35" />
+          <circle cx={teePt.x - 7} cy={teePt.y - 1} r={3.2} fill="#e8e2cf" stroke="#3c5a41" />
+          <circle cx={teePt.x + 7} cy={teePt.y - 1} r={3.2} fill="#e8e2cf" stroke="#3c5a41" />
+        </g>
+      )}
 
       {/* ball */}
       {ball.lie !== 'green' && ball.pos > 0 && (
         <g className="ballwrap">
-          <ellipse cx={ballPt.x + 1.5} cy={ballPt.y + 2.5} rx={5.5 * Math.min(zoom, 1.2)} ry={3 * Math.min(zoom, 1.2)} fill="#101f15" opacity={0.4} />
-          <circle className="ball" cx={ballPt.x} cy={ballPt.y} r={5 * Math.min(zoom, 1.2)} fill="#ffffff" stroke="#26301f" strokeWidth={2} />
+          <ellipse cx={ballPt.x + 1.5} cy={ballPt.y + 2.5} rx={ballR * 1.1} ry={ballR * 0.6} fill="#101f15" opacity={0.4} />
+          <circle className="ball" cx={ballPt.x} cy={ballPt.y} r={ballR} fill="#ffffff" stroke="#26301f" strokeWidth={2} />
         </g>
+      )}
+      {ball.lie !== 'green' && ball.pos <= 0 && (
+        <circle className="ball" cx={teePt.x} cy={teePt.y - 1} r={5} fill="#ffffff" stroke="#26301f" strokeWidth={2} />
       )}
 
       {/* yards-left badge */}
       {yardsLeft > 0 && (
-        <g transform={`translate(${Math.max(40, Math.min(W - 40, labelPt.x + 34))}, ${labelPt.y})`}>
+        <g
+          transform={`translate(${Math.max(40, Math.min(W - 40, labelPt.x + 34))}, ${
+            yardsLeft <= 35 ? labelPt.y - 30 : labelPt.y // short shots: float above so the ball stays visible
+          })`}
+        >
           <rect x={-26} y={-11} width={52} height={22} rx={11} fill="#1d2b20" opacity={0.78} />
           <text x={0} y={4.5} textAnchor="middle" fill="#f4efe3" fontSize={12.5} fontWeight={700}>
             {yardsLeft} yd

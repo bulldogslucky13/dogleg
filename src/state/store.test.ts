@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { COURSES } from '../engine/courses'
-import type { HoleScore } from '../engine/types'
+import { shareText, SITE_URL, type DailySetup } from '../engine/daily'
+import type { HoleResult, HoleScore } from '../engine/types'
 import { buildRecap, characterRecords, type HistoryEntry, type RoundState } from './store'
 
 const entry = (over: Partial<HistoryEntry>): HistoryEntry => ({
@@ -10,6 +11,43 @@ const entry = (over: Partial<HistoryEntry>): HistoryEntry => ({
   toPar: 0,
   results: Array(18).fill('par'),
   ...over,
+})
+
+describe('shareText (Break Par card format)', () => {
+  const course = COURSES[0]
+  const par = course.holes.reduce((s, h) => s + h.par, 0)
+  const setup: DailySetup = {
+    course,
+    cond: { wind: 10, greens: 'Medium', difficulty: 5 },
+    seed: 's',
+    puzzleNumber: 18,
+    dateKey: '2026-07-18',
+  }
+  const results: HoleResult[] = [
+    'birdie', 'par', 'double', 'par', 'bogey', 'birdie', 'birdie', 'bogey', 'par',
+    'par', 'birdie', 'birdie', 'birdie', 'par', 'bogey', 'bogey', 'par', 'birdie',
+  ]
+
+  it('mirrors the original layout with the character in the rank slot', () => {
+    const lines = shareText(setup, results, -1, 'fairway').split('\n')
+    expect(lines[0]).toBe('DOGLEG #18 ⛳')
+    expect(lines[1]).toBe(`${course.name} (Par ${par})`)
+    expect(lines[2]).toBe(`${par - 1} (-1)`)
+    expect(lines[3]).toBe('')
+    expect([...lines[4]]).toHaveLength(9) // spread: emoji are multi-unit in .length
+    expect([...lines[5]]).toHaveLength(9)
+    expect(lines[6]).toBe('💣 Fairway Finder')
+    expect(lines[7]).toBe('')
+    expect(lines[8]).toBe('🐦 7  ·  ⛳ 6  ·  😬 5')
+    expect(lines[9]).toBe(SITE_URL)
+  })
+
+  it('omits the character line for pre-character rounds', () => {
+    const lines = shareText(setup, results, -1).split('\n')
+    expect([...lines[5]]).toHaveLength(9)
+    expect(lines[6]).toBe('')
+    expect(lines[7]).toBe('🐦 7  ·  ⛳ 6  ·  😬 5')
+  })
 })
 
 describe('characterRecords', () => {

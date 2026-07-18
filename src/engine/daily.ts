@@ -94,16 +94,27 @@ export function toParLabel(toPar: number): string {
 /** Shown in share text — update when the final domain is decided. */
 export const SITE_URL = 'dogleg.cameronbristol.xyz'
 
+/** Share card in the classic Break Par format, with the character in the rank line's slot. */
 export function shareText(setup: DailySetup, results: HoleResult[], toPar: number, character?: CharacterId): string {
   const rows: string[] = []
   for (let i = 0; i < 18; i += 9) {
     rows.push(results.slice(i, i + 9).map((r) => RESULT_SQUARE[r]).join(''))
   }
+  const par = setup.course.holes.reduce((s, h) => s + h.par, 0)
   const char = characterById(character)
-  const verdict = toPar < 0 ? 'Broke par 🏆' : toPar === 0 ? 'Level with the course' : 'The course won'
-  const scoreLine = [toParLabel(toPar), verdict, char ? `${char.emoji} ${char.name}` : null]
-    .filter(Boolean)
-    .join(' · ')
-  // blank lines keep the card readable in iMessage/WhatsApp previews
-  return [`Dogleg No. ${setup.puzzleNumber} · ${setup.course.name}`, scoreLine, '', rows[0], rows[1], '', SITE_URL].join('\n')
+  const birdies = results.filter((r) => r === 'albatross' || r === 'eagle' || r === 'birdie').length
+  const pars = results.filter((r) => r === 'par').length
+  const overs = results.length - birdies - pars
+  return [
+    `DOGLEG #${setup.puzzleNumber} ⛳`,
+    `${setup.course.name} (Par ${par})`,
+    `${par + toPar} (${toParLabel(toPar)})`,
+    '',
+    rows[0],
+    rows[1],
+    ...(char ? [`${char.emoji} ${char.name}`] : []),
+    '',
+    `🐦 ${birdies}  ·  ⛳ ${pars}  ·  😬 ${overs}`,
+    SITE_URL,
+  ].join('\n')
 }

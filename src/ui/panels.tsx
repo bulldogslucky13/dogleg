@@ -170,7 +170,12 @@ export function ContextChips(props: { hole: HoleInPlay }) {
   const spec = layout.spec
   const chips: string[] = []
   const m = pressure(spec.strokeIndex, spec.par, cond)
-  chips.push(m < 0.34 ? 'Gettable — green light' : m < 0.6 ? 'Pick your moment' : 'Card-wrecker — respect it')
+  const tier =
+    m < 0.34
+      ? { cls: 'good', text: 'Gettable — green light' }
+      : m < 0.6
+        ? { cls: 'warn', text: 'Pick your moment' }
+        : { cls: 'bad', text: 'Card-wrecker — respect it' }
   if (spec.strokeIndex <= 4) chips.push(`Signature test · SI ${spec.strokeIndex}`)
 
   // geometry-honest hazard chips: only what is actually still in front of the ball
@@ -188,12 +193,18 @@ export function ContextChips(props: { hole: HoleInPlay }) {
   else if (cond.wind >= 12) chips.push(`Breezy · ${cond.wind} mph`)
   if (cond.greens === 'Fast' || cond.greens === 'Firm') chips.push('Slick greens')
   return (
-    <div className="chips">
-      {chips.slice(0, 4).map((c) => (
-        <span key={c} className="chip">
-          {c}
-        </span>
-      ))}
+    <div className="context">
+      <div className={`tier-banner ${tier.cls}`}>
+        <span className="tier-dot" />
+        {tier.text}
+      </div>
+      <div className="chips center">
+        {chips.slice(0, 3).map((c) => (
+          <span key={c} className="chip">
+            {c}
+          </span>
+        ))}
+      </div>
     </div>
   )
 }

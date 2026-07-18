@@ -333,6 +333,53 @@ button {
     cy 0.65s cubic-bezier(0.25, 0.8, 0.35, 1);
 }
 
+.context {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.tier-banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  width: 100%;
+  padding: 13px 14px;
+  border-radius: 12px;
+  font-size: 0.82rem;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  border: 1.5px solid transparent;
+}
+
+.tier-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: currentColor;
+  flex-shrink: 0;
+}
+
+.tier-banner.good {
+  background: #ddedd2;
+  color: #2e6329;
+  border-color: #b9d6a8;
+}
+
+.tier-banner.warn {
+  background: #f5e9c5;
+  color: #8a6a10;
+  border-color: #e0cd94;
+}
+
+.tier-banner.bad {
+  background: #f5dcd5;
+  color: #a33f30;
+  border-color: #e4b7ab;
+}
+
 .status {
   display: flex;
   gap: 10px;

@@ -1,20 +1,31 @@
 # ⛳ Dogleg
 
 **A daily golf strategy game.** One course a day, 18 holes, about 2 minutes a round.
-Every shot is one choice — Safe, Normal, or Aggressive — and every choice honestly
-shifts your odds. You get 8 aggressive plays per round. Spend them well and you might
-break par; the course wins most days.
+Pick your player, then every shot is one choice — Safe, Normal, or Aggressive — and
+every choice honestly shifts your odds. You get 8 aggressive plays per round. Spend
+them well and you might break par; the course wins most days.
 
 What makes Dogleg different from games like it:
 
+- **Pick your player.** Before the round you choose one of three playstyles — the
+  **Fairway Finder** (length + accuracy off the tee), the **Dart Thrower** (approach
+  accuracy), or the **Greens Keeper** (putting). Each is a real ~1-stroke-per-round
+  edge, balance-verified by Monte Carlo tests and *never* a cheat code — and when your
+  edge actually changes a shot's outcome, the game tells you, with the honest number.
 - **Safe means safe.** Playing safe caps your blow-up risk no matter how hard the hole
   is. Bad conditions cost you position (rough, longer putts) — never a snowman.
 - **The odds never lie.** Every hole has real geometry. If the pond is behind your
   ball, your water risk is 0% — the map, the odds bars, and the dice all share one
-  model, and you see your odds *before* you commit.
+  model, and you see your odds *before* you commit. Your character shifts those same
+  odds, so the bars you see already include your edge.
 - **Real sand play.** Fairway traps are a distance problem; greenside traps are an
   escape problem, with a real (small) chance you leave it in the bunker or fly the
   green entirely.
+- **49 courses.** Real championship layouts — Pebble Beach, St Andrews, Augusta,
+  Oakmont, Pine Valley, TPC Sawgrass and more — plus a handful of originals. A new one
+  is the daily; all are playable as practice rounds.
+- **Two ways to see it.** A modern top-down map or a classic side-profile view, toggled
+  any time mid-round — both driven by the same honest odds.
 
 ---
 
@@ -66,8 +77,16 @@ pnpm build      # type-check + production build to dist/
 ```
 
 - Pure-TypeScript game engine in `src/engine/` — the UI never rolls its own dice.
+  `odds.ts` is the single source of truth; `resolve.ts` runs the stage machine;
+  `characters.ts` holds the three playstyles and their buff tables; `advantage.ts`
+  detects when a character measurably helped a shot (by re-scoring it without the
+  character); `courses.ts` is the 49-course library.
 - Daily seed = local date; round state persists to localStorage, so refreshing can't
   re-roll a shot.
+- Tests (`pnpm test`) enforce the design contract: odds always sum to 1, geometry
+  honesty (no water risk once you're past the water), safe-is-safe, and Monte Carlo
+  calibration for both the base policies **and** each character (~1 stroke of edge,
+  none dominant, no stat-padding the game into a birdie-fest).
 - Design docs: [docs/DESIGN.md](docs/DESIGN.md) ·
   [docs/REVERSE-ENGINEERING.md](docs/REVERSE-ENGINEERING.md)
 

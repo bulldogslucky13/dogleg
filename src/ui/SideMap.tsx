@@ -11,31 +11,39 @@ function groundY(x: number): number {
   return (1 - t) * (1 - t) * 102 + 2 * (1 - t) * t * 112 + t * t * 96
 }
 
-function Zone(props: { zone: HazardZone; xFor: (yards: number) => number; behind: boolean }) {
-  const { zone, xFor, behind } = props
-  const midX = Math.min(X1 - 24, (xFor(zone.from) + xFor(zone.to)) / 2)
+/**
+ * Drawn x for a zone, at its honest yardage. Cross features clamp short of the
+ * green's front edge so nothing on the strip can hide under the green.
+ */
+function zoneX(zone: HazardZone, xFor: (yards: number) => number, greenFrontX: number): number {
+  const mid = (xFor(zone.from) + xFor(zone.to)) / 2
+  return zone.side === 'cross' ? Math.min(mid, greenFrontX - 8) : Math.min(X1 - 10, mid)
+}
+
+function Zone(props: { zone: HazardZone; cx: number; xFor: (yards: number) => number; behind: boolean }) {
+  const { zone, cx, xFor, behind } = props
   const rx = Math.max(13, Math.min(34, (xFor(zone.to) - xFor(zone.from)) / 2))
-  const gy = groundY(midX)
-  // no exact geometry shown — hazards sit alongside the strip, crossing water sits on it
+  const gy = groundY(cx)
+  // no exact lateral geometry shown — hazards sit alongside the strip, crossing water sits on it
   const above = zone.side === 'left'
   const y = zone.side === 'cross' ? gy + 6 : above ? gy - 15 : gy + 26
   const opacity = behind ? 0.3 : 1
   switch (zone.kind) {
     case 'bunker':
-      return <ellipse cx={midX} cy={y} rx={rx} ry={6.5} fill="#e3cd96" stroke="#cdb478" strokeWidth={1} opacity={opacity} />
+      return <ellipse cx={cx} cy={y} rx={rx} ry={6.5} fill="#e3cd96" stroke="#cdb478" strokeWidth={1} opacity={opacity} />
     case 'water':
-      return <ellipse cx={midX} cy={y} rx={Math.max(rx, 18)} ry={7.5} fill="#6fa3c0" stroke="#59869f" strokeWidth={1} opacity={opacity} />
+      return <ellipse cx={cx} cy={y} rx={Math.max(rx, 18)} ry={7.5} fill="#6fa3c0" stroke="#59869f" strokeWidth={1} opacity={opacity} />
     case 'ocean':
-      return <ellipse cx={midX} cy={Math.max(y, gy + 26)} rx={Math.max(rx, 40)} ry={9} fill="#5d96b5" stroke="#4b7e99" strokeWidth={1} opacity={opacity} />
+      return <ellipse cx={cx} cy={Math.max(y, gy + 26)} rx={Math.max(rx, 40)} ry={9} fill="#5d96b5" stroke="#4b7e99" strokeWidth={1} opacity={opacity} />
     case 'trees':
       return (
         <g opacity={opacity}>
-          <circle cx={midX - 7} cy={y} r={7} fill="#375c3e" />
-          <circle cx={midX + 6} cy={y + 2} r={5.5} fill="#2f5136" />
+          <circle cx={cx - 7} cy={y} r={7} fill="#375c3e" />
+          <circle cx={cx + 6} cy={y + 2} r={5.5} fill="#2f5136" />
         </g>
       )
     case 'deeprough':
-      return <ellipse cx={midX} cy={y} rx={rx} ry={5} fill="#6d8a4e" opacity={opacity * 0.9} />
+      return <ellipse cx={cx} cy={y} rx={rx} ry={5} fill="#6d8a4e" opacity={opacity * 0.9} />
     default:
       return null
   }
@@ -46,9 +54,15 @@ export function SideMap(props: { layout: HoleLayout; ball: BallState }) {
   const { layout, ball } = props
   const L = layout.length
   const xFor = (yards: number) => X0 + Math.max(0, Math.min(1, yards / L)) * (X1 - X0)
-  const ballX = xFor(ball.pos)
-  const greenX = X1 - 14
+  const greenX = X1 - 6
+  // honest green width: its real depth in yards on the same scale as the strip
+  const greenRx = Math.max(8, Math.min(34, ((layout.greenDepth / 2) / L) * (X1 - X0)))
+  const greenFrontX = greenX - greenRx
   const gy = groundY(greenX)
+
+  // a ball sitting in a mapped hazard anchors to where that hazard is drawn
+  const ballZone = ball.zoneId ? layout.zones.find((z) => z.id === ball.zoneId) : undefined
+  const ballX = ballZone ? zoneX(ballZone, xFor, greenFrontX) : xFor(ball.pos)
   const by = groundY(ballX)
   const yardsLeft = Math.max(0, Math.round(L - ball.pos))
   const labelX = Math.max(X0 + 40, Math.min(X1 - 60, (ballX + greenX) / 2))
@@ -77,17 +91,17 @@ export function SideMap(props: { layout: HoleLayout; ball: BallState }) {
       {/* ground strip */}
       <path d={strip} fill="#4a7a44" stroke="#3f6b3b" strokeWidth={1.5} strokeLinejoin="round" />
 
-      {/* hazards, at their honest yardage — dimmed once they're behind the ball */}
-      {layout.zones.map((z) => (
-        <Zone key={z.id} zone={z} xFor={xFor} behind={z.to < ball.pos - 2} />
-      ))}
-
-      {/* green + flag */}
-      <ellipse cx={greenX} cy={gy + 4} rx={22} ry={8.5} fill="#2f5b3c" />
+      {/* green + flag, under the hazards so nothing can hide beneath the putting surface */}
+      <ellipse cx={greenX} cy={gy + 4} rx={greenRx} ry={8.5} fill="#2f5b3c" />
       <g transform={`translate(${greenX}, ${gy + 1})`}>
         <line x1="0" y1="0" x2="0" y2="-30" stroke="#26301f" strokeWidth={2.2} />
         <path d="M0,-30 L16,-24.5 L0,-19 Z" fill="#c05b4d" />
       </g>
+
+      {/* hazards, at their honest yardage — dimmed once they're behind the ball */}
+      {layout.zones.map((z) => (
+        <Zone key={z.id} zone={z} cx={zoneX(z, xFor, greenFrontX)} xFor={xFor} behind={z.to < ball.pos - 2} />
+      ))}
 
       {/* tee marker */}
       <ellipse cx={X0 + 5} cy={groundY(X0 + 5) + 2} rx={8} ry={4.5} fill="#2f5b3c" />

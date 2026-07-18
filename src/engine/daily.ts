@@ -1,6 +1,7 @@
+import { characterById } from './characters'
 import { COURSES } from './courses'
 import { rngFromString } from './rng'
-import type { Conditions, CourseSpec, Greens, HoleResult } from './types'
+import type { CharacterId, Conditions, CourseSpec, Greens, HoleResult } from './types'
 
 /** Daily No. 1 */
 export const EPOCH = { y: 2026, m: 7, d: 1 }
@@ -93,12 +94,14 @@ export function toParLabel(toPar: number): string {
 /** Shown in share text — update when the final domain is decided. */
 export const SITE_URL = 'dogleg.cameronbristol.xyz'
 
-export function shareText(setup: DailySetup, results: HoleResult[], toPar: number): string {
+export function shareText(setup: DailySetup, results: HoleResult[], toPar: number, character?: CharacterId): string {
   const rows: string[] = []
   for (let i = 0; i < 18; i += 9) {
     rows.push(results.slice(i, i + 9).map((r) => RESULT_SQUARE[r]).join(''))
   }
   const head = `Dogleg No. ${setup.puzzleNumber} · ${setup.course.name} · ${toParLabel(toPar)}`
+  const char = characterById(character)
+  const charLine = char ? `\n${char.emoji} ${char.name}` : ''
   const verdict = toPar < 0 ? 'Broke par 🏆' : toPar === 0 ? 'Level with the course' : 'The course won today'
-  return `${head}\n${rows.join('\n')}\n${verdict}\n${SITE_URL}`
+  return `${head}${charLine}\n${rows.join('\n')}\n${verdict}\n${SITE_URL}`
 }

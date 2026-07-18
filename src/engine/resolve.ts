@@ -1,5 +1,6 @@
 import type {
   BallState,
+  CharacterId,
   Choice,
   Conditions,
   HoleLayout,
@@ -18,6 +19,8 @@ import { approachOdds, longOdds, puttOdds, shortOdds, type ApproachMode, type Zo
 export interface HoleInPlay {
   layout: HoleLayout
   cond: Conditions
+  /** round-long playstyle; shifts the odds the whole model sees */
+  character?: CharacterId
   stage: Stage
   ball: BallState
   strokes: number
@@ -28,10 +31,11 @@ export interface HoleInPlay {
   score?: HoleScore
 }
 
-export function startHole(layout: HoleLayout, cond: Conditions): HoleInPlay {
+export function startHole(layout: HoleLayout, cond: Conditions, character?: CharacterId): HoleInPlay {
   return {
     layout,
     cond,
+    character,
     stage: layout.spec.par === 3 ? 'approach' : 'tee',
     ball: { pos: 0, lie: 'tee', side: 'center' },
     strokes: 0,
@@ -54,15 +58,15 @@ function approachMode(h: HoleInPlay): ApproachMode {
 export function oddsFor(h: HoleInPlay, choice: Choice): Odds {
   switch (h.stage) {
     case 'tee':
-      return longOdds(h.layout, h.cond, h.ball, choice, 'tee').odds
+      return longOdds(h.layout, h.cond, h.ball, choice, 'tee', h.character).odds
     case 'second':
       return choice === 'aggressive'
-        ? approachOdds(h.layout, h.cond, h.ball, choice, 'go').odds
-        : longOdds(h.layout, h.cond, h.ball, choice, 'layup').odds
+        ? approachOdds(h.layout, h.cond, h.ball, choice, 'go', h.character).odds
+        : longOdds(h.layout, h.cond, h.ball, choice, 'layup', h.character).odds
     case 'approach':
-      return approachOdds(h.layout, h.cond, h.ball, choice, approachMode(h)).odds
+      return approachOdds(h.layout, h.cond, h.ball, choice, approachMode(h), h.character).odds
     case 'putt':
-      return puttOdds(h.cond, h.ball.puttFeet ?? 20, choice)
+      return puttOdds(h.cond, h.ball.puttFeet ?? 20, choice, h.character)
     case 'shortgame':
       return shortOdds(h.layout, h.cond, h.ball, choice)
     default:
@@ -152,7 +156,7 @@ export function playShot(h: HoleInPlay, choice: Choice, rng: Rng): HoleInPlay {
         return h
       }
       const mode = h.stage === 'tee' ? 'tee' : 'layup'
-      const detail = longOdds(h.layout, h.cond, h.ball, choice, mode)
+      const detail = longOdds(h.layout, h.cond, h.ball, choice, mode, h.character)
       const o = detail.odds
       const bucket = pickWeighted(rng, {
         dialed: o.dialed,
@@ -216,7 +220,7 @@ export function playShot(h: HoleInPlay, choice: Choice, rng: Rng): HoleInPlay {
     }
 
     case 'putt': {
-      const o = puttOdds(h.cond, h.ball.puttFeet ?? 20, choice)
+      const o = puttOdds(h.cond, h.ball.puttFeet ?? 20, choice, h.character)
       const bucket = pickWeighted(rng, { one: o.one, two: o.two, three: o.three })
       const putts = bucket === 'one' ? 1 : bucket === 'two' ? 2 : 3
       h.strokes += putts
@@ -336,7 +340,7 @@ function resolveApproach(
   mode: ApproachMode,
 ): void {
   const L = h.layout.length
-  const detail = approachOdds(h.layout, h.cond, h.ball, choice, mode)
+  const detail = approachOdds(h.layout, h.cond, h.ball, choice, mode, h.character)
   const o = detail.odds
   const bucket = pickWeighted(rng, {
     holeout: o.holeout,

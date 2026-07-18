@@ -1,5 +1,8 @@
 export type Choice = 'safe' | 'normal' | 'aggressive'
 
+/** Round-long playstyle picked at the first tee. */
+export type CharacterId = 'fairway' | 'dart' | 'greens'
+
 export type Dogleg = 'L' | 'R' | 'S'
 
 /** Hazard personality of a hole used by the generator. */

@@ -2,7 +2,7 @@ import { buildLayout } from '../engine/layout'
 import { dailySetup, practiceSetup, localDateKey, type DailySetup } from '../engine/daily'
 import { startHole, playShot, type HoleInPlay } from '../engine/resolve'
 import { rngFromString, skip, type Rng } from '../engine/rng'
-import type { Choice, Conditions, HoleResult, HoleScore, Stage } from '../engine/types'
+import type { CharacterId, Choice, Conditions, HoleResult, HoleScore, Stage } from '../engine/types'
 import { courseBySlug } from '../engine/courses'
 
 export const AGGRESSIVE_BUDGET = 8
@@ -12,6 +12,8 @@ export interface RoundState {
   seed: string
   courseSlug: string
   cond: Conditions
+  /** playstyle picked at the first tee; optional so pre-feature saves keep working */
+  character?: CharacterId
   puzzleNumber: number
   dateKey: string
   currentHole: number
@@ -38,6 +40,7 @@ export interface HistoryEntry {
   courseSlug: string
   toPar: number
   results: HoleResult[]
+  character?: CharacterId
 }
 
 const ROUND_KEY = 'bp:round:v1'
@@ -45,15 +48,16 @@ const HISTORY_KEY = 'bp:history:v1'
 
 // ---------------------------------------------------------------------------
 
-export function newRound(setup: DailySetup, mode: 'daily' | 'practice'): RoundState {
+export function newRound(setup: DailySetup, mode: 'daily' | 'practice', character?: CharacterId): RoundState {
   const course = setup.course
   const layout = buildLayout(course.slug, course.holes[0])
-  const hole = startHole(layout, setup.cond)
+  const hole = startHole(layout, setup.cond, character)
   return {
     mode,
     seed: setup.seed,
     courseSlug: course.slug,
     cond: setup.cond,
+    character,
     puzzleNumber: setup.puzzleNumber,
     dateKey: setup.dateKey,
     currentHole: 0,
@@ -65,12 +69,12 @@ export function newRound(setup: DailySetup, mode: 'daily' | 'practice'): RoundSt
   }
 }
 
-export function startDailyRound(): RoundState {
-  return newRound(dailySetup(), 'daily')
+export function startDailyRound(character?: CharacterId): RoundState {
+  return newRound(dailySetup(), 'daily', character)
 }
 
-export function startPracticeRound(slug: string): RoundState {
-  return newRound(practiceSetup(slug, `${Date.now()}`), 'practice')
+export function startPracticeRound(slug: string, character?: CharacterId): RoundState {
+  return newRound(practiceSetup(slug, `${Date.now()}`), 'practice', character)
 }
 
 function serializeHole(h: HoleInPlay): SerializedHole {
@@ -90,9 +94,9 @@ export function holeInPlay(state: RoundState): HoleInPlay {
   const course = courseBySlug(state.courseSlug)!
   const spec = course.holes[state.currentHole]
   const layout = buildLayout(course.slug, spec)
-  const s = state.hole ?? serializeHole(startHole(layout, state.cond))
+  const s = state.hole ?? serializeHole(startHole(layout, state.cond, state.character))
   // clone mutable pieces: playShot mutates, and React may re-run state updaters
-  return { layout, cond: state.cond, ...s, ball: { ...s.ball }, shots: [...s.shots] }
+  return { layout, cond: state.cond, character: state.character, ...s, ball: { ...s.ball }, shots: [...s.shots] }
 }
 
 function roundRng(state: RoundState): { rng: Rng; consumed: () => number } {
@@ -141,7 +145,7 @@ export function advanceHole(state: RoundState): RoundState {
   const course = courseBySlug(state.courseSlug)!
   const idx = state.currentHole + 1
   const layout = buildLayout(course.slug, course.holes[idx])
-  const hole = startHole(layout, state.cond)
+  const hole = startHole(layout, state.cond, state.character)
   return { ...state, currentHole: idx, hole: serializeHole(hole) }
 }
 
@@ -196,6 +200,7 @@ export function recordResult(state: RoundState): HistoryEntry[] {
     courseSlug: state.courseSlug,
     toPar: roundToPar(state),
     results: state.scores.map((s) => s?.result ?? 'triple'),
+    character: state.character,
   }
   const next = [...history, entry].sort((a, b) => a.dateKey.localeCompare(b.dateKey))
   try {

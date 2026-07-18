@@ -163,6 +163,15 @@ export type HoleResult =
   | 'double'
   | 'triple'
 
+/** A moment where the round-long character measurably improved this shot's outcome. */
+export interface CharacterAdvantage {
+  id: CharacterId
+  title: string
+  note: string
+  /** the honest edge, e.g. "+9% to find the short grass" */
+  stat: string
+}
+
 export interface ShotRecord {
   stage: Stage
   choice: Choice
@@ -173,6 +182,8 @@ export interface ShotRecord {
   faced: Record<Choice, { summary: OddsSummary; odds: Odds }>
   /** ball position after the shot */
   after: BallState
+  /** set when the character's edge actually helped this outcome */
+  advantage?: CharacterAdvantage
 }
 
 export interface HoleScore {

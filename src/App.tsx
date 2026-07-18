@@ -3,7 +3,7 @@ import { characterById } from './engine/characters'
 import { courseBySlug } from './engine/courses'
 import { dailySetup, localDateKey, practiceSetup, toParLabel, type DailySetup } from './engine/daily'
 import { longOdds } from './engine/odds'
-import type { CharacterId, Choice } from './engine/types'
+import type { CharacterAdvantage, CharacterId, Choice } from './engine/types'
 import {
   advanceHole,
   applyChoice,
@@ -46,7 +46,10 @@ export default function App() {
   /** which result the result view shows — the daily card or a finished practice round */
   const [resultFor, setResultFor] = useState<'daily' | 'practice'>('daily')
   const [animating, setAnimating] = useState(false)
+  const [splash, setSplash] = useState<CharacterAdvantage | null>(null)
+  const [splashKey, setSplashKey] = useState(0)
   const animTimer = useRef<number | null>(null)
+  const splashTimer = useRef<number | null>(null)
 
   useEffect(() => {
     saveRound(round)
@@ -55,6 +58,7 @@ export default function App() {
   useEffect(
     () => () => {
       if (animTimer.current) window.clearTimeout(animTimer.current)
+      if (splashTimer.current) window.clearTimeout(splashTimer.current)
     },
     [],
   )
@@ -184,7 +188,20 @@ export default function App() {
     if (choice === 'aggressive' && usesBudget(hole.stage) && round.aggressiveLeft <= 0) return
     setAnimating(true)
     setSelected(null)
-    setRound((r) => (r ? applyChoice(r, choice) : r))
+    setSplash(null)
+    const nextRound = applyChoice(round, choice)
+    setRound(nextRound)
+    const shots = nextRound.hole?.shots ?? []
+    const adv = shots[shots.length - 1]?.advantage
+    if (adv) {
+      // let the ball settle, then splash the earned edge
+      if (splashTimer.current) window.clearTimeout(splashTimer.current)
+      splashTimer.current = window.setTimeout(() => {
+        setSplash(adv)
+        setSplashKey((k) => k + 1)
+        splashTimer.current = window.setTimeout(() => setSplash(null), 4200)
+      }, 520)
+    }
     animTimer.current = window.setTimeout(() => setAnimating(false), 700)
   }
 
@@ -197,6 +214,7 @@ export default function App() {
   }
 
   const next = () => {
+    setSplash(null)
     const after = advanceHole(round)
     setRound(after)
     setSelected(null)
@@ -260,6 +278,16 @@ export default function App() {
         {!holeDone && (
           <div className="map-overlay top">
             {hole.shots.length === 0 && hole.stage !== 'putt' ? <TierBanner hole={hole} /> : <StatusBanner hole={hole} />}
+          </div>
+        )}
+        {splash && (
+          <div key={splashKey} className={`advantage-splash ${splash.id}`} role="status">
+            <CharacterAvatar id={splash.id} size={34} />
+            <div className="advantage-text">
+              <b>{splash.title}</b>
+              <span>{splash.note}</span>
+              <em>{splash.stat}</em>
+            </div>
           </div>
         )}
         {!holeDone && (

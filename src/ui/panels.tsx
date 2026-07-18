@@ -260,6 +260,11 @@ export function OddsRecap(props: { score: HoleScore; par: number }) {
             {BUCKET_COPY[shot.outcome] ?? shot.outcome}
             {shot.penalty ? ' (+1 penalty)' : ''}
           </div>
+          {shot.advantage && (
+            <div className={`recap-advantage ${shot.advantage.id}`}>
+              ★ {shot.advantage.title} · {shot.advantage.stat}
+            </div>
+          )}
           {(['safe', 'normal', 'aggressive'] as Choice[]).map((c) => {
             const f = shot.faced[c]
             return (

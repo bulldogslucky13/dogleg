@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import posthog from 'posthog-js'
 import { courseBySlug } from './engine/courses'
 import { dailySetup, localDateKey, practiceSetup, toParLabel, type DailySetup } from './engine/daily'
 import { longOdds } from './engine/odds'
@@ -67,13 +68,26 @@ export default function App() {
         hasActiveRound={!!round && !round.complete}
         playedToday={playedToday}
         onTeeOff={() => {
-          setRound(startDailyRound())
+          const r = startDailyRound()
+          posthog.capture('daily_round_started', {
+            course: r.courseSlug,
+            puzzle_number: r.puzzleNumber,
+            wind: r.cond.wind,
+            greens: r.cond.greens,
+            difficulty: r.cond.difficulty,
+          })
+          setRound(r)
           setSelected(null)
           setView('play')
         }}
-        onResume={() => setView('play')}
+        onResume={() => {
+          posthog.capture('round_resumed')
+          setView('play')
+        }}
         onPractice={(slug) => {
-          setRound(startPracticeRound(slug))
+          const r = startPracticeRound(slug)
+          posthog.capture('practice_round_started', { course: slug })
+          setRound(r)
           setSelected(null)
           setView('play')
         }}
@@ -148,6 +162,12 @@ export default function App() {
     if (after.complete) {
       const h = recordResult(after)
       setHistory(h)
+      posthog.capture('round_completed', {
+        mode: after.mode,
+        course: after.courseSlug,
+        puzzle_number: after.puzzleNumber,
+        to_par: roundToPar(after),
+      })
       setView('result')
     }
   }

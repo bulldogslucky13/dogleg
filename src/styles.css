@@ -72,6 +72,28 @@ button {
 
 /* ---------- Home ---------- */
 
+.masthead-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.how-to-play {
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(29, 43, 32, 0.55);
+  border: 1.5px solid var(--line);
+  border-radius: 999px;
+  padding: 4px 12px;
+}
+
+.how-to-play:active {
+  transform: scale(0.97);
+}
+
 .masthead h1 {
   font-size: 3.2rem;
   line-height: 0.95;
@@ -920,6 +942,154 @@ button {
   border-radius: 12px;
   padding: 12px 10px;
   color: rgba(29, 43, 32, 0.85);
+}
+
+/* ---------- first-run tutorial ---------- */
+
+.tut-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+  background: rgba(20, 42, 28, 0.62);
+  backdrop-filter: blur(3px);
+  animation: tut-fade 0.2s ease both;
+}
+
+.tut-card {
+  position: relative;
+  width: 100%;
+  max-width: 420px;
+  background: var(--paper);
+  border-radius: 18px;
+  padding: 24px 20px 20px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  animation: tut-rise 0.28s cubic-bezier(0.2, 1.1, 0.4, 1) both;
+}
+
+.tut-skip {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(29, 43, 32, 0.5);
+}
+
+.tut-title {
+  font-size: 1.6rem;
+  font-weight: 900;
+  line-height: 1.05;
+}
+
+.tut-body {
+  font-size: 0.98rem;
+  line-height: 1.5;
+  color: rgba(29, 43, 32, 0.85);
+  min-height: 132px;
+}
+
+.tut-bar {
+  display: flex;
+  height: 10px;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  margin-top: 12px;
+}
+
+.tut-bar .seg {
+  display: block;
+  height: 100%;
+}
+
+.tut-players {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 14px 0;
+  text-align: center;
+}
+
+.tut-players > span {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  flex: 1;
+}
+
+.tut-players em {
+  font-style: normal;
+  font-weight: 800;
+  font-size: 0.76rem;
+}
+
+.tut-players small {
+  font-size: 0.68rem;
+  color: rgba(29, 43, 32, 0.6);
+}
+
+.tut-dots {
+  display: flex;
+  justify-content: center;
+  gap: 7px;
+}
+
+.tut-dots span {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--line);
+  transition: background 0.15s ease;
+}
+
+.tut-dots span.on {
+  background: var(--ink);
+}
+
+.tut-nav {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.tut-nav .cta {
+  flex: 1;
+  padding: 13px;
+}
+
+.tut-nav > span {
+  flex: 1;
+}
+
+@keyframes tut-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes tut-rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.98);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tut-backdrop,
+  .tut-card {
+    animation: none;
+  }
 }
 
 /* ---------- characters ---------- */

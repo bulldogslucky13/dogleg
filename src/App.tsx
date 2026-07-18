@@ -25,6 +25,7 @@ import { GreenView, HoleMap } from './ui/HoleMap'
 import { SideMap } from './ui/SideMap'
 import { ChoiceCards, ClassicScorecard, HazardChips, HoleComplete, Scorecard, StatusBanner, TierBanner } from './ui/panels'
 import { CharacterPickScreen, HomeScreen, ResultScreen } from './ui/screens'
+import { Tutorial, hasSeenTutorial } from './ui/Tutorial'
 
 type View = 'home' | 'pick' | 'play' | 'result'
 type UiMode = 'modern' | 'classic'
@@ -43,6 +44,7 @@ export default function App() {
   const [selected, setSelected] = useState<Choice | null>(null)
   const [uiMode, setUiMode] = useState<UiMode>(() => (localStorage.getItem(UI_MODE_KEY) === 'classic' ? 'classic' : 'modern'))
   const [pending, setPending] = useState<PendingStart | null>(null)
+  const [showTutorial, setShowTutorial] = useState(() => !hasSeenTutorial())
   /** which result the result view shows — the daily card or a finished practice round */
   const [resultFor, setResultFor] = useState<'daily' | 'practice'>('daily')
   const [animating, setAnimating] = useState(false)
@@ -79,8 +81,11 @@ export default function App() {
 
   if (view === 'home') {
     return (
-      <HomeScreen
+      <>
+        {showTutorial && <Tutorial onClose={() => setShowTutorial(false)} />}
+        <HomeScreen
         history={history}
+        onHowToPlay={() => setShowTutorial(true)}
         activeRound={
           round && !round.complete
             ? { mode: round.mode, courseName: courseBySlug(round.courseSlug)?.name ?? '' }
@@ -100,7 +105,8 @@ export default function App() {
           setResultFor('daily')
           setView('result')
         }}
-      />
+        />
+      </>
     )
   }
 

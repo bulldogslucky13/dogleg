@@ -14,6 +14,7 @@ export function HomeScreen(props: {
   onResume: () => void
   onPractice: (slug: string) => void
   onShowResult: () => void
+  onHowToPlay: () => void
 }) {
   const setup = dailySetup()
   const streaks = computeStreaks(props.history)
@@ -23,7 +24,12 @@ export function HomeScreen(props: {
   return (
     <div className="screen home">
       <header className="masthead">
-        <div className="kicker">Daily challenge · No. {setup.puzzleNumber}</div>
+        <div className="masthead-top">
+          <div className="kicker">Daily challenge · No. {setup.puzzleNumber}</div>
+          <button className="how-to-play" onClick={props.onHowToPlay}>
+            How to play
+          </button>
+        </div>
         <h1>
           Dog<em>leg</em>
         </h1>

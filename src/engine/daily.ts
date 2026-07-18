@@ -99,9 +99,11 @@ export function shareText(setup: DailySetup, results: HoleResult[], toPar: numbe
   for (let i = 0; i < 18; i += 9) {
     rows.push(results.slice(i, i + 9).map((r) => RESULT_SQUARE[r]).join(''))
   }
-  const head = `Dogleg No. ${setup.puzzleNumber} · ${setup.course.name} · ${toParLabel(toPar)}`
   const char = characterById(character)
-  const charLine = char ? `\n${char.emoji} ${char.name}` : ''
-  const verdict = toPar < 0 ? 'Broke par 🏆' : toPar === 0 ? 'Level with the course' : 'The course won today'
-  return `${head}${charLine}\n${rows.join('\n')}\n${verdict}\n${SITE_URL}`
+  const verdict = toPar < 0 ? 'Broke par 🏆' : toPar === 0 ? 'Level with the course' : 'The course won'
+  const scoreLine = [toParLabel(toPar), verdict, char ? `${char.emoji} ${char.name}` : null]
+    .filter(Boolean)
+    .join(' · ')
+  // blank lines keep the card readable in iMessage/WhatsApp previews
+  return [`Dogleg No. ${setup.puzzleNumber} · ${setup.course.name}`, scoreLine, '', rows[0], rows[1], '', SITE_URL].join('\n')
 }

@@ -211,6 +211,74 @@ export function recordResult(state: RoundState): HistoryEntry[] {
   return next
 }
 
+// ---------------------------------------------------------------------------
+// Derived stats
+// ---------------------------------------------------------------------------
+
+export interface CharacterRecord {
+  id: CharacterId
+  played: number
+  avgToPar: number
+  bestToPar: number
+}
+
+/** Daily-round record per character, for the "which player is best" argument. */
+export function characterRecords(history: HistoryEntry[]): CharacterRecord[] {
+  const acc = new Map<CharacterId, { n: number; total: number; best: number }>()
+  for (const e of history) {
+    if (!e.character) continue
+    const r = acc.get(e.character) ?? { n: 0, total: 0, best: Number.POSITIVE_INFINITY }
+    r.n += 1
+    r.total += e.toPar
+    r.best = Math.min(r.best, e.toPar)
+    acc.set(e.character, r)
+  }
+  return [...acc.entries()].map(([id, r]) => ({ id, played: r.n, avgToPar: r.total / r.n, bestToPar: r.best }))
+}
+
+export interface RoundRecap {
+  best: { hole: number; result: HoleResult } | null
+  /** worst over-par hole; null means a clean card */
+  worst: { hole: number; result: HoleResult } | null
+  aggressiveUsed: number
+  penalties: number
+  /** longest one-putt in feet, if any */
+  longestMake: number | null
+}
+
+/** The story of a finished round, computed from its shot records. */
+export function buildRecap(state: RoundState): RoundRecap | null {
+  if (!state.complete) return null
+  const course = courseBySlug(state.courseSlug)
+  if (!course) return null
+  let best: RoundRecap['best'] = null
+  let bestDiff = 99
+  let worst: RoundRecap['worst'] = null
+  let worstDiff = 0
+  let penalties = 0
+  let longestMake: number | null = null
+  state.scores.forEach((s, i) => {
+    if (!s) return
+    const diff = s.strokes - course.holes[i].par
+    if (diff < bestDiff) {
+      bestDiff = diff
+      best = { hole: course.holes[i].number, result: s.result }
+    }
+    if (diff > worstDiff) {
+      worstDiff = diff
+      worst = { hole: course.holes[i].number, result: s.result }
+    }
+    penalties += s.penalties
+    s.shots.forEach((shot, j) => {
+      if (shot.stage === 'putt' && shot.outcome === 'one') {
+        const feet = j > 0 ? (s.shots[j - 1].after.puttFeet ?? null) : null
+        if (feet !== null && (longestMake === null || feet > longestMake)) longestMake = feet
+      }
+    })
+  })
+  return { best, worst, aggressiveUsed: AGGRESSIVE_BUDGET - state.aggressiveLeft, penalties, longestMake }
+}
+
 export interface Streaks {
   dayStreak: number
   bestStreak: number

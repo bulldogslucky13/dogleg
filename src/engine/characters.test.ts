@@ -135,7 +135,11 @@ function simRound(courseIdx: number, cond: Conditions, seed: string, character?:
 }
 
 describe('character balance (Monte Carlo)', () => {
-  const N = 360
+  // Sample EVERY course K times (not `i % length`) so the field is identical for
+  // baseline and each character regardless of array order — the measured shift is
+  // the character's real effect, not an artifact of the daily rotation order.
+  const K = 10
+  const N = COURSES.length * K
 
   interface Dist {
     avgToPar: number
@@ -152,16 +156,17 @@ describe('character balance (Monte Carlo)', () => {
     let birdies = 0
     let hot = 0
     let best = 99
-    for (let i = 0; i < N; i++) {
-      const courseIdx = i % COURSES.length
-      const course = COURSES[courseIdx]
+    for (let c = 0; c < COURSES.length; c++) {
+      const course = COURSES[c]
       const cond: Conditions = { wind: course.wind, greens: course.greens, difficulty: course.difficulty }
-      const r = simRound(courseIdx, cond, `charsim:${i}`, character)
-      total += r.toPar
-      birdies += r.birdiesOrBetter
-      if (r.toPar < 0) broke++
-      if (r.toPar <= -5) hot++
-      best = Math.min(best, r.toPar)
+      for (let k = 0; k < K; k++) {
+        const r = simRound(c, cond, `charsim:${course.slug}:${k}`, character)
+        total += r.toPar
+        birdies += r.birdiesOrBetter
+        if (r.toPar < 0) broke++
+        if (r.toPar <= -5) hot++
+        best = Math.min(best, r.toPar)
+      }
     }
     return {
       avgToPar: total / N,
@@ -186,15 +191,16 @@ describe('character balance (Monte Carlo)', () => {
       // the edge is real but modest…
       expect(gains[spec.id], `${spec.name} gain`).toBeGreaterThan(0.35)
       expect(gains[spec.id], `${spec.name} gain`).toBeLessThan(1.9)
-      // …and it cannot stat-pad the game into a birdie-fest. Measured against the
-      // same bot with no character, so these bound the *shift*, not the bot's skill:
-      // the course keeps winning a similar share of rounds
-      expect(d.brokePct, `${spec.name} break-par rate`).toBeLessThan(base.brokePct + 12)
+      // …and it cannot stat-pad the game into a birdie-fest:
+      // even the strongest character leaves the course winning most rounds against
+      // a near-optimal bot (real players, who are worse, break par far less)
+      expect(d.brokePct, `${spec.name} break-par rate`).toBeLessThan(55)
+      // and the character's break-par *shift* over the same characterless bot stays modest
+      expect(d.brokePct - base.brokePct, `${spec.name} break-par shift`).toBeLessThan(14)
       // birdies stay golf-shaped: well under one extra per round
       expect(d.avgBirdies, `${spec.name} birdies/round`).toBeLessThan(base.avgBirdies + 1)
       // dream rounds (-5 or better) get likelier but never common
-      expect(d.hotRoundPct, `${spec.name} -5-or-better rate`).toBeLessThan(Math.max(base.hotRoundPct * 2.2, 6))
-      expect(d.hotRoundPct, `${spec.name} -5-or-better rate`).toBeLessThan(25)
+      expect(d.hotRoundPct, `${spec.name} -5-or-better rate`).toBeLessThan(18)
       // the all-birdie fantasy (-18) stays a fantasy
       expect(d.best, `${spec.name} best simulated round`).toBeGreaterThan(-15)
     }

@@ -3,8 +3,8 @@ import { COURSES } from './courses'
 import { rngFromString } from './rng'
 import type { CharacterId, Conditions, CourseSpec, Greens, HoleResult } from './types'
 
-/** Daily No. 1 */
-export const EPOCH = { y: 2026, m: 7, d: 1 }
+/** Daily No. 1 — set this to the real go-live date so launch day is Dogleg No. 1. */
+export const EPOCH = { y: 2026, m: 7, d: 19 }
 
 export function localDateKey(now = new Date()): string {
   const y = now.getFullYear()

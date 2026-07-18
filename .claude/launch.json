@@ -4,9 +4,8 @@
     {
       "name": "break-par",
       "runtimeExecutable": "pnpm",
-      "runtimeArgs": ["dev", "--port", "5175", "--strictPort"],
-      "port": 5175,
-      "autoPort": false
+      "runtimeArgs": ["dev"],
+      "port": 5173
     }
   ]
 }

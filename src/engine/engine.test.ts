@@ -24,13 +24,15 @@ describe('course data', () => {
       const par = c.holes.reduce((s, h) => s + h.par, 0)
       expect(par).toBeGreaterThanOrEqual(70)
       expect(par).toBeLessThanOrEqual(73)
+      // bounds cover real championship extremes (e.g. Augusta's 520yd 4th,
+      // Chambers Bay's convertible par 4s, Payne's Valley's 653yd 13th)
       for (const h of c.holes) {
         if (h.par === 3) expect(h.yards).toBeGreaterThanOrEqual(100)
-        if (h.par === 3) expect(h.yards).toBeLessThanOrEqual(280)
+        if (h.par === 3) expect(h.yards).toBeLessThanOrEqual(300)
         if (h.par === 4) expect(h.yards).toBeGreaterThanOrEqual(280)
-        if (h.par === 4) expect(h.yards).toBeLessThanOrEqual(510)
+        if (h.par === 4) expect(h.yards).toBeLessThanOrEqual(620)
         if (h.par === 5) expect(h.yards).toBeGreaterThanOrEqual(460)
-        if (h.par === 5) expect(h.yards).toBeLessThanOrEqual(650)
+        if (h.par === 5) expect(h.yards).toBeLessThanOrEqual(700)
       }
     }
   })

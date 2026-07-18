@@ -3,6 +3,7 @@ import { CHARACTERS, characterById } from '../engine/characters'
 import { COURSES } from '../engine/courses'
 import { dailySetup, RESULT_LABEL, RESULT_SQUARE, shareText, toParLabel, type DailySetup } from '../engine/daily'
 import type { CharacterId, HoleResult } from '../engine/types'
+import { track } from '../lib/analytics'
 import { characterRecords, computeStreaks, type HistoryEntry, type RoundRecap } from '../state/store'
 import { CharacterAvatar } from './Avatars'
 
@@ -196,12 +197,14 @@ export function ResultScreen(props: {
       document.execCommand('copy')
       ta.remove()
     }
+    track('share_clicked', { method: 'clipboard', to_par: toPar })
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }
   const share = async () => {
     try {
       await navigator.share({ text })
+      track('share_clicked', { method: 'native', to_par: toPar })
     } catch {
       /* user cancelled the share sheet — not an error */
     }

@@ -21,6 +21,7 @@ import {
   type HistoryEntry,
   type RoundState,
 } from './state/store'
+import { track } from './lib/analytics'
 import { CharacterAvatar } from './ui/Avatars'
 import { GreenView, HoleMap } from './ui/HoleMap'
 import { SideMap } from './ui/SideMap'
@@ -125,7 +126,9 @@ export default function App() {
         setup={start.setup}
         practice={start.mode === 'practice'}
         onPick={(character: CharacterId) => {
-          setRound(newRound(start.setup, start.mode, character))
+          const r = newRound(start.setup, start.mode, character)
+          track('round_started', { mode: start.mode, course: r.courseSlug, puzzle_number: r.puzzleNumber, character })
+          setRound(r)
           setSelected(null)
           setPending(null)
           setView('play')
@@ -170,7 +173,9 @@ export default function App() {
         onPracticeAgain={() => {
           if (round) {
             // quick rematch: same course, same player
-            setRound(startPracticeRound(round.courseSlug, round.character))
+            const r = startPracticeRound(round.courseSlug, round.character)
+            track('round_started', { mode: 'practice', course: r.courseSlug, puzzle_number: r.puzzleNumber, character: r.character })
+            setRound(r)
             setSelected(null)
             setView('play')
           }

@@ -4,6 +4,7 @@ import { startHole, playShot, type HoleInPlay } from '../engine/resolve'
 import { rngFromString, skip, type Rng } from '../engine/rng'
 import type { CharacterId, Choice, Conditions, HoleResult, HoleScore, Stage } from '../engine/types'
 import { courseBySlug } from '../engine/courses'
+import { track } from '../lib/analytics'
 
 export const AGGRESSIVE_BUDGET = 8
 
@@ -190,9 +191,24 @@ export function loadHistory(): HistoryEntry[] {
   }
 }
 
+function trackRoundCompleted(state: RoundState, streaks: Streaks): void {
+  track('round_completed', {
+    mode: state.mode,
+    course: state.courseSlug,
+    puzzle_number: state.puzzleNumber,
+    to_par: roundToPar(state),
+    aggressive_used: AGGRESSIVE_BUDGET - state.aggressiveLeft,
+    current_streak: streaks.dayStreak,
+    best_streak: streaks.bestStreak,
+  })
+}
+
 export function recordResult(state: RoundState): HistoryEntry[] {
   const history = loadHistory()
-  if (state.mode !== 'daily') return history
+  if (state.mode !== 'daily') {
+    trackRoundCompleted(state, computeStreaks(history))
+    return history
+  }
   if (history.some((e) => e.dateKey === state.dateKey)) return history
   const entry: HistoryEntry = {
     dateKey: state.dateKey,
@@ -208,6 +224,7 @@ export function recordResult(state: RoundState): HistoryEntry[] {
   } catch {
     /* ignore */
   }
+  trackRoundCompleted(state, computeStreaks(next))
   return next
 }
 

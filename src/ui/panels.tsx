@@ -328,13 +328,12 @@ export function ClassicScorecard(props: { course: CourseSpec; scores: (HoleScore
   const { course, scores, currentHole } = props
   const cell = (i: number) => {
     const s = scores[i]
-    const par = course.holes[i].par
     let cls = 'csc-cell'
     if (i === currentHole) cls += ' current'
     if (s) {
-      if (s.strokes < par) cls += ' under'
-      else if (s.strokes - par === 1) cls += ' over'
-      else if (s.strokes - par >= 2) cls += ' over2'
+      if (s.result === 'albatross' || s.result === 'eagle' || s.result === 'birdie') cls += ' under'
+      else if (s.result === 'bogey') cls += ' over'
+      else if (s.result === 'double' || s.result === 'triple') cls += ' over2'
     } else cls += ' todo'
     return (
       <span key={i} className={cls}>

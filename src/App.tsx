@@ -12,14 +12,17 @@ import {
   holeInPlay,
   loadHistory,
   loadRound,
+  loadUiMode,
   recordResult,
   roundToPar,
   saveRound,
+  saveUiMode,
   newRound,
   startPracticeRound,
   usesBudget,
   type HistoryEntry,
   type RoundState,
+  type UiMode,
 } from './state/store'
 import { track } from './lib/analytics'
 import { CharacterAvatar } from './ui/Avatars'
@@ -30,27 +33,8 @@ import { CharacterPickScreen, HomeScreen, ResultScreen } from './ui/screens'
 import { Tutorial, hasSeenTutorial } from './ui/Tutorial'
 
 type View = 'home' | 'pick' | 'play' | 'result'
-type UiMode = 'modern' | 'classic'
 /** setup is generated when the pick screen opens, so the conditions it shows are the ones you play */
 type PendingStart = { mode: 'daily' | 'practice'; setup: DailySetup }
-
-const UI_MODE_KEY = 'dogleg:uimode'
-
-function loadUiMode(): UiMode {
-  try {
-    return localStorage.getItem(UI_MODE_KEY) === 'classic' ? 'classic' : 'modern'
-  } catch {
-    return 'modern' // storage blocked: fall back instead of failing the first render
-  }
-}
-
-function saveUiMode(mode: UiMode): void {
-  try {
-    localStorage.setItem(UI_MODE_KEY, mode)
-  } catch {
-    /* storage blocked: the toggle still works for this session */
-  }
-}
 
 export default function App() {
   const [round, setRound] = useState<RoundState | null>(() => loadRound())
@@ -109,27 +93,27 @@ export default function App() {
       <>
         {showTutorial && <Tutorial onClose={() => setShowTutorial(false)} />}
         <HomeScreen
-        history={history}
-        onHowToPlay={() => setShowTutorial(true)}
-        activeRound={
-          round && !round.complete
-            ? { mode: round.mode, courseName: courseBySlug(round.courseSlug)?.name ?? '' }
-            : null
-        }
-        playedToday={playedToday}
-        onTeeOff={() => {
-          setPending({ mode: 'daily', setup: dailySetup() })
-          setView('pick')
-        }}
-        onResume={() => setView('play')}
-        onPractice={(slug) => {
-          setPending({ mode: 'practice', setup: practiceSetup(slug, `${Date.now()}`) })
-          setView('pick')
-        }}
-        onShowResult={() => {
-          setResultFor('daily')
-          setView('result')
-        }}
+          history={history}
+          onHowToPlay={() => setShowTutorial(true)}
+          activeRound={
+            round && !round.complete
+              ? { mode: round.mode, courseName: courseBySlug(round.courseSlug)?.name ?? '' }
+              : null
+          }
+          playedToday={playedToday}
+          onTeeOff={() => {
+            setPending({ mode: 'daily', setup: dailySetup() })
+            setView('pick')
+          }}
+          onResume={() => setView('play')}
+          onPractice={(slug) => {
+            setPending({ mode: 'practice', setup: practiceSetup(slug, `${Date.now()}`) })
+            setView('pick')
+          }}
+          onShowResult={() => {
+            setResultFor('daily')
+            setView('result')
+          }}
         />
       </>
     )
@@ -249,6 +233,7 @@ export default function App() {
   }
 
   const next = () => {
+    if (splashTimer.current) window.clearTimeout(splashTimer.current)
     setSplash(null)
     const after = advanceHole(round)
     setRound(after)

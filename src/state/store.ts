@@ -1,5 +1,5 @@
 import { buildLayout } from '../engine/layout'
-import { dailySetup, practiceSetup, localDateKey, type DailySetup } from '../engine/daily'
+import { practiceSetup, localDateKey, type DailySetup } from '../engine/daily'
 import { startHole, playShot, type HoleInPlay } from '../engine/resolve'
 import { rngFromString, skip, type Rng } from '../engine/rng'
 import type { CharacterId, Choice, Conditions, HoleResult, HoleScore, Stage } from '../engine/types'
@@ -46,6 +46,9 @@ export interface HistoryEntry {
 
 const ROUND_KEY = 'bp:round:v1'
 const HISTORY_KEY = 'bp:history:v1'
+const UI_MODE_KEY = 'dogleg:uimode'
+
+export type UiMode = 'modern' | 'classic'
 
 // ---------------------------------------------------------------------------
 
@@ -68,10 +71,6 @@ export function newRound(setup: DailySetup, mode: 'daily' | 'practice', characte
     complete: false,
     hole: serializeHole(hole),
   }
-}
-
-export function startDailyRound(character?: CharacterId): RoundState {
-  return newRound(dailySetup(), 'daily', character)
 }
 
 export function startPracticeRound(slug: string, character?: CharacterId): RoundState {
@@ -191,11 +190,28 @@ export function loadHistory(): HistoryEntry[] {
   }
 }
 
+export function loadUiMode(): UiMode {
+  try {
+    return localStorage.getItem(UI_MODE_KEY) === 'classic' ? 'classic' : 'modern'
+  } catch {
+    return 'modern' // storage blocked: fall back instead of failing the first render
+  }
+}
+
+export function saveUiMode(mode: UiMode): void {
+  try {
+    localStorage.setItem(UI_MODE_KEY, mode)
+  } catch {
+    /* storage blocked: the toggle still works for this session */
+  }
+}
+
 function trackRoundCompleted(state: RoundState, streaks: Streaks): void {
   track('round_completed', {
     mode: state.mode,
     course: state.courseSlug,
     puzzle_number: state.puzzleNumber,
+    character: state.character,
     to_par: roundToPar(state),
     aggressive_used: AGGRESSIVE_BUDGET - state.aggressiveLeft,
     current_streak: streaks.dayStreak,

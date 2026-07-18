@@ -184,6 +184,7 @@ export function ResultScreen(props: {
   const text = shareText(props.setup, results, toPar, props.character)
   const canNativeShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function'
   const copy = async () => {
+    let ok = true
     try {
       await navigator.clipboard.writeText(text)
     } catch {
@@ -194,9 +195,10 @@ export function ResultScreen(props: {
       ta.style.opacity = '0'
       document.body.appendChild(ta)
       ta.select()
-      document.execCommand('copy')
+      ok = document.execCommand('copy')
       ta.remove()
     }
+    if (!ok) return
     track('share_clicked', { method: 'clipboard', to_par: toPar })
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
@@ -205,8 +207,10 @@ export function ResultScreen(props: {
     try {
       await navigator.share({ text })
       track('share_clicked', { method: 'native', to_par: toPar })
-    } catch {
-      /* user cancelled the share sheet — not an error */
+    } catch (err) {
+      // AbortError means the user closed the share sheet — anything else is a real failure
+      if (err instanceof Error && err.name === 'AbortError') return
+      await copy()
     }
   }
   return (

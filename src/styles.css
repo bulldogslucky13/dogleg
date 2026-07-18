@@ -884,6 +884,26 @@ button {
   letter-spacing: 0.06em;
 }
 
+/* share card: show exactly what lands in the group chat */
+.share-block {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.share-preview {
+  font: inherit;
+  font-size: 0.86rem;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  text-align: center;
+  background: var(--cream);
+  border: 1.5px solid var(--line);
+  border-radius: 12px;
+  padding: 12px 10px;
+  color: rgba(29, 43, 32, 0.85);
+}
+
 /* ---------- characters ---------- */
 
 .screen.pick {
@@ -963,6 +983,55 @@ button {
   font-size: 0.78rem;
   color: rgba(29, 43, 32, 0.68);
   line-height: 1.35;
+}
+
+/* per-character daily records on the home screen */
+.char-records {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 7px;
+}
+
+.char-record {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1.5px solid var(--line);
+  border-radius: 12px;
+  padding: 7px 12px;
+}
+
+.char-record-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  text-align: left;
+}
+
+.char-record-text b {
+  font-size: 0.85rem;
+}
+
+.char-record-text span {
+  font-size: 0.74rem;
+  color: rgba(29, 43, 32, 0.6);
+}
+
+/* end-of-round recap tiles */
+.recap-tiles {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.recap-tiles .stat b {
+  font-size: 1.02rem;
+}
+
+@media (max-width: 480px) {
+  .recap-tiles {
+    grid-template-columns: repeat(2, 1fr);
+  }
 }
 
 /* small chip shown throughout the round */

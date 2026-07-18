@@ -1,14 +1,14 @@
 import { useState } from 'react'
 import { CHARACTERS, characterById } from '../engine/characters'
 import { COURSES } from '../engine/courses'
-import { dailySetup, RESULT_SQUARE, shareText, toParLabel, type DailySetup } from '../engine/daily'
+import { dailySetup, RESULT_LABEL, RESULT_SQUARE, shareText, toParLabel, type DailySetup } from '../engine/daily'
 import type { CharacterId, HoleResult } from '../engine/types'
-import { computeStreaks, type HistoryEntry } from '../state/store'
+import { characterRecords, computeStreaks, type HistoryEntry, type RoundRecap } from '../state/store'
 import { CharacterAvatar } from './Avatars'
 
 export function HomeScreen(props: {
   history: HistoryEntry[]
-  hasActiveRound: boolean
+  activeRound: { mode: 'daily' | 'practice'; courseName: string } | null
   playedToday: HistoryEntry | null
   onTeeOff: () => void
   onResume: () => void
@@ -17,7 +17,9 @@ export function HomeScreen(props: {
 }) {
   const setup = dailySetup()
   const streaks = computeStreaks(props.history)
+  const records = characterRecords(props.history)
   const [showCourses, setShowCourses] = useState(false)
+  const avgLabel = (avg: number) => (avg > 0 ? `+${avg.toFixed(1)}` : avg.toFixed(1))
   return (
     <div className="screen home">
       <header className="masthead">
@@ -56,19 +58,43 @@ export function HomeScreen(props: {
           <span>Best to par</span>
         </div>
       </div>
+      {records.length > 0 && (
+        <div className="char-records">
+          {records.map((r) => {
+            const spec = characterById(r.id)!
+            return (
+              <div key={r.id} className="char-record" title={spec.edge}>
+                <CharacterAvatar id={r.id} size={36} />
+                <div className="char-record-text">
+                  <b>{spec.name}</b>
+                  <span>
+                    {r.played} round{r.played === 1 ? '' : 's'} · avg {avgLabel(r.avgToPar)} · best {toParLabel(r.bestToPar)}
+                  </span>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
       <p className="cta-tease">Can you break par today?</p>
 
       {props.playedToday ? (
         <button className="cta" onClick={props.onShowResult}>
           See today's card · {toParLabel(props.playedToday.toPar)}
         </button>
-      ) : props.hasActiveRound ? (
+      ) : props.activeRound?.mode === 'daily' ? (
         <button className="cta" onClick={props.onResume}>
           Resume today's round
         </button>
       ) : (
         <button className="cta" onClick={props.onTeeOff}>
           Tee off
+        </button>
+      )}
+      {props.activeRound?.mode === 'practice' && (
+        <button className="cta ghost" onClick={props.onResume}>
+          Resume practice round · {props.activeRound.courseName}
         </button>
       )}
 
@@ -93,21 +119,30 @@ export function HomeScreen(props: {
 }
 
 export function CharacterPickScreen(props: {
-  courseName: string
+  setup: DailySetup
   practice: boolean
   onPick: (c: CharacterId) => void
   onBack: () => void
 }) {
+  const { course, cond } = props.setup
   return (
     <div className="screen pick">
       <button className="home-link" onClick={props.onBack}>
         ‹ Clubhouse
       </button>
       <header>
-        <div className="kicker">{props.practice ? 'Practice round' : "Today's round"} · {props.courseName}</div>
+        <div className="kicker">
+          {props.practice ? 'Practice round' : "Today's round"} · {course.name}
+        </div>
         <h2 className="pick-title">Pick your player</h2>
-        <p className="tagline">One edge, all 18 holes. Choose for the course in front of you.</p>
+        <p className="tagline">One edge, all 18 holes. Choose for the course in front of you:</p>
       </header>
+      <div className="chips center">
+        <span className="chip">{course.holes.reduce((s, h) => s + h.yards, 0).toLocaleString()} yards</span>
+        <span className="chip">Wind {cond.wind} mph</span>
+        <span className="chip">{cond.greens} greens</span>
+        <span className="chip">Difficulty {cond.difficulty}/10</span>
+      </div>
       <div className="char-cards">
         {CHARACTERS.map((c) => (
           <button key={c.id} className={`char-card ${c.id}`} onClick={() => props.onPick(c.id)}>
@@ -129,6 +164,7 @@ export function ResultScreen(props: {
   toPar: number
   practice: boolean
   character?: CharacterId
+  recap: RoundRecap | null
   history: HistoryEntry[]
   onHome: () => void
   onPracticeAgain: () => void
@@ -138,22 +174,30 @@ export function ResultScreen(props: {
   const streaks = computeStreaks(props.history)
   const broke = toPar < 0
   const char = characterById(props.character)
-  const share = async () => {
-    const text = shareText(props.setup, results, toPar, props.character)
-    try {
-      if (navigator.share) {
-        await navigator.share({ text })
-        return
-      }
-    } catch {
-      /* fall through to clipboard */
-    }
+  const text = shareText(props.setup, results, toPar, props.character)
+  const canNativeShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function'
+  const copy = async () => {
     try {
       await navigator.clipboard.writeText(text)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 1800)
     } catch {
-      /* ignore */
+      // clipboard API blocked (http, old browser): select-and-copy fallback
+      const ta = document.createElement('textarea')
+      ta.value = text
+      ta.style.position = 'fixed'
+      ta.style.opacity = '0'
+      document.body.appendChild(ta)
+      ta.select()
+      document.execCommand('copy')
+      ta.remove()
+    }
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+  const share = async () => {
+    try {
+      await navigator.share({ text })
+    } catch {
+      /* user cancelled the share sheet — not an error */
     }
   }
   return (
@@ -185,6 +229,46 @@ export function ResultScreen(props: {
           <span key={i}>{RESULT_SQUARE[r]}</span>
         ))}</div>
       </div>
+      {props.recap && (
+        <div className="recap-tiles">
+          {props.recap.best && (
+            <div className="stat">
+              <b>{RESULT_LABEL[props.recap.best.result]}</b>
+              <span>Best · No. {props.recap.best.hole}</span>
+            </div>
+          )}
+          <div className="stat">
+            {props.recap.worst ? (
+              <>
+                <b>{RESULT_LABEL[props.recap.worst.result]}</b>
+                <span>Toughest · No. {props.recap.worst.hole}</span>
+              </>
+            ) : (
+              <>
+                <b>Clean</b>
+                <span>No blow-ups</span>
+              </>
+            )}
+          </div>
+          <div className="stat">
+            <b>{props.recap.aggressiveUsed}/8</b>
+            <span>Aggressive used</span>
+          </div>
+          <div className="stat">
+            {props.recap.longestMake !== null && props.recap.longestMake >= 15 ? (
+              <>
+                <b>{props.recap.longestMake} ft</b>
+                <span>Longest make</span>
+              </>
+            ) : (
+              <>
+                <b>{props.recap.penalties}</b>
+                <span>Penalt{props.recap.penalties === 1 ? 'y' : 'ies'}</span>
+              </>
+            )}
+          </div>
+        </div>
+      )}
       {!props.practice && (
         <div className="stats-row">
           <div className="stat">
@@ -202,9 +286,18 @@ export function ResultScreen(props: {
         </div>
       )}
       {!props.practice && (
-        <button className="cta" onClick={share}>
-          {copied ? 'Copied!' : 'Share your card'}
-        </button>
+        <div className="share-block">
+          <div className="kicker">Your share card</div>
+          <pre className="share-preview">{text}</pre>
+          {canNativeShare && (
+            <button className="cta" onClick={share}>
+              Share your card
+            </button>
+          )}
+          <button className={`cta${canNativeShare ? ' ghost' : ''}`} onClick={copy}>
+            {copied ? 'Copied — paste it in the chat ✓' : 'Copy for the group chat'}
+          </button>
+        </div>
       )}
       {props.practice && (
         <button className="cta" onClick={props.onPracticeAgain}>

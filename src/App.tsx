@@ -7,13 +7,14 @@ import type { CharacterId, Choice } from './engine/types'
 import {
   advanceHole,
   applyChoice,
+  buildRecap,
   holeInPlay,
   loadHistory,
   loadRound,
   recordResult,
   roundToPar,
   saveRound,
-  startDailyRound,
+  newRound,
   startPracticeRound,
   usesBudget,
   type HistoryEntry,
@@ -27,7 +28,8 @@ import { CharacterPickScreen, HomeScreen, ResultScreen } from './ui/screens'
 
 type View = 'home' | 'pick' | 'play' | 'result'
 type UiMode = 'modern' | 'classic'
-type PendingStart = { mode: 'daily' } | { mode: 'practice'; slug: string }
+/** setup is generated when the pick screen opens, so the conditions it shows are the ones you play */
+type PendingStart = { mode: 'daily' | 'practice'; setup: DailySetup }
 
 const UI_MODE_KEY = 'dogleg:uimode'
 
@@ -41,6 +43,8 @@ export default function App() {
   const [selected, setSelected] = useState<Choice | null>(null)
   const [uiMode, setUiMode] = useState<UiMode>(() => (localStorage.getItem(UI_MODE_KEY) === 'classic' ? 'classic' : 'modern'))
   const [pending, setPending] = useState<PendingStart | null>(null)
+  /** which result the result view shows — the daily card or a finished practice round */
+  const [resultFor, setResultFor] = useState<'daily' | 'practice'>('daily')
   const [animating, setAnimating] = useState(false)
   const animTimer = useRef<number | null>(null)
 
@@ -73,32 +77,37 @@ export default function App() {
     return (
       <HomeScreen
         history={history}
-        hasActiveRound={!!round && !round.complete}
+        activeRound={
+          round && !round.complete
+            ? { mode: round.mode, courseName: courseBySlug(round.courseSlug)?.name ?? '' }
+            : null
+        }
         playedToday={playedToday}
         onTeeOff={() => {
-          setPending({ mode: 'daily' })
+          setPending({ mode: 'daily', setup: dailySetup() })
           setView('pick')
         }}
         onResume={() => setView('play')}
         onPractice={(slug) => {
-          setPending({ mode: 'practice', slug })
+          setPending({ mode: 'practice', setup: practiceSetup(slug, `${Date.now()}`) })
           setView('pick')
         }}
-        onShowResult={() => setView('result')}
+        onShowResult={() => {
+          setResultFor('daily')
+          setView('result')
+        }}
       />
     )
   }
 
   if (view === 'pick') {
-    const start = pending ?? { mode: 'daily' as const }
-    const courseName =
-      start.mode === 'practice' ? (courseBySlug(start.slug)?.name ?? '') : dailySetup().course.name
+    const start = pending ?? { mode: 'daily' as const, setup: dailySetup() }
     return (
       <CharacterPickScreen
-        courseName={courseName}
+        setup={start.setup}
         practice={start.mode === 'practice'}
         onPick={(character: CharacterId) => {
-          setRound(start.mode === 'daily' ? startDailyRound(character) : startPracticeRound(start.slug, character))
+          setRound(newRound(start.setup, start.mode, character))
           setSelected(null)
           setPending(null)
           setView('play')
@@ -113,7 +122,7 @@ export default function App() {
 
   if (view === 'result') {
     const entry = playedToday
-    const isPractice = !!round && round.mode === 'practice' && round.complete
+    const isPractice = resultFor === 'practice' && !!round && round.mode === 'practice' && round.complete
     let setup: DailySetup
     let results = entry?.results ?? []
     let toPar = entry?.toPar ?? 0
@@ -124,12 +133,19 @@ export default function App() {
     } else {
       setup = dailySetup()
     }
+    // the full shot-by-shot round only survives in localStorage for the round it belongs to
+    const recapSource = isPractice
+      ? round
+      : round && round.mode === 'daily' && round.complete && round.dateKey === entry?.dateKey
+        ? round
+        : null
     return (
       <ResultScreen
         setup={setup}
         results={results}
         toPar={toPar}
         practice={isPractice}
+        recap={recapSource ? buildRecap(recapSource) : null}
         character={isPractice && round ? round.character : entry?.character}
         history={history}
         onHome={() => setView('home')}
@@ -187,6 +203,7 @@ export default function App() {
     if (after.complete) {
       const h = recordResult(after)
       setHistory(h)
+      setResultFor(after.mode)
       setView('result')
     }
   }

@@ -1,8 +1,8 @@
 import { buildLayout } from '../engine/layout'
-import { dailySetup, practiceSetup, localDateKey, type DailySetup } from '../engine/daily'
+import { practiceSetup, localDateKey, type DailySetup } from '../engine/daily'
 import { startHole, playShot, type HoleInPlay } from '../engine/resolve'
 import { rngFromString, skip, type Rng } from '../engine/rng'
-import type { Choice, Conditions, HoleResult, HoleScore, Stage } from '../engine/types'
+import type { CharacterId, Choice, Conditions, HoleResult, HoleScore, Stage } from '../engine/types'
 import { courseBySlug } from '../engine/courses'
 import { track } from '../lib/analytics'
 
@@ -13,6 +13,8 @@ export interface RoundState {
   seed: string
   courseSlug: string
   cond: Conditions
+  /** playstyle picked at the first tee; optional so pre-feature saves keep working */
+  character?: CharacterId
   puzzleNumber: number
   dateKey: string
   currentHole: number
@@ -39,22 +41,27 @@ export interface HistoryEntry {
   courseSlug: string
   toPar: number
   results: HoleResult[]
+  character?: CharacterId
 }
 
 const ROUND_KEY = 'bp:round:v1'
 const HISTORY_KEY = 'bp:history:v1'
+const UI_MODE_KEY = 'dogleg:uimode'
+
+export type UiMode = 'modern' | 'classic'
 
 // ---------------------------------------------------------------------------
 
-export function newRound(setup: DailySetup, mode: 'daily' | 'practice'): RoundState {
+export function newRound(setup: DailySetup, mode: 'daily' | 'practice', character?: CharacterId): RoundState {
   const course = setup.course
   const layout = buildLayout(course.slug, course.holes[0])
-  const hole = startHole(layout, setup.cond)
+  const hole = startHole(layout, setup.cond, character)
   return {
     mode,
     seed: setup.seed,
     courseSlug: course.slug,
     cond: setup.cond,
+    character,
     puzzleNumber: setup.puzzleNumber,
     dateKey: setup.dateKey,
     currentHole: 0,
@@ -66,12 +73,8 @@ export function newRound(setup: DailySetup, mode: 'daily' | 'practice'): RoundSt
   }
 }
 
-export function startDailyRound(): RoundState {
-  return newRound(dailySetup(), 'daily')
-}
-
-export function startPracticeRound(slug: string): RoundState {
-  return newRound(practiceSetup(slug, `${Date.now()}`), 'practice')
+export function startPracticeRound(slug: string, character?: CharacterId): RoundState {
+  return newRound(practiceSetup(slug, `${Date.now()}`), 'practice', character)
 }
 
 function serializeHole(h: HoleInPlay): SerializedHole {
@@ -91,9 +94,9 @@ export function holeInPlay(state: RoundState): HoleInPlay {
   const course = courseBySlug(state.courseSlug)!
   const spec = course.holes[state.currentHole]
   const layout = buildLayout(course.slug, spec)
-  const s = state.hole ?? serializeHole(startHole(layout, state.cond))
+  const s = state.hole ?? serializeHole(startHole(layout, state.cond, state.character))
   // clone mutable pieces: playShot mutates, and React may re-run state updaters
-  return { layout, cond: state.cond, ...s, ball: { ...s.ball }, shots: [...s.shots] }
+  return { layout, cond: state.cond, character: state.character, ...s, ball: { ...s.ball }, shots: [...s.shots] }
 }
 
 function roundRng(state: RoundState): { rng: Rng; consumed: () => number } {
@@ -142,7 +145,7 @@ export function advanceHole(state: RoundState): RoundState {
   const course = courseBySlug(state.courseSlug)!
   const idx = state.currentHole + 1
   const layout = buildLayout(course.slug, course.holes[idx])
-  const hole = startHole(layout, state.cond)
+  const hole = startHole(layout, state.cond, state.character)
   return { ...state, currentHole: idx, hole: serializeHole(hole) }
 }
 
@@ -187,11 +190,28 @@ export function loadHistory(): HistoryEntry[] {
   }
 }
 
+export function loadUiMode(): UiMode {
+  try {
+    return localStorage.getItem(UI_MODE_KEY) === 'classic' ? 'classic' : 'modern'
+  } catch {
+    return 'modern' // storage blocked: fall back instead of failing the first render
+  }
+}
+
+export function saveUiMode(mode: UiMode): void {
+  try {
+    localStorage.setItem(UI_MODE_KEY, mode)
+  } catch {
+    /* storage blocked: the toggle still works for this session */
+  }
+}
+
 function trackRoundCompleted(state: RoundState, streaks: Streaks): void {
   track('round_completed', {
     mode: state.mode,
     course: state.courseSlug,
     puzzle_number: state.puzzleNumber,
+    character: state.character,
     to_par: roundToPar(state),
     aggressive_used: AGGRESSIVE_BUDGET - state.aggressiveLeft,
     current_streak: streaks.dayStreak,
@@ -212,6 +232,7 @@ export function recordResult(state: RoundState): HistoryEntry[] {
     courseSlug: state.courseSlug,
     toPar: roundToPar(state),
     results: state.scores.map((s) => s?.result ?? 'triple'),
+    character: state.character,
   }
   const next = [...history, entry].sort((a, b) => a.dateKey.localeCompare(b.dateKey))
   try {
@@ -221,6 +242,74 @@ export function recordResult(state: RoundState): HistoryEntry[] {
   }
   trackRoundCompleted(state, computeStreaks(next))
   return next
+}
+
+// ---------------------------------------------------------------------------
+// Derived stats
+// ---------------------------------------------------------------------------
+
+export interface CharacterRecord {
+  id: CharacterId
+  played: number
+  avgToPar: number
+  bestToPar: number
+}
+
+/** Daily-round record per character, for the "which player is best" argument. */
+export function characterRecords(history: HistoryEntry[]): CharacterRecord[] {
+  const acc = new Map<CharacterId, { n: number; total: number; best: number }>()
+  for (const e of history) {
+    if (!e.character) continue
+    const r = acc.get(e.character) ?? { n: 0, total: 0, best: Number.POSITIVE_INFINITY }
+    r.n += 1
+    r.total += e.toPar
+    r.best = Math.min(r.best, e.toPar)
+    acc.set(e.character, r)
+  }
+  return [...acc.entries()].map(([id, r]) => ({ id, played: r.n, avgToPar: r.total / r.n, bestToPar: r.best }))
+}
+
+export interface RoundRecap {
+  best: { hole: number; result: HoleResult } | null
+  /** worst over-par hole; null means a clean card */
+  worst: { hole: number; result: HoleResult } | null
+  aggressiveUsed: number
+  penalties: number
+  /** longest one-putt in feet, if any */
+  longestMake: number | null
+}
+
+/** The story of a finished round, computed from its shot records. */
+export function buildRecap(state: RoundState): RoundRecap | null {
+  if (!state.complete) return null
+  const course = courseBySlug(state.courseSlug)
+  if (!course) return null
+  let best: RoundRecap['best'] = null
+  let bestDiff = 99
+  let worst: RoundRecap['worst'] = null
+  let worstDiff = 0
+  let penalties = 0
+  let longestMake: number | null = null
+  state.scores.forEach((s, i) => {
+    if (!s) return
+    const diff = s.strokes - course.holes[i].par
+    if (diff < bestDiff) {
+      bestDiff = diff
+      best = { hole: course.holes[i].number, result: s.result }
+    }
+    if (diff > worstDiff) {
+      worstDiff = diff
+      worst = { hole: course.holes[i].number, result: s.result }
+    }
+    penalties += s.penalties
+    s.shots.forEach((shot, j) => {
+      if (shot.stage === 'putt' && shot.outcome === 'one') {
+        const feet = j > 0 ? (s.shots[j - 1].after.puttFeet ?? null) : null
+        if (feet !== null && (longestMake === null || feet > longestMake)) longestMake = feet
+      }
+    })
+  })
+  return { best, worst, aggressiveUsed: AGGRESSIVE_BUDGET - state.aggressiveLeft, penalties, longestMake }
 }
 
 export interface Streaks {

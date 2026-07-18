@@ -1,9 +1,10 @@
+import { characterById } from './characters'
 import { COURSES } from './courses'
 import { rngFromString } from './rng'
-import type { Conditions, CourseSpec, Greens, HoleResult } from './types'
+import type { CharacterId, Conditions, CourseSpec, Greens, HoleResult } from './types'
 
-/** Daily No. 1 */
-export const EPOCH = { y: 2026, m: 7, d: 1 }
+/** Daily No. 1 — set this to the real go-live date so launch day is Dogleg No. 1. */
+export const EPOCH = { y: 2026, m: 7, d: 19 }
 
 export function localDateKey(now = new Date()): string {
   const y = now.getFullYear()
@@ -93,12 +94,27 @@ export function toParLabel(toPar: number): string {
 /** Shown in share text — update when the final domain is decided. */
 export const SITE_URL = 'dogleg.cameronbristol.xyz'
 
-export function shareText(setup: DailySetup, results: HoleResult[], toPar: number): string {
+/** Share card in the classic Break Par format, with the character in the rank line's slot. */
+export function shareText(setup: DailySetup, results: HoleResult[], toPar: number, character?: CharacterId): string {
   const rows: string[] = []
   for (let i = 0; i < 18; i += 9) {
     rows.push(results.slice(i, i + 9).map((r) => RESULT_SQUARE[r]).join(''))
   }
-  const head = `Dogleg No. ${setup.puzzleNumber} · ${setup.course.name} · ${toParLabel(toPar)}`
-  const verdict = toPar < 0 ? 'Broke par 🏆' : toPar === 0 ? 'Level with the course' : 'The course won today'
-  return `${head}\n${rows.join('\n')}\n${verdict}\n${SITE_URL}`
+  const par = setup.course.holes.reduce((s, h) => s + h.par, 0)
+  const char = characterById(character)
+  const birdies = results.filter((r) => r === 'albatross' || r === 'eagle' || r === 'birdie').length
+  const pars = results.filter((r) => r === 'par').length
+  const overs = results.length - birdies - pars
+  return [
+    `DOGLEG #${setup.puzzleNumber} ⛳`,
+    `${setup.course.name} (Par ${par})`,
+    `${par + toPar} (${toParLabel(toPar)})`,
+    '',
+    rows[0],
+    rows[1],
+    ...(char ? [`${char.emoji} ${char.name}`] : []),
+    '',
+    `🐦 ${birdies}  ·  ⛳ ${pars}  ·  😬 ${overs}`,
+    SITE_URL,
+  ].join('\n')
 }

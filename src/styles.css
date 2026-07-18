@@ -72,6 +72,28 @@ button {
 
 /* ---------- Home ---------- */
 
+.masthead-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.how-to-play {
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(29, 43, 32, 0.55);
+  border: 1.5px solid var(--line);
+  border-radius: 999px;
+  padding: 4px 12px;
+}
+
+.how-to-play:active {
+  transform: scale(0.97);
+}
+
 .masthead h1 {
   font-size: 3.2rem;
   line-height: 0.95;
@@ -240,8 +262,18 @@ button {
 /* ---------- Play ---------- */
 
 .screen.play {
-  padding: 14px 12px 20px;
+  padding: 12px 12px 16px;
   gap: 10px;
+  /* fill the viewport exactly — the map flexes, so choices never scroll away */
+  align-self: stretch;
+  min-height: 0;
+  max-height: calc(100dvh - max(10px, env(safe-area-inset-top)) - max(18px, env(safe-area-inset-bottom)));
+}
+
+.top-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
 .home-link {
@@ -316,15 +348,76 @@ button {
 }
 
 .map-wrap {
+  position: relative;
   border-radius: 14px;
   overflow: hidden;
   box-shadow: 0 4px 18px rgba(0, 0, 0, 0.25);
+  /* the map absorbs whatever height is left over; #22402c matches the SVG turf */
+  flex: 1 1 140px;
+  min-height: 140px;
+  background: #22402c;
+}
+
+/* hole info floats over the map instead of eating vertical space below it */
+.map-overlay {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  pointer-events: none;
+}
+
+.map-overlay.top {
+  top: 8px;
+}
+
+.map-overlay.bottom {
+  bottom: 8px;
+}
+
+.map-overlay .tier-banner {
+  width: auto;
+  padding: 6px 14px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
+}
+
+.map-overlay .status {
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: rgba(248, 244, 233, 0.94);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
+  text-align: left;
+}
+
+/* single line, so the pill never hides the green on small screens */
+.map-overlay .status > div {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+}
+
+.map-overlay .status b {
+  font-size: 0.78rem;
+  white-space: nowrap;
+}
+
+.map-overlay .status p {
+  font-size: 0.74rem;
+}
+
+.map-overlay .chip {
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
 }
 
 .holemap {
   display: block;
   width: 100%;
-  height: auto;
+  height: 100%;
 }
 
 .ball {
@@ -424,6 +517,10 @@ button {
   display: flex;
   flex-direction: column;
   gap: 11px;
+  /* if a tall panel (expanded odds recap) outgrows the screen, it scrolls
+     internally instead of pushing the map and choices off-screen */
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .stage-label {
@@ -723,6 +820,24 @@ button {
   color: rgba(29, 43, 32, 0.6);
 }
 
+.recap-advantage {
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.recap-advantage.fairway {
+  color: var(--accent);
+}
+
+.recap-advantage.dart {
+  color: #a07a12;
+}
+
+.recap-advantage.greens {
+  color: #2e6329;
+}
+
 /* ---------- scorecard ---------- */
 
 .scorecard {
@@ -807,6 +922,635 @@ button {
   font-size: 1.5rem;
   line-height: 1.5;
   letter-spacing: 0.06em;
+}
+
+/* share card: show exactly what lands in the group chat */
+.share-block {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.share-preview {
+  font: inherit;
+  font-size: 0.86rem;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  text-align: center;
+  background: var(--cream);
+  border: 1.5px solid var(--line);
+  border-radius: 12px;
+  padding: 12px 10px;
+  color: rgba(29, 43, 32, 0.85);
+}
+
+/* ---------- first-run tutorial ---------- */
+
+.tut-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+  background: rgba(20, 42, 28, 0.62);
+  backdrop-filter: blur(3px);
+  animation: tut-fade 0.2s ease both;
+}
+
+.tut-card {
+  position: relative;
+  width: 100%;
+  max-width: 420px;
+  background: var(--paper);
+  border-radius: 18px;
+  padding: 24px 20px 20px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  animation: tut-rise 0.28s cubic-bezier(0.2, 1.1, 0.4, 1) both;
+}
+
+.tut-skip {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(29, 43, 32, 0.5);
+}
+
+.tut-title {
+  font-size: 1.6rem;
+  font-weight: 900;
+  line-height: 1.05;
+}
+
+.tut-body {
+  font-size: 0.98rem;
+  line-height: 1.5;
+  color: rgba(29, 43, 32, 0.85);
+  min-height: 132px;
+}
+
+.tut-bar {
+  display: flex;
+  height: 10px;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  margin-top: 12px;
+}
+
+.tut-bar .seg {
+  display: block;
+  height: 100%;
+}
+
+.tut-players {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 14px 0;
+  text-align: center;
+}
+
+.tut-players > span {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  flex: 1;
+}
+
+.tut-players em {
+  font-style: normal;
+  font-weight: 800;
+  font-size: 0.76rem;
+}
+
+.tut-players small {
+  font-size: 0.68rem;
+  color: rgba(29, 43, 32, 0.6);
+}
+
+.tut-dots {
+  display: flex;
+  justify-content: center;
+  gap: 7px;
+}
+
+.tut-dots span {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--line);
+  transition: background 0.15s ease;
+}
+
+.tut-dots span.on {
+  background: var(--ink);
+}
+
+.tut-nav {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.tut-nav .cta {
+  flex: 1;
+  padding: 13px;
+}
+
+.tut-nav > span {
+  flex: 1;
+}
+
+@keyframes tut-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes tut-rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.98);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tut-backdrop,
+  .tut-card {
+    animation: none;
+  }
+}
+
+/* ---------- characters ---------- */
+
+.screen.pick {
+  gap: 16px;
+}
+
+.pick-title {
+  font-size: 2rem;
+  font-weight: 900;
+  margin: 4px 0 2px;
+}
+
+.char-cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+@media (max-width: 480px) {
+  .char-cards {
+    grid-template-columns: 1fr;
+  }
+}
+
+.char-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  text-align: center;
+  background: var(--cream);
+  border: 1.5px solid var(--line);
+  border-radius: 14px;
+  padding: 16px 10px 14px;
+  transition:
+    transform 0.08s ease,
+    border-color 0.12s ease,
+    box-shadow 0.12s ease;
+}
+
+.char-card:hover,
+.char-card:focus-visible {
+  border-color: var(--ink);
+  box-shadow: 0 0 0 1.5px var(--ink);
+}
+
+.char-card:active {
+  transform: scale(0.97);
+}
+
+.char-card b {
+  font-size: 1.02rem;
+  margin-top: 4px;
+}
+
+.char-card.fairway b {
+  color: var(--accent);
+}
+
+.char-card.dart b {
+  color: #a07a12;
+}
+
+.char-card.greens b {
+  color: #2e6329;
+}
+
+.char-tagline {
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(29, 43, 32, 0.5);
+}
+
+.char-edge {
+  font-size: 0.78rem;
+  color: rgba(29, 43, 32, 0.68);
+  line-height: 1.35;
+}
+
+/* per-character daily records on the home screen */
+.char-records {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 7px;
+}
+
+.char-record {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1.5px solid var(--line);
+  border-radius: 12px;
+  padding: 7px 12px;
+}
+
+.char-record-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  text-align: left;
+}
+
+.char-record-text b {
+  font-size: 0.85rem;
+}
+
+.char-record-text span {
+  font-size: 0.74rem;
+  color: rgba(29, 43, 32, 0.6);
+}
+
+/* end-of-round recap tiles */
+.recap-tiles {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.recap-tiles .stat b {
+  font-size: 1.02rem;
+}
+
+@media (max-width: 480px) {
+  .recap-tiles {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* small chip shown throughout the round */
+.char-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--cream);
+  border: 1.5px solid var(--line);
+  border-radius: 999px;
+  padding: 2px 11px 2px 4px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(29, 43, 32, 0.75);
+}
+
+.char-chip .avatar {
+  display: block;
+}
+
+.result-chip {
+  align-self: center;
+  padding: 4px 14px 4px 6px;
+  font-size: 0.8rem;
+}
+
+@media (max-width: 420px) {
+  .char-chip-name {
+    display: none;
+  }
+
+  .char-chip {
+    padding: 2px 6px;
+  }
+}
+
+/* advantage splash — a character's edge that actually helped the last shot */
+.advantage-splash {
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  top: 50%;
+  margin: 0 auto;
+  max-width: 340px;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 11px 15px;
+  border-radius: 14px;
+  background: rgba(248, 244, 233, 0.97);
+  border: 2px solid var(--gold);
+  box-shadow: 0 8px 26px rgba(0, 0, 0, 0.4);
+  z-index: 5;
+  pointer-events: none;
+  transform: translateY(-50%);
+  animation: splash-pop 0.42s cubic-bezier(0.2, 1.3, 0.5, 1) both;
+}
+
+.advantage-splash.fairway {
+  border-color: var(--accent);
+}
+
+.advantage-splash.dart {
+  border-color: var(--gold);
+}
+
+.advantage-splash.greens {
+  border-color: var(--good);
+}
+
+.advantage-splash .avatar {
+  flex-shrink: 0;
+}
+
+.advantage-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.advantage-text b {
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.advantage-splash.fairway .advantage-text b {
+  color: var(--accent);
+}
+
+.advantage-splash.dart .advantage-text b {
+  color: #a07a12;
+}
+
+.advantage-splash.greens .advantage-text b {
+  color: #2e6329;
+}
+
+.advantage-text span {
+  font-size: 0.82rem;
+  color: rgba(29, 43, 32, 0.8);
+  line-height: 1.3;
+}
+
+.advantage-text em {
+  font-style: normal;
+  font-size: 0.74rem;
+  font-weight: 800;
+  color: rgba(29, 43, 32, 0.6);
+}
+
+@keyframes splash-pop {
+  0% {
+    opacity: 0;
+    transform: translateY(-50%) scale(0.8);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(-50%) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .advantage-splash {
+    animation: none;
+  }
+}
+
+/* idle animations — one moving group per character */
+.avatar-fairway .swing {
+  animation: waggle 2.1s ease-in-out infinite alternate;
+  transform-origin: 46px 42px;
+}
+
+@keyframes waggle {
+  from {
+    transform: rotate(-7deg);
+  }
+  to {
+    transform: rotate(6deg);
+  }
+}
+
+.avatar-dart .aim {
+  animation: pulse 1.9s ease-in-out infinite;
+  transform-origin: 80px 30px;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 0.55;
+    transform: scale(0.92);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.05);
+  }
+}
+
+.avatar-greens .tap {
+  animation: tap 1.7s ease-in-out infinite alternate;
+  transform-origin: 60px 42px;
+}
+
+@keyframes tap {
+  from {
+    transform: rotate(-4deg);
+  }
+  to {
+    transform: rotate(5deg);
+  }
+}
+
+/* ---------- classic (original Break Par) view ---------- */
+
+/* side-profile map sits on the pale-green panel from the original */
+.map-wrap.side {
+  background: #d5e6cf;
+}
+
+/* darker pills so they read on the light panel */
+.map-wrap.side + * .tier-banner,
+.classic .map-overlay .chip {
+  box-shadow: 0 2px 8px rgba(29, 43, 32, 0.18);
+}
+
+/* stacked full-width choice rows, text instead of odds bars */
+.classic .choices {
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+
+.classic .choice {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  row-gap: 3px;
+  column-gap: 12px;
+  align-items: center;
+  min-height: 0;
+  padding: 14px 16px;
+}
+
+.classic .choice .choice-head {
+  font-size: 0.92rem;
+}
+
+.classic .choice .choice-blurb {
+  min-height: 0;
+}
+
+/* same odds bar as modern, stretched across the bottom of the row */
+.classic .choice .odds-bar {
+  grid-column: 1 / -1;
+  grid-row: 3;
+  margin-top: 5px;
+}
+
+.classic .choice .choice-foot {
+  grid-column: 2;
+  grid-row: 1 / 3;
+  align-items: flex-end;
+  text-align: right;
+}
+
+.classic .choice .foot-row {
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 3px;
+}
+
+.classic .choice .tag {
+  font-size: 0.72rem;
+}
+
+/* classic scorecard: 18 squares, ○ under par · □ over par */
+.classic-scorecard {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.csc-grid {
+  display: grid;
+  grid-template-columns: repeat(9, 1fr);
+  gap: 6px;
+}
+
+.csc-cell {
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--cream);
+  border: 1.5px solid var(--line);
+  border-radius: 9px;
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+
+.csc-cell.todo {
+  color: rgba(29, 43, 32, 0.45);
+  font-weight: 600;
+}
+
+.csc-cell.under {
+  border-radius: 50%;
+  border-color: var(--good);
+  color: #2e6329;
+}
+
+.csc-cell.over {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.csc-cell.over2 {
+  border-color: var(--accent);
+  color: var(--accent);
+  box-shadow: inset 0 0 0 2.5px var(--paper), inset 0 0 0 4px var(--accent);
+}
+
+.csc-cell.current {
+  box-shadow: 0 0 0 2px var(--paper), 0 0 0 3.5px var(--accent);
+}
+
+.csc-cell.over2.current {
+  box-shadow:
+    inset 0 0 0 2.5px var(--paper),
+    inset 0 0 0 4px var(--accent),
+    0 0 0 2px var(--paper),
+    0 0 0 3.5px var(--accent);
+}
+
+.csc-foot {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.68rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: rgba(29, 43, 32, 0.55);
+}
+
+/* wide screens: map on the left, decisions on the right — nothing to scroll */
+@media (min-width: 900px) {
+  .screen.play {
+    max-width: 980px;
+    display: grid;
+    grid-template-columns: minmax(0, 11fr) minmax(0, 9fr);
+    grid-template-rows: auto auto minmax(0, 1fr);
+    column-gap: 18px;
+  }
+
+  .screen.play .top-row,
+  .screen.play .hole-head {
+    grid-column: 1 / -1;
+  }
+
+  .screen.play .map-wrap {
+    grid-column: 1;
+    grid-row: 3;
+  }
+
+  .screen.play .panel {
+    grid-column: 2;
+    grid-row: 3;
+  }
 }
 
 @media (max-width: 420px) {

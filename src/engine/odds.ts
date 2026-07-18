@@ -1,6 +1,7 @@
 import type {
   ApproachOdds,
   BallState,
+  CharacterId,
   Choice,
   Conditions,
   HazardZone,
@@ -9,6 +10,7 @@ import type {
   PuttOdds,
   ShortOdds,
 } from './types'
+import { DART_BUFF, FAIRWAY_BUFF, GREENS_BUFF } from './characters'
 import { reachableZones } from './layout'
 
 const clamp01 = (x: number) => Math.max(0, Math.min(1, x))
@@ -36,7 +38,7 @@ function normalize<T extends Record<string, number>>(o: T, keys: (keyof T)[]): v
 // ---------------------------------------------------------------------------
 
 /** carry window in yards from the ball, per choice */
-export function driveWindow(choice: Choice, ballPos: number, layout: HoleLayout): [number, number] {
+export function driveWindow(choice: Choice, ballPos: number, layout: HoleLayout, extraYards = 0): [number, number] {
   const spans: Record<Choice, [number, number]> = {
     safe: [205, 240],
     normal: [235, 272],
@@ -44,7 +46,7 @@ export function driveWindow(choice: Choice, ballPos: number, layout: HoleLayout)
   }
   const [a, b] = spans[choice]
   const maxTo = layout.length - 12 // a drive never finishes on the green (drivable = tiny approach)
-  return [Math.min(ballPos + a, maxTo - 10), Math.min(ballPos + b, maxTo)]
+  return [Math.min(ballPos + a + extraYards, maxTo - 10), Math.min(ballPos + b + extraYards, maxTo)]
 }
 
 export interface ZoneShare {
@@ -119,6 +121,7 @@ export function longOdds(
   ball: BallState,
   choice: Choice,
   mode: 'tee' | 'layup',
+  character?: CharacterId,
 ): LongOddsDetail {
   const m = pressure(layout.spec.strokeIndex, layout.spec.par, cond)
   const base = { ...(mode === 'tee' ? TEE_BASE : LAYUP_BASE)[choice] }
@@ -132,7 +135,16 @@ export function longOdds(
   if (choice === 'normal') base.trouble *= 1 + 0.8 * m
   if (choice === 'aggressive') base.trouble *= 1 + 2.4 * m
 
-  let window = driveWindow(choice, ball.pos, layout)
+  // the Fairway Finder's edge lives off the tee box only
+  const finder = character === 'fairway' && mode === 'tee'
+  if (finder) {
+    base.dialed *= FAIRWAY_BUFF.dialed
+    base.fairway *= FAIRWAY_BUFF.fairway
+    base.rough *= FAIRWAY_BUFF.rough
+    base.trouble *= FAIRWAY_BUFF.trouble
+  }
+
+  let window = driveWindow(choice, ball.pos, layout, finder ? FAIRWAY_BUFF.extraYards : 0)
   if (mode === 'layup') {
     const target = layout.length - (choice === 'safe' ? 100 : 78)
     window = [target - (choice === 'safe' ? 14 : 20), target + (choice === 'safe' ? 14 : 20)]
@@ -248,10 +260,19 @@ export function approachOdds(
   ball: BallState,
   choice: Choice,
   mode: ApproachMode,
+  character?: CharacterId,
 ): ApproachOddsDetail {
   const m = pressure(layout.spec.strokeIndex, layout.spec.par, cond)
   const lie: LieRow = ball.lie === 'tee' ? 'tee' : (ball.lie as LieRow)
   const row = { ...APPROACH_BASE[lie][choice] }
+
+  // the Dart Thrower's edge: every approach-style swing flies truer
+  if (character === 'dart') {
+    row.kickin *= DART_BUFF.kickin
+    row.makeable *= DART_BUFF.makeable
+    row.lag *= DART_BUFF.lag
+    row.scramble *= DART_BUFF.scramble
+  }
 
   row.kickin *= 1 - (choice === 'safe' ? 0.5 : 0.6) * m
   row.makeable *= 1 - (choice === 'safe' ? 0.3 : 0.35) * m
@@ -291,8 +312,10 @@ export function approachOdds(
     sand: 0,
     water: 0,
   }
-  // Hazards can claim at most 70% of missed greens; the rest is plain fringe/rough.
-  const hazardable = row.scramble * 0.7
+  // Hazards claim a choice-scaled share of missed greens; the rest is plain
+  // fringe/rough. Safe bails toward the fat side, so its misses rarely find
+  // the short-side trouble — hunting pins is what brings it in play.
+  const hazardable = row.scramble * (choice === 'safe' ? 0.32 : choice === 'normal' ? 0.7 : 0.88)
   let claimed = 0
   for (const s of shares) {
     if (s.bucket === 'trees') continue // near the green, tree misses are just fringe junk
@@ -304,7 +327,7 @@ export function approachOdds(
 
   normalize(odds as unknown as Record<string, number>, ['kickin', 'makeable', 'lag', 'fringe', 'sand', 'water'])
 
-  const holeoutBase =
+  let holeoutBase =
     mode === 'par3tee'
       ? HOLEOUT.par3Tee[choice]
       : mode === 'go'
@@ -312,6 +335,7 @@ export function approachOdds(
         : mode === 'wedge'
           ? HOLEOUT.wedge[choice]
           : HOLEOUT.approach[choice] * HOLEOUT_LIE[lie]
+  if (character === 'dart') holeoutBase *= DART_BUFF.holeout
   odds.holeout = holeoutBase
   const scale = 1 - holeoutBase
   odds.kickin *= scale
@@ -353,7 +377,7 @@ const PUTT_DIST = {
   long: { min: 22, max: 60, midpoint: 35, makeSlope: 0.045, threeSlope: 0.035 },
 } as const
 
-export function puttOdds(cond: Conditions, feet: number, choice: Choice): PuttOdds {
+export function puttOdds(cond: Conditions, feet: number, choice: Choice, character?: CharacterId): PuttOdds {
   const range = feet <= 20 ? 'short' : 'long'
   const base = PUTT_BASE[range][choice]
   const speed = GREEN_SPEED[cond.greens]
@@ -362,6 +386,11 @@ export function puttOdds(cond: Conditions, feet: number, choice: Choice): PuttOd
 
   let one = base.one * speed.make * (1 - delta * d.makeSlope)
   let three = base.three * speed.three * (1 + delta * d.threeSlope)
+  // the Greens Keeper's edge — applied before the lag cap so caps stay honest
+  if (character === 'greens') {
+    one *= GREENS_BUFF.one
+    three *= GREENS_BUFF.three
+  }
   // Lagging is the whole point of lagging: it caps the disaster.
   if (choice === 'safe') three = Math.min(three, 8)
   one = Math.max(0.5, one)

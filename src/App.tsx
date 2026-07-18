@@ -1,29 +1,40 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { characterById } from './engine/characters'
 import { courseBySlug } from './engine/courses'
 import { dailySetup, localDateKey, practiceSetup, toParLabel, type DailySetup } from './engine/daily'
 import { longOdds } from './engine/odds'
-import type { Choice } from './engine/types'
+import { oddsFor } from './engine/resolve'
+import type { ApproachOdds, CharacterAdvantage, CharacterId, Choice } from './engine/types'
 import {
   advanceHole,
   applyChoice,
+  buildRecap,
   holeInPlay,
   loadHistory,
   loadRound,
+  loadUiMode,
   recordResult,
   roundToPar,
   saveRound,
-  startDailyRound,
+  saveUiMode,
+  newRound,
   startPracticeRound,
   usesBudget,
   type HistoryEntry,
   type RoundState,
+  type UiMode,
 } from './state/store'
 import { track } from './lib/analytics'
+import { CharacterAvatar } from './ui/Avatars'
 import { GreenView, HoleMap } from './ui/HoleMap'
-import { ChoiceCards, ContextChips, HoleComplete, Scorecard, StatusBanner } from './ui/panels'
-import { HomeScreen, ResultScreen } from './ui/screens'
+import { SideMap } from './ui/SideMap'
+import { ChoiceCards, ClassicScorecard, HazardChips, HoleComplete, Scorecard, StatusBanner, TierBanner } from './ui/panels'
+import { CharacterPickScreen, HomeScreen, ResultScreen } from './ui/screens'
+import { Tutorial, hasSeenTutorial } from './ui/Tutorial'
 
-type View = 'home' | 'play' | 'result'
+type View = 'home' | 'pick' | 'play' | 'result'
+/** setup is generated when the pick screen opens, so the conditions it shows are the ones you play */
+type PendingStart = { mode: 'daily' | 'practice'; setup: DailySetup }
 
 export default function App() {
   const [round, setRound] = useState<RoundState | null>(() => loadRound())
@@ -33,8 +44,16 @@ export default function App() {
     return r && !r.complete ? 'play' : 'home'
   })
   const [selected, setSelected] = useState<Choice | null>(null)
+  const [uiMode, setUiMode] = useState<UiMode>(loadUiMode)
+  const [pending, setPending] = useState<PendingStart | null>(null)
+  const [showTutorial, setShowTutorial] = useState(() => !hasSeenTutorial())
+  /** which result the result view shows — the daily card or a finished practice round */
+  const [resultFor, setResultFor] = useState<'daily' | 'practice'>('daily')
   const [animating, setAnimating] = useState(false)
+  const [splash, setSplash] = useState<CharacterAdvantage | null>(null)
+  const [splashKey, setSplashKey] = useState(0)
   const animTimer = useRef<number | null>(null)
+  const splashTimer = useRef<number | null>(null)
 
   useEffect(() => {
     saveRound(round)
@@ -43,6 +62,7 @@ export default function App() {
   useEffect(
     () => () => {
       if (animTimer.current) window.clearTimeout(animTimer.current)
+      if (splashTimer.current) window.clearTimeout(splashTimer.current)
     },
     [],
   )
@@ -53,43 +73,77 @@ export default function App() {
 
   const previewWindow = useMemo<[number, number] | null>(() => {
     if (!hole || !selected || animating) return null
-    if (hole.stage === 'tee') return longOdds(hole.layout, hole.cond, hole.ball, selected, 'tee').window
+    if (hole.stage === 'tee') return longOdds(hole.layout, hole.cond, hole.ball, selected, 'tee', hole.character).window
     if (hole.stage === 'second' && selected !== 'aggressive')
-      return longOdds(hole.layout, hole.cond, hole.ball, selected, 'layup').window
-    if (hole.stage === 'second') return [hole.layout.length - 40, hole.layout.length]
-    if (hole.stage === 'approach') return [hole.layout.length - 30, hole.layout.length]
+      return longOdds(hole.layout, hole.cond, hole.ball, selected, 'layup', hole.character).window
     return null
+  }, [hole, selected, animating])
+
+  // approach-style shots get landing rings driven by the full odds distribution
+  const previewApproach = useMemo<ApproachOdds | null>(() => {
+    if (!hole || !selected || animating) return null
+    const approachStyle = hole.stage === 'approach' || (hole.stage === 'second' && selected === 'aggressive')
+    if (!approachStyle) return null
+    const o = oddsFor(hole, selected)
+    return o.kind === 'approach' ? o : null
   }, [hole, selected, animating])
 
   if (view === 'home') {
     return (
-      <HomeScreen
-        history={history}
-        hasActiveRound={!!round && !round.complete}
-        playedToday={playedToday}
-        onTeeOff={() => {
-          const r = startDailyRound()
-          track('round_started', { mode: 'daily', course: r.courseSlug, puzzle_number: r.puzzleNumber })
+      <>
+        {showTutorial && <Tutorial onClose={() => setShowTutorial(false)} />}
+        <HomeScreen
+          history={history}
+          onHowToPlay={() => setShowTutorial(true)}
+          activeRound={
+            round && !round.complete
+              ? { mode: round.mode, courseName: courseBySlug(round.courseSlug)?.name ?? '' }
+              : null
+          }
+          playedToday={playedToday}
+          onTeeOff={() => {
+            setPending({ mode: 'daily', setup: dailySetup() })
+            setView('pick')
+          }}
+          onResume={() => setView('play')}
+          onPractice={(slug) => {
+            setPending({ mode: 'practice', setup: practiceSetup(slug, `${Date.now()}`) })
+            setView('pick')
+          }}
+          onShowResult={() => {
+            setResultFor('daily')
+            setView('result')
+          }}
+        />
+      </>
+    )
+  }
+
+  if (view === 'pick') {
+    const start = pending ?? { mode: 'daily' as const, setup: dailySetup() }
+    return (
+      <CharacterPickScreen
+        setup={start.setup}
+        practice={start.mode === 'practice'}
+        onPick={(character: CharacterId) => {
+          const r = newRound(start.setup, start.mode, character)
+          track('round_started', { mode: start.mode, course: r.courseSlug, puzzle_number: r.puzzleNumber, character })
           setRound(r)
           setSelected(null)
+          setPending(null)
           setView('play')
         }}
-        onResume={() => setView('play')}
-        onPractice={(slug) => {
-          const r = startPracticeRound(slug)
-          track('round_started', { mode: 'practice', course: slug, puzzle_number: r.puzzleNumber })
-          setRound(r)
-          setSelected(null)
-          setView('play')
+        onBack={() => {
+          setPending(null)
+          setView('home')
         }}
-        onShowResult={() => setView('result')}
       />
     )
   }
 
   if (view === 'result') {
     const entry = playedToday
-    const isPractice = !!round && round.mode === 'practice' && round.complete
+    const isPractice = resultFor === 'practice' && !!round && round.mode === 'practice' && round.complete
     let setup: DailySetup
     let results = entry?.results ?? []
     let toPar = entry?.toPar ?? 0
@@ -100,17 +154,28 @@ export default function App() {
     } else {
       setup = dailySetup()
     }
+    // the full shot-by-shot round only survives in localStorage for the round it belongs to
+    const recapSource = isPractice
+      ? round
+      : round && round.mode === 'daily' && round.complete && round.dateKey === entry?.dateKey
+        ? round
+        : null
     return (
       <ResultScreen
         setup={setup}
         results={results}
         toPar={toPar}
         practice={isPractice}
+        recap={recapSource ? buildRecap(recapSource) : null}
+        character={isPractice && round ? round.character : entry?.character}
         history={history}
         onHome={() => setView('home')}
         onPracticeAgain={() => {
           if (round) {
-            setRound(startPracticeRound(round.courseSlug))
+            // quick rematch: same course, same player
+            const r = startPracticeRound(round.courseSlug, round.character)
+            track('round_started', { mode: 'practice', course: r.courseSlug, puzzle_number: r.puzzleNumber, character: r.character })
+            setRound(r)
             setSelected(null)
             setView('play')
           }
@@ -142,26 +207,64 @@ export default function App() {
     if (choice === 'aggressive' && usesBudget(hole.stage) && round.aggressiveLeft <= 0) return
     setAnimating(true)
     setSelected(null)
-    setRound((r) => (r ? applyChoice(r, choice) : r))
+    setSplash(null)
+    const nextRound = applyChoice(round, choice)
+    setRound(nextRound)
+    const shots = nextRound.hole?.shots ?? []
+    const adv = shots[shots.length - 1]?.advantage
+    if (adv) {
+      // let the ball settle, then splash the earned edge
+      if (splashTimer.current) window.clearTimeout(splashTimer.current)
+      splashTimer.current = window.setTimeout(() => {
+        setSplash(adv)
+        setSplashKey((k) => k + 1)
+        splashTimer.current = window.setTimeout(() => setSplash(null), 4200)
+      }, 520)
+    }
     animTimer.current = window.setTimeout(() => setAnimating(false), 700)
   }
 
+  const toggleUi = () => {
+    setUiMode((m) => {
+      const nextMode: UiMode = m === 'modern' ? 'classic' : 'modern'
+      saveUiMode(nextMode)
+      return nextMode
+    })
+  }
+
   const next = () => {
+    if (splashTimer.current) window.clearTimeout(splashTimer.current)
+    setSplash(null)
     const after = advanceHole(round)
     setRound(after)
     setSelected(null)
     if (after.complete) {
       const h = recordResult(after)
       setHistory(h)
+      setResultFor(after.mode)
       setView('result')
     }
   }
 
+  const classic = uiMode === 'classic'
+  const char = characterById(round.character)
+
   return (
-    <div className="screen play">
-      <button className="home-link" onClick={() => setView('home')} aria-label="Back to clubhouse">
-        ‹ Clubhouse
-      </button>
+    <div className={`screen play${classic ? ' classic' : ''}`}>
+      <div className="top-row">
+        <button className="home-link" onClick={() => setView('home')} aria-label="Back to clubhouse">
+          ‹ Clubhouse
+        </button>
+        {char && (
+          <div className="char-chip" title={char.edge}>
+            <CharacterAvatar id={char.id} size={26} />
+            <span className="char-chip-name">{char.name}</span>
+          </div>
+        )}
+        <button className="home-link" onClick={toggleUi}>
+          ⇄ {classic ? 'Classic view' : 'Modern view'}
+        </button>
+      </div>
       <header className="hole-head">
         <div className="hole-id">
           <b className="hole-num">{spec.number}</b>
@@ -184,11 +287,42 @@ export default function App() {
         </div>
       </header>
 
-      <div className="map-wrap">
+      <div className={`map-wrap${classic && hole.stage !== 'putt' ? ' side' : ''}`}>
         {hole.stage === 'putt' ? (
           <GreenView feet={hole.ball.puttFeet ?? 20} holeNumber={spec.number} greens={round.cond.greens} />
+        ) : classic ? (
+          <SideMap layout={hole.layout} ball={hole.ball} />
         ) : (
-          <HoleMap layout={hole.layout} ball={hole.ball} previewWindow={previewWindow} previewChoice={selected} />
+          <HoleMap layout={hole.layout} ball={hole.ball} previewWindow={previewWindow} previewApproach={previewApproach} previewChoice={selected} />
+        )}
+        {!holeDone && (
+          <div className="map-overlay top">
+            {hole.shots.length === 0 && hole.stage !== 'putt' ? <TierBanner hole={hole} /> : <StatusBanner hole={hole} />}
+          </div>
+        )}
+        {splash && (
+          <div key={splashKey} className={`advantage-splash ${splash.id}`} role="status">
+            <CharacterAvatar id={splash.id} size={34} />
+            <div className="advantage-text">
+              <b>{splash.title}</b>
+              <span>{splash.note}</span>
+              <em>{splash.stat}</em>
+            </div>
+          </div>
+        )}
+        {!holeDone && (
+          <div className="map-overlay bottom">
+            {hole.stage === 'putt' ? (
+              <div className="chips slim center">
+                <span className="chip">
+                  {(hole.ball.puttFeet ?? 0) <= 20 ? 'Birdie-range putt' : 'Long putt'} · ~{hole.ball.puttFeet} ft
+                </span>
+                <span className="chip">{round.cond.greens} green</span>
+              </div>
+            ) : hole.shots.length === 0 ? (
+              <HazardChips hole={hole} />
+            ) : null}
+          </div>
         )}
       </div>
 
@@ -203,26 +337,22 @@ export default function App() {
           />
         ) : (
           <>
-            {hole.shots.length === 0 && hole.stage !== 'putt' ? <ContextChips hole={hole} /> : <StatusBanner hole={hole} />}
-            {hole.stage === 'putt' && (
-              <div className="chips slim center">
-                <span className="chip">
-                  {(hole.ball.puttFeet ?? 0) <= 20 ? 'Birdie-range putt' : 'Long putt'} · ~{hole.ball.puttFeet} ft
-                </span>
-                <span className="chip">{round.cond.greens} green</span>
-              </div>
-            )}
             <ChoiceCards
               hole={hole}
               aggressiveLeft={round.aggressiveLeft}
               selected={selected}
               disabled={animating}
+              classic={classic}
               onSelect={setSelected}
               onCommit={() => selected && commit(selected)}
             />
           </>
         )}
-        <Scorecard course={course} scores={round.scores} currentHole={round.currentHole} />
+        {classic ? (
+          <ClassicScorecard course={course} scores={round.scores} currentHole={round.currentHole} />
+        ) : (
+          <Scorecard course={course} scores={round.scores} currentHole={round.currentHole} />
+        )}
       </div>
     </div>
   )

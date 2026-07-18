@@ -1,5 +1,6 @@
 import type {
   BallState,
+  CharacterId,
   Choice,
   Conditions,
   HoleLayout,
@@ -13,11 +14,14 @@ import type {
 import type { HazardZone } from './types'
 import type { Rng } from './rng'
 import { pickWeighted } from './rng'
+import { approachAdvantage, longAdvantage, puttAdvantage } from './advantage'
 import { approachOdds, longOdds, puttOdds, shortOdds, type ApproachMode, type ZoneShare } from './odds'
 
 export interface HoleInPlay {
   layout: HoleLayout
   cond: Conditions
+  /** round-long playstyle; shifts the odds the whole model sees */
+  character?: CharacterId
   stage: Stage
   ball: BallState
   strokes: number
@@ -28,10 +32,11 @@ export interface HoleInPlay {
   score?: HoleScore
 }
 
-export function startHole(layout: HoleLayout, cond: Conditions): HoleInPlay {
+export function startHole(layout: HoleLayout, cond: Conditions, character?: CharacterId): HoleInPlay {
   return {
     layout,
     cond,
+    character,
     stage: layout.spec.par === 3 ? 'approach' : 'tee',
     ball: { pos: 0, lie: 'tee', side: 'center' },
     strokes: 0,
@@ -54,15 +59,15 @@ function approachMode(h: HoleInPlay): ApproachMode {
 export function oddsFor(h: HoleInPlay, choice: Choice): Odds {
   switch (h.stage) {
     case 'tee':
-      return longOdds(h.layout, h.cond, h.ball, choice, 'tee').odds
+      return longOdds(h.layout, h.cond, h.ball, choice, 'tee', h.character).odds
     case 'second':
       return choice === 'aggressive'
-        ? approachOdds(h.layout, h.cond, h.ball, choice, 'go').odds
-        : longOdds(h.layout, h.cond, h.ball, choice, 'layup').odds
+        ? approachOdds(h.layout, h.cond, h.ball, choice, 'go', h.character).odds
+        : longOdds(h.layout, h.cond, h.ball, choice, 'layup', h.character).odds
     case 'approach':
-      return approachOdds(h.layout, h.cond, h.ball, choice, approachMode(h)).odds
+      return approachOdds(h.layout, h.cond, h.ball, choice, approachMode(h), h.character).odds
     case 'putt':
-      return puttOdds(h.cond, h.ball.puttFeet ?? 20, choice)
+      return puttOdds(h.cond, h.ball.puttFeet ?? 20, choice, h.character)
     case 'shortgame':
       return shortOdds(h.layout, h.cond, h.ball, choice)
     default:
@@ -143,6 +148,9 @@ export function playShot(h: HoleInPlay, choice: Choice, rng: Rng): HoleInPlay {
   const faced = facedAll(h)
   const L = h.layout.length
   const spec = h.layout.spec
+  // capture the lie/position before the shot mutates it — advantage detection
+  // re-scores this exact shot with and without the character
+  const preBall: BallState = { ...h.ball }
 
   switch (h.stage) {
     case 'tee':
@@ -152,7 +160,7 @@ export function playShot(h: HoleInPlay, choice: Choice, rng: Rng): HoleInPlay {
         return h
       }
       const mode = h.stage === 'tee' ? 'tee' : 'layup'
-      const detail = longOdds(h.layout, h.cond, h.ball, choice, mode)
+      const detail = longOdds(h.layout, h.cond, h.ball, choice, mode, h.character)
       const o = detail.odds
       const bucket = pickWeighted(rng, {
         dialed: o.dialed,
@@ -204,7 +212,8 @@ export function playShot(h: HoleInPlay, choice: Choice, rng: Rng): HoleInPlay {
       }
 
       h.ball = after
-      h.shots.push({ stage: h.stage, choice, outcome: bucket, penalty, faced, after })
+      const advantage = h.stage === 'tee' ? (longAdvantage(h.layout, h.cond, preBall, choice, h.character, bucket) ?? undefined) : undefined
+      h.shots.push({ stage: h.stage, choice, outcome: bucket, penalty, faced, after, advantage })
       h.stage = spec.par === 5 && h.stage === 'tee' ? 'second' : 'approach'
       h.status = teeStatus(bucket, penalty)
       return h
@@ -216,13 +225,14 @@ export function playShot(h: HoleInPlay, choice: Choice, rng: Rng): HoleInPlay {
     }
 
     case 'putt': {
-      const o = puttOdds(h.cond, h.ball.puttFeet ?? 20, choice)
+      const o = puttOdds(h.cond, h.ball.puttFeet ?? 20, choice, h.character)
       const bucket = pickWeighted(rng, { one: o.one, two: o.two, three: o.three })
       const putts = bucket === 'one' ? 1 : bucket === 'two' ? 2 : 3
       h.strokes += putts
       const feet = h.ball.puttFeet ?? 20
       h.ball = { ...h.ball, pos: L, lie: 'green', puttFeet: 0 }
-      h.shots.push({ stage: 'putt', choice, outcome: bucket, penalty: false, faced, after: h.ball })
+      const puttAdv = puttAdvantage(h.cond, feet, choice, h.character, bucket) ?? undefined
+      h.shots.push({ stage: 'putt', choice, outcome: bucket, penalty: false, faced, after: h.ball, advantage: puttAdv })
       finish(
         h,
         bucket === 'one'
@@ -336,7 +346,8 @@ function resolveApproach(
   mode: ApproachMode,
 ): void {
   const L = h.layout.length
-  const detail = approachOdds(h.layout, h.cond, h.ball, choice, mode)
+  const preBall: BallState = { ...h.ball }
+  const detail = approachOdds(h.layout, h.cond, h.ball, choice, mode, h.character)
   const o = detail.odds
   const bucket = pickWeighted(rng, {
     holeout: o.holeout,
@@ -349,18 +360,19 @@ function resolveApproach(
   })
   h.strokes += 1
   const stageWas = h.stage
+  const advantage = approachAdvantage(h.layout, h.cond, preBall, choice, mode, h.character, bucket) ?? undefined
   let penalty = false
 
   if (bucket === 'holeout') {
     h.ball = { pos: L, lie: 'green', side: 'center', puttFeet: 0 }
-    h.shots.push({ stage: stageWas, choice, outcome: bucket, penalty, faced, after: h.ball })
+    h.shots.push({ stage: stageWas, choice, outcome: bucket, penalty, faced, after: h.ball, advantage })
     finish(h, h.strokes === 1 ? 'ACE. Buy the bar a round.' : 'Holed it from the fairway — pandemonium')
     return
   }
   if (bucket === 'kickin') {
     h.strokes += 1 // tap-in
     h.ball = { pos: L, lie: 'green', side: 'center', puttFeet: 0 }
-    h.shots.push({ stage: stageWas, choice, outcome: bucket, penalty, faced, after: h.ball })
+    h.shots.push({ stage: stageWas, choice, outcome: bucket, penalty, faced, after: h.ball, advantage })
     finish(h, 'Stuffed it — kick-in range')
     return
   }
@@ -375,7 +387,7 @@ function resolveApproach(
       bucket === 'makeable'
         ? { tone: 'good', title: 'Birdie look', note: `${feet} feet — on the dance floor.` }
         : { tone: 'even', title: 'Long putt', note: `${feet} feet — lag it close.` }
-    h.shots.push({ stage: stageWas, choice, outcome: bucket, penalty, faced, after: h.ball })
+    h.shots.push({ stage: stageWas, choice, outcome: bucket, penalty, faced, after: h.ball, advantage })
     return
   }
   if (bucket === 'water') {

@@ -3,6 +3,7 @@ import { characterById } from './engine/characters'
 import { courseBySlug } from './engine/courses'
 import { dailySetup, localDateKey, practiceSetup, toParLabel, type DailySetup } from './engine/daily'
 import { longOdds } from './engine/odds'
+import { oddsFor, summarize } from './engine/resolve'
 import type { CharacterAdvantage, CharacterId, Choice } from './engine/types'
 import {
   advanceHole,
@@ -71,12 +72,18 @@ export default function App() {
 
   const previewWindow = useMemo<[number, number] | null>(() => {
     if (!hole || !selected || animating) return null
-    if (hole.stage === 'tee') return longOdds(hole.layout, hole.cond, hole.ball, selected, 'tee').window
+    if (hole.stage === 'tee') return longOdds(hole.layout, hole.cond, hole.ball, selected, 'tee', hole.character).window
     if (hole.stage === 'second' && selected !== 'aggressive')
-      return longOdds(hole.layout, hole.cond, hole.ball, selected, 'layup').window
-    if (hole.stage === 'second') return [hole.layout.length - 40, hole.layout.length]
-    if (hole.stage === 'approach') return [hole.layout.length - 30, hole.layout.length]
+      return longOdds(hole.layout, hole.cond, hole.ball, selected, 'layup', hole.character).window
     return null
+  }, [hole, selected, animating])
+
+  // approach-style shots get a landing ring around the green sized by the real miss odds
+  const previewMiss = useMemo<number | null>(() => {
+    if (!hole || !selected || animating) return null
+    const approachStyle = hole.stage === 'approach' || (hole.stage === 'second' && selected === 'aggressive')
+    if (!approachStyle) return null
+    return summarize(oddsFor(hole, selected)).bad
   }, [hole, selected, animating])
 
   if (view === 'home') {
@@ -279,7 +286,7 @@ export default function App() {
         ) : classic ? (
           <SideMap layout={hole.layout} ball={hole.ball} />
         ) : (
-          <HoleMap layout={hole.layout} ball={hole.ball} previewWindow={previewWindow} previewChoice={selected} />
+          <HoleMap layout={hole.layout} ball={hole.ball} previewWindow={previewWindow} previewMiss={previewMiss} previewChoice={selected} />
         )}
         {!holeDone && (
           <div className="map-overlay top">

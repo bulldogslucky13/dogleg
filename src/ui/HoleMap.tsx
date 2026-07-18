@@ -195,6 +195,8 @@ export function HoleMap(props: {
   layout: HoleLayout
   ball: BallState
   previewWindow: [number, number] | null
+  /** approach-style shots: real missed-green probability for the selected choice */
+  previewMiss: number | null
   previewChoice: Choice | null
 }) {
   const { layout, ball } = props
@@ -330,17 +332,39 @@ export function HoleMap(props: {
     )
   })
 
+  const previewColor = (c: Choice) => (c === 'safe' ? '#7fb56b' : c === 'normal' ? '#d9c15c' : '#d07a5a')
+
   const preview =
     props.previewWindow && props.previewChoice ? (
       <path
         d={ribbonPath(geo, props.previewWindow[0], Math.min(props.previewWindow[1], L), () => 34)}
-        fill={props.previewChoice === 'safe' ? '#7fb56b' : props.previewChoice === 'normal' ? '#d9c15c' : '#d07a5a'}
+        fill={previewColor(props.previewChoice)}
         opacity={0.32}
         stroke="#f4efe3"
         strokeDasharray="5 5"
         strokeWidth={1.4}
       />
     ) : null
+
+  // Landing ring for approach shots: the green plus a miss margin that grows with
+  // the choice's real missed-green odds — the ball can finish anywhere inside it.
+  const missRing = (() => {
+    if (props.previewMiss == null || !props.previewChoice) return null
+    const spread = (6 + props.previewMiss * 95) * Math.min(zoom, 1.2)
+    return (
+      <ellipse
+        cx={greenPt.x}
+        cy={greenPt.y}
+        rx={greenRx + spread}
+        ry={greenRy + spread * 0.8}
+        fill={previewColor(props.previewChoice)}
+        opacity={0.2}
+        stroke="#f4efe3"
+        strokeDasharray="5 5"
+        strokeWidth={1.4}
+      />
+    )
+  })()
 
   const yardsLeft = Math.max(0, Math.round(L - ball.pos))
   const labelPt = at(Math.min(ball.pos + (L - ball.pos) / 2, L - 20))
@@ -387,6 +411,7 @@ export function HoleMap(props: {
       <ellipse cx={greenPt.x} cy={greenPt.y} rx={greenRx} ry={greenRy} fill="url(#mow)" stroke="#5d9049" strokeWidth={2} />
 
       {preview}
+      {missRing}
 
       {/* aim line */}
       <path

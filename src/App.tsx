@@ -36,6 +36,22 @@ type PendingStart = { mode: 'daily' | 'practice'; setup: DailySetup }
 
 const UI_MODE_KEY = 'dogleg:uimode'
 
+function loadUiMode(): UiMode {
+  try {
+    return localStorage.getItem(UI_MODE_KEY) === 'classic' ? 'classic' : 'modern'
+  } catch {
+    return 'modern' // storage blocked: fall back instead of failing the first render
+  }
+}
+
+function saveUiMode(mode: UiMode): void {
+  try {
+    localStorage.setItem(UI_MODE_KEY, mode)
+  } catch {
+    /* storage blocked: the toggle still works for this session */
+  }
+}
+
 export default function App() {
   const [round, setRound] = useState<RoundState | null>(() => loadRound())
   const [history, setHistory] = useState<HistoryEntry[]>(() => loadHistory())
@@ -44,7 +60,7 @@ export default function App() {
     return r && !r.complete ? 'play' : 'home'
   })
   const [selected, setSelected] = useState<Choice | null>(null)
-  const [uiMode, setUiMode] = useState<UiMode>(() => (localStorage.getItem(UI_MODE_KEY) === 'classic' ? 'classic' : 'modern'))
+  const [uiMode, setUiMode] = useState<UiMode>(loadUiMode)
   const [pending, setPending] = useState<PendingStart | null>(null)
   const [showTutorial, setShowTutorial] = useState(() => !hasSeenTutorial())
   /** which result the result view shows — the daily card or a finished practice round */
@@ -227,7 +243,7 @@ export default function App() {
   const toggleUi = () => {
     setUiMode((m) => {
       const nextMode: UiMode = m === 'modern' ? 'classic' : 'modern'
-      localStorage.setItem(UI_MODE_KEY, nextMode)
+      saveUiMode(nextMode)
       return nextMode
     })
   }

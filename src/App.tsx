@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { characterById } from './engine/characters'
 import { courseBySlug } from './engine/courses'
 import { dailySetup, localDateKey, practiceSetup, toParLabel, type DailySetup } from './engine/daily'
 import { longOdds } from './engine/odds'
-import type { Choice } from './engine/types'
+import type { CharacterId, Choice } from './engine/types'
 import {
   advanceHole,
   applyChoice,
@@ -18,11 +19,17 @@ import {
   type HistoryEntry,
   type RoundState,
 } from './state/store'
+import { CharacterAvatar } from './ui/Avatars'
 import { GreenView, HoleMap } from './ui/HoleMap'
-import { ChoiceCards, ContextChips, HoleComplete, Scorecard, StatusBanner } from './ui/panels'
-import { HomeScreen, ResultScreen } from './ui/screens'
+import { SideMap } from './ui/SideMap'
+import { ChoiceCards, ClassicScorecard, HazardChips, HoleComplete, Scorecard, StatusBanner, TierBanner } from './ui/panels'
+import { CharacterPickScreen, HomeScreen, ResultScreen } from './ui/screens'
 
-type View = 'home' | 'play' | 'result'
+type View = 'home' | 'pick' | 'play' | 'result'
+type UiMode = 'modern' | 'classic'
+type PendingStart = { mode: 'daily' } | { mode: 'practice'; slug: string }
+
+const UI_MODE_KEY = 'dogleg:uimode'
 
 export default function App() {
   const [round, setRound] = useState<RoundState | null>(() => loadRound())
@@ -32,6 +39,8 @@ export default function App() {
     return r && !r.complete ? 'play' : 'home'
   })
   const [selected, setSelected] = useState<Choice | null>(null)
+  const [uiMode, setUiMode] = useState<UiMode>(() => (localStorage.getItem(UI_MODE_KEY) === 'classic' ? 'classic' : 'modern'))
+  const [pending, setPending] = useState<PendingStart | null>(null)
   const [animating, setAnimating] = useState(false)
   const animTimer = useRef<number | null>(null)
 
@@ -67,17 +76,37 @@ export default function App() {
         hasActiveRound={!!round && !round.complete}
         playedToday={playedToday}
         onTeeOff={() => {
-          setRound(startDailyRound())
-          setSelected(null)
-          setView('play')
+          setPending({ mode: 'daily' })
+          setView('pick')
         }}
         onResume={() => setView('play')}
         onPractice={(slug) => {
-          setRound(startPracticeRound(slug))
-          setSelected(null)
-          setView('play')
+          setPending({ mode: 'practice', slug })
+          setView('pick')
         }}
         onShowResult={() => setView('result')}
+      />
+    )
+  }
+
+  if (view === 'pick') {
+    const start = pending ?? { mode: 'daily' as const }
+    const courseName =
+      start.mode === 'practice' ? (courseBySlug(start.slug)?.name ?? '') : dailySetup().course.name
+    return (
+      <CharacterPickScreen
+        courseName={courseName}
+        practice={start.mode === 'practice'}
+        onPick={(character: CharacterId) => {
+          setRound(start.mode === 'daily' ? startDailyRound(character) : startPracticeRound(start.slug, character))
+          setSelected(null)
+          setPending(null)
+          setView('play')
+        }}
+        onBack={() => {
+          setPending(null)
+          setView('home')
+        }}
       />
     )
   }
@@ -101,11 +130,13 @@ export default function App() {
         results={results}
         toPar={toPar}
         practice={isPractice}
+        character={isPractice && round ? round.character : entry?.character}
         history={history}
         onHome={() => setView('home')}
         onPracticeAgain={() => {
           if (round) {
-            setRound(startPracticeRound(round.courseSlug))
+            // quick rematch: same course, same player
+            setRound(startPracticeRound(round.courseSlug, round.character))
             setSelected(null)
             setView('play')
           }
@@ -141,6 +172,14 @@ export default function App() {
     animTimer.current = window.setTimeout(() => setAnimating(false), 700)
   }
 
+  const toggleUi = () => {
+    setUiMode((m) => {
+      const nextMode: UiMode = m === 'modern' ? 'classic' : 'modern'
+      localStorage.setItem(UI_MODE_KEY, nextMode)
+      return nextMode
+    })
+  }
+
   const next = () => {
     const after = advanceHole(round)
     setRound(after)
@@ -152,11 +191,25 @@ export default function App() {
     }
   }
 
+  const classic = uiMode === 'classic'
+  const char = characterById(round.character)
+
   return (
-    <div className="screen play">
-      <button className="home-link" onClick={() => setView('home')} aria-label="Back to clubhouse">
-        ‹ Clubhouse
-      </button>
+    <div className={`screen play${classic ? ' classic' : ''}`}>
+      <div className="top-row">
+        <button className="home-link" onClick={() => setView('home')} aria-label="Back to clubhouse">
+          ‹ Clubhouse
+        </button>
+        {char && (
+          <div className="char-chip" title={char.edge}>
+            <CharacterAvatar id={char.id} size={26} />
+            <span className="char-chip-name">{char.name}</span>
+          </div>
+        )}
+        <button className="home-link" onClick={toggleUi}>
+          ⇄ {classic ? 'Classic view' : 'Modern view'}
+        </button>
+      </div>
       <header className="hole-head">
         <div className="hole-id">
           <b className="hole-num">{spec.number}</b>
@@ -179,11 +232,32 @@ export default function App() {
         </div>
       </header>
 
-      <div className="map-wrap">
+      <div className={`map-wrap${classic && hole.stage !== 'putt' ? ' side' : ''}`}>
         {hole.stage === 'putt' ? (
           <GreenView feet={hole.ball.puttFeet ?? 20} holeNumber={spec.number} greens={round.cond.greens} />
+        ) : classic ? (
+          <SideMap layout={hole.layout} ball={hole.ball} />
         ) : (
           <HoleMap layout={hole.layout} ball={hole.ball} previewWindow={previewWindow} previewChoice={selected} />
+        )}
+        {!holeDone && (
+          <div className="map-overlay top">
+            {hole.shots.length === 0 && hole.stage !== 'putt' ? <TierBanner hole={hole} /> : <StatusBanner hole={hole} />}
+          </div>
+        )}
+        {!holeDone && (
+          <div className="map-overlay bottom">
+            {hole.stage === 'putt' ? (
+              <div className="chips slim center">
+                <span className="chip">
+                  {(hole.ball.puttFeet ?? 0) <= 20 ? 'Birdie-range putt' : 'Long putt'} · ~{hole.ball.puttFeet} ft
+                </span>
+                <span className="chip">{round.cond.greens} green</span>
+              </div>
+            ) : hole.shots.length === 0 ? (
+              <HazardChips hole={hole} />
+            ) : null}
+          </div>
         )}
       </div>
 
@@ -198,26 +272,22 @@ export default function App() {
           />
         ) : (
           <>
-            {hole.shots.length === 0 && hole.stage !== 'putt' ? <ContextChips hole={hole} /> : <StatusBanner hole={hole} />}
-            {hole.stage === 'putt' && (
-              <div className="chips slim center">
-                <span className="chip">
-                  {(hole.ball.puttFeet ?? 0) <= 20 ? 'Birdie-range putt' : 'Long putt'} · ~{hole.ball.puttFeet} ft
-                </span>
-                <span className="chip">{round.cond.greens} green</span>
-              </div>
-            )}
             <ChoiceCards
               hole={hole}
               aggressiveLeft={round.aggressiveLeft}
               selected={selected}
               disabled={animating}
+              classic={classic}
               onSelect={setSelected}
               onCommit={() => selected && commit(selected)}
             />
           </>
         )}
-        <Scorecard course={course} scores={round.scores} currentHole={round.currentHole} />
+        {classic ? (
+          <ClassicScorecard course={course} scores={round.scores} currentHole={round.currentHole} />
+        ) : (
+          <Scorecard course={course} scores={round.scores} currentHole={round.currentHole} />
+        )}
       </div>
     </div>
   )

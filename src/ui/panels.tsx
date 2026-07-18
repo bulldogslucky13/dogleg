@@ -95,6 +95,7 @@ export function ChoiceCards(props: {
   aggressiveLeft: number
   selected: Choice | null
   disabled: boolean
+  classic?: boolean
   onSelect: (c: Choice) => void
   onCommit: () => void
 }) {
@@ -104,7 +105,10 @@ export function ChoiceCards(props: {
   const choices: Choice[] = ['safe', 'normal', 'aggressive']
   return (
     <div className="choices-wrap">
-      <div className="stage-label">{stageName(stage, hole.layout.spec.par, hole.ball.lie)}</div>
+      <div className="stage-label">
+        {stageName(stage, hole.layout.spec.par, hole.ball.lie)}
+        {props.classic ? ' — how do you play it?' : ''}
+      </div>
       <div className="choices">
         {choices.map((c) => {
           const summary = summarize(oddsFor(hole, c))
@@ -132,7 +136,9 @@ export function ChoiceCards(props: {
                 <span className="foot-row">
                   <span className={`tag ${tag.tone}`}>{tag.text}</span>
                   {c === 'aggressive' && budgeted && (
-                    <em className="agg-left">{lockout ? 'none left' : `${props.aggressiveLeft} left`}</em>
+                    <em className="agg-left">
+                      {lockout ? 'none left' : `${props.classic ? '🔥 ' : ''}${props.aggressiveLeft} left`}
+                    </em>
                   )}
                 </span>
                 <span className="headline">
@@ -165,17 +171,27 @@ export function StatusBanner(props: { hole: HoleInPlay }) {
   )
 }
 
-export function ContextChips(props: { hole: HoleInPlay }) {
-  const { layout, cond, ball } = props.hole
-  const spec = layout.spec
-  const chips: string[] = []
-  const m = pressure(spec.strokeIndex, spec.par, cond)
+export function TierBanner(props: { hole: HoleInPlay }) {
+  const spec = props.hole.layout.spec
+  const m = pressure(spec.strokeIndex, spec.par, props.hole.cond)
   const tier =
     m < 0.34
       ? { cls: 'good', text: 'Gettable — green light' }
       : m < 0.6
         ? { cls: 'warn', text: 'Pick your moment' }
         : { cls: 'bad', text: 'Card-wrecker — respect it' }
+  return (
+    <div className={`tier-banner ${tier.cls}`}>
+      <span className="tier-dot" />
+      {tier.text}
+    </div>
+  )
+}
+
+export function HazardChips(props: { hole: HoleInPlay }) {
+  const { layout, cond, ball } = props.hole
+  const spec = layout.spec
+  const chips: string[] = []
   if (spec.strokeIndex <= 4) chips.push(`Signature test · SI ${spec.strokeIndex}`)
 
   // geometry-honest hazard chips: only what is actually still in front of the ball
@@ -192,19 +208,14 @@ export function ContextChips(props: { hole: HoleInPlay }) {
   if (cond.wind >= 18) chips.push(`Howling · ${cond.wind} mph`)
   else if (cond.wind >= 12) chips.push(`Breezy · ${cond.wind} mph`)
   if (cond.greens === 'Fast' || cond.greens === 'Firm') chips.push('Slick greens')
+  if (chips.length === 0) return null
   return (
-    <div className="context">
-      <div className={`tier-banner ${tier.cls}`}>
-        <span className="tier-dot" />
-        {tier.text}
-      </div>
-      <div className="chips center">
-        {chips.slice(0, 3).map((c) => (
-          <span key={c} className="chip">
-            {c}
-          </span>
-        ))}
-      </div>
+    <div className="chips center">
+      {chips.slice(0, 3).map((c) => (
+        <span key={c} className="chip">
+          {c}
+        </span>
+      ))}
     </div>
   )
 }
@@ -303,6 +314,41 @@ export function Scorecard(props: { course: CourseSpec; scores: (HoleScore | null
       {row('Par', nine.map((h) => h.par))}
       {row('SI', nine.map((h) => h.strokeIndex))}
       {row('Score', nine.map((_h, i) => (scores[offset + i] ? scores[offset + i]!.strokes : '–')), true)}
+    </div>
+  )
+}
+
+/** Classic scorecard: 18 squares, ○ under par · □ over par, like the original. */
+export function ClassicScorecard(props: { course: CourseSpec; scores: (HoleScore | null)[]; currentHole: number }) {
+  const { course, scores, currentHole } = props
+  const cell = (i: number) => {
+    const s = scores[i]
+    const par = course.holes[i].par
+    let cls = 'csc-cell'
+    if (i === currentHole) cls += ' current'
+    if (s) {
+      if (s.strokes < par) cls += ' under'
+      else if (s.strokes - par === 1) cls += ' over'
+      else if (s.strokes - par >= 2) cls += ' over2'
+    } else cls += ' todo'
+    return (
+      <span key={i} className={cls}>
+        {s ? s.strokes : course.holes[i].number}
+      </span>
+    )
+  }
+  const nine = (from: number) => scores.slice(from, from + 9).reduce((t, s) => t + (s?.strokes ?? 0), 0)
+  const front = nine(0)
+  const back = nine(9)
+  return (
+    <div className="classic-scorecard">
+      <div className="csc-grid">{course.holes.slice(0, 9).map((_, i) => cell(i))}</div>
+      <div className="csc-grid">{course.holes.slice(9).map((_, i) => cell(i + 9))}</div>
+      <div className="csc-foot">
+        <span>Front {front || '–'}</span>
+        <span className="csc-legend">○ under · □ over</span>
+        <span>Back {back || '–'}</span>
+      </div>
     </div>
   )
 }

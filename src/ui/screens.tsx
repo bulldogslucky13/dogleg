@@ -1,8 +1,10 @@
 import { useState } from 'react'
+import { CHARACTERS, characterById } from '../engine/characters'
 import { COURSES } from '../engine/courses'
 import { dailySetup, RESULT_SQUARE, shareText, toParLabel, type DailySetup } from '../engine/daily'
-import type { HoleResult } from '../engine/types'
+import type { CharacterId, HoleResult } from '../engine/types'
 import { computeStreaks, type HistoryEntry } from '../state/store'
+import { CharacterAvatar } from './Avatars'
 
 export function HomeScreen(props: {
   history: HistoryEntry[]
@@ -90,11 +92,43 @@ export function HomeScreen(props: {
   )
 }
 
+export function CharacterPickScreen(props: {
+  courseName: string
+  practice: boolean
+  onPick: (c: CharacterId) => void
+  onBack: () => void
+}) {
+  return (
+    <div className="screen pick">
+      <button className="home-link" onClick={props.onBack}>
+        ‹ Clubhouse
+      </button>
+      <header>
+        <div className="kicker">{props.practice ? 'Practice round' : "Today's round"} · {props.courseName}</div>
+        <h2 className="pick-title">Pick your player</h2>
+        <p className="tagline">One edge, all 18 holes. Choose for the course in front of you.</p>
+      </header>
+      <div className="char-cards">
+        {CHARACTERS.map((c) => (
+          <button key={c.id} className={`char-card ${c.id}`} onClick={() => props.onPick(c.id)}>
+            <CharacterAvatar id={c.id} size={84} />
+            <b>{c.name}</b>
+            <span className="char-tagline">{c.tagline}</span>
+            <span className="char-edge">{c.edge}</span>
+          </button>
+        ))}
+      </div>
+      <p className="fine">Your player shifts the real odds — you'll see it in every bar.</p>
+    </div>
+  )
+}
+
 export function ResultScreen(props: {
   setup: DailySetup
   results: HoleResult[]
   toPar: number
   practice: boolean
+  character?: CharacterId
   history: HistoryEntry[]
   onHome: () => void
   onPracticeAgain: () => void
@@ -103,8 +137,9 @@ export function ResultScreen(props: {
   const [copied, setCopied] = useState(false)
   const streaks = computeStreaks(props.history)
   const broke = toPar < 0
+  const char = characterById(props.character)
   const share = async () => {
-    const text = shareText(props.setup, results, toPar)
+    const text = shareText(props.setup, results, toPar, props.character)
     try {
       if (navigator.share) {
         await navigator.share({ text })
@@ -127,6 +162,12 @@ export function ResultScreen(props: {
         {props.practice ? 'Practice round' : `Daily No. ${props.setup.puzzleNumber}`} · {props.setup.course.name}
       </div>
       <h1 className={`final ${broke ? 'good' : ''}`}>{toParLabel(toPar)}</h1>
+      {char && (
+        <div className="char-chip result-chip">
+          <CharacterAvatar id={char.id} size={34} />
+          <span>as the {char.name}</span>
+        </div>
+      )}
       <p className="verdict">
         {broke
           ? 'You broke par. Cap tipped, card signed. 🏆'

@@ -312,8 +312,10 @@ export function approachOdds(
     sand: 0,
     water: 0,
   }
-  // Hazards can claim at most 70% of missed greens; the rest is plain fringe/rough.
-  const hazardable = row.scramble * 0.7
+  // Hazards claim a choice-scaled share of missed greens; the rest is plain
+  // fringe/rough. Safe bails toward the fat side, so its misses rarely find
+  // the short-side trouble — hunting pins is what brings it in play.
+  const hazardable = row.scramble * (choice === 'safe' ? 0.32 : choice === 'normal' ? 0.7 : 0.88)
   let claimed = 0
   for (const s of shares) {
     if (s.bucket === 'trees') continue // near the green, tree misses are just fringe junk

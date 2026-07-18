@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import type { BallState, Choice, HazardZone, HoleLayout } from '../engine/types'
+import type { ApproachOdds, BallState, Choice, HazardZone, HoleLayout } from '../engine/types'
 import { fnv1a, mulberry32 } from '../engine/rng'
 
 const W = 360
@@ -240,8 +240,8 @@ export function HoleMap(props: {
   layout: HoleLayout
   ball: BallState
   previewWindow: [number, number] | null
-  /** approach-style shots: real missed-green probability for the selected choice */
-  previewMiss: number | null
+  /** approach-style shots: the full odds distribution for the selected choice */
+  previewApproach: ApproachOdds | null
   previewChoice: Choice | null
 }) {
   const { layout, ball } = props
@@ -396,23 +396,52 @@ export function HoleMap(props: {
       />
     ) : null
 
-  // Landing ring for approach shots: the green plus a miss margin that grows with
-  // the choice's real missed-green odds — the ball can finish anywhere inside it.
+  // Two-ring approach preview, both driven by the real odds distribution.
+  // Outer ring: how far a miss can travel — severity-weighted, so harmless
+  // fringe misses barely grow it while sand and water blow it out. Inner ring:
+  // expected finish proximity for on-green outcomes, from the same putt-feet
+  // model resolve.ts uses. Safe reads as "tight outer, wide inner" (few misses,
+  // longer putts); aggressive as "wide outer, tiny inner" (pin-high or trouble).
   const missRing = (() => {
-    if (props.previewMiss == null || !props.previewChoice) return null
-    const spread = (3 + props.previewMiss * 32) * uPerYd
+    if (!props.previewApproach || !props.previewChoice) return null
+    const o = props.previewApproach
+    const ch = props.previewChoice
+    const color = previewColor(ch)
+
+    const spreadYd = 4 + o.fringe * 22 + o.sand * 55 + o.water * 110
+    const spread = spreadYd * uPerYd
+
+    const makeFeet = 5 + (ch === 'aggressive' ? 8 : 13) / 2
+    const lagFeet = 24 + (ch === 'safe' ? 22 : 32) / 2
+    const onGreen = o.holeout + o.kickin + o.makeable + o.lag
+    const feet = (o.kickin * 2 + o.makeable * makeFeet + o.lag * lagFeet) / Math.max(0.0001, onGreen)
+    const innerR = Math.min(greenRy * 0.95, Math.max(6, (feet / 3) * 1.15 * uPerYd))
+
     return (
-      <ellipse
-        cx={greenPt.x}
-        cy={greenPt.y}
-        rx={greenRx + spread}
-        ry={greenRy + spread * 0.8}
-        fill={previewColor(props.previewChoice)}
-        opacity={0.2}
-        stroke="#f4efe3"
-        strokeDasharray="5 5"
-        strokeWidth={1.4}
-      />
+      <g>
+        <ellipse
+          cx={greenPt.x}
+          cy={greenPt.y}
+          rx={greenRx + spread}
+          ry={greenRy + spread * 0.8}
+          fill={color}
+          opacity={0.18}
+          stroke="#f4efe3"
+          strokeDasharray="5 5"
+          strokeWidth={1.4}
+        />
+        <ellipse
+          cx={greenPt.x}
+          cy={greenPt.y}
+          rx={innerR}
+          ry={innerR * 0.8}
+          fill={color}
+          fillOpacity={0.28}
+          stroke="#f4efe3"
+          strokeDasharray="2 4"
+          strokeWidth={1.6}
+        />
+      </g>
     )
   })()
 

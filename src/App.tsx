@@ -3,8 +3,8 @@ import { characterById } from './engine/characters'
 import { courseBySlug } from './engine/courses'
 import { dailySetup, localDateKey, practiceSetup, toParLabel, type DailySetup } from './engine/daily'
 import { longOdds } from './engine/odds'
-import { oddsFor, summarize } from './engine/resolve'
-import type { CharacterAdvantage, CharacterId, Choice } from './engine/types'
+import { oddsFor } from './engine/resolve'
+import type { ApproachOdds, CharacterAdvantage, CharacterId, Choice } from './engine/types'
 import {
   advanceHole,
   applyChoice,
@@ -78,12 +78,13 @@ export default function App() {
     return null
   }, [hole, selected, animating])
 
-  // approach-style shots get a landing ring around the green sized by the real miss odds
-  const previewMiss = useMemo<number | null>(() => {
+  // approach-style shots get landing rings driven by the full odds distribution
+  const previewApproach = useMemo<ApproachOdds | null>(() => {
     if (!hole || !selected || animating) return null
     const approachStyle = hole.stage === 'approach' || (hole.stage === 'second' && selected === 'aggressive')
     if (!approachStyle) return null
-    return summarize(oddsFor(hole, selected)).bad
+    const o = oddsFor(hole, selected)
+    return o.kind === 'approach' ? o : null
   }, [hole, selected, animating])
 
   if (view === 'home') {
@@ -286,7 +287,7 @@ export default function App() {
         ) : classic ? (
           <SideMap layout={hole.layout} ball={hole.ball} />
         ) : (
-          <HoleMap layout={hole.layout} ball={hole.ball} previewWindow={previewWindow} previewMiss={previewMiss} previewChoice={selected} />
+          <HoleMap layout={hole.layout} ball={hole.ball} previewWindow={previewWindow} previewApproach={previewApproach} previewChoice={selected} />
         )}
         {!holeDone && (
           <div className="map-overlay top">

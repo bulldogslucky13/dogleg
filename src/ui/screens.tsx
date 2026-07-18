@@ -106,10 +106,11 @@ export function ResultScreen(props: {
   const broke = toPar < 0
   const share = async () => {
     const text = shareText(props.setup, results, toPar)
+    const mode = props.practice ? 'practice' : 'daily'
     try {
       if (navigator.share) {
         await navigator.share({ text })
-        track('share_clicked', { method: 'native', to_par: toPar })
+        track('share_clicked', { method: 'native', to_par: toPar, mode })
         return
       }
     } catch {
@@ -119,7 +120,7 @@ export function ResultScreen(props: {
       await navigator.clipboard.writeText(text)
       setCopied(true)
       setTimeout(() => setCopied(false), 1800)
-      track('share_clicked', { method: 'clipboard', to_par: toPar })
+      track('share_clicked', { method: 'clipboard', to_par: toPar, mode })
     } catch {
       /* ignore */
     }
@@ -163,14 +164,18 @@ export function ResultScreen(props: {
           </div>
         </div>
       )}
-      {!props.practice && (
+      {props.practice ? (
+        <>
+          <button className="cta" onClick={props.onPracticeAgain}>
+            Play another practice round
+          </button>
+          <button className="cta ghost" onClick={share}>
+            {copied ? 'Copied!' : 'Share your card'}
+          </button>
+        </>
+      ) : (
         <button className="cta" onClick={share}>
           {copied ? 'Copied!' : 'Share your card'}
-        </button>
-      )}
-      {props.practice && (
-        <button className="cta" onClick={props.onPracticeAgain}>
-          Play another practice round
         </button>
       )}
       <button className="cta ghost" onClick={props.onHome}>

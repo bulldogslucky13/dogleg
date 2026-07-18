@@ -98,7 +98,9 @@ export function shareText(setup: DailySetup, results: HoleResult[], toPar: numbe
   for (let i = 0; i < 18; i += 9) {
     rows.push(results.slice(i, i + 9).map((r) => RESULT_SQUARE[r]).join(''))
   }
-  const head = `Dogleg No. ${setup.puzzleNumber} · ${setup.course.name} · ${toParLabel(toPar)}`
+  // Practice rounds have no puzzle number; label them as practice instead.
+  const tag = setup.puzzleNumber > 0 ? `No. ${setup.puzzleNumber}` : 'Practice'
+  const head = `Dogleg ${tag} · ${setup.course.name} · ${toParLabel(toPar)}`
   const verdict = toPar < 0 ? 'Broke par 🏆' : toPar === 0 ? 'Level with the course' : 'The course won today'
   return `${head}\n${rows.join('\n')}\n${verdict}\n${SITE_URL}`
 }

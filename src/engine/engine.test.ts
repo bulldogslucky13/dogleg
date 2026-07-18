@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { COURSES } from './courses'
+import { dailySetup, practiceSetup, shareText, SITE_URL } from './daily'
 import { buildLayout, reachableZones } from './layout'
 import { longOdds, approachOdds, puttOdds, shortOdds } from './odds'
 import { startHole, playShot, oddsFor, type HoleInPlay } from './resolve'
 import { rngFromString } from './rng'
-import type { Choice, Conditions } from './types'
+import type { Choice, Conditions, HoleResult } from './types'
 
 const CONDS: Conditions[] = [
   { wind: 5, greens: 'Medium', difficulty: 4 },
@@ -276,5 +277,28 @@ describe('calibration (Monte Carlo)', () => {
     const r = stats(smart, 'smart')
     expect(r.brokePct).toBeGreaterThan(12)
     expect(r.brokePct).toBeLessThan(45)
+  })
+})
+
+describe('shareText', () => {
+  const results: HoleResult[] = Array(18).fill('par')
+  results[2] = 'birdie'
+  results[6] = 'double'
+
+  it('labels a daily round with its puzzle number', () => {
+    const setup = dailySetup(new Date(2026, 6, 5))
+    const text = shareText(setup, results, -6)
+    expect(text.startsWith(`Dogleg No. ${setup.puzzleNumber} · `)).toBe(true)
+    expect(text).toContain('-6')
+    expect(text).toContain('Broke par 🏆')
+    expect(text.trimEnd().endsWith(SITE_URL)).toBe(true)
+  })
+
+  it('labels a practice round as Practice, never "No. 0"', () => {
+    const setup = practiceSetup(COURSES[0].slug, 'x')
+    const text = shareText(setup, results, -6)
+    expect(text).toContain('Dogleg Practice · ')
+    expect(text).not.toContain('No. 0')
+    expect(text).toContain(COURSES[0].name)
   })
 })

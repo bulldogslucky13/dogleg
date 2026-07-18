@@ -18,6 +18,7 @@ import {
   type HistoryEntry,
   type RoundState,
 } from './state/store'
+import { track } from './lib/analytics'
 import { GreenView, HoleMap } from './ui/HoleMap'
 import { ChoiceCards, ContextChips, HoleComplete, Scorecard, StatusBanner } from './ui/panels'
 import { HomeScreen, ResultScreen } from './ui/screens'
@@ -67,13 +68,17 @@ export default function App() {
         hasActiveRound={!!round && !round.complete}
         playedToday={playedToday}
         onTeeOff={() => {
-          setRound(startDailyRound())
+          const r = startDailyRound()
+          track('round_started', { mode: 'daily', course: r.courseSlug, puzzle_number: r.puzzleNumber })
+          setRound(r)
           setSelected(null)
           setView('play')
         }}
         onResume={() => setView('play')}
         onPractice={(slug) => {
-          setRound(startPracticeRound(slug))
+          const r = startPracticeRound(slug)
+          track('round_started', { mode: 'practice', course: slug, puzzle_number: r.puzzleNumber })
+          setRound(r)
           setSelected(null)
           setView('play')
         }}

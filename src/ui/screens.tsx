@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { COURSES } from '../engine/courses'
 import { dailySetup, RESULT_SQUARE, shareText, toParLabel, type DailySetup } from '../engine/daily'
 import type { HoleResult } from '../engine/types'
+import { track } from '../lib/analytics'
 import { computeStreaks, type HistoryEntry } from '../state/store'
 
 export function HomeScreen(props: {
@@ -108,6 +109,7 @@ export function ResultScreen(props: {
     try {
       if (navigator.share) {
         await navigator.share({ text })
+        track('share_clicked', { method: 'native', to_par: toPar })
         return
       }
     } catch {
@@ -117,6 +119,7 @@ export function ResultScreen(props: {
       await navigator.clipboard.writeText(text)
       setCopied(true)
       setTimeout(() => setCopied(false), 1800)
+      track('share_clicked', { method: 'clipboard', to_par: toPar })
     } catch {
       /* ignore */
     }

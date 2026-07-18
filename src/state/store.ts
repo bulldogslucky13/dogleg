@@ -1,0 +1,255 @@
+import { buildLayout } from '../engine/layout'
+import { dailySetup, practiceSetup, localDateKey, type DailySetup } from '../engine/daily'
+import { startHole, playShot, type HoleInPlay } from '../engine/resolve'
+import { rngFromString, skip, type Rng } from '../engine/rng'
+import type { Choice, Conditions, HoleResult, HoleScore, Stage } from '../engine/types'
+import { courseBySlug } from '../engine/courses'
+
+export const AGGRESSIVE_BUDGET = 8
+
+export interface RoundState {
+  mode: 'daily' | 'practice'
+  seed: string
+  courseSlug: string
+  cond: Conditions
+  puzzleNumber: number
+  dateKey: string
+  currentHole: number
+  scores: (HoleScore | null)[]
+  aggressiveLeft: number
+  rolls: number
+  complete: boolean
+  hole: SerializedHole | null
+}
+
+interface SerializedHole {
+  stage: Stage
+  ball: HoleInPlay['ball']
+  strokes: number
+  penalties: number
+  shots: HoleInPlay['shots']
+  status: HoleInPlay['status']
+  score?: HoleScore
+}
+
+export interface HistoryEntry {
+  dateKey: string
+  puzzleNumber: number
+  courseSlug: string
+  toPar: number
+  results: HoleResult[]
+}
+
+const ROUND_KEY = 'bp:round:v1'
+const HISTORY_KEY = 'bp:history:v1'
+
+// ---------------------------------------------------------------------------
+
+export function newRound(setup: DailySetup, mode: 'daily' | 'practice'): RoundState {
+  const course = setup.course
+  const layout = buildLayout(course.slug, course.holes[0])
+  const hole = startHole(layout, setup.cond)
+  return {
+    mode,
+    seed: setup.seed,
+    courseSlug: course.slug,
+    cond: setup.cond,
+    puzzleNumber: setup.puzzleNumber,
+    dateKey: setup.dateKey,
+    currentHole: 0,
+    scores: Array(18).fill(null),
+    aggressiveLeft: AGGRESSIVE_BUDGET,
+    rolls: 0,
+    complete: false,
+    hole: serializeHole(hole),
+  }
+}
+
+export function startDailyRound(): RoundState {
+  return newRound(dailySetup(), 'daily')
+}
+
+export function startPracticeRound(slug: string): RoundState {
+  return newRound(practiceSetup(slug, `${Date.now()}`), 'practice')
+}
+
+function serializeHole(h: HoleInPlay): SerializedHole {
+  return {
+    stage: h.stage,
+    ball: h.ball,
+    strokes: h.strokes,
+    penalties: h.penalties,
+    shots: h.shots,
+    status: h.status,
+    score: h.score,
+  }
+}
+
+/** Rebuild the live HoleInPlay (layout is derived, everything else persisted). */
+export function holeInPlay(state: RoundState): HoleInPlay {
+  const course = courseBySlug(state.courseSlug)!
+  const spec = course.holes[state.currentHole]
+  const layout = buildLayout(course.slug, spec)
+  const s = state.hole ?? serializeHole(startHole(layout, state.cond))
+  // clone mutable pieces: playShot mutates, and React may re-run state updaters
+  return { layout, cond: state.cond, ...s, ball: { ...s.ball }, shots: [...s.shots] }
+}
+
+function roundRng(state: RoundState): { rng: Rng; consumed: () => number } {
+  const base = rngFromString(state.seed)
+  skip(base, state.rolls)
+  let n = 0
+  const rng: Rng = () => {
+    n++
+    return base()
+  }
+  return { rng, consumed: () => n }
+}
+
+export function usesBudget(stage: Stage): boolean {
+  return stage === 'tee' || stage === 'second' || stage === 'approach'
+}
+
+/** Apply a decision immutably; returns the next round state. */
+export function applyChoice(state: RoundState, choice: Choice): RoundState {
+  if (state.complete || !state.hole || state.hole.stage === 'done') return state
+  const h = holeInPlay(state)
+  if (choice === 'aggressive' && usesBudget(h.stage) && state.aggressiveLeft <= 0) return state
+
+  const { rng, consumed } = roundRng(state)
+  const budgetSpent = choice === 'aggressive' && usesBudget(h.stage) ? 1 : 0
+  playShot(h, choice, rng)
+
+  const next: RoundState = {
+    ...state,
+    rolls: state.rolls + consumed(),
+    aggressiveLeft: state.aggressiveLeft - budgetSpent,
+    hole: serializeHole(h),
+    scores: state.scores.slice(),
+  }
+  if (h.stage === 'done' && h.score) {
+    next.scores[state.currentHole] = h.score
+  }
+  return next
+}
+
+export function advanceHole(state: RoundState): RoundState {
+  if (!state.hole?.score) return state
+  if (state.currentHole >= 17) {
+    return { ...state, complete: true }
+  }
+  const course = courseBySlug(state.courseSlug)!
+  const idx = state.currentHole + 1
+  const layout = buildLayout(course.slug, course.holes[idx])
+  const hole = startHole(layout, state.cond)
+  return { ...state, currentHole: idx, hole: serializeHole(hole) }
+}
+
+export function roundToPar(state: RoundState): number {
+  const course = courseBySlug(state.courseSlug)!
+  return state.scores.reduce((sum, s, i) => (s ? sum + s.strokes - course.holes[i].par : sum), 0)
+}
+
+// ---------------------------------------------------------------------------
+// Persistence
+// ---------------------------------------------------------------------------
+
+export function saveRound(state: RoundState | null): void {
+  try {
+    if (!state) localStorage.removeItem(ROUND_KEY)
+    else localStorage.setItem(ROUND_KEY, JSON.stringify(state))
+  } catch {
+    /* private mode etc. */
+  }
+}
+
+export function loadRound(): RoundState | null {
+  try {
+    const raw = localStorage.getItem(ROUND_KEY)
+    if (!raw) return null
+    const state = JSON.parse(raw) as RoundState
+    if (!courseBySlug(state.courseSlug)) return null
+    // a stale daily from a previous day is dead
+    if (state.mode === 'daily' && state.dateKey !== localDateKey()) return null
+    return state
+  } catch {
+    return null
+  }
+}
+
+export function loadHistory(): HistoryEntry[] {
+  try {
+    const raw = localStorage.getItem(HISTORY_KEY)
+    return raw ? (JSON.parse(raw) as HistoryEntry[]) : []
+  } catch {
+    return []
+  }
+}
+
+export function recordResult(state: RoundState): HistoryEntry[] {
+  const history = loadHistory()
+  if (state.mode !== 'daily') return history
+  if (history.some((e) => e.dateKey === state.dateKey)) return history
+  const entry: HistoryEntry = {
+    dateKey: state.dateKey,
+    puzzleNumber: state.puzzleNumber,
+    courseSlug: state.courseSlug,
+    toPar: roundToPar(state),
+    results: state.scores.map((s) => s?.result ?? 'triple'),
+  }
+  const next = [...history, entry].sort((a, b) => a.dateKey.localeCompare(b.dateKey))
+  try {
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(next))
+  } catch {
+    /* ignore */
+  }
+  return next
+}
+
+export interface Streaks {
+  dayStreak: number
+  bestStreak: number
+  bestToPar: number | null
+  played: number
+  brokePar: number
+}
+
+/** Parse a YYYY-MM-DD key as a *local* date (new Date(str) would parse UTC and shift a day). */
+function parseKey(key: string): Date {
+  const [y, m, d] = key.split('-').map(Number)
+  return new Date(y, m - 1, d)
+}
+
+export function computeStreaks(history: HistoryEntry[]): Streaks {
+  if (!history.length) return { dayStreak: 0, bestStreak: 0, bestToPar: null, played: 0, brokePar: 0 }
+  const days = history.map((h) => h.dateKey)
+  const set = new Set(days)
+  let best = 0
+  let run = 0
+  const d0 = parseKey(days[0])
+  const today = parseKey(localDateKey())
+  for (let d = new Date(d0); d.getTime() <= today.getTime(); d.setDate(d.getDate() + 1)) {
+    const key = localDateKey(d)
+    if (set.has(key)) {
+      run++
+      best = Math.max(best, run)
+    } else {
+      run = 0
+    }
+  }
+  // current streak counts back from today (or yesterday if today unplayed)
+  let cur = 0
+  const cursor = new Date(today)
+  if (!set.has(localDateKey(cursor))) cursor.setDate(cursor.getDate() - 1)
+  while (set.has(localDateKey(cursor))) {
+    cur++
+    cursor.setDate(cursor.getDate() - 1)
+  }
+  return {
+    dayStreak: cur,
+    bestStreak: best,
+    bestToPar: Math.min(...history.map((h) => h.toPar)),
+    played: history.length,
+    brokePar: history.filter((h) => h.toPar < 0).length,
+  }
+}

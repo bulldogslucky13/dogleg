@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import posthog from 'posthog-js'
 import { courseBySlug } from './engine/courses'
 import { dailySetup, localDateKey, practiceSetup, toParLabel, type DailySetup } from './engine/daily'
 import { longOdds } from './engine/odds'
@@ -19,6 +18,7 @@ import {
   type HistoryEntry,
   type RoundState,
 } from './state/store'
+import { track } from './lib/analytics'
 import { GreenView, HoleMap } from './ui/HoleMap'
 import { ChoiceCards, ContextChips, HoleComplete, Scorecard, StatusBanner } from './ui/panels'
 import { HomeScreen, ResultScreen } from './ui/screens'
@@ -69,24 +69,15 @@ export default function App() {
         playedToday={playedToday}
         onTeeOff={() => {
           const r = startDailyRound()
-          posthog.capture('daily_round_started', {
-            course: r.courseSlug,
-            puzzle_number: r.puzzleNumber,
-            wind: r.cond.wind,
-            greens: r.cond.greens,
-            difficulty: r.cond.difficulty,
-          })
+          track('round_started', { mode: 'daily', course: r.courseSlug, puzzle_number: r.puzzleNumber })
           setRound(r)
           setSelected(null)
           setView('play')
         }}
-        onResume={() => {
-          posthog.capture('round_resumed')
-          setView('play')
-        }}
+        onResume={() => setView('play')}
         onPractice={(slug) => {
           const r = startPracticeRound(slug)
-          posthog.capture('practice_round_started', { course: slug })
+          track('round_started', { mode: 'practice', course: slug, puzzle_number: r.puzzleNumber })
           setRound(r)
           setSelected(null)
           setView('play')
@@ -162,12 +153,6 @@ export default function App() {
     if (after.complete) {
       const h = recordResult(after)
       setHistory(h)
-      posthog.capture('round_completed', {
-        mode: after.mode,
-        course: after.courseSlug,
-        puzzle_number: after.puzzleNumber,
-        to_par: roundToPar(after),
-      })
       setView('result')
     }
   }

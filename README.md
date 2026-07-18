@@ -70,6 +70,9 @@ pnpm build      # type-check + production build to dist/
   re-roll a shot.
 - Design docs: [docs/DESIGN.md](docs/DESIGN.md) ·
   [docs/REVERSE-ENGINEERING.md](docs/REVERSE-ENGINEERING.md)
+- Privacy: the deployed site uses [PostHog](https://posthog.com) for anonymous,
+  cookie-free usage analytics (no accounts, no PII; honors Do Not Track). Local dev
+  sends nothing unless `VITE_POSTHOG_KEY` is set.
 
 ### Deploying
 

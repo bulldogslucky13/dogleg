@@ -1,8 +1,8 @@
 import { useState } from 'react'
-import posthog from 'posthog-js'
 import { COURSES } from '../engine/courses'
 import { dailySetup, RESULT_SQUARE, shareText, toParLabel, type DailySetup } from '../engine/daily'
 import type { HoleResult } from '../engine/types'
+import { track } from '../lib/analytics'
 import { computeStreaks, type HistoryEntry } from '../state/store'
 
 export function HomeScreen(props: {
@@ -71,11 +71,7 @@ export function HomeScreen(props: {
         </button>
       )}
 
-      <button className="cta ghost" onClick={() => {
-        const next = !showCourses
-        setShowCourses(next)
-        if (next) posthog.capture('courses_browsed')
-      }}>
+      <button className="cta ghost" onClick={() => setShowCourses((v) => !v)}>
         Play unlimited · Browse courses
       </button>
       {showCourses && (
@@ -113,12 +109,7 @@ export function ResultScreen(props: {
     try {
       if (navigator.share) {
         await navigator.share({ text })
-        posthog.capture('result_shared', {
-          method: 'native_share',
-          to_par: toPar,
-          course: props.setup.course.name,
-          practice: props.practice,
-        })
+        track('share_clicked', { method: 'native', to_par: toPar })
         return
       }
     } catch {
@@ -128,11 +119,7 @@ export function ResultScreen(props: {
       await navigator.clipboard.writeText(text)
       setCopied(true)
       setTimeout(() => setCopied(false), 1800)
-      posthog.capture('result_copied', {
-        to_par: toPar,
-        course: props.setup.course.name,
-        practice: props.practice,
-      })
+      track('share_clicked', { method: 'clipboard', to_par: toPar })
     } catch {
       /* ignore */
     }
@@ -182,10 +169,7 @@ export function ResultScreen(props: {
         </button>
       )}
       {props.practice && (
-        <button className="cta" onClick={() => {
-          posthog.capture('practice_again_clicked', { course: props.setup.course.name })
-          props.onPracticeAgain()
-        }}>
+        <button className="cta" onClick={props.onPracticeAgain}>
           Play another practice round
         </button>
       )}

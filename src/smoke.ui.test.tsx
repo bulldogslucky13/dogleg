@@ -190,6 +190,8 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
 
     render(<App />)
     fireEvent.click(screen.getByText(/My rounds/))
+    // lifetime tally in the header, seeded/bumped by the archived round
+    expect(screen.getByText(/1 lifetime round/)).toBeTruthy()
     // Recent is the default tab; the records shelf lives behind its own tab
     expect(screen.getByText(/Last 1 round/)).toBeTruthy()
     expect(screen.getByText(/St Andrews/)).toBeTruthy()

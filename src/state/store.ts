@@ -522,8 +522,39 @@ export function archiveRound(state: RoundState): void {
     decisions,
     playedAt: Date.now(),
   }
-  const existing = loadArchive().filter((r) => r.seed !== entry.seed)
-  saveArchive(pruneArchive([entry, ...existing]))
+  const current = loadArchive()
+  // bump the lifetime tally only for genuinely new rounds (and seed the
+  // counter from pre-feature data BEFORE this round joins the archive)
+  if (!current.some((r) => r.seed === entry.seed)) bumpLifetimeRounds()
+  saveArchive(pruneArchive([entry, ...current.filter((r) => r.seed !== entry.seed)]))
+}
+
+// ---------------------------------------------------------------------------
+// Lifetime tally — survives archive pruning
+// ---------------------------------------------------------------------------
+
+const LIFETIME_KEY = 'dogleg:lifetime:v1'
+
+/** Completed rounds, ever. Seeded once for pre-counter players from what's
+ * still visible: daily history (kept forever) + archived practice rounds. */
+export function lifetimeRounds(): number {
+  try {
+    const raw = localStorage.getItem(LIFETIME_KEY)
+    if (raw !== null) return Math.max(0, Number(raw) || 0)
+    const seeded = loadHistory().length + loadArchive().filter((r) => r.mode === 'practice').length
+    localStorage.setItem(LIFETIME_KEY, String(seeded))
+    return seeded
+  } catch {
+    return 0
+  }
+}
+
+function bumpLifetimeRounds(): void {
+  try {
+    localStorage.setItem(LIFETIME_KEY, String(lifetimeRounds() + 1))
+  } catch {
+    /* private mode */
+  }
 }
 
 /** The server confirmed a course record for this round — pin it forever. */

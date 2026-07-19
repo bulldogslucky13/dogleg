@@ -203,6 +203,67 @@ describe('pruneArchive retention', () => {
   })
 })
 
+describe('lifetimeRounds', () => {
+  const fakeStorage = (seed: Record<string, string> = {}): Storage => {
+    const map = new Map(Object.entries(seed))
+    return {
+      get length() {
+        return map.size
+      },
+      clear: () => map.clear(),
+      getItem: (k: string) => map.get(k) ?? null,
+      key: (i: number) => [...map.keys()][i] ?? null,
+      removeItem: (k: string) => void map.delete(k),
+      setItem: (k: string, v: string) => void map.set(k, v),
+    }
+  }
+
+  afterEach(() => vi.unstubAllGlobals())
+
+  it('seeds pre-counter players from daily history + archived practice rounds', async () => {
+    const { lifetimeRounds } = await import('./store')
+    const history = [entry({ dateKey: '2026-07-18' }), entry({ dateKey: '2026-07-19' })]
+    const archive = [
+      { seed: 'p1', mode: 'practice', playedAt: 1 },
+      { seed: 'd1', mode: 'daily', playedAt: 2 }, // daily already counted via history
+    ]
+    vi.stubGlobal(
+      'localStorage',
+      fakeStorage({
+        'dogleg:history:v1': JSON.stringify(history),
+        'dogleg:archive:v1': JSON.stringify(archive),
+      }),
+    )
+    expect(lifetimeRounds()).toBe(3) // 2 dailies + 1 practice
+    expect(lifetimeRounds()).toBe(3) // stable on re-read
+  })
+
+  it('archiving a finished round bumps the tally exactly once', async () => {
+    const { archiveRound, lifetimeRounds } = await import('./store')
+    vi.stubGlobal('localStorage', fakeStorage())
+    const shots = [{ stage: 'tee', choice: 'normal', outcome: 'fairway', penalty: false, faced: {}, after: {} }]
+    const round = {
+      mode: 'practice',
+      seed: 'practice:pebble-beach:lifetime',
+      courseSlug: 'pebble-beach',
+      cond: { wind: 10, greens: 'Medium', difficulty: 5 },
+      puzzleNumber: 0,
+      dateKey: '2026-07-19',
+      currentHole: 17,
+      scores: Array(18).fill({ strokes: 4, penalties: 0, result: 'par', note: '', shots }),
+      aggressiveLeft: 8,
+      rolls: 1,
+      complete: true,
+      hole: null,
+    } as unknown as RoundState
+    expect(lifetimeRounds()).toBe(0)
+    archiveRound(round)
+    expect(lifetimeRounds()).toBe(1)
+    archiveRound(round) // same round again — must not double-count
+    expect(lifetimeRounds()).toBe(1)
+  })
+})
+
 describe('characterRecords', () => {
   it('groups daily rounds by character and tracks avg/best', () => {
     const history: HistoryEntry[] = [

@@ -4,7 +4,7 @@ import { courseBySlug } from '../engine/courses'
 import { toParLabel } from '../engine/daily'
 import type { ReplayPayload } from '../engine/replay'
 import { loadPlayer } from '../lib/leaderboard'
-import { loadArchive, type ArchivedRound } from '../state/store'
+import { lifetimeRounds, loadArchive, type ArchivedRound } from '../state/store'
 
 /**
  * My rounds — two tabs so the trophy shelf can grow without burying the feed:
@@ -54,7 +54,9 @@ export function RoundsScreen(props: { onWatch: (p: ReplayPayload) => void; onBac
         ‹ Clubhouse
       </button>
       <header>
-        <div className="kicker">Your locker</div>
+        <div className="kicker">
+          Your locker · {lifetimeRounds()} lifetime round{lifetimeRounds() === 1 ? '' : 's'}
+        </div>
         <h2 className="pick-title">My rounds</h2>
       </header>
 

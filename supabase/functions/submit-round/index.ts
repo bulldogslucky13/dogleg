@@ -7,7 +7,7 @@
 //
 // deno-lint-ignore-file no-explicit-any
 import { createClient } from 'npm:@supabase/supabase-js@2'
-import { dailySalt, replayRound } from './engine.mjs'
+import { FORTUNE_CONFIG, dailySalt, replayRound } from './engine.mjs'
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -84,6 +84,21 @@ Deno.serve(async (req) => {
   if (info.mode === 'daily' && info.salt) {
     if (info.salt !== dailySalt(player.id, info.dateKey!)) {
       return json(422, { error: 'round rejected: seed is not yours' })
+    }
+  }
+
+  // ---- fortune sanity: a daily claiming a destiny-due counter must have a
+  // posting history that makes it credible (grace: 40% of the guarantee) ----
+  if (info.mode === 'daily' && info.fortune) {
+    const g = FORTUNE_CONFIG.daily.guaranteeAt
+    if (info.fortune.ace >= g || info.fortune.alb >= g) {
+      const { count } = await supabase
+        .from('daily_scores')
+        .select('*', { count: 'exact', head: true })
+        .eq('player_id', player.id)
+      if ((count ?? 0) < Math.floor(g * 0.4)) {
+        return json(422, { error: 'destiny counter is not credible for this player yet' })
+      }
     }
   }
 

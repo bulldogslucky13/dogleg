@@ -201,6 +201,42 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
     expect(screen.getByText('‹ Exit replay')).toBeTruthy()
   })
 
+  it('a destiny ace fires the HOLE IN ONE splash, which dismisses on tap', () => {
+    vi.useFakeTimers()
+    // a due ace counter → the round's first par-3 tee shot holes out
+    localStorage.setItem(
+      'dogleg:fortune:v1',
+      JSON.stringify({ p: { ace: 999, aceK: 0, alb: 0, albK: 0 }, d: { ace: 0, alb: 0 } }),
+    )
+    render(<App />)
+    fireEvent.click(screen.getByText(/Play unlimited/))
+    const courseButton = screen
+      .getAllByText('Pebble Beach Links')
+      .map((el) => el.closest('button'))
+      .find((b): b is HTMLButtonElement => b !== null)!
+    fireEvent.click(courseButton)
+    fireEvent.click(screen.getByText(CHARACTERS[0].name))
+
+    for (let guard = 0; guard < 200; guard++) {
+      if (screen.queryByText('HOLE IN ONE')) break
+      const advance = screen.queryByText('Next hole') ?? screen.queryByText('Sign the card')
+      if (advance) {
+        fireEvent.click(advance)
+        continue
+      }
+      const card = document.querySelector<HTMLButtonElement>('button.choice')!
+      fireEvent.click(card)
+      fireEvent.click(card)
+      act(() => {
+        vi.advanceTimersByTime(1500)
+      })
+    }
+    expect(screen.getByText('HOLE IN ONE')).toBeTruthy()
+    expect(screen.getByText(/tap to keep playing/)).toBeTruthy()
+    fireEvent.click(screen.getByText('HOLE IN ONE'))
+    expect(screen.queryByText('HOLE IN ONE')).toBeNull()
+  })
+
   it('toggles between modern and classic views mid-round', () => {
     vi.useFakeTimers()
     render(<App />)

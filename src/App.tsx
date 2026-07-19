@@ -31,6 +31,8 @@ import { GreenView, HoleMap, useMapSize } from './ui/HoleMap'
 import { SideMap } from './ui/SideMap'
 import { ChoiceCards, ClassicScorecard, HazardChips, HoleComplete, Scorecard, StatusBanner, TierBanner } from './ui/panels'
 import { decodeReplay, type ReplayPayload } from './engine/replay'
+import type { MomentKind } from './engine/fortune'
+import { MomentSplash } from './ui/MomentSplash'
 import { ReplayScreen } from './ui/ReplayScreen'
 import { RoundsScreen } from './ui/RoundsScreen'
 import { CharacterPickScreen, HomeScreen, ResultScreen } from './ui/screens'
@@ -64,6 +66,7 @@ export default function App() {
   const [animating, setAnimating] = useState(false)
   const [splash, setSplash] = useState<CharacterAdvantage | null>(null)
   const [splashKey, setSplashKey] = useState(0)
+  const [moment, setMoment] = useState<{ kind: MomentKind; holeNumber: number } | null>(null)
   const animTimer = useRef<number | null>(null)
   const splashTimer = useRef<number | null>(null)
   const [mapRef, mapSize] = useMapSize()
@@ -248,9 +251,20 @@ export default function App() {
     setSplash(null)
     const nextRound = applyChoice(round, choice)
     setRound(nextRound)
+    // THE moment: an ace (1 on a par 3) or albatross (2 on a par 5) just landed
+    const justScored = nextRound.hole?.score
+    const parNow = courseBySlug(nextRound.courseSlug)!.holes[nextRound.currentHole].par
+    let momentFired = false
+    if (justScored && parNow === 3 && justScored.strokes === 1) {
+      setMoment({ kind: 'ace', holeNumber: nextRound.currentHole + 1 })
+      momentFired = true
+    } else if (justScored && parNow === 5 && justScored.strokes === 2) {
+      setMoment({ kind: 'albatross', holeNumber: nextRound.currentHole + 1 })
+      momentFired = true
+    }
     const shots = nextRound.hole?.shots ?? []
     const adv = shots[shots.length - 1]?.advantage
-    if (adv) {
+    if (adv && !momentFired) {
       // let the ball settle, then splash the earned edge
       if (splashTimer.current) window.clearTimeout(splashTimer.current)
       splashTimer.current = window.setTimeout(() => {
@@ -290,6 +304,17 @@ export default function App() {
 
   return (
     <div className={`screen play${classic ? ' classic' : ''}`}>
+      {moment && (
+        <MomentSplash
+          kind={moment.kind}
+          holeNumber={moment.holeNumber}
+          courseName={course.name}
+          dateKey={round.dateKey}
+          toPar={toPar}
+          character={round.character}
+          onClose={() => setMoment(null)}
+        />
+      )}
       <div className="top-row">
         <button className="home-link" onClick={() => setView('home')} aria-label="Back to clubhouse">
           ‹ Clubhouse

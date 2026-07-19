@@ -29,6 +29,13 @@ the source of truth for local `supabase serve` as well as deploys. Auth
 settings are *not* in that file: site_url and the redirect allow-list are
 managed in the dashboard, so they aren't in version control.
 
+**Fortune** (`src/engine/fortune.ts`): ace/albatross odds + the destiny
+guarantee. Counters ride as a seed tail (`:f…`), so the referee and replay
+links resolve identical luck; conditions always derive from the seed WITHOUT
+the tail. Destiny (forced holeout at the guarantee threshold) is deliberately
+resolved OUTSIDE the displayed odds — the game's one sanctioned exception to
+"the odds never lie", chosen for surprise. Don't add more exceptions.
+
 Cross-device sync is optional email magic links (Supabase Auth): the
 `link-account` function ties `auth.users` to a player row (`players.user_id`);
 `src/lib/auth.ts` + `src/ui/AccountPanel.tsx` handle send/reconcile/adopt.

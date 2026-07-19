@@ -1,5 +1,6 @@
 import { courseBySlug } from './courses'
 import { dailyConditions, courseForPuzzle, practiceConditions, puzzleNumberForDateKey } from './daily'
+import { destinyDue, fortuneShotOdds, splitFortune, type FortuneState, type MomentKind } from './fortune'
 import { buildLayout } from './layout'
 import { playShot, startHole, type HoleInPlay } from './resolve'
 import { rngFromString } from './rng'
@@ -26,6 +27,8 @@ export interface SeedInfo {
   mode: 'daily' | 'practice'
   course: CourseSpec
   cond: Conditions
+  /** ace/albatross counters carried by the seed; null for pre-fortune seeds */
+  fortune: FortuneState | null
   /** daily only */
   dateKey?: string
   puzzleNumber?: number
@@ -39,24 +42,52 @@ export interface SeedInfo {
  * Daily seeds may carry a per-player dice salt (`round:date:slug:salt`) —
  * the salt changes the rolls, never the course or conditions. Verifying that
  * the salt belongs to the submitting player is the caller's job; see
- * `dailySalt` and the submit-round function. */
+ * `dailySalt` and the submit-round function. Either mode may also carry a
+ * trailing fortune segment (`:f…`); conditions always derive from the seed
+ * WITHOUT that tail, so the pick screen and the round agree. */
 export function setupFromSeed(seed: string): SeedInfo | null {
-  const daily = /^round:(\d{4}-\d{2}-\d{2}):([a-z0-9-]+?)(?::([a-z0-9]+))?$/.exec(seed)
+  const { base, fortune } = splitFortune(seed)
+  const daily = /^round:(\d{4}-\d{2}-\d{2}):([a-z0-9-]+?)(?::([a-z0-9]+))?$/.exec(base)
   if (daily) {
     const [, dateKey, slug, salt] = daily
     const n = puzzleNumberForDateKey(dateKey)
     const course = courseForPuzzle(n)
     if (course.slug !== slug) return null // seed names a course that isn't that day's rotation
-    return { mode: 'daily', course, cond: dailyConditions(dateKey, course), dateKey, puzzleNumber: n, salt }
+    return { mode: 'daily', course, cond: dailyConditions(dateKey, course), fortune, dateKey, puzzleNumber: n, salt }
   }
-  const practice = /^practice:([a-z0-9-]+):/.exec(seed)
+  const practice = /^practice:([a-z0-9-]+):/.exec(base)
   if (practice) {
     const course = courseBySlug(practice[1])
     if (!course) return null
-    return { mode: 'practice', course, cond: practiceConditions(seed, course) }
+    return { mode: 'practice', course, cond: practiceConditions(base, course), fortune }
   }
   return null
 }
+
+/**
+ * Round-scope destiny plan, identical on client and server: when a track's
+ * counter has crossed its threshold, the round's FIRST qualifying shot
+ * (par-3 tee for the ace, par-5 go-attempt for the albatross) holes out.
+ */
+export interface DestinyPlan {
+  ace: boolean
+  albatross: boolean
+}
+
+export function destinyPlan(info: SeedInfo): DestinyPlan {
+  if (!info.fortune) return { ace: false, albatross: false }
+  const due = destinyDue(info.mode, info.fortune)
+  return { ace: due.ace, albatross: due.albatross }
+}
+
+/** The per-shot probability boosts that DO flow through the honest odds. */
+export function fortuneOddsFor(info: SeedInfo): { acePerShot: number; albPerShot: number } | undefined {
+  if (!info.fortune) return undefined
+  return fortuneShotOdds(info.mode, info.fortune)
+}
+
+// re-exported for the server bundle's fortune verification
+export { FORTUNE_CONFIG } from './fortune'
 
 export type ReplayOutcome =
   | { ok: true; strokes: number; toPar: number; results: HoleResult[]; scores: HoleScore[]; info: SeedInfo }
@@ -72,11 +103,13 @@ export function replayRound(seed: string, character: CharacterId | undefined, de
   const rng = rngFromString(seed)
   const scores: HoleScore[] = []
   let aggressiveLeft = AGGRESSIVE_BUDGET
+  const plan = destinyPlan(info)
+  const fOdds = fortuneOddsFor(info)
 
   for (let i = 0; i < 18; i++) {
     const spec = info.course.holes[i]
     const layout = buildLayout(info.course.slug, spec)
-    const h = startHole(layout, info.cond, character)
+    const h = startHole(layout, info.cond, character, fOdds)
     const holeChoices = decisions[i]
     if (!Array.isArray(holeChoices) || holeChoices.length === 0 || holeChoices.length > 20) {
       return { ok: false, error: `hole ${i + 1}: bad decision list` }
@@ -91,7 +124,16 @@ export function replayRound(seed: string, character: CharacterId | undefined, de
         if (aggressiveLeft <= 0) return { ok: false, error: `hole ${i + 1}: aggressive over budget` }
         aggressiveLeft -= 1
       }
-      playShot(h, choice, rng)
+      // destiny: the round's first qualifying shot of a due track holes out
+      let destiny: MomentKind | undefined
+      if (plan.ace && spec.par === 3 && h.ball.lie === 'tee') {
+        destiny = 'ace'
+        plan.ace = false
+      } else if (plan.albatross && h.stage === 'second' && choice === 'aggressive') {
+        destiny = 'albatross'
+        plan.albatross = false
+      }
+      playShot(h, choice, rng, destiny)
     }
     if (h.stage !== 'done' || !h.score) return { ok: false, error: `hole ${i + 1}: round left unfinished` }
     scores.push(h.score)
@@ -136,13 +178,23 @@ export function replayFrames(seed: string, character: CharacterId | undefined, d
   const rng = rngFromString(seed)
   const frames: ReplayFrame[] = []
   let runToPar = 0
+  const plan = destinyPlan(info)
+  const fOdds = fortuneOddsFor(info)
   for (let i = 0; i < 18; i++) {
     const spec = info.course.holes[i]
     const layout = buildLayout(info.course.slug, spec)
-    const h = startHole(layout, info.cond, character)
+    const h = startHole(layout, info.cond, character, fOdds)
     frames.push({ holeIndex: i, shotIndex: 0, hole: snapshot(h), runningToPar: runToPar })
     decisions[i].forEach((choice, j) => {
-      playShot(h, choice, rng)
+      let destiny: MomentKind | undefined
+      if (plan.ace && spec.par === 3 && h.ball.lie === 'tee') {
+        destiny = 'ace'
+        plan.ace = false
+      } else if (plan.albatross && h.stage === 'second' && choice === 'aggressive') {
+        destiny = 'albatross'
+        plan.albatross = false
+      }
+      playShot(h, choice, rng, destiny)
       frames.push({ holeIndex: i, shotIndex: j + 1, hole: snapshot(h), runningToPar: runToPar })
     })
     runToPar += h.score!.strokes - spec.par

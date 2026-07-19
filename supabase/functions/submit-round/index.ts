@@ -113,7 +113,7 @@ Deno.serve(async (req) => {
   // practice: course records
   const { data: existing } = await supabase
     .from('course_records')
-    .select('to_par, player_name')
+    .select('to_par, player_name, character')
     .eq('course_slug', info.course.slug)
     .maybeSingle()
   const isRecord = !existing || replay.toPar < existing.to_par
@@ -133,8 +133,8 @@ Deno.serve(async (req) => {
     toPar: replay.toPar,
     strokes: replay.strokes,
     record: isRecord
-      ? { broken: true, toPar: replay.toPar, holder: player.name }
-      : { broken: false, toPar: existing!.to_par, holder: existing!.player_name },
+      ? { broken: true, toPar: replay.toPar, holder: player.name, character: character ?? null }
+      : { broken: false, toPar: existing!.to_par, holder: existing!.player_name, character: existing!.character ?? null },
     player: { id: player.id, name: player.name, ...(player.secret ? { secret: player.secret } : {}) },
   })
 })

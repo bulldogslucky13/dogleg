@@ -1,8 +1,16 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { COURSES } from '../engine/courses'
 import { shareText, SITE_URL, type DailySetup } from '../engine/daily'
 import type { HoleResult, HoleScore } from '../engine/types'
-import { buildRecap, characterRecords, type HistoryEntry, type RoundState } from './store'
+import {
+  buildRecap,
+  characterRecords,
+  loadHistory,
+  loadRound,
+  migrateLegacyStorage,
+  type HistoryEntry,
+  type RoundState,
+} from './store'
 
 const entry = (over: Partial<HistoryEntry>): HistoryEntry => ({
   dateKey: '2026-07-01',
@@ -47,6 +55,69 @@ describe('shareText (Break Par card format)', () => {
     expect([...lines[5]]).toHaveLength(9)
     expect(lines[6]).toBe('')
     expect(lines[7]).toBe('🐦 7  ·  ⛳ 6  ·  😬 5')
+  })
+})
+
+describe('legacy bp: → dogleg: storage migration', () => {
+  // the suite runs in node, so stand in for the browser's localStorage
+  const fakeStorage = (seed: Record<string, string> = {}): Storage => {
+    const map = new Map(Object.entries(seed))
+    return {
+      get length() {
+        return map.size
+      },
+      clear: () => map.clear(),
+      getItem: (k: string) => map.get(k) ?? null,
+      key: (i: number) => [...map.keys()][i] ?? null,
+      removeItem: (k: string) => void map.delete(k),
+      setItem: (k: string, v: string) => void map.set(k, v),
+    }
+  }
+
+  afterEach(() => vi.unstubAllGlobals())
+
+  it('moves bp:* saves to dogleg:* and drops the old keys', () => {
+    const storage = fakeStorage({ 'bp:round:v1': '{"seed":"s"}', 'bp:history:v1': '[]' })
+    vi.stubGlobal('localStorage', storage)
+    migrateLegacyStorage()
+    expect(storage.getItem('dogleg:round:v1')).toBe('{"seed":"s"}')
+    expect(storage.getItem('dogleg:history:v1')).toBe('[]')
+    expect(storage.getItem('bp:round:v1')).toBeNull()
+    expect(storage.getItem('bp:history:v1')).toBeNull()
+  })
+
+  it('never clobbers an existing dogleg:* value', () => {
+    const storage = fakeStorage({ 'bp:history:v1': '["stale"]', 'dogleg:history:v1': '["current"]' })
+    vi.stubGlobal('localStorage', storage)
+    migrateLegacyStorage()
+    expect(storage.getItem('dogleg:history:v1')).toBe('["current"]')
+    expect(storage.getItem('bp:history:v1')).toBeNull()
+  })
+
+  it('loadRound and loadHistory pick up saves still under the legacy keys', () => {
+    const round: RoundState = {
+      mode: 'practice',
+      seed: 's',
+      courseSlug: COURSES[0].slug,
+      cond: { wind: 10, greens: 'Medium', difficulty: 5 },
+      puzzleNumber: 1,
+      dateKey: '2026-07-01',
+      currentHole: 0,
+      scores: Array(18).fill(null),
+      aggressiveLeft: 8,
+      rolls: 0,
+      complete: false,
+      hole: null,
+    }
+    vi.stubGlobal(
+      'localStorage',
+      fakeStorage({
+        'bp:round:v1': JSON.stringify(round),
+        'bp:history:v1': JSON.stringify([entry({})]),
+      }),
+    )
+    expect(loadRound()?.seed).toBe('s')
+    expect(loadHistory()).toHaveLength(1)
   })
 })
 

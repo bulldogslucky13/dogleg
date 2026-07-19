@@ -44,9 +44,31 @@ export interface HistoryEntry {
   character?: CharacterId
 }
 
-const ROUND_KEY = 'bp:round:v1'
-const HISTORY_KEY = 'bp:history:v1'
+const ROUND_KEY = 'dogleg:round:v1'
+const HISTORY_KEY = 'dogleg:history:v1'
 const UI_MODE_KEY = 'dogleg:uimode'
+
+/** Keys from before the rename off the Break Par-era `bp:` prefix. */
+const LEGACY_KEYS: ReadonlyArray<readonly [legacy: string, current: string]> = [
+  ['bp:round:v1', ROUND_KEY],
+  ['bp:history:v1', HISTORY_KEY],
+]
+
+/** Copy any legacy `bp:*` saves to the `dogleg:*` keys (then drop the old keys)
+ * so nobody loses their streak or history. Idempotent; runs before every read
+ * rather than once at import so a stubbed storage in tests still sees it. */
+export function migrateLegacyStorage(): void {
+  try {
+    for (const [legacy, current] of LEGACY_KEYS) {
+      const raw = localStorage.getItem(legacy)
+      if (raw === null) continue
+      if (localStorage.getItem(current) === null) localStorage.setItem(current, raw)
+      localStorage.removeItem(legacy)
+    }
+  } catch {
+    /* private mode etc. */
+  }
+}
 
 export type UiMode = 'modern' | 'classic'
 
@@ -168,6 +190,7 @@ export function saveRound(state: RoundState | null): void {
 }
 
 export function loadRound(): RoundState | null {
+  migrateLegacyStorage()
   try {
     const raw = localStorage.getItem(ROUND_KEY)
     if (!raw) return null
@@ -182,6 +205,7 @@ export function loadRound(): RoundState | null {
 }
 
 export function loadHistory(): HistoryEntry[] {
+  migrateLegacyStorage()
   try {
     const raw = localStorage.getItem(HISTORY_KEY)
     return raw ? (JSON.parse(raw) as HistoryEntry[]) : []

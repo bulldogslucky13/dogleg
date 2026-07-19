@@ -18,7 +18,6 @@ import {
   saveRound,
   saveUiMode,
   newRound,
-  startPracticeRound,
   usesBudget,
   type HistoryEntry,
   type RoundState,
@@ -173,12 +172,10 @@ export default function App() {
         onHome={() => setView('home')}
         onPracticeAgain={() => {
           if (round) {
-            // quick rematch: same course, same player
-            const r = startPracticeRound(round.courseSlug, round.character)
-            track('round_started', { mode: 'practice', course: r.courseSlug, puzzle_number: r.puzzleNumber, character: r.character })
-            setRound(r)
-            setSelected(null)
-            setView('play')
+            // rematch on the same course, but pick your player fresh each run
+            // (round_started is tracked by the pick screen's onPick)
+            setPending({ mode: 'practice', setup: practiceSetup(round.courseSlug, `${Date.now()}`) })
+            setView('pick')
           }
         }}
       />

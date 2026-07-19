@@ -8,6 +8,7 @@ import type { ApproachOdds, CharacterAdvantage, CharacterId, Choice } from './en
 import {
   advanceHole,
   applyChoice,
+  archiveRound,
   buildRecap,
   holeInPlay,
   loadHistory,
@@ -31,10 +32,11 @@ import { SideMap } from './ui/SideMap'
 import { ChoiceCards, ClassicScorecard, HazardChips, HoleComplete, Scorecard, StatusBanner, TierBanner } from './ui/panels'
 import { decodeReplay, type ReplayPayload } from './engine/replay'
 import { ReplayScreen } from './ui/ReplayScreen'
+import { RoundsScreen } from './ui/RoundsScreen'
 import { CharacterPickScreen, HomeScreen, ResultScreen } from './ui/screens'
 import { Tutorial, hasSeenTutorial } from './ui/Tutorial'
 
-type View = 'home' | 'pick' | 'play' | 'result' | 'watch'
+type View = 'home' | 'pick' | 'play' | 'result' | 'watch' | 'rounds'
 
 /** a #watch=<code> link opens straight into the replay viewer */
 function watchFromHash(): ReplayPayload | null {
@@ -106,6 +108,7 @@ export default function App() {
         <HomeScreen
           history={history}
           onHowToPlay={() => setShowTutorial(true)}
+          onMyRounds={() => setView('rounds')}
           activeRound={
             round && !round.complete
               ? { mode: round.mode, courseName: courseBySlug(round.courseSlug)?.name ?? '' }
@@ -139,6 +142,18 @@ export default function App() {
           setWatching(null)
           setView('home')
         }}
+      />
+    )
+  }
+
+  if (view === 'rounds') {
+    return (
+      <RoundsScreen
+        onWatch={(p) => {
+          setWatching(p)
+          setView('watch')
+        }}
+        onBack={() => setView('home')}
       />
     )
   }
@@ -264,6 +279,7 @@ export default function App() {
     if (after.complete) {
       const h = recordResult(after)
       setHistory(h)
+      archiveRound(after) // into the locker — replayable forever if it's a PR/CR
       setResultFor(after.mode)
       setView('result')
     }

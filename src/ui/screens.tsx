@@ -7,7 +7,7 @@ import type { CharacterId, HoleResult } from '../engine/types'
 import { track } from '../lib/analytics'
 import { backendEnabled } from '../lib/backend'
 import { fetchCourseRecords, loadPlayer, type CourseRecord } from '../lib/leaderboard'
-import { characterRecords, computeStreaks, type HistoryEntry, type RoundRecap, type RoundState } from '../state/store'
+import { characterRecords, computeStreaks, loadArchive, type HistoryEntry, type RoundRecap, type RoundState } from '../state/store'
 import { AccountPanel } from './AccountPanel'
 import { CharacterAvatar } from './Avatars'
 import { ScoreBoard } from './Leaderboard'
@@ -21,6 +21,7 @@ export function HomeScreen(props: {
   onPractice: (slug: string) => void
   onShowResult: () => void
   onHowToPlay: () => void
+  onMyRounds: () => void
 }) {
   const setup = dailySetup()
   const streaks = computeStreaks(props.history)
@@ -138,6 +139,11 @@ export function HomeScreen(props: {
           ))}
           <p className="fine">Practice rounds don't touch your streak.</p>
         </div>
+      )}
+      {loadArchive().length > 0 && (
+        <button className="cta ghost" onClick={props.onMyRounds}>
+          🔒 My rounds · locker
+        </button>
       )}
       <AccountPanel />
     </div>

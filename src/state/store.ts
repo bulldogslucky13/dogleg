@@ -4,6 +4,7 @@ import { startHole, playShot, type HoleInPlay } from '../engine/resolve'
 import { rngFromString, skip, type Rng } from '../engine/rng'
 import type { CharacterId, Choice, Conditions, HoleResult, HoleScore, Stage } from '../engine/types'
 import { courseBySlug } from '../engine/courses'
+import { decisionsFromScores } from '../engine/replay'
 import { track } from '../lib/analytics'
 
 export const AGGRESSIVE_BUDGET = 8
@@ -445,4 +446,91 @@ export function computeStreaks(history: HistoryEntry[]): Streaks {
     played: history.length,
     brokePar: history.filter((h) => h.toPar < 0).length,
   }
+}
+
+// ---------------------------------------------------------------------------
+// Round archive — the raw material for "My rounds" and replays
+// ---------------------------------------------------------------------------
+
+export interface ArchivedRound {
+  seed: string
+  mode: 'daily' | 'practice'
+  courseSlug: string
+  character?: CharacterId
+  dateKey: string
+  toPar: number
+  strokes: number
+  results: HoleResult[]
+  /** the round's full decision list — enough to replay it forever */
+  decisions: Choice[][]
+  /** confirmed by the server: this round took the course record */
+  courseRecord?: boolean
+  playedAt: number
+}
+
+const ARCHIVE_KEY = 'dogleg:archive:v1'
+
+export function loadArchive(): ArchivedRound[] {
+  try {
+    const raw = localStorage.getItem(ARCHIVE_KEY)
+    return raw ? (JSON.parse(raw) as ArchivedRound[]) : []
+  } catch {
+    return []
+  }
+}
+
+function saveArchive(rounds: ArchivedRound[]): void {
+  try {
+    localStorage.setItem(ARCHIVE_KEY, JSON.stringify(rounds))
+  } catch {
+    /* private mode / quota */
+  }
+}
+
+/**
+ * Retention: the 10 most recent rounds always stay. Beyond that, a round
+ * lives forever if it's your personal best on its course (PR) or a confirmed
+ * course record — records don't age out.
+ */
+export function pruneArchive(rounds: ArchivedRound[]): ArchivedRound[] {
+  const byNewest = [...rounds].sort((a, b) => b.playedAt - a.playedAt)
+  const keep = new Set<ArchivedRound>(byNewest.slice(0, 10))
+  const bestByCourse = new Map<string, ArchivedRound>()
+  for (const r of byNewest) {
+    const best = bestByCourse.get(r.courseSlug)
+    if (!best || r.toPar < best.toPar) bestByCourse.set(r.courseSlug, r)
+  }
+  for (const r of bestByCourse.values()) keep.add(r)
+  for (const r of byNewest) if (r.courseRecord) keep.add(r)
+  return byNewest.filter((r) => keep.has(r))
+}
+
+/** Archive a finished round (call once, when it completes). */
+export function archiveRound(state: RoundState): void {
+  if (!state.complete) return
+  const decisions = decisionsFromScores(state.scores)
+  if (!decisions) return
+  const entry: ArchivedRound = {
+    seed: state.seed,
+    mode: state.mode,
+    courseSlug: state.courseSlug,
+    character: state.character,
+    dateKey: state.dateKey,
+    toPar: roundToPar(state),
+    strokes: state.scores.reduce((s, sc) => s + (sc?.strokes ?? 0), 0),
+    results: state.scores.map((s) => s?.result ?? 'triple'),
+    decisions,
+    playedAt: Date.now(),
+  }
+  const existing = loadArchive().filter((r) => r.seed !== entry.seed)
+  saveArchive(pruneArchive([entry, ...existing]))
+}
+
+/** The server confirmed a course record for this round — pin it forever. */
+export function markArchiveRecord(seed: string): void {
+  const rounds = loadArchive()
+  const hit = rounds.find((r) => r.seed === seed)
+  if (!hit) return
+  hit.courseRecord = true
+  saveArchive(pruneArchive(rounds))
 }

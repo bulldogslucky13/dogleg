@@ -163,6 +163,46 @@ describe('legacy bp: → dogleg: storage migration', () => {
   })
 })
 
+describe('pruneArchive retention', () => {
+  const arch = (over: Partial<import('./store').ArchivedRound>): import('./store').ArchivedRound => ({
+    seed: `practice:x:${Math.random()}`,
+    mode: 'practice',
+    courseSlug: 'pebble-beach',
+    dateKey: '2026-07-19',
+    toPar: 2,
+    strokes: 74,
+    results: Array(18).fill('par'),
+    decisions: Array(18).fill(['normal', 'normal']),
+    playedAt: 0,
+    ...over,
+  })
+
+  it('keeps the 10 most recent, personal bests, and course records forever', async () => {
+    const { pruneArchive } = await import('./store')
+    const rounds = [
+      // 12 recent mediocre rounds on the same course, newest last
+      ...Array.from({ length: 12 }, (_x, i) => arch({ seed: `s${i}`, toPar: 5, playedAt: 100 + i })),
+      // an old personal best on another course
+      arch({ seed: 'pr-old', courseSlug: 'st-andrews-old', toPar: -4, playedAt: 1 }),
+      // an ancient confirmed course record, worse than a later personal round
+      arch({ seed: 'cr-ancient', courseSlug: 'oakmont', toPar: -1, courseRecord: true, playedAt: 2 }),
+      arch({ seed: 'oak-better', courseSlug: 'oakmont', toPar: -3, playedAt: 3 }),
+    ]
+    const kept = pruneArchive(rounds)
+    const seeds = new Set(kept.map((r) => r.seed))
+    // 10 most recent of the mediocre pile survive; the 2 oldest drop (unless they're bests)
+    expect(seeds.has('s11')).toBe(true)
+    expect(seeds.has('s2')).toBe(true)
+    expect(seeds.has('s1')).toBe(false)
+    // the pebble PR among them: s0 is oldest but tied at 5 — the best (first-found newest) stays anyway via recency; PRs on other courses:
+    expect(seeds.has('pr-old')).toBe(true) // personal best never ages out
+    expect(seeds.has('cr-ancient')).toBe(true) // course record never ages out
+    expect(seeds.has('oak-better')).toBe(true) // personal best on oakmont too
+    // sorted newest first
+    expect(kept[0].seed).toBe('s11')
+  })
+})
+
 describe('characterRecords', () => {
   it('groups daily rounds by character and tracks avg/best', () => {
     const history: HistoryEntry[] = [

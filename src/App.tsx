@@ -3,7 +3,7 @@ import { characterById } from './engine/characters'
 import { courseBySlug } from './engine/courses'
 import { dailySetup, localDateKey, practiceSetup, toParLabel, type DailySetup } from './engine/daily'
 import { longOdds } from './engine/odds'
-import { oddsFor } from './engine/resolve'
+import { LOOK_LABEL, madePuttLook, oddsFor } from './engine/resolve'
 import type { ApproachOdds, CharacterAdvantage, CharacterId, Choice } from './engine/types'
 import {
   advanceHole,
@@ -315,7 +315,7 @@ export default function App() {
             {hole.stage === 'putt' ? (
               <div className="chips slim center">
                 <span className="chip">
-                  {(hole.ball.puttFeet ?? 0) <= 20 ? 'Birdie-range putt' : 'Long putt'} · ~{hole.ball.puttFeet} ft
+                  {LOOK_LABEL[madePuttLook(hole.strokes, spec.par)].chip} · ~{hole.ball.puttFeet} ft
                 </span>
                 <span className="chip">{round.cond.greens} green</span>
               </div>

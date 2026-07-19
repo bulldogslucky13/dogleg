@@ -17,6 +17,34 @@ import { pickWeighted } from './rng'
 import { approachAdvantage, longAdvantage, puttAdvantage } from './advantage'
 import { approachOdds, longOdds, puttOdds, shortOdds, type ApproachMode, type ZoneShare } from './odds'
 
+/** What a made putt scores relative to par — accounts for every stroke already
+ * taken, penalties included. A "birdie look" is only a birdie look if holing out
+ * from here would actually be a birdie. */
+export type ScoreLook = 'eagle' | 'birdie' | 'par' | 'bogey' | 'double' | 'worse'
+
+/** `strokesTaken` = strokes already on the card (incl. penalties). A single made
+ * putt adds one, so the hole would finish `strokesTaken + 1 - par` to par. */
+export function madePuttLook(strokesTaken: number, par: number): ScoreLook {
+  const diff = strokesTaken + 1 - par
+  if (diff <= -2) return 'eagle'
+  if (diff === -1) return 'birdie'
+  if (diff === 0) return 'par'
+  if (diff === 1) return 'bogey'
+  if (diff === 2) return 'double'
+  return 'worse'
+}
+
+/** Copy for each score look: `title` for the status card, `chip` for the map
+ * HUD, `look` for the "% __ look" odds headline, `phrase` for the recap line. */
+export const LOOK_LABEL: Record<ScoreLook, { title: string; chip: string; look: string; phrase: string }> = {
+  eagle: { title: 'Eagle look', chip: 'Eagle putt', look: 'eagle look', phrase: 'an eagle look' },
+  birdie: { title: 'Birdie look', chip: 'Birdie putt', look: 'birdie look', phrase: 'a birdie look' },
+  par: { title: 'Par putt', chip: 'Par putt', look: 'par look', phrase: 'a par look' },
+  bogey: { title: 'Bogey putt', chip: 'Bogey putt', look: 'bogey look', phrase: 'a bogey look' },
+  double: { title: 'Double-bogey putt', chip: 'Double putt', look: 'double look', phrase: 'a double look' },
+  worse: { title: 'Damage-control putt', chip: 'Long putt', look: 'scramble', phrase: 'a scramble' },
+}
+
 export interface HoleInPlay {
   layout: HoleLayout
   cond: Conditions
@@ -75,7 +103,9 @@ export function oddsFor(h: HoleInPlay, choice: Choice): Odds {
   }
 }
 
-export function summarize(odds: Odds): OddsSummary {
+/** `ctx` carries the strokes-so-far and par so an approach headline can name the
+ * look honestly — a drop after a penalty is a bogey look, not a birdie look. */
+export function summarize(odds: Odds, ctx?: { strokes: number; par: number }): OddsSummary {
   switch (odds.kind) {
     case 'long': {
       const good = odds.dialed + odds.fairway
@@ -91,12 +121,15 @@ export function summarize(odds: Odds): OddsSummary {
     case 'approach': {
       const good = odds.holeout + odds.kickin + odds.makeable
       const bad = odds.fringe + odds.sand + odds.water
+      // the "look" is what a make would score: land the approach (strokes + 1),
+      // then hole the putt — so name it off strokes + 1.
+      const look = ctx ? LOOK_LABEL[madePuttLook(ctx.strokes + 1, ctx.par)].look : 'birdie look'
       return {
         good,
         neutral: odds.lag,
         bad,
         penalty: odds.water,
-        headline: `${Math.round(good * 100)}% birdie look`,
+        headline: `${Math.round(good * 100)}% ${look}`,
       }
     }
     case 'putt':
@@ -127,7 +160,7 @@ export function summarize(odds: Odds): OddsSummary {
 function facedAll(h: HoleInPlay): Record<Choice, { summary: OddsSummary; odds: Odds }> {
   const make = (c: Choice) => {
     const o = oddsFor(h, c)
-    return { summary: summarize(o), odds: o }
+    return { summary: summarize(o, { strokes: h.strokes, par: h.layout.spec.par }), odds: o }
   }
   return { safe: make('safe'), normal: make('normal'), aggressive: make('aggressive') }
 }
@@ -213,7 +246,7 @@ export function playShot(h: HoleInPlay, choice: Choice, rng: Rng): HoleInPlay {
 
       h.ball = after
       const advantage = h.stage === 'tee' ? (longAdvantage(h.layout, h.cond, preBall, choice, h.character, bucket) ?? undefined) : undefined
-      h.shots.push({ stage: h.stage, choice, outcome: bucket, penalty, faced, after, advantage })
+      h.shots.push({ stage: h.stage, choice, outcome: bucket, penalty, faced, after, advantage, strokesAfter: h.strokes })
       h.stage = spec.par === 5 && h.stage === 'tee' ? 'second' : 'approach'
       h.status = teeStatus(bucket, penalty)
       return h
@@ -231,8 +264,10 @@ export function playShot(h: HoleInPlay, choice: Choice, rng: Rng): HoleInPlay {
       h.strokes += putts
       const feet = h.ball.puttFeet ?? 20
       h.ball = { ...h.ball, pos: L, lie: 'green', puttFeet: 0 }
-      const puttAdv = puttAdvantage(h.cond, feet, choice, h.character, bucket) ?? undefined
-      h.shots.push({ stage: 'putt', choice, outcome: bucket, penalty: false, faced, after: h.ball, advantage: puttAdv })
+      // draining a putt only earns the Greens Keeper callout when the make is a birdie or eagle
+      const putForBirdie = h.strokes - h.layout.spec.par <= -1
+      const puttAdv = putForBirdie ? (puttAdvantage(h.cond, feet, choice, h.character, bucket) ?? undefined) : undefined
+      h.shots.push({ stage: 'putt', choice, outcome: bucket, penalty: false, faced, after: h.ball, advantage: puttAdv, strokesAfter: h.strokes })
       finish(
         h,
         bucket === 'one'
@@ -264,7 +299,7 @@ export function playShot(h: HoleInPlay, choice: Choice, rng: Rng): HoleInPlay {
       if (bucket === 'stillin') {
         // one swing, ball still in the trap — same decision again
         h.strokes += 1
-        h.shots.push({ stage: 'shortgame', choice, outcome: bucket, penalty: false, faced, after: h.ball })
+        h.shots.push({ stage: 'shortgame', choice, outcome: bucket, penalty: false, faced, after: h.ball, strokesAfter: h.strokes })
         h.status = { tone: 'bad', title: 'Still in the bunker', note: 'Caught the lip — dig in and go again.' }
         return h
       }
@@ -276,7 +311,7 @@ export function playShot(h: HoleInPlay, choice: Choice, rng: Rng): HoleInPlay {
           lie: 'fringe',
           side: h.ball.side === 'left' ? 'right' : h.ball.side === 'right' ? 'left' : 'right',
         }
-        h.shots.push({ stage: 'shortgame', choice, outcome: bucket, penalty: false, faced, after: h.ball })
+        h.shots.push({ stage: 'shortgame', choice, outcome: bucket, penalty: false, faced, after: h.ball, strokesAfter: h.strokes })
         h.status = { tone: 'bad', title: 'Across the green', note: 'Thinned it — long side now, chip coming back.' }
         return h
       }
@@ -284,7 +319,7 @@ export function playShot(h: HoleInPlay, choice: Choice, rng: Rng): HoleInPlay {
       const add = bucket === 'holeout' ? 1 : bucket === 'updown' ? 2 : bucket === 'twochip' ? 3 : bucket === 'blowup' ? 4 : 5
       h.strokes += add
       h.ball = { pos: L, lie: 'green', side: 'center', puttFeet: 0 }
-      h.shots.push({ stage: 'shortgame', choice, outcome: bucket, penalty: false, faced, after: h.ball })
+      h.shots.push({ stage: 'shortgame', choice, outcome: bucket, penalty: false, faced, after: h.ball, strokesAfter: h.strokes })
       finish(
         h,
         bucket === 'holeout'
@@ -363,16 +398,18 @@ function resolveApproach(
   const advantage = approachAdvantage(h.layout, h.cond, preBall, choice, mode, h.character, bucket) ?? undefined
   let penalty = false
 
+  // the Dart Thrower callout only lands when the result is actually birdie-or-better
+  const scoringAdvantage = (final: number) => (final - h.layout.spec.par <= -1 ? advantage : undefined)
   if (bucket === 'holeout') {
     h.ball = { pos: L, lie: 'green', side: 'center', puttFeet: 0 }
-    h.shots.push({ stage: stageWas, choice, outcome: bucket, penalty, faced, after: h.ball, advantage })
+    h.shots.push({ stage: stageWas, choice, outcome: bucket, penalty, faced, after: h.ball, advantage: scoringAdvantage(h.strokes), strokesAfter: h.strokes })
     finish(h, h.strokes === 1 ? 'ACE. Buy the bar a round.' : 'Holed it from the fairway — pandemonium')
     return
   }
   if (bucket === 'kickin') {
     h.strokes += 1 // tap-in
     h.ball = { pos: L, lie: 'green', side: 'center', puttFeet: 0 }
-    h.shots.push({ stage: stageWas, choice, outcome: bucket, penalty, faced, after: h.ball, advantage })
+    h.shots.push({ stage: stageWas, choice, outcome: bucket, penalty, faced, after: h.ball, advantage: scoringAdvantage(h.strokes), strokesAfter: h.strokes })
     finish(h, 'Stuffed it — kick-in range')
     return
   }
@@ -383,11 +420,15 @@ function resolveApproach(
         : Math.round(24 + rng() * (choice === 'safe' ? 22 : 32))
     h.ball = { pos: L, lie: 'green', side: 'center', puttFeet: feet }
     h.stage = 'putt'
+    // name the look off what a make actually scores, penalties included
+    const look = madePuttLook(h.strokes, h.layout.spec.par)
     h.status =
       bucket === 'makeable'
-        ? { tone: 'good', title: 'Birdie look', note: `${feet} feet — on the dance floor.` }
+        ? { tone: look === 'birdie' || look === 'eagle' ? 'good' : 'even', title: LOOK_LABEL[look].title, note: `${feet} feet — on the dance floor.` }
         : { tone: 'even', title: 'Long putt', note: `${feet} feet — lag it close.` }
-    h.shots.push({ stage: stageWas, choice, outcome: bucket, penalty, faced, after: h.ball, advantage })
+    // the "stuck it to birdie range" edge only earns a callout when it's truly a birdie look or better
+    const stuckAdvantage = look === 'birdie' || look === 'eagle' ? advantage : undefined
+    h.shots.push({ stage: stageWas, choice, outcome: bucket, penalty, faced, after: h.ball, advantage: stuckAdvantage, strokesAfter: h.strokes })
     return
   }
   if (bucket === 'water') {
@@ -399,7 +440,7 @@ function resolveApproach(
     h.ball = { pos: Math.min(dropPos, L - 35), lie: 'fairway', side: 'center' }
     h.stage = 'approach'
     h.status = { tone: 'bad', title: 'In the water', note: 'One-stroke penalty — playing from the drop.' }
-    h.shots.push({ stage: stageWas, choice, outcome: bucket, penalty, faced, after: h.ball })
+    h.shots.push({ stage: stageWas, choice, outcome: bucket, penalty, faced, after: h.ball, strokesAfter: h.strokes })
     return
   }
   // fringe / sand: greenside scramble
@@ -415,5 +456,5 @@ function resolveApproach(
     bucket === 'sand'
       ? { tone: 'bad', title: 'Greenside bunker', note: 'Splash it out — save the par.' }
       : { tone: 'bad', title: 'Missed the green', note: 'Short-game test — get it up and down.' }
-  h.shots.push({ stage: stageWas, choice, outcome: bucket, penalty, faced, after: h.ball })
+  h.shots.push({ stage: stageWas, choice, outcome: bucket, penalty, faced, after: h.ball, strokesAfter: h.strokes })
 }

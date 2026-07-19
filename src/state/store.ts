@@ -48,25 +48,51 @@ const ROUND_KEY = 'dogleg:round:v1'
 const HISTORY_KEY = 'dogleg:history:v1'
 const UI_MODE_KEY = 'dogleg:uimode'
 
-/** Keys from before the rename off the Break Par-era `bp:` prefix. */
-const LEGACY_KEYS: ReadonlyArray<readonly [legacy: string, current: string]> = [
-  ['bp:round:v1', ROUND_KEY],
-  ['bp:history:v1', HISTORY_KEY],
-]
-
-/** Copy any legacy `bp:*` saves to the `dogleg:*` keys (then drop the old keys)
- * so nobody loses their streak or history. Idempotent; runs before every read
- * rather than once at import so a stubbed storage in tests still sees it. */
+/** Move any legacy `bp:*` saves (the Break Par-era prefix) to the `dogleg:*`
+ * keys so nobody loses their streak or history. Idempotent; runs before every
+ * read rather than once at import so a stubbed storage in tests still sees it. */
 export function migrateLegacyStorage(): void {
   try {
-    for (const [legacy, current] of LEGACY_KEYS) {
-      const raw = localStorage.getItem(legacy)
-      if (raw === null) continue
-      if (localStorage.getItem(current) === null) localStorage.setItem(current, raw)
-      localStorage.removeItem(legacy)
-    }
+    migrateKey('bp:round:v1', ROUND_KEY, reconcileRounds)
+    migrateKey('bp:history:v1', HISTORY_KEY, reconcileHistory)
   } catch {
     /* private mode etc. */
+  }
+}
+
+function migrateKey(legacy: string, current: string, reconcile: (legacyRaw: string, currentRaw: string) => string): void {
+  const raw = localStorage.getItem(legacy)
+  if (raw === null) return
+  const existing = localStorage.getItem(current)
+  localStorage.setItem(current, existing === null ? raw : reconcile(raw, existing))
+  localStorage.removeItem(legacy)
+}
+
+/** Both keys populated means an old-bundle tab kept writing `bp:*` after a new
+ * tab migrated: union the histories by day (current wins ties) so neither tab's
+ * completed rounds are lost. */
+function reconcileHistory(legacyRaw: string, currentRaw: string): string {
+  try {
+    const cur = JSON.parse(currentRaw) as HistoryEntry[]
+    const have = new Set(cur.map((e) => e.dateKey))
+    const legacy = (JSON.parse(legacyRaw) as HistoryEntry[]).filter((e) => !have.has(e.dateKey))
+    if (!legacy.length) return currentRaw
+    return JSON.stringify([...cur, ...legacy].sort((a, b) => a.dateKey.localeCompare(b.dateKey)))
+  } catch {
+    return currentRaw
+  }
+}
+
+/** Same round saved under both keys: keep whichever tab got further (rolls only
+ * grow). Unrelated rounds: the `dogleg:*` one is the user's latest, keep it. */
+function reconcileRounds(legacyRaw: string, currentRaw: string): string {
+  try {
+    const cur = JSON.parse(currentRaw) as RoundState
+    const legacy = JSON.parse(legacyRaw) as RoundState
+    const sameRound = cur.seed === legacy.seed && cur.mode === legacy.mode && cur.dateKey === legacy.dateKey
+    return sameRound && legacy.rolls > cur.rolls ? legacyRaw : currentRaw
+  } catch {
+    return currentRaw
   }
 }
 

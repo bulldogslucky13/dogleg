@@ -86,12 +86,54 @@ describe('legacy bp: → dogleg: storage migration', () => {
     expect(storage.getItem('bp:history:v1')).toBeNull()
   })
 
-  it('never clobbers an existing dogleg:* value', () => {
-    const storage = fakeStorage({ 'bp:history:v1': '["stale"]', 'dogleg:history:v1': '["current"]' })
+  it('merges histories by day when an old-bundle tab wrote bp:* after migration', () => {
+    // legacy has an extra day (07-01) plus a different copy of 07-02; current wins the tie
+    const legacy = [entry({ dateKey: '2026-07-01', toPar: -1 }), entry({ dateKey: '2026-07-02', toPar: 9 })]
+    const current = [entry({ dateKey: '2026-07-02', toPar: 2 }), entry({ dateKey: '2026-07-03', toPar: 1 })]
+    const storage = fakeStorage({
+      'bp:history:v1': JSON.stringify(legacy),
+      'dogleg:history:v1': JSON.stringify(current),
+    })
     vi.stubGlobal('localStorage', storage)
     migrateLegacyStorage()
-    expect(storage.getItem('dogleg:history:v1')).toBe('["current"]')
+    const merged = JSON.parse(storage.getItem('dogleg:history:v1')!) as HistoryEntry[]
+    expect(merged.map((e) => [e.dateKey, e.toPar])).toEqual([
+      ['2026-07-01', -1],
+      ['2026-07-02', 2],
+      ['2026-07-03', 1],
+    ])
     expect(storage.getItem('bp:history:v1')).toBeNull()
+  })
+
+  it('keeps the further-along copy when the same round sits under both keys', () => {
+    const base = { seed: 's', mode: 'daily', dateKey: '2026-07-19' }
+    const storage = fakeStorage({
+      'bp:round:v1': JSON.stringify({ ...base, rolls: 12 }),
+      'dogleg:round:v1': JSON.stringify({ ...base, rolls: 4 }),
+    })
+    vi.stubGlobal('localStorage', storage)
+    migrateLegacyStorage()
+    expect((JSON.parse(storage.getItem('dogleg:round:v1')!) as RoundState).rolls).toBe(12)
+    expect(storage.getItem('bp:round:v1')).toBeNull()
+  })
+
+  it('keeps the dogleg round when the legacy one is a different round or corrupt', () => {
+    const current = JSON.stringify({ seed: 'new', mode: 'daily', dateKey: '2026-07-19', rolls: 1 })
+    const different = fakeStorage({
+      'bp:round:v1': JSON.stringify({ seed: 'old', mode: 'practice', dateKey: '2026-07-10', rolls: 40 }),
+      'dogleg:round:v1': current,
+    })
+    vi.stubGlobal('localStorage', different)
+    migrateLegacyStorage()
+    expect(different.getItem('dogleg:round:v1')).toBe(current)
+    expect(different.getItem('bp:round:v1')).toBeNull()
+    vi.unstubAllGlobals()
+
+    const corrupt = fakeStorage({ 'bp:round:v1': 'not json', 'dogleg:round:v1': current })
+    vi.stubGlobal('localStorage', corrupt)
+    migrateLegacyStorage()
+    expect(corrupt.getItem('dogleg:round:v1')).toBe(current)
+    expect(corrupt.getItem('bp:round:v1')).toBeNull()
   })
 
   it('loadRound and loadHistory pick up saves still under the legacy keys', () => {

@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { characterById } from '../engine/characters'
 import { courseBySlug } from '../engine/courses'
 import { toParLabel } from '../engine/daily'
@@ -6,11 +7,13 @@ import { loadPlayer } from '../lib/leaderboard'
 import { loadArchive, type ArchivedRound } from '../state/store'
 
 /**
- * My rounds: your 10 most recent, plus the permanent shelf — personal bests
- * per course and any course records you hold never age out. Every entry has
- * a Watch button into the replay viewer.
+ * My rounds — two tabs so the trophy shelf can grow without burying the feed:
+ * "Recent" is your last 10 rounds; "Records" is the permanent shelf (course
+ * records you hold + personal bests per course, which never age out). Every
+ * entry has a Watch button into the replay viewer.
  */
 export function RoundsScreen(props: { onWatch: (p: ReplayPayload) => void; onBack: () => void }) {
+  const [tab, setTab] = useState<'recent' | 'records'>('recent')
   const rounds = loadArchive()
   const records = rounds.filter((r) => r.courseRecord)
   const bestByCourse = new Map<string, ArchivedRound>()
@@ -55,34 +58,59 @@ export function RoundsScreen(props: { onWatch: (p: ReplayPayload) => void; onBac
         <h2 className="pick-title">My rounds</h2>
       </header>
 
-      {rounds.length === 0 && (
+      {rounds.length === 0 ? (
         <p className="tagline center">No rounds in the locker yet — go play one and it'll show up here.</p>
+      ) : (
+        <>
+          <div className="locker-tabs" role="tablist">
+            <button
+              role="tab"
+              aria-selected={tab === 'recent'}
+              className={`locker-tab${tab === 'recent' ? ' on' : ''}`}
+              onClick={() => setTab('recent')}
+            >
+              Recent
+            </button>
+            <button
+              role="tab"
+              aria-selected={tab === 'records'}
+              className={`locker-tab${tab === 'records' ? ' on' : ''}`}
+              onClick={() => setTab('records')}
+            >
+              Records · {records.length + prs.length}
+            </button>
+          </div>
+
+          {tab === 'recent' && (
+            <section className="rounds-section">
+              <div className="kicker">Last {recent.length} round{recent.length === 1 ? '' : 's'}</div>
+              {recent.map((r) => row(r))}
+            </section>
+          )}
+
+          {tab === 'records' && (
+            <>
+              {records.length > 0 && (
+                <section className="rounds-section">
+                  <div className="kicker">🏆 Course records you hold</div>
+                  {records.map((r) => row(r, 'CR'))}
+                </section>
+              )}
+              {prs.length > 0 && (
+                <section className="rounds-section">
+                  <div className="kicker">Personal bests</div>
+                  {prs.map((r) => row(r, 'PR'))}
+                </section>
+              )}
+              {records.length + prs.length === 0 && (
+                <p className="fine">No records yet — beat your best on any course and it lives here forever.</p>
+              )}
+            </>
+          )}
+        </>
       )}
 
-      {records.length > 0 && (
-        <section className="rounds-section">
-          <div className="kicker">🏆 Course records you hold</div>
-          {records.map((r) => row(r, 'CR'))}
-        </section>
-      )}
-
-      {prs.length > 0 && (
-        <section className="rounds-section">
-          <div className="kicker">Personal bests</div>
-          {prs.map((r) => row(r, 'PR'))}
-        </section>
-      )}
-
-      {recent.length > 0 && (
-        <section className="rounds-section">
-          <div className="kicker">Recent rounds</div>
-          {recent.map((r) => row(r))}
-        </section>
-      )}
-
-      <p className="fine">
-        The last 10 rounds stay here; personal bests and course records stay forever.
-      </p>
+      <p className="fine">Recent keeps your last 10; records and personal bests stay forever.</p>
     </div>
   )
 }

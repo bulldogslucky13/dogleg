@@ -190,9 +190,11 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
 
     render(<App />)
     fireEvent.click(screen.getByText(/My rounds/))
+    // Recent is the default tab; the records shelf lives behind its own tab
+    expect(screen.getByText(/Last 1 round/)).toBeTruthy()
+    expect(screen.getByText(/St Andrews/)).toBeTruthy()
+    fireEvent.click(screen.getByText(/Records · 1/))
     expect(screen.getByText('Personal bests')).toBeTruthy()
-    // the round shows as both a personal best and a recent round
-    expect(screen.getAllByText(/St Andrews/).length).toBeGreaterThanOrEqual(2)
     fireEvent.click(screen.getAllByText('▶ Watch')[0])
     expect(screen.getByText('‹ Exit replay')).toBeTruthy()
   })

@@ -142,7 +142,7 @@ export function HomeScreen(props: {
       )}
       {loadArchive().length > 0 && (
         <button className="cta ghost" onClick={props.onMyRounds}>
-          🔒 My rounds · locker
+          🛅 My rounds · locker
         </button>
       )}
       <AccountPanel />

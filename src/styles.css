@@ -1041,6 +1041,29 @@ button {
 }
 
 /* my rounds locker */
+.locker-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.locker-tab {
+  border: 1.5px solid var(--line);
+  border-radius: 10px;
+  padding: 9px;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(29, 43, 32, 0.6);
+}
+
+.locker-tab.on {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--cream);
+}
+
 .rounds-section {
   display: flex;
   flex-direction: column;

@@ -183,8 +183,9 @@ export interface ShotRecord {
   /** ball position after the shot */
   after: BallState
   /** running stroke total after this shot (penalties included) — lets the recap
-   * name a shot's scoring look honestly */
-  strokesAfter: number
+   * name a shot's scoring look honestly. Optional: rounds persisted under
+   * bp:round:v1 before this field existed won't have it, so readers must guard. */
+  strokesAfter?: number
   /** set when the character's edge actually helped this outcome */
   advantage?: CharacterAdvantage
 }

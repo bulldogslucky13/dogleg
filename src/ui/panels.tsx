@@ -257,7 +257,7 @@ export function OddsRecap(props: { score: HoleScore; par: number }) {
           <div className="recap-stage">
             {stageName(shot.stage, props.par, lieBefore(i))} — went{' '}
             {choiceCopy(shot.stage as Exclude<Stage, 'done'>, lieBefore(i), shot.choice).label.toLowerCase()}, finished{' '}
-            {shot.outcome === 'makeable'
+            {shot.outcome === 'makeable' && shot.strokesAfter != null
               ? LOOK_LABEL[madePuttLook(shot.strokesAfter, props.par)].phrase
               : (BUCKET_COPY[shot.outcome] ?? shot.outcome)}
             {shot.penalty ? ' (+1 penalty)' : ''}

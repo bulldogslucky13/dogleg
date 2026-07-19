@@ -1,4 +1,4 @@
-import { useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 import type { ApproachOdds, BallState, Choice, HazardZone, HoleLayout } from '../engine/types'
 import { fnv1a, mulberry32 } from '../engine/rng'
 
@@ -13,19 +13,22 @@ export interface MapSize {
 /**
  * Measured size of the map panel, so the SVG viewBox can match its aspect
  * instead of letterboxing a fixed portrait frame inside a short, wide box.
+ * Callback ref rather than an effect: the panel doesn't exist until the play
+ * view renders, so observation has to start whenever the element appears.
  */
-export function useMapSize(): [React.RefObject<HTMLDivElement | null>, MapSize | null] {
-  const ref = useRef<HTMLDivElement | null>(null)
+export function useMapSize(): [(el: HTMLDivElement | null) => void, MapSize | null] {
   const [size, setSize] = useState<MapSize | null>(null)
-  useLayoutEffect(() => {
-    const el = ref.current
+  const observer = useRef<ResizeObserver | null>(null)
+  const ref = useCallback((el: HTMLDivElement | null) => {
+    observer.current?.disconnect()
+    observer.current = null
     if (!el) return
     const ro = new ResizeObserver((entries) => {
       const r = entries[0].contentRect
       if (r.width > 0 && r.height > 0) setSize({ w: Math.round(r.width), h: Math.round(r.height) })
     })
     ro.observe(el)
-    return () => ro.disconnect()
+    observer.current = ro
   }, [])
   return [ref, size]
 }

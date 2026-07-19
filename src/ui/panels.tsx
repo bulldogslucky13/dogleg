@@ -1,6 +1,6 @@
 import type { Choice, CourseSpec, HoleScore, OddsSummary, Stage } from '../engine/types'
 import type { HoleInPlay } from '../engine/resolve'
-import { oddsFor, summarize } from '../engine/resolve'
+import { LOOK_LABEL, madePuttLook, oddsFor, summarize } from '../engine/resolve'
 import { pressure } from '../engine/odds'
 import { RESULT_LABEL, toParLabel } from '../engine/daily'
 
@@ -111,7 +111,7 @@ export function ChoiceCards(props: {
       </div>
       <div className="choices">
         {choices.map((c) => {
-          const summary = summarize(oddsFor(hole, c))
+          const summary = summarize(oddsFor(hole, c), { strokes: hole.strokes, par: hole.layout.spec.par })
           const copy = choiceCopy(stage, hole.ball.lie, c)
           const tag = riskTag(hole, c, summary)
           const lockout = c === 'aggressive' && budgeted && props.aggressiveLeft <= 0
@@ -257,7 +257,9 @@ export function OddsRecap(props: { score: HoleScore; par: number }) {
           <div className="recap-stage">
             {stageName(shot.stage, props.par, lieBefore(i))} — went{' '}
             {choiceCopy(shot.stage as Exclude<Stage, 'done'>, lieBefore(i), shot.choice).label.toLowerCase()}, finished{' '}
-            {BUCKET_COPY[shot.outcome] ?? shot.outcome}
+            {shot.outcome === 'makeable'
+              ? LOOK_LABEL[madePuttLook(shot.strokesAfter, props.par)].phrase
+              : (BUCKET_COPY[shot.outcome] ?? shot.outcome)}
             {shot.penalty ? ' (+1 penalty)' : ''}
           </div>
           {shot.advantage && (

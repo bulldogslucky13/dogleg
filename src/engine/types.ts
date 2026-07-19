@@ -182,6 +182,9 @@ export interface ShotRecord {
   faced: Record<Choice, { summary: OddsSummary; odds: Odds }>
   /** ball position after the shot */
   after: BallState
+  /** running stroke total after this shot (penalties included) — lets the recap
+   * name a shot's scoring look honestly */
+  strokesAfter: number
   /** set when the character's edge actually helped this outcome */
   advantage?: CharacterAdvantage
 }

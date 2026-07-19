@@ -153,7 +153,7 @@ describe('odds invariants', () => {
     const fast: Conditions = { wind: 10, greens: 'Fast', difficulty: 8 }
     for (const ch of CHOICES) {
       for (const feet of [45, 55, 60]) {
-        expect(puttOdds(fast, feet, ch).three).toBeLessThanOrEqual(0.401)
+        expect(puttOdds(fast, feet, ch).three).toBeLessThanOrEqual(0.601)
       }
     }
     // short putts are nearly 3-putt-proof, and tap-in charges are near-automatic

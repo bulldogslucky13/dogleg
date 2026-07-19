@@ -374,9 +374,9 @@ const GREEN_SPEED = {
 const PUTT_CURVE = { minFeet: 3, maxFeet: 60, makeAnchor: 12, makeExp: 1, threeFrom: 4, threeAnchor: 20 } as const
 const MAKE_FLOOR = 0.5
 const MAKE_CAP = 92
-/** Even a reckless charge from downtown tops out here — scarier with distance,
- * never a coin flip. */
-const THREE_CAP = 40
+/** Even a reckless charge from downtown tops out here — brutal, but never a
+ * guaranteed three-jack. */
+const THREE_CAP = 60
 const LAG_THREE_CAP = 8
 
 export function puttOdds(cond: Conditions, feet: number, choice: Choice, character?: CharacterId): PuttOdds {

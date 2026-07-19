@@ -55,6 +55,31 @@ describe('replayRound is a perfect mirror of the client store', () => {
     expect(info.puzzleNumber).toBe(setup.puzzleNumber)
   })
 
+  it('per-player daily salt changes the dice but never the course or conditions', () => {
+    const setup = dailySetup()
+    const salted = setupFromSeed(`${setup.seed}:a1b2c3d4`)!
+    expect(salted.course.slug).toBe(setup.course.slug)
+    expect(salted.cond).toEqual(setup.cond) // conditions are shared — the challenge is the same
+    // the same strategy rolls different dice under different salts
+    const probe = (seed: string) => {
+      // grow decision lists until the replay accepts them — deterministic per seed
+      const decisions: Choice[][] = Array(18).fill(null).map(() => ['normal'])
+      for (let guard = 0; guard < 200; guard++) {
+        const r = replayRound(seed, undefined, decisions)
+        if (r.ok) return r
+        const m = /hole (\d+): round left unfinished/.exec(r.error)
+        if (!m) throw new Error(`unexpected: ${r.error}`)
+        decisions[Number(m[1]) - 1].push('normal')
+      }
+      throw new Error('probe never finished')
+    }
+    const a = probe(`${setup.seed}:saltaaaa`)
+    const b = probe(`${setup.seed}:saltbbbb`)
+    // identical strategies, different luck: the full result sequence differing
+    // (or scores) proves the dice are per-player
+    expect(a.results.join() === b.results.join() && a.toPar === b.toPar).toBe(false)
+  })
+
   it('rejects tampered submissions', () => {
     const setup = practiceSetup(COURSES[0].slug, 'tamper')
     const finished = playThroughStore(setup, 'practice', 'dart')

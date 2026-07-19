@@ -119,11 +119,24 @@ describe('smoke: the daily is valid and deterministic for every course in rotati
   })
 
   it('replaying the same seed with the same choices gives the identical round', () => {
+    // dailies carry a per-player dice salt, so pin the seed to test determinism:
+    // the SAME seed must always replay identically…
+    const setup = dailySetup(new Date(2026, 6, 25))
+    const first = newRound(setup, 'daily', 'dart')
+    const a = playRound(first, aggressivePolicy)
+    const b = playRound({ ...newRound(setup, 'daily', 'dart'), seed: first.seed }, aggressivePolicy)
+    expect(b.scores).toEqual(a.scores)
+    expect(roundToPar(b)).toBe(roundToPar(a))
+  })
+
+  it('two players get their own dice on the same daily (replays are not copyable)', () => {
     const setup = dailySetup(new Date(2026, 6, 25))
     const a = playRound(newRound(setup, 'daily', 'dart'), aggressivePolicy)
     const b = playRound(newRound(setup, 'daily', 'dart'), aggressivePolicy)
-    expect(b.scores).toEqual(a.scores)
-    expect(roundToPar(b)).toBe(roundToPar(a))
+    // identical strategy, independent luck — the salted seeds differ
+    expect(a.seed).not.toBe(b.seed)
+    const sameOutcome = JSON.stringify(a.scores) === JSON.stringify(b.scores)
+    expect(sameOutcome).toBe(false)
   })
 })
 

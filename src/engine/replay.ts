@@ -27,9 +27,11 @@ export interface SeedInfo {
   puzzleNumber?: number
 }
 
-/** Reconstruct the full round setup from a seed string, or null if invalid. */
+/** Reconstruct the full round setup from a seed string, or null if invalid.
+ * Daily seeds may carry a per-player dice salt (`round:date:slug:salt`) —
+ * the salt changes the rolls, never the course or conditions. */
 export function setupFromSeed(seed: string): SeedInfo | null {
-  const daily = /^round:(\d{4}-\d{2}-\d{2}):([a-z0-9-]+)$/.exec(seed)
+  const daily = /^round:(\d{4}-\d{2}-\d{2}):([a-z0-9-]+?)(?::([a-z0-9]+))?$/.exec(seed)
   if (daily) {
     const [, dateKey, slug] = daily
     const n = puzzleNumberForDateKey(dateKey)

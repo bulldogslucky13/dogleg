@@ -104,9 +104,13 @@ export function newRound(setup: DailySetup, mode: 'daily' | 'practice', characte
   const course = setup.course
   const layout = buildLayout(course.slug, course.holes[0])
   const hole = startHole(layout, setup.cond, character)
+  // Daily seeds get a per-player salt: same course, same conditions for
+  // everyone, but your OWN dice — so watching someone's replay can't be
+  // copied shot-for-shot into your daily. (Practice seeds are unique already.)
+  const salt = Math.random().toString(36).slice(2, 10)
   return {
     mode,
-    seed: setup.seed,
+    seed: mode === 'daily' ? `${setup.seed}:${salt}` : setup.seed,
     courseSlug: course.slug,
     cond: setup.cond,
     character,

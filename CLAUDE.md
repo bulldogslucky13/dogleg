@@ -1,10 +1,24 @@
 # Dogleg — agent guide
 
 Dogleg is a daily golf strategy game: static Vite + React 19 + TypeScript app,
-pnpm, no backend. The pure-TypeScript game engine lives in `src/engine/` (odds,
-layout geometry, shot resolution, characters, 49-course library), round state in
+pnpm. The pure-TypeScript game engine lives in `src/engine/` (odds, layout
+geometry, shot resolution, characters, 49-course library), round state in
 `src/state/store.ts`, UI in `src/ui/` + `src/App.tsx`. Design rationale is in
 `docs/DESIGN.md`; the original-game study is in `docs/REVERSE-ENGINEERING.md`.
+
+The one backend piece is the **leaderboard** (Supabase): `supabase/schema.sql`
+holds the tables/RLS, `supabase/functions/submit-round/` is the edge function
+that validates every submission by REPLAYING the round with the real engine
+(`src/engine/replay.ts`, bundled to `engine.mjs` by `pnpm build:validator`).
+The client (`src/lib/backend.ts`, `src/lib/leaderboard.ts`, `src/ui/
+Leaderboard.tsx`) reads boards with the public key and submits through the
+function; identity is a clubhouse name + device secret, no accounts. Backend
+features disable themselves in tests (`backendEnabled` is false when
+`MODE === 'test'`) so CI never touches the network — keep that property.
+Engine changes that alter odds/resolution require redeploying the function
+(`pnpm build:validator && supabase functions deploy submit-round --project-ref
+<ref> --no-verify-jwt --use-api`), or old and new clients will disagree with
+the referee.
 
 ## Commands
 

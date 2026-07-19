@@ -149,16 +149,23 @@ describe('odds invariants', () => {
     }
   })
 
-  it('3-putt risk is capped even for a charge from downtown on glass', () => {
-    const fast: Conditions = { wind: 10, greens: 'Fast', difficulty: 8 }
-    for (const ch of CHOICES) {
-      for (const feet of [45, 55, 60]) {
-        expect(puttOdds(fast, feet, ch).three).toBeLessThanOrEqual(0.601)
+  it('two-putt is the modal outcome from distance, even charging on glass', () => {
+    for (const cond of CONDS) {
+      for (const ch of CHOICES) {
+        for (const feet of [25, 35, 45, 55, 60]) {
+          const po = puttOdds(cond, feet, ch)
+          expect(po.two).toBeGreaterThanOrEqual(po.three)
+          expect(po.two).toBeGreaterThan(po.one)
+        }
       }
     }
     // short putts are nearly 3-putt-proof, and tap-in charges are near-automatic
+    const fast: Conditions = { wind: 10, greens: 'Fast', difficulty: 8 }
     expect(puttOdds(fast, 4, 'aggressive').three).toBeLessThanOrEqual(0.005)
     expect(puttOdds(fast, 5, 'aggressive').one).toBeGreaterThan(0.8)
+    // up close the make itself takes over as the modal outcome — birdie country
+    const close = puttOdds(fast, 6, 'aggressive')
+    expect(close.one).toBeGreaterThan(close.two)
   })
 
   it('punch short game cannot blow up', () => {

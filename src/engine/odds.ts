@@ -374,9 +374,6 @@ const GREEN_SPEED = {
 const PUTT_CURVE = { minFeet: 3, maxFeet: 60, makeAnchor: 12, makeExp: 1, threeFrom: 4, threeAnchor: 20 } as const
 const MAKE_FLOOR = 0.5
 const MAKE_CAP = 92
-/** Even a reckless charge from downtown tops out here — brutal, but never a
- * guaranteed three-jack. */
-const THREE_CAP = 60
 const LAG_THREE_CAP = 8
 
 export function puttOdds(cond: Conditions, feet: number, choice: Choice, character?: CharacterId): PuttOdds {
@@ -393,8 +390,11 @@ export function puttOdds(cond: Conditions, feet: number, choice: Choice, charact
     three *= GREENS_BUFF.three
   }
   // Lagging is the whole point of lagging: it caps the disaster.
-  three = Math.min(three, choice === 'safe' ? LAG_THREE_CAP : THREE_CAP)
+  if (choice === 'safe') three = Math.min(three, LAG_THREE_CAP)
   one = Math.min(MAKE_CAP, Math.max(MAKE_FLOOR, one))
+  // however deep the charge, the two-putt stays the modal outcome from
+  // distance: 3-putt never claims more than the two-putt share left by the make
+  three = Math.min(three, (100 - one) / 2)
   const two = Math.max(1, 100 - one - three)
 
   const odds: PuttOdds = { kind: 'putt', one, two, three }

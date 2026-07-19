@@ -23,7 +23,8 @@ export function loadPlayer(): Player | null {
   }
 }
 
-function savePlayer(p: Player): void {
+/** Persist this device's identity (also used by account sync in auth.ts). */
+export function savePlayerIdentity(p: Player): void {
   try {
     localStorage.setItem(PLAYER_KEY, JSON.stringify(p))
   } catch {
@@ -109,7 +110,7 @@ export async function submitRound(round: RoundState, name?: string): Promise<Sub
     })
     const body = (await res.json()) as SubmitResult & { player?: Player & { secret?: string } }
     if (!res.ok) return { ok: false, error: (body as { error?: string }).error ?? `submit failed (${res.status})` }
-    if (body.player?.secret) savePlayer({ id: body.player.id, secret: body.player.secret, name: body.player.name })
+    if (body.player?.secret) savePlayerIdentity({ id: body.player.id, secret: body.player.secret, name: body.player.name })
     return { ...body, ok: true }
   } catch {
     return { ok: false, error: 'network hiccup — your score is safe locally, try again' }

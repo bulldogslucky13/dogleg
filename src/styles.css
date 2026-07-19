@@ -1136,6 +1136,25 @@ button {
   color: var(--accent);
 }
 
+/* optional account sync, tucked under the home screen */
+.account-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
+}
+
+.account-body {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  border: 1.5px solid var(--line);
+  border-radius: 12px;
+  padding: 12px 14px;
+  text-align: left;
+}
+
 /* share card: show exactly what lands in the group chat */
 .share-block {
   display: flex;

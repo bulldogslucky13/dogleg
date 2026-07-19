@@ -9,9 +9,12 @@ create table if not exists players (
   id uuid primary key default gen_random_uuid(),
   secret uuid not null default gen_random_uuid(),
   name text not null,
+  -- set when a player optionally attaches an email account (cross-device sync)
+  user_id uuid unique references auth.users (id),
   created_at timestamptz not null default now()
 );
 create unique index if not exists players_name_ci on players (lower(name));
+alter table players add column if not exists user_id uuid unique references auth.users (id);
 
 create table if not exists daily_scores (
   id bigint generated always as identity primary key,

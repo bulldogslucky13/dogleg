@@ -20,6 +20,13 @@ Engine changes that alter odds/resolution require redeploying the function
 <ref> --no-verify-jwt --use-api`), or old and new clients will disagree with
 the referee.
 
+Cross-device sync is optional email magic links (Supabase Auth): the
+`link-account` function ties `auth.users` to a player row (`players.user_id`);
+`src/lib/auth.ts` + `src/ui/AccountPanel.tsx` handle send/reconcile/adopt.
+Auth redirect URLs are configured for the prod domain and localhost:5173.
+Caveat: the project uses Supabase's built-in mailer (a few emails/hour on the
+free tier) — plug custom SMTP into the dashboard if sign-in volume grows.
+
 ## Commands
 
 ```sh

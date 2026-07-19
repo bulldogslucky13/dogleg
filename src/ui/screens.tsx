@@ -7,6 +7,7 @@ import { track } from '../lib/analytics'
 import { backendEnabled } from '../lib/backend'
 import { fetchCourseRecords, type CourseRecord } from '../lib/leaderboard'
 import { characterRecords, computeStreaks, type HistoryEntry, type RoundRecap, type RoundState } from '../state/store'
+import { AccountPanel } from './AccountPanel'
 import { CharacterAvatar } from './Avatars'
 import { ScoreBoard } from './Leaderboard'
 
@@ -137,6 +138,7 @@ export function HomeScreen(props: {
           <p className="fine">Practice rounds don't touch your streak.</p>
         </div>
       )}
+      <AccountPanel />
     </div>
   )
 }

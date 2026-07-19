@@ -15,6 +15,7 @@
     "build:validator": "vite build --config vite.validator.config.ts"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.110.7",
     "posthog-js": "^1.404.1",
     "react": "^19.1.0",
     "react-dom": "^19.1.0"

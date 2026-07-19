@@ -1,13 +1,58 @@
-import { useMemo } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 import type { ApproachOdds, BallState, Choice, HazardZone, HoleLayout } from '../engine/types'
 import { fnv1a, mulberry32 } from '../engine/rng'
 
 const W = 360
 const H = 520
-/** screen anchors for the camera window: view start / view end along the centerline */
-const Y_BOTTOM = 472
-const Y_TOP = 88
-const SPAN = Y_BOTTOM - Y_TOP
+
+export interface MapSize {
+  w: number
+  h: number
+}
+
+/**
+ * Measured size of the map panel, so the SVG viewBox can match its aspect
+ * instead of letterboxing a fixed portrait frame inside a short, wide box.
+ * Callback ref rather than an effect: the panel doesn't exist until the play
+ * view renders, so observation has to start whenever the element appears.
+ */
+export function useMapSize(): [(el: HTMLDivElement | null) => void, MapSize | null] {
+  const [size, setSize] = useState<MapSize | null>(null)
+  const observer = useRef<ResizeObserver | null>(null)
+  const ref = useCallback((el: HTMLDivElement | null) => {
+    observer.current?.disconnect()
+    observer.current = null
+    if (!el) return
+    const ro = new ResizeObserver((entries) => {
+      const r = entries[0].contentRect
+      if (r.width > 0 && r.height > 0) setSize({ w: Math.round(r.width), h: Math.round(r.height) })
+    })
+    ro.observe(el)
+    observer.current = ro
+  }, [])
+  return [ref, size]
+}
+
+interface Frame {
+  w: number
+  h: number
+  cx: number
+  yTop: number
+  yBottom: number
+}
+
+/**
+ * Screen anchors for the camera window: view start / view end along the
+ * centerline. Margins keep the flag clear of the floating top banner and the
+ * tee box clear of the bottom chip overlay at any panel height.
+ */
+function cameraFrame(size: MapSize | null): Frame {
+  const w = size?.w ?? W
+  const h = size?.h ?? H
+  const yTop = Math.min(84, Math.max(58, h * 0.16))
+  const yBottom = h - Math.min(64, Math.max(42, h * 0.11))
+  return { w, h, cx: w / 2, yTop, yBottom }
+}
 
 interface Pt {
   x: number
@@ -41,7 +86,7 @@ function viewWindow(layout: HoleLayout, ball: BallState): [number, number] {
  * works in *yards* and converts via uPerYd, so drawn sizes are honest at every
  * zoom level — the green included.
  */
-function useGeometry(layout: HoleLayout, view: [number, number]) {
+function useGeometry(layout: HoleLayout, view: [number, number], fr: Frame) {
   return useMemo(() => {
     const { dogleg } = layout.spec
     const L = layout.length
@@ -94,14 +139,14 @@ function useGeometry(layout: HoleLayout, view: [number, number]) {
     const c = Math.hypot(P1.x - P0.x, P1.y - P0.y) || 1
     const ux = (P1.x - P0.x) / c
     const uy = (P1.y - P0.y) / c
-    const s = SPAN / c
+    const s = (fr.yBottom - fr.yTop) / c
     const uPerYd = s * worldPerYd
 
     const at = (yards: number): Pt => {
       const w = worldAt(yards)
       const dx = w.x - P0.x
       const dy = w.y - P0.y
-      return { x: 180 + s * (-uy * dx + ux * dy), y: Y_BOTTOM + s * (-ux * dx - uy * dy) }
+      return { x: fr.cx + s * (-uy * dx + ux * dy), y: fr.yBottom + s * (-ux * dx - uy * dy) }
     }
     /** golfer-left unit normal at yards, in screen space */
     const normalAt = (yards: number): Pt => {
@@ -121,7 +166,7 @@ function useGeometry(layout: HoleLayout, view: [number, number]) {
     const greenRx = greenRy * (1.3 + rng() * 0.3)
 
     return { at, normalAt, view, uPerYd, greenRx, greenRy }
-  }, [layout, view[0], view[1]]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [layout, view[0], view[1], fr.w, fr.h]) // eslint-disable-line react-hooks/exhaustive-deps
 }
 
 type Geo = ReturnType<typeof useGeometry>
@@ -243,10 +288,13 @@ export function HoleMap(props: {
   /** approach-style shots: the full odds distribution for the selected choice */
   previewApproach: ApproachOdds | null
   previewChoice: Choice | null
+  /** measured panel size (from useMapSize) — omit to fall back to the classic 360×520 frame */
+  size?: MapSize | null
 }) {
   const { layout, ball } = props
+  const fr = cameraFrame(props.size ?? null)
   const view = viewWindow(layout, ball)
-  const geo = useGeometry(layout, view)
+  const geo = useGeometry(layout, view, fr)
   const { at, normalAt, uPerYd, greenRx, greenRy } = geo
   const L = layout.length
   const par3 = layout.spec.par === 3
@@ -321,7 +369,7 @@ export function HoleMap(props: {
         pts.push(`${(pp.x + nn.x * sideSign * 30 * uPerYd).toFixed(1)},${(pp.y + nn.y * sideSign * 30 * uPerYd).toFixed(1)}`)
       }
       const n = normalAt(Math.min((z.from + z.to) / 2, L - 1))
-      const cornerX = sideSign > 0 ? (n.x > 0 ? W + 40 : -40) : n.x < 0 ? W + 40 : -40
+      const cornerX = sideSign > 0 ? (n.x > 0 ? fr.w + 40 : -40) : n.x < 0 ? fr.w + 40 : -40
       return (
         <path
           key={z.id}
@@ -451,7 +499,7 @@ export function HoleMap(props: {
   const ballR = clampPx(5 * Math.sqrt(uPerYd), 4.5, 8)
 
   return (
-    <svg className="holemap" viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`Hole ${layout.spec.number} map, ${yardsLeft} yards to the pin`}>
+    <svg className="holemap" viewBox={`0 0 ${fr.w} ${fr.h}`} role="img" aria-label={`Hole ${layout.spec.number} map, ${yardsLeft} yards to the pin`}>
       <defs>
         <radialGradient id="water" cx="35%" cy="30%" r="80%">
           <stop offset="0" stopColor="#5f9ab8" />
@@ -467,7 +515,7 @@ export function HoleMap(props: {
         </pattern>
       </defs>
 
-      <rect width={W} height={H} fill="url(#sky)" />
+      <rect width={fr.w} height={fr.h} fill="url(#sky)" />
 
       {/* fairway / apron */}
       {!par3 && (
@@ -536,7 +584,7 @@ export function HoleMap(props: {
       {/* yards-left badge */}
       {yardsLeft > 0 && (
         <g
-          transform={`translate(${Math.max(40, Math.min(W - 40, labelPt.x + 34))}, ${
+          transform={`translate(${Math.max(40, Math.min(fr.w - 40, labelPt.x + 34))}, ${
             yardsLeft <= 35 ? labelPt.y - 30 : labelPt.y // short shots: float above so the ball stays visible
           })`}
         >
@@ -551,27 +599,31 @@ export function HoleMap(props: {
 }
 
 /** Putting surface view. */
-export function GreenView(props: { feet: number; holeNumber: number; greens: string }) {
+export function GreenView(props: { feet: number; holeNumber: number; greens: string; size?: MapSize | null }) {
   const { feet } = props
+  const { w, h, cx } = cameraFrame(props.size ?? null)
+  // green fills the panel height; putt length scales with it
+  const k = h / H
   const bend = props.holeNumber % 2 === 0 ? 1 : -1
-  const dist = Math.min(215, 46 + feet * 3.4)
-  const bx = 180 + bend * Math.min(40, feet * 0.9)
-  const holeY = 108
+  const dist = Math.min(215, 46 + feet * 3.4) * k
+  const bx = cx + bend * Math.min(40, feet * 0.9) * k
+  // floor keeps the flag (44 units tall) clear of the floating status pill
+  const holeY = Math.max(108 * k, 92)
   const ballY = holeY + dist
   return (
-    <svg className="holemap" viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`${feet} foot putt`}>
+    <svg className="holemap" viewBox={`0 0 ${w} ${h}`} role="img" aria-label={`${feet} foot putt`}>
       <defs>
         <radialGradient id="gsurf" cx="50%" cy="35%" r="85%">
           <stop offset="0" stopColor="#83b167" />
           <stop offset="1" stopColor="#5d8d4b" />
         </radialGradient>
       </defs>
-      <rect width={W} height={H} fill="#22402c" />
-      <ellipse cx={180} cy={250} rx={230} ry={228} fill="url(#gsurf)" />
-      <ellipse cx={180} cy={250} rx={150} ry={148} fill="none" stroke="#f4efe3" strokeWidth={1} opacity={0.18} />
-      <ellipse cx={180} cy={250} rx={82} ry={80} fill="none" stroke="#f4efe3" strokeWidth={1} opacity={0.18} />
+      <rect width={w} height={h} fill="#22402c" />
+      <ellipse cx={cx} cy={250 * k} rx={Math.max(230 * k, w * 0.68)} ry={228 * k} fill="url(#gsurf)" />
+      <ellipse cx={cx} cy={250 * k} rx={150 * k} ry={148 * k} fill="none" stroke="#f4efe3" strokeWidth={1} opacity={0.18} />
+      <ellipse cx={cx} cy={250 * k} rx={82 * k} ry={80 * k} fill="none" stroke="#f4efe3" strokeWidth={1} opacity={0.18} />
       <path
-        d={`M180,${ballY} Q${bx},${(ballY + holeY) / 2} 180,${holeY + 10}`}
+        d={`M${cx},${ballY} Q${bx},${(ballY + holeY) / 2} ${cx},${holeY + 10}`}
         fill="none"
         stroke="#f4efe3"
         strokeWidth={3}
@@ -579,12 +631,12 @@ export function GreenView(props: { feet: number; holeNumber: number; greens: str
         strokeLinecap="round"
         opacity={0.9}
       />
-      <ellipse cx={180} cy={holeY} rx={7} ry={4.5} fill="#1d2b20" />
-      <g transform={`translate(180, ${holeY})`}>
+      <ellipse cx={cx} cy={holeY} rx={7} ry={4.5} fill="#1d2b20" />
+      <g transform={`translate(${cx}, ${holeY})`}>
         <line x1="0" y1="0" x2="0" y2="-44" stroke="#26301f" strokeWidth={2.6} />
         <path d="M0,-44 L22,-36 L0,-29 Z" fill="#c05b4d" />
       </g>
-      <circle cx={180} cy={ballY} r={7} fill="#f7f5ee" stroke="#26301f" strokeWidth={1.6} />
+      <circle cx={cx} cy={ballY} r={7} fill="#f7f5ee" stroke="#26301f" strokeWidth={1.6} />
     </svg>
   )
 }

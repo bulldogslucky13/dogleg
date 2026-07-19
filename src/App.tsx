@@ -26,7 +26,7 @@ import {
 } from './state/store'
 import { track } from './lib/analytics'
 import { CharacterAvatar } from './ui/Avatars'
-import { GreenView, HoleMap } from './ui/HoleMap'
+import { GreenView, HoleMap, useMapSize } from './ui/HoleMap'
 import { SideMap } from './ui/SideMap'
 import { ChoiceCards, ClassicScorecard, HazardChips, HoleComplete, Scorecard, StatusBanner, TierBanner } from './ui/panels'
 import { CharacterPickScreen, HomeScreen, ResultScreen } from './ui/screens'
@@ -54,6 +54,7 @@ export default function App() {
   const [splashKey, setSplashKey] = useState(0)
   const animTimer = useRef<number | null>(null)
   const splashTimer = useRef<number | null>(null)
+  const [mapRef, mapSize] = useMapSize()
 
   useEffect(() => {
     saveRound(round)
@@ -272,6 +273,10 @@ export default function App() {
             <div className="hole-par">
               Par {spec.par} · SI {spec.strokeIndex}
             </div>
+            {/* phones hide the chip row, so the course rides along as plain text */}
+            <div className="hole-course">
+              {course.name} · {modeTag}
+            </div>
             <div className="chips slim">
               <span className="chip">
                 {course.name} · {modeTag}
@@ -287,13 +292,20 @@ export default function App() {
         </div>
       </header>
 
-      <div className={`map-wrap${classic && hole.stage !== 'putt' ? ' side' : ''}`}>
+      <div ref={mapRef} className={`map-wrap${classic && hole.stage !== 'putt' ? ' side' : ''}`}>
         {hole.stage === 'putt' ? (
-          <GreenView feet={hole.ball.puttFeet ?? 20} holeNumber={spec.number} greens={round.cond.greens} />
+          <GreenView feet={hole.ball.puttFeet ?? 20} holeNumber={spec.number} greens={round.cond.greens} size={mapSize} />
         ) : classic ? (
           <SideMap layout={hole.layout} ball={hole.ball} />
         ) : (
-          <HoleMap layout={hole.layout} ball={hole.ball} previewWindow={previewWindow} previewApproach={previewApproach} previewChoice={selected} />
+          <HoleMap
+            layout={hole.layout}
+            ball={hole.ball}
+            previewWindow={previewWindow}
+            previewApproach={previewApproach}
+            previewChoice={selected}
+            size={mapSize}
+          />
         )}
         {!holeDone && (
           <div className="map-overlay top">
@@ -319,9 +331,11 @@ export default function App() {
                 </span>
                 <span className="chip">{round.cond.greens} green</span>
               </div>
-            ) : hole.shots.length === 0 ? (
+            ) : (
+              // wind/greens/hazards live on the map at every stage — the hole
+              // head no longer carries condition chips on small screens
               <HazardChips hole={hole} />
-            ) : null}
+            )}
           </div>
         )}
       </div>

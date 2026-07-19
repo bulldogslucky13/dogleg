@@ -310,6 +310,24 @@ export function Scorecard(props: { course: CourseSpec; scores: (HoleScore | null
       ))}
     </div>
   )
+  // single-row strip shown on small screens instead of the full table, so the
+  // vertical space goes to the course map. Standard golf marks: ○ under par,
+  // □ over, double box for double bogey or worse — par stays unmarked.
+  const stripCell = (i: number) => {
+    const s = scores[offset + i]
+    let cls = 'scs'
+    if (offset + i === currentHole) cls += ' current'
+    if (s) {
+      if (s.result === 'albatross' || s.result === 'eagle' || s.result === 'birdie') cls += ' under'
+      else if (s.result === 'bogey') cls += ' over'
+      else if (s.result !== 'par') cls += ' over2'
+    } else cls += ' todo'
+    return (
+      <span key={i} className={cls}>
+        {s ? s.strokes : nine[i].number}
+      </span>
+    )
+  }
   return (
     <div className="scorecard">
       <div className="sc-head">
@@ -321,6 +339,7 @@ export function Scorecard(props: { course: CourseSpec; scores: (HoleScore | null
       {row('Par', nine.map((h) => h.par))}
       {row('SI', nine.map((h) => h.strokeIndex))}
       {row('Score', nine.map((_h, i) => (scores[offset + i] ? scores[offset + i]!.strokes : '–')), true)}
+      <div className="sc-strip">{nine.map((_h, i) => stripCell(i))}</div>
     </div>
   )
 }

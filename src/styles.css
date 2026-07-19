@@ -314,6 +314,18 @@ button {
   margin-bottom: 5px;
 }
 
+/* course name as quiet text under the par line — replaces the chip row on
+   phones, hidden on wide screens where the chips still carry it */
+.hole-course {
+  display: none;
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: rgba(29, 43, 32, 0.6);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .hole-right {
   text-align: right;
   flex-shrink: 0;
@@ -894,6 +906,110 @@ button {
 
 .sc-scores > span {
   font-weight: 700;
+}
+
+/* compact one-row round card for phones — the full table only shows on wide screens */
+.sc-strip {
+  display: none;
+  grid-template-columns: repeat(9, 1fr);
+  gap: 4px;
+}
+
+/* classic golf marks, sized down for the strip: ○ under par · □ over par ·
+   double box for double+ — par is unmarked, like a real card */
+.scs {
+  width: 100%;
+  max-width: 30px;
+  aspect-ratio: 1;
+  justify-self: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px solid transparent;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: rgba(29, 43, 32, 0.78);
+}
+
+.scs.todo {
+  color: rgba(29, 43, 32, 0.4);
+  font-weight: 600;
+}
+
+.scs.under {
+  border-radius: 50%;
+  border-color: var(--good);
+  color: #2e6329;
+  font-weight: 800;
+}
+
+.scs.over {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.scs.over2 {
+  border-color: var(--accent);
+  color: var(--accent);
+  box-shadow: inset 0 0 0 2.5px var(--cream), inset 0 0 0 4px var(--accent);
+}
+
+.scs.current {
+  background: #f3ddd8;
+  color: var(--accent);
+  font-weight: 800;
+}
+
+/* phones: trade chrome for map height — chips live on the map overlay instead,
+   and the round card collapses to the one-line strip */
+@media (max-width: 899px) {
+  .screen.play .hole-head .chips {
+    display: none;
+  }
+
+  .screen.play .hole-course {
+    display: block;
+  }
+
+  /* let the course line ellipsize instead of pushing the to-par pill */
+  .screen.play .hole-id,
+  .screen.play .hole-id > div {
+    min-width: 0;
+  }
+
+  /* overlay chips stay on one row so they never stack up over the tee */
+  .map-overlay.bottom .chips {
+    flex-wrap: nowrap;
+    max-width: 100%;
+  }
+
+  .map-overlay.bottom .chip {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 0.72rem;
+    padding: 3px 9px;
+  }
+
+  .scorecard .sc-line {
+    display: none;
+  }
+
+  .sc-strip {
+    display: grid;
+  }
+}
+
+@media (max-width: 420px) {
+  .map-overlay.bottom .chips {
+    gap: 5px;
+  }
+
+  .map-overlay.bottom .chip {
+    font-size: 0.66rem;
+    padding: 3px 7px;
+  }
 }
 
 /* ---------- result ---------- */

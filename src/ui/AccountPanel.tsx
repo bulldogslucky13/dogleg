@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { backendEnabled } from '../lib/backend'
 import { currentEmail, sendMagicLink, signOut, syncAccount } from '../lib/auth'
 import { loadPlayer } from '../lib/leaderboard'
+import { Spinner } from './Spinner'
 
 /**
  * Optional account sync, tucked under the home screen. Three states:
@@ -80,9 +81,17 @@ export function AccountPanel() {
                     placeholder="Clubhouse name"
                     maxLength={18}
                     aria-label="Clubhouse name"
+                    disabled={busy}
                   />
                   <button className="cta slim" disabled={busy || nameInput.trim().length < 2} type="submit">
-                    Claim it
+                    {busy ? (
+                      <>
+                        <Spinner />
+                        Claiming…
+                      </>
+                    ) : (
+                      'Claim it'
+                    )}
                   </button>
                 </form>
               </>
@@ -98,13 +107,23 @@ export function AccountPanel() {
                 </p>
                 <button
                   className="cta ghost slim"
+                  disabled={busy}
                   onClick={async () => {
+                    setBusy(true)
                     await signOut()
+                    setBusy(false)
                     setSignedInAs(null)
                     setSent(false)
                   }}
                 >
-                  Sign out (this device keeps its name)
+                  {busy ? (
+                    <>
+                      <Spinner />
+                      Signing out…
+                    </>
+                  ) : (
+                    'Sign out (this device keeps its name)'
+                  )}
                 </button>
               </>
             )
@@ -123,9 +142,17 @@ export function AccountPanel() {
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="you@example.com"
                   aria-label="Email for magic link"
+                  disabled={busy}
                 />
                 <button className="cta slim" disabled={busy || !email.includes('@')} type="submit">
-                  Send magic link
+                  {busy ? (
+                    <>
+                      <Spinner />
+                      Sending…
+                    </>
+                  ) : (
+                    'Send magic link'
+                  )}
                 </button>
               </form>
             </>

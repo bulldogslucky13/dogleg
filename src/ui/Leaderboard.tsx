@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { characterById } from '../engine/characters'
+import { Spinner } from './Spinner'
 import { toParLabel } from '../engine/daily'
 import { backendEnabled } from '../lib/backend'
 import {
@@ -71,9 +72,19 @@ export function ScoreBoard(props: { round: RoundState }) {
         placeholder="Clubhouse name"
         maxLength={18}
         aria-label="Clubhouse name"
+        disabled={busy}
       />
       <button className="cta slim" disabled={busy || name.trim().length < 2} type="submit">
-        {round.mode === 'daily' ? 'Post my card' : 'Claim records'}
+        {busy ? (
+          <>
+            <Spinner />
+            Posting…
+          </>
+        ) : round.mode === 'daily' ? (
+          'Post my card'
+        ) : (
+          'Claim records'
+        )}
       </button>
     </form>
   )
@@ -105,6 +116,12 @@ export function ScoreBoard(props: { round: RoundState }) {
   return (
     <div className="board-block">
       <div className="kicker">Today's board</div>
+      {player && busy && (
+        <p className="fine">
+          <Spinner />
+          Posting your card…
+        </p>
+      )}
       {result?.rank && (
         <p className="board-rank">
           You're <b>{ordinal(result.rank)}</b> of {result.total} so far today

@@ -3,7 +3,7 @@ import { advanceHole, applyChoice, newRound, roundToPar } from '../state/store'
 import { CHARACTERS } from './characters'
 import { COURSES } from './courses'
 import { dailySalt, dailySetup, practiceSetup } from './daily'
-import { decisionsFromScores, replayRound, setupFromSeed } from './replay'
+import { decisionsFromScores, decodeReplay, encodeReplay, replayFrames, replayRound, setupFromSeed } from './replay'
 import type { CharacterId, Choice } from './types'
 
 /** Play a full round through the real client store, exactly as the UI does. */
@@ -133,6 +133,31 @@ describe('replayRound is a perfect mirror of the client store', () => {
     // a player with no identity yet plays the one canonical seed: no salt,
     // therefore nothing to grind
     expect(setupFromSeed(newRound(setup, 'daily', 'dart').seed)!.salt).toBeUndefined()
+  })
+
+  it('replay codes roundtrip and frames retell the exact same round', () => {
+    const setup = practiceSetup(COURSES[5].slug, 'frames')
+    const finished = playThroughStore(setup, 'practice', 'fairway')
+    const decisions = decisionsFromScores(finished.scores)!
+
+    // encode → decode is lossless (including a name with non-ASCII)
+    const code = encodeReplay({ seed: finished.seed, character: 'fairway', decisions, name: 'Señor Bogey' })
+    expect(code).toMatch(/^[A-Za-z0-9_-]+$/) // URL-safe
+    const decoded = decodeReplay(code)!
+    expect(decoded.seed).toBe(finished.seed)
+    expect(decoded.character).toBe('fairway')
+    expect(decoded.decisions).toEqual(decisions)
+    expect(decoded.name).toBe('Señor Bogey')
+
+    // frames: one per tee + one per shot, ending on the same final score
+    const frames = replayFrames(finished.seed, 'fairway', decisions)!
+    const shotCount = decisions.reduce((s, h) => s + h.length, 0)
+    expect(frames).toHaveLength(18 + shotCount)
+    const lastFrame = frames[frames.length - 1]
+    const finalToPar = lastFrame.runningToPar + (lastFrame.hole.score!.strokes - lastFrame.hole.layout.spec.par)
+    expect(finalToPar).toBe(roundToPar(finished))
+    // garbage codes are rejected, not crashed on
+    expect(decodeReplay('not-a-real-code')).toBeNull()
   })
 
   it('a different character cannot ride on the same decisions unnoticed', () => {

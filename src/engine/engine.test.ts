@@ -164,6 +164,27 @@ describe('odds invariants', () => {
     }
   })
 
+  it('longer approaches always offer a worse birdie look from the same lie', () => {
+    for (const c of COURSES) {
+      for (const spec of c.holes.filter((h) => h.par !== 3)) {
+        const layout = buildLayout(c.slug, spec)
+        for (const cond of CONDS) {
+          for (const ch of CHOICES) {
+            let prev = Infinity
+            for (const dist of [90, 130, 170, 210, 250]) {
+              if (dist > layout.length - 20) continue
+              const ball = { pos: layout.length - dist, lie: 'fairway', side: 'center' } as const
+              const o = approachOdds(layout, cond, ball, ch, 'standard').odds
+              const good = o.holeout + o.kickin + o.makeable
+              expect(good, `${c.slug} #${spec.number} ${ch} ${dist}yd`).toBeLessThan(prev)
+              prev = good
+            }
+          }
+        }
+      }
+    }
+  })
+
   it('fairway bunkers are easier to escape cleanly than trees', () => {
     for (const c of COURSES.slice(0, 3)) {
       for (const spec of c.holes.filter((h) => h.par !== 3).slice(0, 4)) {

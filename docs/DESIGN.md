@@ -53,6 +53,16 @@ Calibration (Monte Carlo in vitest): all-safe policy ≈ +2..+6 over a round, se
 mixed policy breaks par ~25-35% of days, all-aggressive is high-variance (occasional -5,
 frequent +8). Safe blow-up (double+) rate < 5% of holes.
 
+## Approach distance
+
+The approach rows are anchored at a ~150-yard shot. `approachOdds` applies a distance
+taper (clamped to 60–280yd): wedge distances stuff it close more often, long irons trade
+kick-ins/makeables for lags and missed greens (~85% birdie look at 80yd from a dialed
+lie vs ~55% at 240yd in the same conditions). Hole-out odds shrink with distance too.
+A monotonicity test pins it: from the same lie, more yards is always a worse look.
+Side effect: the Fairway Finder's extra carry now buys real birdie-look equity on the
+next shot, so its lie buffs were trimmed to hold the ~1-stroke calibration target.
+
 ## UX improvements
 
 - **Live odds before choosing**: each choice card shows a stacked bar

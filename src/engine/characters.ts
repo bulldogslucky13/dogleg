@@ -42,13 +42,15 @@ export function characterById(id: CharacterId | undefined): CharacterSpec | null
  * downstream — so displayed odds and the dice always agree, character included.
  * Calibration target (characters.test.ts): each is worth ~1 stroke per round.
  */
+// Tuned down when approach odds became distance-aware: the extra carry now
+// buys real birdie-look equity on the next shot, so the lie buff carries less.
 export const FAIRWAY_BUFF = {
-  dialed: 1.55,
-  fairway: 1.15,
-  rough: 0.6,
-  trouble: 0.72,
+  dialed: 1.4,
+  fairway: 1.12,
+  rough: 0.68,
+  trouble: 0.78,
   /** extra carry in yards off the tee box */
-  extraYards: 20,
+  extraYards: 16,
 } as const
 
 export const DART_BUFF = {

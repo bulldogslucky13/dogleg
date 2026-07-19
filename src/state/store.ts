@@ -44,9 +44,57 @@ export interface HistoryEntry {
   character?: CharacterId
 }
 
-const ROUND_KEY = 'bp:round:v1'
-const HISTORY_KEY = 'bp:history:v1'
+const ROUND_KEY = 'dogleg:round:v1'
+const HISTORY_KEY = 'dogleg:history:v1'
 const UI_MODE_KEY = 'dogleg:uimode'
+
+/** Move any legacy `bp:*` saves (the Break Par-era prefix) to the `dogleg:*`
+ * keys so nobody loses their streak or history. Idempotent; runs before every
+ * read rather than once at import so a stubbed storage in tests still sees it. */
+export function migrateLegacyStorage(): void {
+  try {
+    migrateKey('bp:round:v1', ROUND_KEY, reconcileRounds)
+    migrateKey('bp:history:v1', HISTORY_KEY, reconcileHistory)
+  } catch {
+    /* private mode etc. */
+  }
+}
+
+function migrateKey(legacy: string, current: string, reconcile: (legacyRaw: string, currentRaw: string) => string): void {
+  const raw = localStorage.getItem(legacy)
+  if (raw === null) return
+  const existing = localStorage.getItem(current)
+  localStorage.setItem(current, existing === null ? raw : reconcile(raw, existing))
+  localStorage.removeItem(legacy)
+}
+
+/** Both keys populated means an old-bundle tab kept writing `bp:*` after a new
+ * tab migrated: union the histories by day (current wins ties) so neither tab's
+ * completed rounds are lost. */
+function reconcileHistory(legacyRaw: string, currentRaw: string): string {
+  try {
+    const cur = JSON.parse(currentRaw) as HistoryEntry[]
+    const have = new Set(cur.map((e) => e.dateKey))
+    const legacy = (JSON.parse(legacyRaw) as HistoryEntry[]).filter((e) => !have.has(e.dateKey))
+    if (!legacy.length) return currentRaw
+    return JSON.stringify([...cur, ...legacy].sort((a, b) => a.dateKey.localeCompare(b.dateKey)))
+  } catch {
+    return currentRaw
+  }
+}
+
+/** Same round saved under both keys: keep whichever tab got further (rolls only
+ * grow). Unrelated rounds: the `dogleg:*` one is the user's latest, keep it. */
+function reconcileRounds(legacyRaw: string, currentRaw: string): string {
+  try {
+    const cur = JSON.parse(currentRaw) as RoundState
+    const legacy = JSON.parse(legacyRaw) as RoundState
+    const sameRound = cur.seed === legacy.seed && cur.mode === legacy.mode && cur.dateKey === legacy.dateKey
+    return sameRound && legacy.rolls > cur.rolls ? legacyRaw : currentRaw
+  } catch {
+    return currentRaw
+  }
+}
 
 export type UiMode = 'modern' | 'classic'
 
@@ -168,6 +216,7 @@ export function saveRound(state: RoundState | null): void {
 }
 
 export function loadRound(): RoundState | null {
+  migrateLegacyStorage()
   try {
     const raw = localStorage.getItem(ROUND_KEY)
     if (!raw) return null
@@ -182,6 +231,7 @@ export function loadRound(): RoundState | null {
 }
 
 export function loadHistory(): HistoryEntry[] {
+  migrateLegacyStorage()
   try {
     const raw = localStorage.getItem(HISTORY_KEY)
     return raw ? (JSON.parse(raw) as HistoryEntry[]) : []

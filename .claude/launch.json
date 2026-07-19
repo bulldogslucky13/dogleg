@@ -2,7 +2,7 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "break-par",
+      "name": "dogleg",
       "runtimeExecutable": "pnpm",
       "runtimeArgs": ["dev"],
       "port": 5173

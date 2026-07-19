@@ -10,7 +10,8 @@
  * persistence key), extend this suite so the new surface is exercised.
  * See CLAUDE.md § Smoke tests.
  */
-import { describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { track } from './lib/analytics'
 import { CHARACTERS } from './engine/characters'
 import { COURSES, courseBySlug } from './engine/courses'
 import { dailySetup, practiceSetup, shareText, type DailySetup } from './engine/daily'
@@ -26,6 +27,9 @@ import {
   usesBudget,
   type RoundState,
 } from './state/store'
+
+// track() is a no-op without a PostHog key, so stub it to assert on the calls
+vi.mock('./lib/analytics', () => ({ track: vi.fn(), initAnalytics: vi.fn() }))
 
 /** Play a full 18 through the store exactly like the UI does. */
 function playRound(state: RoundState, pick: (s: RoundState) => Choice): RoundState {
@@ -151,6 +155,57 @@ describe('smoke: a round survives the save/load JSON round-trip mid-hole', () =>
     const h = holeInPlay(s)
     h.ball.pos += 100 // mutating the rebuilt hole must not leak into state
     expect(JSON.stringify(s)).toBe(frozen)
+  })
+})
+
+describe('smoke: hole-level analytics track progress through the round', () => {
+  beforeEach(() => {
+    vi.mocked(track).mockClear()
+  })
+
+  /** The hole_completed payloads emitted so far, in order. */
+  const holeEvents = (): Record<string, unknown>[] =>
+    vi
+      .mocked(track)
+      .mock.calls.filter(([event]) => event === 'hole_completed')
+      .map(([, props]) => (props ?? {}) as Record<string, unknown>)
+
+  it('emits one hole_completed per hole, in order, with a running score', () => {
+    const setup = practiceSetup(COURSES[4].slug, 'smoke-analytics')
+    const done = playRound(newRound(setup, 'practice', 'dart'), normalPolicy)
+    const events = holeEvents()
+
+    expect(events).toHaveLength(18)
+    expect(events.map((e) => e.hole_number)).toEqual(setup.course.holes.map((h) => h.number))
+
+    events.forEach((e, i) => {
+      const spec = setup.course.holes[i]
+      expect(e.mode).toBe('practice')
+      expect(e.course).toBe(setup.course.slug)
+      expect(e.character).toBe('dart')
+      expect(e.par).toBe(spec.par)
+      expect(e.strokes).toBe(done.scores[i]!.strokes)
+      expect(e.result).toBe(done.scores[i]!.result)
+      expect(e.hole_to_par).toBe(done.scores[i]!.strokes - spec.par)
+    })
+
+    // the last hole's running total is the final score — this is the property
+    // the drop-off-by-hole reporting leans on
+    expect(events[17].running_to_par).toBe(roundToPar(done))
+  })
+
+  it('stops emitting where an abandoned round stopped', () => {
+    const setup = practiceSetup(COURSES[5].slug, 'smoke-abandon')
+    let s = newRound(setup, 'practice', 'greens')
+    // walk off after finishing the 5th hole
+    while (s.currentHole < 5) {
+      s = s.hole?.stage === 'done' ? advanceHole(s) : applyChoice(s, 'normal')
+    }
+
+    const events = holeEvents()
+    expect(events).toHaveLength(5)
+    expect(events.map((e) => e.hole_number)).toEqual([1, 2, 3, 4, 5])
+    expect(s.complete).toBe(false)
   })
 })
 

@@ -15,10 +15,19 @@ Leaderboard.tsx`) reads boards with the public key and submits through the
 function; identity is a clubhouse name + device secret, no accounts. Backend
 features disable themselves in tests (`backendEnabled` is false when
 `MODE === 'test'`) so CI never touches the network — keep that property.
-Engine changes that alter odds/resolution require redeploying the function
-(`pnpm build:validator && supabase functions deploy submit-round --project-ref
-<ref> --no-verify-jwt --use-api`), or old and new clients will disagree with
-the referee.
+Engine changes that alter odds/resolution require the function to be
+redeployed, or old and new clients will disagree with the referee. **This is
+automated** — the `functions` job in `.github/workflows/deploy.yml` rebuilds
+`engine.mjs` and redeploys on every push to `main`, before the site goes live.
+It needs the `SUPABASE_ACCESS_TOKEN` secret and `SUPABASE_PROJECT_REF`
+variable, and fails loudly if either is missing. To deploy by hand:
+`pnpm build:validator && supabase functions deploy submit-round --project-ref
+<ref> --no-verify-jwt --use-api`.
+
+Per-function settings (`verify_jwt`) live in `supabase/config.toml` — that is
+the source of truth for local `supabase serve` as well as deploys. Auth
+settings are *not* in that file: site_url and the redirect allow-list are
+managed in the dashboard, so they aren't in version control.
 
 Cross-device sync is optional email magic links (Supabase Auth): the
 `link-account` function ties `auth.users` to a player row (`players.user_id`);

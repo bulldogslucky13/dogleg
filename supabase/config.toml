@@ -1,0 +1,20 @@
+# Supabase project config. Only the pieces this repo actually depends on are
+# declared here — everything else takes CLI defaults.
+#
+# Note that the Auth settings (site_url, redirect allow-list) are managed in
+# the dashboard, not here: this file governs local `supabase start/serve` and
+# function deploys, and pushing auth config from it would need an explicit
+# `supabase config push`. See CLAUDE.md.
+
+project_id = "cphmpypnvopoylwxsrlk"
+
+# The referee. Anonymous players post scores, and the function authenticates
+# submissions itself (device secret, then a full engine replay), so a gateway
+# JWT check would only lock out the people it exists to serve.
+[functions.submit-round]
+verify_jwt = false
+
+# Account linking. Requires a real signed-in user — the function re-checks the
+# token with getUser() and 401s, so the gateway check is defence in depth.
+[functions.link-account]
+verify_jwt = true

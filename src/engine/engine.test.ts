@@ -133,6 +133,34 @@ describe('odds invariants', () => {
     expect(charge.three).toBeGreaterThan(0.25)
   })
 
+  it('distance moves the needle: makes fall and 3-putts climb as putts get longer', () => {
+    for (const cond of CONDS) {
+      for (const ch of CHOICES) {
+        let prev = puttOdds(cond, 4, ch)
+        for (let feet = 6; feet <= 60; feet += 2) {
+          const po = puttOdds(cond, feet, ch)
+          expect(po.one).toBeLessThan(prev.one)
+          expect(po.three).toBeGreaterThanOrEqual(prev.three)
+          prev = po
+        }
+        // the climb is real, not just monotone-flat
+        expect(puttOdds(cond, 45, ch).three).toBeGreaterThan(puttOdds(cond, 10, ch).three)
+      }
+    }
+  })
+
+  it('3-putt risk is capped even for a charge from downtown on glass', () => {
+    const fast: Conditions = { wind: 10, greens: 'Fast', difficulty: 8 }
+    for (const ch of CHOICES) {
+      for (const feet of [45, 55, 60]) {
+        expect(puttOdds(fast, feet, ch).three).toBeLessThanOrEqual(0.401)
+      }
+    }
+    // short putts are nearly 3-putt-proof, and tap-in charges are near-automatic
+    expect(puttOdds(fast, 4, 'aggressive').three).toBeLessThanOrEqual(0.005)
+    expect(puttOdds(fast, 5, 'aggressive').one).toBeGreaterThan(0.8)
+  })
+
   it('punch short game cannot blow up', () => {
     const brutal: Conditions = { wind: 25, greens: 'Fast', difficulty: 10 }
     for (const c of COURSES.slice(0, 2)) {

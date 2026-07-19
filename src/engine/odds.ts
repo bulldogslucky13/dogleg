@@ -352,18 +352,14 @@ export function approachOdds(
 // Putting
 // ---------------------------------------------------------------------------
 
-const PUTT_BASE = {
-  short: {
-    safe: { one: 10, two: 88, three: 2 },
-    normal: { one: 22, two: 74, three: 4 },
-    aggressive: { one: 32, two: 59, three: 9 },
-  },
-  long: {
-    safe: { one: 3, two: 88, three: 9 },
-    normal: { one: 6, two: 79, three: 15 },
-    aggressive: { one: 10, two: 60, three: 30 },
-  },
-} as const
+/** Per-choice anchors: `one` is the make % at PUTT_CURVE.makeAnchor feet,
+ * `three` is the 3-putt % at PUTT_CURVE.threeAnchor feet. Distance shapes both
+ * continuously — no short/long buckets, so a 21-footer isn't a cliff. */
+const PUTT_BASE: Record<Choice, { one: number; three: number }> = {
+  safe: { one: 10, three: 4 },
+  normal: { one: 22, three: 8 },
+  aggressive: { one: 32, three: 16 },
+}
 
 const GREEN_SPEED = {
   Slow: { make: 0.85, three: 0.8 },
@@ -372,29 +368,33 @@ const GREEN_SPEED = {
   Fast: { make: 1.2, three: 1.45 },
 } as const
 
-const PUTT_DIST = {
-  short: { min: 4, max: 20, midpoint: 12, makeSlope: 0.07, threeSlope: 0.04 },
-  long: { min: 22, max: 60, midpoint: 35, makeSlope: 0.045, threeSlope: 0.035 },
-} as const
+/** Make decays hyperbolically from the 12ft anchor — tap-ins near-automatic,
+ * bombs rare but never impossible. 3-putt is a non-factor inside `threeFrom`
+ * feet, then climbs linearly with distance through the 20ft anchor. */
+const PUTT_CURVE = { minFeet: 3, maxFeet: 60, makeAnchor: 12, makeExp: 1, threeFrom: 4, threeAnchor: 20 } as const
+const MAKE_FLOOR = 0.5
+const MAKE_CAP = 92
+/** Even a reckless charge from downtown tops out here — scarier with distance,
+ * never a coin flip. */
+const THREE_CAP = 40
+const LAG_THREE_CAP = 8
 
 export function puttOdds(cond: Conditions, feet: number, choice: Choice, character?: CharacterId): PuttOdds {
-  const range = feet <= 20 ? 'short' : 'long'
-  const base = PUTT_BASE[range][choice]
+  const base = PUTT_BASE[choice]
   const speed = GREEN_SPEED[cond.greens]
-  const d = PUTT_DIST[range]
-  const delta = Math.max(d.min, Math.min(d.max, feet)) - d.midpoint
+  const c = PUTT_CURVE
+  const ft = Math.max(c.minFeet, Math.min(c.maxFeet, feet))
 
-  let one = base.one * speed.make * (1 - delta * d.makeSlope)
-  let three = base.three * speed.three * (1 + delta * d.threeSlope)
-  // the Greens Keeper's edge — applied before the lag cap so caps stay honest
+  let one = base.one * speed.make * Math.pow(c.makeAnchor / ft, c.makeExp)
+  let three = base.three * speed.three * (Math.max(0, ft - c.threeFrom) / (c.threeAnchor - c.threeFrom))
+  // the Greens Keeper's edge — applied before the caps so caps stay honest
   if (character === 'greens') {
     one *= GREENS_BUFF.one
     three *= GREENS_BUFF.three
   }
   // Lagging is the whole point of lagging: it caps the disaster.
-  if (choice === 'safe') three = Math.min(three, 8)
-  one = Math.max(0.5, one)
-  three = Math.max(0, three)
+  three = Math.min(three, choice === 'safe' ? LAG_THREE_CAP : THREE_CAP)
+  one = Math.min(MAKE_CAP, Math.max(MAKE_FLOOR, one))
   const two = Math.max(1, 100 - one - three)
 
   const odds: PuttOdds = { kind: 'putt', one, two, three }

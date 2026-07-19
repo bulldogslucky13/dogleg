@@ -44,6 +44,10 @@ exposure is 0 and it cannot appear in the odds or the outcome.
 - Safe aims away from hazards: its landing window is placed short of cross hazards and
   center-away from side hazards (exposure multiplier ~0.25); aggressive hugs the hazard
   line (×1.5).
+- Putting odds are continuous in distance (no short/long buckets): make odds decay
+  hyperbolically from a 12ft anchor — tap-ins near-automatic, 60-footers rare — and
+  3-putt odds climb linearly with distance, hard-capped at 40% so long bombs get
+  scarier, never hopeless.
 - Lag putts cap three-putt risk at ~8% even long+fast; Charge owns the 3-putt risk.
 - Punch short game: blow-up ≤2% always.
 - Cost preserved: Safe rarely produces birdie looks (kick-in/dialed rates stay low, or

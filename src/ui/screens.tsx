@@ -1,11 +1,15 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { CHARACTERS, characterById } from '../engine/characters'
 import { COURSES } from '../engine/courses'
 import { dailySetup, RESULT_LABEL, RESULT_SQUARE, shareText, toParLabel, type DailySetup } from '../engine/daily'
 import type { CharacterId, HoleResult } from '../engine/types'
 import { track } from '../lib/analytics'
-import { characterRecords, computeStreaks, type HistoryEntry, type RoundRecap } from '../state/store'
+import { backendEnabled } from '../lib/backend'
+import { fetchCourseRecords, type CourseRecord } from '../lib/leaderboard'
+import { characterRecords, computeStreaks, type HistoryEntry, type RoundRecap, type RoundState } from '../state/store'
+import { AccountPanel } from './AccountPanel'
 import { CharacterAvatar } from './Avatars'
+import { ScoreBoard } from './Leaderboard'
 
 export function HomeScreen(props: {
   history: HistoryEntry[]
@@ -21,6 +25,14 @@ export function HomeScreen(props: {
   const streaks = computeStreaks(props.history)
   const records = characterRecords(props.history)
   const [showCourses, setShowCourses] = useState(false)
+  const [courseRecs, setCourseRecs] = useState<Map<string, CourseRecord> | null>(null)
+
+  // course records load once when the browser opens — free-play bragging rights
+  useEffect(() => {
+    if (showCourses && backendEnabled && courseRecs === null) {
+      void fetchCourseRecords().then((r) => setCourseRecs(r ?? new Map()))
+    }
+  }, [showCourses, courseRecs])
   const avgLabel = (avg: number) => (avg > 0 ? `+${avg.toFixed(1)}` : avg.toFixed(1))
   return (
     <div className="screen home">
@@ -116,11 +128,17 @@ export function HomeScreen(props: {
               <span>
                 {c.location} · Difficulty {c.difficulty}/10
               </span>
+              {courseRecs?.get(c.slug) && (
+                <em className="course-cr">
+                  CR {toParLabel(courseRecs.get(c.slug)!.to_par)} · {courseRecs.get(c.slug)!.player_name}
+                </em>
+              )}
             </button>
           ))}
           <p className="fine">Practice rounds don't touch your streak.</p>
         </div>
       )}
+      <AccountPanel />
     </div>
   )
 }
@@ -172,6 +190,8 @@ export function ResultScreen(props: {
   practice: boolean
   character?: CharacterId
   recap: RoundRecap | null
+  /** the finished round, when it's still in storage — enables board submission */
+  boardRound: RoundState | null
   history: HistoryEntry[]
   onHome: () => void
   onPracticeAgain: () => void
@@ -282,6 +302,7 @@ export function ResultScreen(props: {
           </div>
         </div>
       )}
+      {props.boardRound && <ScoreBoard round={props.boardRound} />}
       {!props.practice && (
         <div className="stats-row">
           <div className="stat">

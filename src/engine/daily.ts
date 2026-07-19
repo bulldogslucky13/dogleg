@@ -20,6 +20,17 @@ export function puzzleNumber(now = new Date()): number {
   return Math.max(1, days + 1)
 }
 
+/** Puzzle number for a YYYY-MM-DD key (server-side validation uses this). */
+export function puzzleNumberForDateKey(dateKey: string): number {
+  const [y, m, d] = dateKey.split('-').map(Number)
+  return puzzleNumber(new Date(y, m - 1, d))
+}
+
+/** The rotation is the array order: puzzle n plays COURSES[(n-1) % length]. */
+export function courseForPuzzle(n: number): CourseSpec {
+  return COURSES[(n - 1) % COURSES.length]
+}
+
 export interface DailySetup {
   course: CourseSpec
   cond: Conditions
@@ -35,17 +46,32 @@ const GREEN_BUMP: Record<Greens, Greens[]> = {
   Fast: ['Firm', 'Fast', 'Fast'],
 }
 
+/** Conditions jitter shared by daily and practice — and by the server-side
+ * validator, which must reconstruct the exact conditions from the seed alone. */
+function jitteredConditions(rngKey: string, course: CourseSpec, windSpan: number, diffSpan: number): Conditions {
+  const rng = rngFromString(rngKey)
+  const wind = Math.max(3, Math.round(course.wind + (rng() - 0.5) * windSpan))
+  const greens = GREEN_BUMP[course.greens][Math.floor(rng() * 3)]
+  const difficulty = Math.max(1, Math.min(10, Math.round(course.difficulty + (rng() - 0.5) * diffSpan)))
+  return { wind, greens, difficulty }
+}
+
+export function dailyConditions(dateKey: string, course: CourseSpec): Conditions {
+  return jitteredConditions(`daily:${dateKey}:${course.slug}`, course, 10, 2)
+}
+
+/** For practice the round seed itself is the conditions key. */
+export function practiceConditions(seed: string, course: CourseSpec): Conditions {
+  return jitteredConditions(seed, course, 12, 3)
+}
+
 export function dailySetup(now = new Date()): DailySetup {
   const n = puzzleNumber(now)
   const dateKey = localDateKey(now)
-  const course = COURSES[(n - 1) % COURSES.length]
-  const rng = rngFromString(`daily:${dateKey}:${course.slug}`)
-  const wind = Math.max(3, Math.round(course.wind + (rng() - 0.5) * 10))
-  const greens = GREEN_BUMP[course.greens][Math.floor(rng() * 3)]
-  const difficulty = Math.max(1, Math.min(10, Math.round(course.difficulty + (rng() - 0.5) * 2)))
+  const course = courseForPuzzle(n)
   return {
     course,
-    cond: { wind, greens, difficulty },
+    cond: dailyConditions(dateKey, course),
     seed: `round:${dateKey}:${course.slug}`,
     puzzleNumber: n,
     dateKey,
@@ -54,14 +80,11 @@ export function dailySetup(now = new Date()): DailySetup {
 
 export function practiceSetup(slug: string, seedExtra: string): DailySetup {
   const course = COURSES.find((c) => c.slug === slug) ?? COURSES[0]
-  const rng = rngFromString(`practice:${slug}:${seedExtra}`)
-  const wind = Math.max(3, Math.round(course.wind + (rng() - 0.5) * 12))
-  const greens = GREEN_BUMP[course.greens][Math.floor(rng() * 3)]
-  const difficulty = Math.max(1, Math.min(10, Math.round(course.difficulty + (rng() - 0.5) * 3)))
+  const seed = `practice:${slug}:${seedExtra}`
   return {
     course,
-    cond: { wind, greens, difficulty },
-    seed: `practice:${slug}:${seedExtra}`,
+    cond: practiceConditions(seed, course),
+    seed,
     puzzleNumber: 0,
     dateKey: localDateKey(),
   }

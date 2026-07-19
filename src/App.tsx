@@ -167,6 +167,7 @@ export default function App() {
         toPar={toPar}
         practice={isPractice}
         recap={recapSource ? buildRecap(recapSource) : null}
+        boardRound={recapSource}
         character={isPractice && round ? round.character : entry?.character}
         history={history}
         onHome={() => setView('home')}

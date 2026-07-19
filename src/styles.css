@@ -1040,6 +1040,158 @@ button {
   letter-spacing: 0.06em;
 }
 
+/* leaderboard block: today's board + course records */
+.board-block {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border: 1.5px solid var(--line);
+  border-radius: 12px;
+  padding: 12px 14px;
+  text-align: left;
+}
+
+.board-rank {
+  font-size: 0.9rem;
+}
+
+.name-form {
+  display: flex;
+  gap: 8px;
+}
+
+.name-form input {
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+  font-size: 0.9rem;
+  padding: 9px 12px;
+  border: 1.5px solid var(--line);
+  border-radius: 10px;
+  background: var(--cream);
+  color: var(--ink);
+}
+
+.name-form input:focus {
+  outline: 2px solid var(--good);
+  outline-offset: 1px;
+}
+
+.cta.slim {
+  padding: 9px 14px;
+  font-size: 0.72rem;
+  white-space: nowrap;
+}
+
+.cta:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.cta:disabled:active {
+  transform: none;
+}
+
+.spinner {
+  display: inline-block;
+  width: 0.85em;
+  height: 0.85em;
+  margin-right: 0.5em;
+  vertical-align: -0.08em;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    animation-duration: 1.6s;
+  }
+}
+
+.name-form input:disabled {
+  opacity: 0.6;
+}
+
+.board-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.board-list li {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  font-size: 0.88rem;
+  padding: 3px 6px;
+  border-radius: 7px;
+}
+
+.board-list li.me {
+  background: rgba(78, 138, 72, 0.14);
+  font-weight: 700;
+}
+
+.board-pos {
+  width: 1.4em;
+  text-align: right;
+  font-weight: 800;
+  font-size: 0.74rem;
+  color: rgba(29, 43, 32, 0.5);
+}
+
+.board-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.board-error {
+  color: var(--accent);
+}
+
+.record-banner {
+  font-weight: 800;
+  font-size: 0.92rem;
+  color: #2e6329;
+}
+
+.course-cr {
+  font-style: normal;
+  font-size: 0.7rem;
+  font-weight: 800;
+  color: var(--accent);
+}
+
+/* optional account sync, tucked under the home screen */
+.account-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
+}
+
+.account-body {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  border: 1.5px solid var(--line);
+  border-radius: 12px;
+  padding: 12px 14px;
+  text-align: left;
+}
+
 /* share card: show exactly what lands in the group chat */
 .share-block {
   display: flex;

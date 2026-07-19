@@ -185,8 +185,30 @@ export function applyChoice(state: RoundState, choice: Choice): RoundState {
   return next
 }
 
+/** Fires as each hole is scored, so an abandoned round still shows how far it
+ * got — round_completed alone can't tell "quit on 14" from "never teed off". */
+function trackHoleCompleted(state: RoundState): void {
+  const score = state.hole?.score
+  if (!score) return
+  const spec = courseBySlug(state.courseSlug)!.holes[state.currentHole]
+  track('hole_completed', {
+    mode: state.mode,
+    course: state.courseSlug,
+    puzzle_number: state.puzzleNumber,
+    character: state.character,
+    hole_number: spec.number,
+    par: spec.par,
+    strokes: score.strokes,
+    result: score.result,
+    hole_to_par: score.strokes - spec.par,
+    running_to_par: roundToPar(state), // applyChoice already banked this hole's score
+    aggressive_used: AGGRESSIVE_BUDGET - state.aggressiveLeft,
+  })
+}
+
 export function advanceHole(state: RoundState): RoundState {
   if (!state.hole?.score) return state
+  trackHoleCompleted(state)
   if (state.currentHole >= 17) {
     return { ...state, complete: true }
   }

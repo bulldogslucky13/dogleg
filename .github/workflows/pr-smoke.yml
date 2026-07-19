@@ -1,0 +1,41 @@
+# Smoke tests for every pull request.
+#
+# Runs the full check pipeline — install, typecheck, complete test suite
+# (including the dedicated smoke tests in src/smoke.test.ts and
+# src/smoke.ui.test.tsx), and a production build — on every PR opened
+# against any branch, and on every push to an open PR.
+#
+# This workflow is a required safety net: keep it passing, and when you add
+# features, extend the smoke suite so this run still covers the whole game.
+# See CLAUDE.md § Smoke tests.
+name: PR smoke tests
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-smoke-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    name: Typecheck, test, build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Typecheck
+        run: pnpm typecheck
+      - name: Full test suite (unit + smoke)
+        run: pnpm test
+      - name: Production build
+        run: pnpm build

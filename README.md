@@ -71,9 +71,10 @@ To play again later: open Terminal, type `cd dogleg`, then `pnpm dev`.
 ## For developers
 
 ```sh
-pnpm dev        # dev server at http://localhost:5173
-pnpm test       # engine invariants + Monte Carlo calibration
-pnpm build      # type-check + production build to dist/
+pnpm dev         # dev server at http://localhost:5173
+pnpm test        # full suite: engine invariants + Monte Carlo calibration + smoke
+pnpm test:smoke  # just the whole-game smoke tests (~2s)
+pnpm build       # type-check + production build to dist/
 ```
 
 - Pure-TypeScript game engine in `src/engine/` — the UI never rolls its own dice.
@@ -87,6 +88,11 @@ pnpm build      # type-check + production build to dist/
   honesty (no water risk once you're past the water), safe-is-safe, and Monte Carlo
   calibration for both the base policies **and** each character (~1 stroke of edge,
   none dominant, no stat-padding the game into a birdie-fest).
+- Smoke tests (`src/smoke.test.ts` + `src/smoke.ui.test.tsx`) play complete rounds
+  through the real store API and click through the real `<App />` in jsdom. They run
+  on **every pull request** via `.github/workflows/pr-smoke.yml` and must be kept
+  green and extended alongside new features — the maintenance policy lives in
+  [CLAUDE.md](CLAUDE.md).
 - Design docs: [docs/DESIGN.md](docs/DESIGN.md) ·
   [docs/REVERSE-ENGINEERING.md](docs/REVERSE-ENGINEERING.md)
 - Privacy: the deployed site uses [PostHog](https://posthog.com) for anonymous,

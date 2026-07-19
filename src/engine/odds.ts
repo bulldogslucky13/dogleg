@@ -252,6 +252,24 @@ export interface ApproachOddsDetail {
   window: [number, number]
 }
 
+/**
+ * Distance taper. The base rows are tuned around a ~150-yard approach; a wedge
+ * distance stuffs it close more often, while a long iron bleeds green-hitting
+ * odds into lags and missed greens. Clamped so extreme layouts never zero a
+ * bucket out before normalization.
+ */
+const DIST_TAPER = { anchor: 150, span: 130, min: 60, max: 280 } as const
+
+function distanceTaper(dist: number): ApproachRow {
+  const t = (Math.max(DIST_TAPER.min, Math.min(DIST_TAPER.max, dist)) - DIST_TAPER.anchor) / DIST_TAPER.span
+  return {
+    kickin: 1 - 0.65 * t,
+    makeable: 1 - 0.38 * t,
+    lag: 1 + 0.32 * t,
+    scramble: 1 + 0.55 * t,
+  }
+}
+
 export type ApproachMode = 'par3tee' | 'standard' | 'wedge' | 'go'
 
 export function approachOdds(
@@ -297,8 +315,16 @@ export function approachOdds(
     row.scramble *= 1.35
   }
 
-  // Where can this shot actually miss? Between the ball and just past the green.
+  // Longer approaches hit fewer greens and stuff fewer shots close, whatever
+  // the lie — 198 out is a different ask than 120, even from the fairway.
   const dist = layout.length - ball.pos
+  const taper = distanceTaper(dist)
+  row.kickin *= taper.kickin
+  row.makeable *= taper.makeable
+  row.lag *= taper.lag
+  row.scramble *= taper.scramble
+
+  // Where can this shot actually miss? Between the ball and just past the green.
   const window: [number, number] = [ball.pos + dist * 0.45, layout.length + 12]
   const { shares } = hazardShares(layout, ball, window, choice)
 
@@ -335,6 +361,7 @@ export function approachOdds(
         : mode === 'wedge'
           ? HOLEOUT.wedge[choice]
           : HOLEOUT.approach[choice] * HOLEOUT_LIE[lie]
+  holeoutBase *= taper.kickin // jarring it from 220 is rarer than from a wedge
   if (character === 'dart') holeoutBase *= DART_BUFF.holeout
   odds.holeout = holeoutBase
   const scale = 1 - holeoutBase

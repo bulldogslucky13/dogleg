@@ -134,6 +134,47 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
     expect(save.currentHole).toBe(0)
   })
 
+  it('opens a #watch= replay link straight into the viewer', async () => {
+    // build a real finished round through the store, encode it like a share link
+    const { newRound, applyChoice, advanceHole } = await import('./state/store')
+    const { practiceSetup } = await import('./engine/daily')
+    const { decisionsFromScores, encodeReplay } = await import('./engine/replay')
+    let s = newRound(practiceSetup('pebble-beach', 'smokewatch'), 'practice', 'dart')
+    let guard = 0
+    while (!s.complete && guard++ < 500) {
+      if (s.hole?.stage === 'done') {
+        s = advanceHole(s)
+        continue
+      }
+      const next = applyChoice(s, 'normal')
+      s = next === s ? applyChoice(s, 'safe') : next
+    }
+    const code = encodeReplay({
+      seed: s.seed,
+      character: 'dart',
+      decisions: decisionsFromScores(s.scores)!,
+      name: 'Smoke Watcher',
+    })
+    window.location.hash = `#watch=${code}`
+    localStorage.clear()
+    localStorage.setItem('dogleg:tutorial:v1', 'done')
+
+    render(<App />)
+    expect(screen.getByText('‹ Exit replay')).toBeTruthy()
+    expect(screen.getByText(/Smoke Watcher's round/)).toBeTruthy()
+    // stepping forward shows shot state, loudly labeled with the choice made
+    fireEvent.click(screen.getByText('Next ›'))
+    expect(screen.getByText(/1 stroke/)).toBeTruthy()
+    expect(screen.getByText(/Went (safe|normal|aggressive)/)).toBeTruthy()
+    // the hole strip jumps anywhere in the round
+    fireEvent.click(screen.getByLabelText('Jump to hole 14'))
+    expect(screen.getByText('Hole 14 of 18')).toBeTruthy()
+    // exiting cleans the hash and lands home
+    fireEvent.click(screen.getByText('‹ Exit replay'))
+    expect(screen.getByText('Tee off')).toBeTruthy()
+    window.location.hash = ''
+  })
+
   it('toggles between modern and classic views mid-round', () => {
     vi.useFakeTimers()
     render(<App />)

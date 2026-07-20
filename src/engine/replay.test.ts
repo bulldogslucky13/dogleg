@@ -3,7 +3,7 @@ import { advanceHole, applyChoice, newRound, roundToPar } from '../state/store'
 import { CHARACTERS } from './characters'
 import { COURSES } from './courses'
 import { dailySalt, dailySetup, practiceSetup } from './daily'
-import { decisionsFromScores, replayRound, setupFromSeed } from './replay'
+import { decisionsFromScores, decodeReplay, encodeReplay, replayFrames, replayRound, setupFromSeed } from './replay'
 import type { CharacterId, Choice } from './types'
 
 /** Play a full round through the real client store, exactly as the UI does. */
@@ -133,6 +133,47 @@ describe('replayRound is a perfect mirror of the client store', () => {
     const allAgg = decisions.map((d) => d.map(() => 'aggressive' as Choice))
     const r = replayRound(finished.seed, 'dart', allAgg)
     expect(r.ok).toBe(false)
+  })
+
+  it('replay codes roundtrip and frames retell the exact same round', () => {
+    const setup = practiceSetup(COURSES[5].slug, 'frames')
+    const finished = playThroughStore(setup, 'practice', 'fairway')
+    const decisions = decisionsFromScores(finished.scores)!
+
+    // encode → decode is lossless (including a name with non-ASCII)
+    const code = encodeReplay({ seed: finished.seed, character: 'fairway', decisions, name: 'Señor Bogey' })
+    expect(code).toMatch(/^[A-Za-z0-9_-]+$/) // URL-safe
+    const decoded = decodeReplay(code)!
+    expect(decoded.seed).toBe(finished.seed)
+    expect(decoded.character).toBe('fairway')
+    expect(decoded.decisions).toEqual(decisions)
+    expect(decoded.name).toBe('Señor Bogey')
+
+    // frames: one per tee + one per shot, ending on the same final score
+    const frames = replayFrames(finished.seed, 'fairway', decisions)!
+    const shotCount = decisions.reduce((s, h) => s + h.length, 0)
+    expect(frames).toHaveLength(18 + shotCount)
+    const lastFrame = frames[frames.length - 1]
+    const finalToPar = lastFrame.runningToPar + (lastFrame.hole.score!.strokes - lastFrame.hole.layout.spec.par)
+    expect(finalToPar).toBe(roundToPar(finished))
+    // garbage codes are rejected, not crashed on
+    expect(decodeReplay('not-a-real-code')).toBeNull()
+  })
+
+  it('a salted daily seed replays through frames — share links survive per-player dice', () => {
+    // regression for the #24/#28 interaction: replay links carry the salted
+    // seed verbatim, so the frames builder must accept it like the referee does
+    const setup = dailySetup()
+    const playerId = 'a3f1c2d4-0000-4000-8000-abcdefabcdef'
+    const round = playThroughStore({ ...setup, seed: newRound(setup, 'daily', 'dart', playerId).seed }, 'daily', 'dart')
+    const decisions = decisionsFromScores(round.scores)!
+    const decoded = decodeReplay(encodeReplay({ seed: round.seed, character: 'dart', decisions }))!
+    expect(decoded.seed).toBe(round.seed)
+    const frames = replayFrames(decoded.seed, decoded.character, decoded.decisions)!
+    expect(frames).not.toBeNull()
+    const lastFrame = frames[frames.length - 1]
+    const finalToPar = lastFrame.runningToPar + (lastFrame.hole.score!.strokes - lastFrame.hole.layout.spec.par)
+    expect(finalToPar).toBe(roundToPar(round))
   })
 
   it('a different character cannot ride on the same decisions unnoticed', () => {

@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
 import { CHARACTERS, characterById } from '../engine/characters'
 import { COURSES } from '../engine/courses'
-import { dailySetup, RESULT_LABEL, RESULT_SQUARE, shareText, toParLabel, type DailySetup } from '../engine/daily'
+import { dailySetup, RESULT_LABEL, RESULT_SQUARE, shareText, SITE_URL, toParLabel, type DailySetup } from '../engine/daily'
+import { decisionsFromScores, encodeReplay } from '../engine/replay'
 import type { CharacterId, HoleResult } from '../engine/types'
 import { track } from '../lib/analytics'
 import { backendEnabled } from '../lib/backend'
-import { fetchCourseRecords, type CourseRecord } from '../lib/leaderboard'
+import { fetchCourseRecords, loadPlayer, type CourseRecord } from '../lib/leaderboard'
 import { characterRecords, computeStreaks, type HistoryEntry, type RoundRecap, type RoundState } from '../state/store'
 import { AccountPanel } from './AccountPanel'
 import { CharacterAvatar } from './Avatars'
@@ -200,10 +201,26 @@ export function ResultScreen(props: {
 }) {
   const { toPar, results } = props
   const [copied, setCopied] = useState(false)
+  const [copiedReplay, setCopiedReplay] = useState(false)
   const streaks = computeStreaks(props.history)
   const broke = toPar < 0
   const char = characterById(props.character)
   const text = shareText(props.setup, results, toPar, props.character)
+  // a replay link IS the round: seed + decisions, re-run by the viewer's engine
+  const replayUrl = (() => {
+    if (!props.boardRound) return null
+    const decisions = decisionsFromScores(props.boardRound.scores)
+    if (!decisions) return null
+    const code = encodeReplay({
+      seed: props.boardRound.seed,
+      character: props.boardRound.character,
+      decisions,
+      // loadPlayer is the NAMED identity — an anonymous player's replay is
+      // simply unattributed, it never leaks their minted id as a name
+      name: loadPlayer()?.name ?? undefined,
+    })
+    return `https://${SITE_URL}/#watch=${code}`
+  })()
   const canNativeShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function'
   const copy = async () => {
     let ok = true
@@ -334,6 +351,30 @@ export function ResultScreen(props: {
             {copied ? 'Copied — paste it in the chat ✓' : 'Copy for the group chat'}
           </button>
         </div>
+      )}
+      {replayUrl && (
+        <button
+          className="cta ghost"
+          onClick={async () => {
+            try {
+              await navigator.clipboard.writeText(replayUrl)
+            } catch {
+              const ta = document.createElement('textarea')
+              ta.value = replayUrl
+              ta.style.position = 'fixed'
+              ta.style.opacity = '0'
+              document.body.appendChild(ta)
+              ta.select()
+              document.execCommand('copy')
+              ta.remove()
+            }
+            track('replay_link_copied', { to_par: toPar, mode: props.practice ? 'practice' : 'daily' })
+            setCopiedReplay(true)
+            setTimeout(() => setCopiedReplay(false), 2000)
+          }}
+        >
+          {copiedReplay ? 'Replay link copied ✓' : '🎬 Copy replay link — let them watch it'}
+        </button>
       )}
       {props.practice && (
         <button className="cta" onClick={props.onPracticeAgain}>

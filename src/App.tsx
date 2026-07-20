@@ -29,17 +29,27 @@ import { CharacterAvatar } from './ui/Avatars'
 import { GreenView, HoleMap, useMapSize } from './ui/HoleMap'
 import { SideMap } from './ui/SideMap'
 import { ChoiceCards, ClassicScorecard, HazardChips, HoleComplete, Scorecard, StatusBanner, TierBanner } from './ui/panels'
+import { decodeReplay, type ReplayPayload } from './engine/replay'
+import { ReplayScreen } from './ui/ReplayScreen'
 import { CharacterPickScreen, HomeScreen, ResultScreen } from './ui/screens'
 import { Tutorial, hasSeenTutorial } from './ui/Tutorial'
 
-type View = 'home' | 'pick' | 'play' | 'result'
+type View = 'home' | 'pick' | 'play' | 'result' | 'watch'
+
+/** a #watch=<code> link opens straight into the replay viewer */
+function watchFromHash(): ReplayPayload | null {
+  const m = /#watch=([A-Za-z0-9_-]+)/.exec(window.location.hash)
+  return m ? decodeReplay(m[1]) : null
+}
 /** setup is generated when the pick screen opens, so the conditions it shows are the ones you play */
 type PendingStart = { mode: 'daily' | 'practice'; setup: DailySetup }
 
 export default function App() {
   const [round, setRound] = useState<RoundState | null>(() => loadRound())
   const [history, setHistory] = useState<HistoryEntry[]>(() => loadHistory())
+  const [watching, setWatching] = useState<ReplayPayload | null>(() => watchFromHash())
   const [view, setView] = useState<View>(() => {
+    if (watchFromHash()) return 'watch'
     const r = loadRound()
     return r && !r.complete ? 'play' : 'home'
   })
@@ -123,6 +133,19 @@ export default function App() {
           }}
         />
       </>
+    )
+  }
+
+  if (view === 'watch' && watching) {
+    return (
+      <ReplayScreen
+        payload={watching}
+        onExit={() => {
+          window.history.replaceState(null, '', window.location.pathname)
+          setWatching(null)
+          setView('home')
+        }}
+      />
     )
   }
 

@@ -472,19 +472,25 @@ export function computeStreaks(history: HistoryEntry[]): Streaks {
 const FORTUNE_KEY = 'dogleg:fortune:v1'
 const FORTUNE_LAST_KEY = 'dogleg:fortune:last'
 
+/** Only PRACTICE counters are stored — daily counters are derived from
+ * posted dailies on demand (see postedDailyCounters), because the referee
+ * verifies daily claims against its daily_scores table and would reject
+ * anything local-only rounds inflated. */
 interface StoredFortune {
   p: { ace: number; aceK: number; alb: number; albK: number }
-  d: { ace: number; alb: number }
 }
 
 function loadStoredFortune(): StoredFortune {
   try {
     const raw = localStorage.getItem(FORTUNE_KEY)
-    if (raw) return JSON.parse(raw) as StoredFortune
+    if (raw) {
+      const j = JSON.parse(raw) as StoredFortune
+      if (j?.p) return { p: j.p }
+    }
   } catch {
     /* fall through */
   }
-  return { p: { ace: 0, aceK: 0, alb: 0, albK: 0 }, d: { ace: 0, alb: 0 } }
+  return { p: { ace: 0, aceK: 0, alb: 0, albK: 0 } }
 }
 
 function saveStoredFortune(f: StoredFortune): void {
@@ -497,16 +503,17 @@ function saveStoredFortune(f: StoredFortune): void {
 
 /** The fortune snapshot a new round bakes into its seed. */
 export function fortuneFor(mode: 'daily' | 'practice'): FortuneState {
-  const sf = loadStoredFortune()
   if (mode === 'daily') {
-    // The streak multiplier is only claimed by a NAMED identity, and only
-    // from dailies this device actually POSTED: the referee verifies the
-    // claim against the consecutive run in its daily_scores table, so a
-    // streak built from local-only rounds (anonymous days, offline days)
-    // would be rejected, not boosted. Board loyalty is what's rewarded.
-    const streak = hasNamedIdentity() ? postedStreak() : 0
-    return { ...EMPTY_FORTUNE, ace: sf.d.ace, alb: sf.d.alb, streak }
+    // Every daily claim — streak AND the ace/albatross counters — is derived
+    // from dailies this device actually POSTED, and only for a NAMED
+    // identity: the referee verifies all of them against its daily_scores
+    // table, so anything local-only rounds inflated would be rejected, not
+    // boosted. Board loyalty is what's rewarded.
+    if (!hasNamedIdentity()) return { ...EMPTY_FORTUNE }
+    const { ace, alb } = postedDailyCounters()
+    return { ...EMPTY_FORTUNE, ace, alb, streak: postedStreak() }
   }
+  const sf = loadStoredFortune()
   return { ace: sf.p.ace, aceK: sf.p.aceK, alb: sf.p.alb, albK: sf.p.albK, streak: 0 }
 }
 
@@ -526,10 +533,9 @@ function hasNamedIdentity(): boolean {
  * The posted set is written by lib/leaderboard on successful submission. */
 function postedStreak(): number {
   try {
-    const raw = localStorage.getItem('dogleg:posted:v1')
-    const keys = new Set(raw ? (JSON.parse(raw) as string[]) : [])
+    const keys = postedDays()
     let run = 0
-    let cursor = parseKey(localDateKey())
+    const cursor = parseKey(localDateKey())
     for (;;) {
       cursor.setDate(cursor.getDate() - 1)
       if (!keys.has(localDateKey(cursor))) break
@@ -538,6 +544,44 @@ function postedStreak(): number {
     return run + 1
   } catch {
     return 0
+  }
+}
+
+function postedDays(): Set<string> {
+  const raw = localStorage.getItem('dogleg:posted:v1')
+  return new Set(raw ? (JSON.parse(raw) as string[]) : [])
+}
+
+/** Daily ace/albatross counters as the referee can verify them: posted
+ * dailies since the last POSTED daily that contained the moment. An ace is
+ * an eagle result on a par 3; an albatross result on a par 5 is the 2. */
+function postedDailyCounters(): { ace: number; alb: number } {
+  try {
+    const posted = postedDays()
+    const rows = loadHistory()
+      .filter((e) => posted.has(e.dateKey))
+      .sort((a, b) => b.dateKey.localeCompare(a.dateKey))
+    let ace = 0
+    let alb = 0
+    let aceDone = false
+    let albDone = false
+    for (const e of rows) {
+      const course = courseBySlug(e.courseSlug)
+      const hasAce = !!course && e.results.some((r, i) => r === 'eagle' && course.holes[i]?.par === 3)
+      const hasAlb = !!course && e.results.some((r, i) => r === 'albatross' && course.holes[i]?.par === 5)
+      if (!aceDone) {
+        if (hasAce) aceDone = true
+        else ace++
+      }
+      if (!albDone) {
+        if (hasAlb) albDone = true
+        else alb++
+      }
+      if (aceDone && albDone) break
+    }
+    return { ace, alb }
+  } catch {
+    return { ace: 0, alb: 0 }
   }
 }
 
@@ -576,6 +620,9 @@ export function roundMoments(state: RoundState): { ace: boolean; albatross: bool
 
 function updateFortuneAfterRound(state: RoundState): void {
   if (!state.complete) return
+  // daily counters are DERIVED from posted dailies, never accumulated
+  // locally — see postedDailyCounters
+  if (state.mode !== 'practice') return
   try {
     // a round counts once, however many times the result screen re-records it
     if (localStorage.getItem(FORTUNE_LAST_KEY) === state.seed) return
@@ -585,18 +632,13 @@ function updateFortuneAfterRound(state: RoundState): void {
   }
   const { ace, albatross } = roundMoments(state)
   const sf = loadStoredFortune()
-  if (state.mode === 'daily') {
-    sf.d.ace = ace ? 0 : sf.d.ace + 1
-    sf.d.alb = albatross ? 0 : sf.d.alb + 1
-  } else {
-    if (ace) {
-      sf.p.ace = 0
-      sf.p.aceK += 1
-    } else sf.p.ace += 1
-    if (albatross) {
-      sf.p.alb = 0
-      sf.p.albK += 1
-    } else sf.p.alb += 1
-  }
+  if (ace) {
+    sf.p.ace = 0
+    sf.p.aceK += 1
+  } else sf.p.ace += 1
+  if (albatross) {
+    sf.p.alb = 0
+    sf.p.albK += 1
+  } else sf.p.alb += 1
   saveStoredFortune(sf)
 }

@@ -9,7 +9,7 @@
 //
 // deno-lint-ignore-file no-explicit-any
 import { createClient } from 'npm:@supabase/supabase-js@2'
-import { FORTUNE_CONFIG, dailySalt, destinyDue, replayRound } from './engine.mjs'
+import { FORTUNE_CONFIG, courseBySlug, dailySalt, destinyDue, replayRound } from './engine.mjs'
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -108,11 +108,12 @@ Deno.serve(async (req) => {
     if (info.mode === 'daily' && info.fortune) {
       const g = FORTUNE_CONFIG.daily.guaranteeAt
       const claimsStreak = info.fortune.streak > 1
-      const claimsDestiny = info.fortune.ace >= g || info.fortune.alb >= g
-      if (claimsStreak || claimsDestiny) {
+      const claimsAceDestiny = info.fortune.ace >= g
+      const claimsAlbDestiny = info.fortune.alb >= g
+      if (claimsStreak || claimsAceDestiny || claimsAlbDestiny) {
         const { data: rows } = await supabase
           .from('daily_scores')
-          .select('date_key')
+          .select('date_key, course_slug, results')
           .eq('player_id', data.id)
           .order('date_key', { ascending: false })
           .limit(400)
@@ -127,10 +128,38 @@ Deno.serve(async (req) => {
         if (info.fortune.streak > run + 1 + 3) {
           return json(422, { error: 'streak is not credible for this player yet' })
         }
-        // destiny needs a posting history that makes the counter believable
-        // (grace: 40% of the guarantee)
-        if (claimsDestiny && postedKeys.size < Math.floor(g * 0.4)) {
-          return json(422, { error: 'destiny counter is not credible for this player yet' })
+        // destiny is only honored when the referee can RECOMPUTE the drought
+        // from posted cards: count posted dailies since the last one that
+        // contained the moment (ace = eagle result on a par 3; an albatross
+        // result on a par 5 is the 2). A claim of >= guaranteeAt needs a
+        // recomputed drought within a small grace of it — a client cannot
+        // manufacture a destiny holeout out of a short or fabricated history.
+        if (claimsAceDestiny || claimsAlbDestiny) {
+          let sinceAce = 0
+          let sinceAlb = 0
+          let aceDone = false
+          let albDone = false
+          for (const row of (rows ?? []) as { course_slug: string; results: string[] | null }[]) {
+            const course = courseBySlug(row.course_slug)
+            const results = row.results ?? []
+            const hasAce = !!course && results.some((r, i) => r === 'eagle' && course.holes[i]?.par === 3)
+            const hasAlb = !!course && results.some((r, i) => r === 'albatross' && course.holes[i]?.par === 5)
+            if (!aceDone) {
+              if (hasAce) aceDone = true
+              else sinceAce++
+            }
+            if (!albDone) {
+              if (hasAlb) albDone = true
+              else sinceAlb++
+            }
+          }
+          const GRACE = 5 // a few locally-completed-but-unposted dailies
+          if (claimsAceDestiny && sinceAce < g - GRACE) {
+            return json(422, { error: 'destiny counter is not credible for this player yet' })
+          }
+          if (claimsAlbDestiny && sinceAlb < g - GRACE) {
+            return json(422, { error: 'destiny counter is not credible for this player yet' })
+          }
         }
       }
     }

@@ -218,4 +218,51 @@ describe('destiny in the engine', () => {
     expect(fortuneFor('daily').streak).toBe(1) // first-ever post still counts itself
     vi.unstubAllGlobals()
   })
+
+  it('daily ace/albatross counters are derived from posted cards, not local tallies', async () => {
+    const map = new Map<string, string>()
+    vi.stubGlobal('localStorage', {
+      get length() {
+        return map.size
+      },
+      clear: () => map.clear(),
+      getItem: (k: string) => map.get(k) ?? null,
+      key: (i: number) => [...map.keys()][i] ?? null,
+      removeItem: (k: string) => void map.delete(k),
+      setItem: (k: string, v: string) => void map.set(k, v),
+    } as Storage)
+    const { fortuneFor } = await import('../state/store')
+    localStorage.setItem('dogleg:player:v1', JSON.stringify({ id: 'x', secret: 'y', name: 'Cam' }))
+    const day = (offset: number) => {
+      const d = new Date()
+      d.setDate(d.getDate() + offset)
+      return localDateKey(d)
+    }
+    // pebble-beach hole 5 (index 4) is a par 3 — an eagle there is an ace
+    const pars = Array(18).fill('par')
+    const aceDay = [...pars]
+    aceDay[4] = 'eagle'
+    const hist = (dateKey: string, results: string[]) => ({
+      dateKey,
+      puzzleNumber: 1,
+      courseSlug: 'pebble-beach',
+      toPar: 0,
+      results,
+    })
+    localStorage.setItem(
+      'dogleg:history:v1',
+      JSON.stringify([hist(day(-5), pars), hist(day(-3), aceDay), hist(day(-2), pars), hist(day(-1), pars)]),
+    )
+    // only day(-3) onward count toward the ace drought; the albatross track
+    // never reset, so it spans every posted card. day(-4) played locally but
+    // never posted — it must not exist as far as the counters are concerned.
+    localStorage.setItem('dogleg:posted:v1', JSON.stringify([day(-5), day(-3), day(-2), day(-1)]))
+    const f1 = fortuneFor('daily')
+    expect(f1.ace).toBe(2) // the two ace-less cards since the posted ace
+    expect(f1.alb).toBe(4) // all four posted cards, no albatross ever
+    // a card that never posted doesn't extend the drought
+    localStorage.setItem('dogleg:posted:v1', JSON.stringify([day(-3), day(-2), day(-1)]))
+    expect(fortuneFor('daily').alb).toBe(3)
+    vi.unstubAllGlobals()
+  })
 })

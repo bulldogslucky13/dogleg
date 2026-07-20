@@ -9,8 +9,11 @@ import type { CharacterId, Choice, Conditions, CourseSpec, HoleResult, HoleScore
 // Re-exported so it reaches the edge function through engine.mjs: the referee
 // derives the expected salt with the exact same code the client seeds with.
 export { dailySalt } from './daily'
-// re-exported for the server bundle's fortune verification
+// re-exported for the server bundle's fortune verification: the referee
+// recomputes days-since-last-ace/albatross from posted cards, which takes
+// the course's pars to tell an ace (eagle on a par 3) from a plain eagle
 export { FORTUNE_CONFIG, destinyDue } from './fortune'
+export { courseBySlug } from './courses'
 
 /**
  * Deterministic round replay — the backbone of leaderboard score validation.

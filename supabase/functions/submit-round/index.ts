@@ -9,7 +9,7 @@
 //
 // deno-lint-ignore-file no-explicit-any
 import { createClient } from 'npm:@supabase/supabase-js@2'
-import { dailySalt, replayRound } from './engine.mjs'
+import { FORTUNE_CONFIG, dailySalt, replayRound } from './engine.mjs'
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -79,6 +79,23 @@ Deno.serve(async (req) => {
       return json(422, { error: 'round rejected: seed is not yours' })
     }
 
+    // ---- fortune sanity: a daily claiming a destiny-due counter must have a
+    // posting history that makes it credible (grace: 40% of the guarantee).
+    // The counter itself is client-kept — this stops a fresh account from
+    // faking its way to a guaranteed ace on the board. ----
+    if (info.mode === 'daily' && info.fortune) {
+      const g = FORTUNE_CONFIG.daily.guaranteeAt
+      if (info.fortune.ace >= g || info.fortune.alb >= g) {
+        const { count } = await supabase
+          .from('daily_scores')
+          .select('*', { count: 'exact', head: true })
+          .eq('player_id', data.id)
+        if ((count ?? 0) < Math.floor(g * 0.4)) {
+          return json(422, { error: 'destiny counter is not credible for this player yet' })
+        }
+      }
+    }
+
     if (!data.name) {
       // an anonymous minted identity posting its first card: the name is
       // claimed onto THIS row, the one the round's dice were salted for
@@ -98,6 +115,15 @@ Deno.serve(async (req) => {
     // Rejected here, before the insert, so the doomed submission can't
     // reserve a name on its way out.
     if (info.mode === 'daily' && info.salt) return json(422, { error: 'round rejected: seed is not yours' })
+    // a brand-new player row has zero posted dailies, so a destiny-due daily
+    // can never be credible here — rejected BEFORE the insert, same ordering
+    // rule as the salt check above
+    if (info.mode === 'daily' && info.fortune) {
+      const g = FORTUNE_CONFIG.daily.guaranteeAt
+      if (info.fortune.ace >= g || info.fortune.alb >= g) {
+        return json(422, { error: 'destiny counter is not credible for this player yet' })
+      }
+    }
     if (!name || !NAME_RE.test(name)) return json(400, { error: 'pick a clubhouse name (2-18 letters/numbers)' })
     const { data, error } = await supabase.from('players').insert({ name }).select('id, name, secret').single()
     if (error) {

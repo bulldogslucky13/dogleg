@@ -4,6 +4,8 @@ import { startHole, playShot, type HoleInPlay } from '../engine/resolve'
 import { rngFromString, skip, type Rng } from '../engine/rng'
 import type { CharacterId, Choice, Conditions, HoleResult, HoleScore, Stage } from '../engine/types'
 import { courseBySlug } from '../engine/courses'
+import { EMPTY_FORTUNE, encodeFortune, type FortuneState } from '../engine/fortune'
+import { destinyPlan, fortuneOddsFor, setupFromSeed } from '../engine/replay'
 import { track } from '../lib/analytics'
 
 export const AGGRESSIVE_BUDGET = 8
@@ -120,10 +122,14 @@ export function newRound(
   // app start (see ensureIdentity), so they roll their own dice too. Only a
   // player the backend has never seen (offline, mint failed) falls back to
   // the unsalted canonical seed — shared dice, but zero freedom to grind.
+  //
+  // Both modes then carry the player's fortune counters as a seed tail, so
+  // ace/albatross odds and destiny replay identically on the server.
   const salt = mode === 'daily' && playerId ? dailySalt(playerId, setup.dateKey) : null
+  const fortuneTail = `:${encodeFortune(fortuneFor(mode))}`
   return {
     mode,
-    seed: salt ? `${setup.seed}:${salt}` : setup.seed,
+    seed: (salt ? `${setup.seed}:${salt}` : setup.seed) + fortuneTail,
     courseSlug: course.slug,
     cond: setup.cond,
     character,
@@ -159,9 +165,11 @@ export function holeInPlay(state: RoundState): HoleInPlay {
   const course = courseBySlug(state.courseSlug)!
   const spec = course.holes[state.currentHole]
   const layout = buildLayout(course.slug, spec)
-  const s = state.hole ?? serializeHole(startHole(layout, state.cond, state.character))
+  const info = setupFromSeed(state.seed)
+  const fOdds = info ? fortuneOddsFor(info) : undefined
+  const s = state.hole ?? serializeHole(startHole(layout, state.cond, state.character, fOdds))
   // clone mutable pieces: playShot mutates, and React may re-run state updaters
-  return { layout, cond: state.cond, character: state.character, ...s, ball: { ...s.ball }, shots: [...s.shots] }
+  return { layout, cond: state.cond, character: state.character, fortuneOdds: fOdds, ...s, ball: { ...s.ball }, shots: [...s.shots] }
 }
 
 function roundRng(state: RoundState): { rng: Rng; consumed: () => number } {
@@ -187,7 +195,7 @@ export function applyChoice(state: RoundState, choice: Choice): RoundState {
 
   const { rng, consumed } = roundRng(state)
   const budgetSpent = choice === 'aggressive' && usesBudget(h.stage) ? 1 : 0
-  playShot(h, choice, rng)
+  playShot(h, choice, rng, destinyFor(state, h, choice))
 
   const next: RoundState = {
     ...state,
@@ -232,7 +240,8 @@ export function advanceHole(state: RoundState): RoundState {
   const course = courseBySlug(state.courseSlug)!
   const idx = state.currentHole + 1
   const layout = buildLayout(course.slug, course.holes[idx])
-  const hole = startHole(layout, state.cond, state.character)
+  const info = setupFromSeed(state.seed)
+  const hole = startHole(layout, state.cond, state.character, info ? fortuneOddsFor(info) : undefined)
   return { ...state, currentHole: idx, hole: serializeHole(hole) }
 }
 
@@ -309,6 +318,9 @@ function trackRoundCompleted(state: RoundState, streaks: Streaks): void {
 }
 
 export function recordResult(state: RoundState): HistoryEntry[] {
+  // fortune counters march on every completed round, both modes — dedup'd by
+  // seed so re-rendering the result screen can't double-count a round
+  updateFortuneAfterRound(state)
   const history = loadHistory()
   if (state.mode !== 'daily') {
     trackRoundCompleted(state, computeStreaks(history))
@@ -447,4 +459,104 @@ export function computeStreaks(history: HistoryEntry[]): Streaks {
     played: history.length,
     brokePar: history.filter((h) => h.toPar < 0).length,
   }
+}
+
+// ---------------------------------------------------------------------------
+// Fortune counters — the player's march toward an ace / albatross
+// ---------------------------------------------------------------------------
+
+const FORTUNE_KEY = 'dogleg:fortune:v1'
+const FORTUNE_LAST_KEY = 'dogleg:fortune:last'
+
+interface StoredFortune {
+  p: { ace: number; aceK: number; alb: number; albK: number }
+  d: { ace: number; alb: number }
+}
+
+function loadStoredFortune(): StoredFortune {
+  try {
+    const raw = localStorage.getItem(FORTUNE_KEY)
+    if (raw) return JSON.parse(raw) as StoredFortune
+  } catch {
+    /* fall through */
+  }
+  return { p: { ace: 0, aceK: 0, alb: 0, albK: 0 }, d: { ace: 0, alb: 0 } }
+}
+
+function saveStoredFortune(f: StoredFortune): void {
+  try {
+    localStorage.setItem(FORTUNE_KEY, JSON.stringify(f))
+  } catch {
+    /* private mode */
+  }
+}
+
+/** The fortune snapshot a new round bakes into its seed. */
+export function fortuneFor(mode: 'daily' | 'practice'): FortuneState {
+  const sf = loadStoredFortune()
+  if (mode === 'daily') {
+    const streak = computeStreaks(loadHistory()).dayStreak
+    return { ...EMPTY_FORTUNE, ace: sf.d.ace, alb: sf.d.alb, streak }
+  }
+  return { ace: sf.p.ace, aceK: sf.p.aceK, alb: sf.p.alb, albK: sf.p.albK, streak: 0 }
+}
+
+/** Mirror of replayRound's destiny rule: the round's FIRST qualifying shot
+ * of a due track holes out. Must stay in lockstep with the engine. */
+function destinyFor(state: RoundState, h: HoleInPlay, choice: Choice): 'ace' | 'albatross' | undefined {
+  const info = setupFromSeed(state.seed)
+  if (!info) return undefined
+  const plan = destinyPlan(info)
+  const course = courseBySlug(state.courseSlug)
+  if (!course) return undefined
+  const spec = course.holes[state.currentHole]
+  if (plan.ace && spec.par === 3 && h.ball.lie === 'tee') {
+    const earlierPar3 = course.holes.slice(0, state.currentHole).some((hh) => hh.par === 3)
+    if (!earlierPar3) return 'ace'
+  }
+  if (plan.albatross && h.stage === 'second' && choice === 'aggressive') {
+    const earlierGo = state.scores
+      .slice(0, state.currentHole)
+      .some((sc) => sc?.shots.some((sh) => sh.stage === 'second' && sh.choice === 'aggressive'))
+    if (!earlierGo) return 'albatross'
+  }
+  return undefined
+}
+
+/** Did a finished round contain the moments? (An ace is 1 stroke on a par 3;
+ * an albatross is 2 on a par 5.) */
+export function roundMoments(state: RoundState): { ace: boolean; albatross: boolean } {
+  const course = courseBySlug(state.courseSlug)
+  if (!course) return { ace: false, albatross: false }
+  return {
+    ace: state.scores.some((sc, i) => !!sc && course.holes[i].par === 3 && sc.strokes === 1),
+    albatross: state.scores.some((sc, i) => !!sc && course.holes[i].par === 5 && sc.strokes === 2),
+  }
+}
+
+function updateFortuneAfterRound(state: RoundState): void {
+  if (!state.complete) return
+  try {
+    // a round counts once, however many times the result screen re-records it
+    if (localStorage.getItem(FORTUNE_LAST_KEY) === state.seed) return
+    localStorage.setItem(FORTUNE_LAST_KEY, state.seed)
+  } catch {
+    return
+  }
+  const { ace, albatross } = roundMoments(state)
+  const sf = loadStoredFortune()
+  if (state.mode === 'daily') {
+    sf.d.ace = ace ? 0 : sf.d.ace + 1
+    sf.d.alb = albatross ? 0 : sf.d.alb + 1
+  } else {
+    if (ace) {
+      sf.p.ace = 0
+      sf.p.aceK += 1
+    } else sf.p.ace += 1
+    if (albatross) {
+      sf.p.alb = 0
+      sf.p.albK += 1
+    } else sf.p.alb += 1
+  }
+  saveStoredFortune(sf)
 }

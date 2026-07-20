@@ -1040,6 +1040,225 @@ button {
   letter-spacing: 0.06em;
 }
 
+/* THE moment: hole-in-one / albatross full-screen splash */
+.moment-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  overflow: hidden;
+  cursor: pointer;
+  animation: moment-in 0.5s cubic-bezier(0.2, 1.2, 0.4, 1) both;
+}
+
+.moment-backdrop.ace {
+  background: radial-gradient(90% 90% at 50% 45%, #b98a1f 0%, #7a5a10 45%, #241c05 100%);
+}
+
+.moment-backdrop.albatross {
+  background: radial-gradient(90% 90% at 50% 45%, #7c56b8 0%, #4c3378 45%, #150d24 100%);
+}
+
+.moment-rays {
+  position: absolute;
+  inset: -60%;
+  background: repeating-conic-gradient(
+    from 0deg,
+    rgba(255, 255, 255, 0.14) 0deg 9deg,
+    transparent 9deg 24deg
+  );
+  animation: moment-spin 22s linear infinite;
+}
+
+.moment-confetti {
+  position: absolute;
+  top: -24px;
+  border-radius: 2px;
+  background: var(--cream);
+  opacity: 0.9;
+  animation-name: moment-fall;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+
+.moment-backdrop.ace .moment-confetti:nth-child(3n) {
+  background: #ffd968;
+}
+
+.moment-backdrop.ace .moment-confetti:nth-child(3n + 1) {
+  background: #c05b4d;
+}
+
+.moment-backdrop.albatross .moment-confetti:nth-child(3n) {
+  background: #c9a7ff;
+}
+
+.moment-backdrop.albatross .moment-confetti:nth-child(3n + 1) {
+  background: #6fbf66;
+}
+
+.moment-card {
+  position: relative;
+  text-align: center;
+  color: var(--paper);
+  max-width: 420px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  text-shadow: 0 2px 18px rgba(0, 0, 0, 0.45);
+}
+
+.moment-kicker {
+  font-size: 0.78rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  font-weight: 800;
+  opacity: 0.85;
+}
+
+.moment-ball {
+  width: 74px;
+  height: 74px;
+  border-radius: 50%;
+  background: radial-gradient(120% 120% at 32% 28%, #ffffff 0%, #d9d4c4 70%, #a9a494 100%);
+  box-shadow:
+    0 10px 34px rgba(0, 0, 0, 0.5),
+    0 0 60px rgba(255, 255, 255, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: moment-drop 0.9s cubic-bezier(0.3, 1.6, 0.4, 1) both 0.15s;
+}
+
+.moment-ball span {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.18);
+  box-shadow:
+    -18px -6px 0 rgba(0, 0, 0, 0.14),
+    16px -10px 0 rgba(0, 0, 0, 0.14),
+    -8px 14px 0 rgba(0, 0, 0, 0.14),
+    14px 12px 0 rgba(0, 0, 0, 0.14);
+}
+
+.moment-title {
+  font-size: clamp(2.6rem, 11vw, 4.2rem);
+  line-height: 0.95;
+  font-weight: 900;
+  letter-spacing: -0.01em;
+  text-transform: uppercase;
+  animation: moment-pop 0.55s cubic-bezier(0.2, 1.6, 0.4, 1) both 0.3s;
+}
+
+.moment-sub {
+  font-size: 1rem;
+  font-weight: 700;
+  opacity: 0.92;
+}
+
+.moment-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.86rem;
+  font-weight: 600;
+  opacity: 0.92;
+  margin-top: 6px;
+}
+
+.moment-char {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(248, 244, 233, 0.14);
+  border: 1.5px solid rgba(248, 244, 233, 0.35);
+  border-radius: 999px;
+  padding: 5px 14px 5px 6px;
+  font-weight: 800;
+}
+
+.moment-hint {
+  margin-top: 14px;
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  opacity: 0.65;
+  animation: moment-blink 2.2s ease-in-out infinite;
+}
+
+@keyframes moment-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes moment-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes moment-fall {
+  from {
+    transform: translateY(-4vh) rotate(0deg);
+  }
+  to {
+    transform: translateY(104vh) rotate(320deg);
+  }
+}
+
+@keyframes moment-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes moment-drop {
+  0% {
+    opacity: 0;
+    transform: translateY(-70px) scale(0.6);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes moment-blink {
+  0%,
+  100% {
+    opacity: 0.65;
+  }
+  50% {
+    opacity: 0.25;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .moment-backdrop,
+  .moment-rays,
+  .moment-confetti,
+  .moment-ball,
+  .moment-title,
+  .moment-hint {
+    animation: none;
+  }
+}
+
 /* leaderboard block: today's board + course records */
 .board-block {
   display: flex;

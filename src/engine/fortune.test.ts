@@ -112,6 +112,35 @@ describe('destiny in the engine', () => {
     expect(layup.scores.some((s, i) => course.holes[i].par === 5 && s.strokes === 2)).toBe(false)
   })
 
+  it('a penalty-tainted go attempt neither fires nor spends the albatross destiny', () => {
+    // Hunt any course/seed where the FIRST par 5's tee shot takes a penalty
+    // (aggressive tee, courting the trouble) while the next par 5's tee
+    // stays clean — the destined albatross must SKIP the for-3 recovery on
+    // the first and fire on the next clean go instead. Deterministic: the
+    // scan order is fixed, so the same seed is found every run.
+    for (const course of COURSES) {
+      const par5s = course.holes.map((h, i) => ({ par: h.par, i })).filter((x) => x.par === 5).map((x) => x.i)
+      if (par5s.length < 2) continue
+      const [wetIdx, nextIdx] = [par5s[0], par5s[1]]
+      const policy = (h: number, shot: number): Choice =>
+        h === wetIdx && shot === 0 ? 'aggressive' : par5s.includes(h) && shot === 1 ? 'aggressive' : 'normal'
+      for (let i = 0; i < 60; i++) {
+        const seed = `practice:${course.slug}:albpen${i}:${encodeFortune(f({ alb: 500 }))}`
+        const { r } = probe(seed, policy)
+        if (!r.ok) throw new Error('replay failed')
+        const wetTee = r.scores[wetIdx].shots[0]
+        const dryTee = r.scores[nextIdx].shots[0]
+        if (!wetTee.penalty || dryTee.penalty) continue // keep hunting
+        // the first go was for 3 — no albatross possible, guarantee untouched
+        expect(r.scores[wetIdx].strokes).toBeGreaterThanOrEqual(3)
+        // …and it fires on the next CLEAN go instead of being silently spent
+        expect(r.scores[nextIdx].strokes).toBe(2)
+        return
+      }
+    }
+    throw new Error('no seed with a penalized first-par-5 tee and a clean next one')
+  })
+
   it('the client store and the referee agree on a destiny round', () => {
     // node env: stand in for the browser's localStorage
     const map = new Map<string, string>()

@@ -127,12 +127,16 @@ export function replayRound(seed: string, character: CharacterId | undefined, de
         if (aggressiveLeft <= 0) return { ok: false, error: `hole ${i + 1}: aggressive over budget` }
         aggressiveLeft -= 1
       }
-      // destiny: the round's first qualifying shot of a due track holes out
+      // destiny: the round's first qualifying shot of a due track holes out.
+      // An albatross attempt only qualifies while the shot is still FOR 2
+      // (h.strokes === 1): after a tee-shot penalty the "go" would finish as
+      // an eagle, so it neither fires nor spends the guarantee — the plan
+      // stays live for the next clean chance.
       let destiny: MomentKind | undefined
       if (plan.ace && spec.par === 3 && h.ball.lie === 'tee') {
         destiny = 'ace'
         plan.ace = false
-      } else if (plan.albatross && h.stage === 'second' && choice === 'aggressive') {
+      } else if (plan.albatross && h.stage === 'second' && choice === 'aggressive' && h.strokes === 1) {
         destiny = 'albatross'
         plan.albatross = false
       }

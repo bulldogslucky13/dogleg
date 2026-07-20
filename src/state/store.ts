@@ -598,10 +598,17 @@ function destinyFor(state: RoundState, h: HoleInPlay, choice: Choice): 'ace' | '
     const earlierPar3 = course.holes.slice(0, state.currentHole).some((hh) => hh.par === 3)
     if (!earlierPar3) return 'ace'
   }
-  if (plan.albatross && h.stage === 'second' && choice === 'aggressive') {
+  // an albatross attempt only qualifies while the shot is still FOR 2 —
+  // after a tee penalty the go would finish as an eagle, so it neither
+  // fires nor spends the guarantee (mirrors replayRound exactly)
+  if (plan.albatross && h.stage === 'second' && choice === 'aggressive' && h.strokes === 1) {
     const earlierGo = state.scores
       .slice(0, state.currentHole)
-      .some((sc) => sc?.shots.some((sh) => sh.stage === 'second' && sh.choice === 'aggressive'))
+      .some((sc) =>
+        sc?.shots.some(
+          (sh) => sh.stage === 'second' && sh.choice === 'aggressive' && sc.shots[0]?.strokesAfter === 1,
+        ),
+      )
     if (!earlierGo) return 'albatross'
   }
   return undefined

@@ -168,6 +168,8 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
     expect(screen.getByText(/tap to keep playing/)).toBeTruthy()
     fireEvent.click(screen.getByText('HOLE IN ONE'))
     expect(screen.queryByText('HOLE IN ONE')).toBeNull()
+    // the hole card behind it calls it what it is — not "Eagle"
+    expect(screen.getByText('Hole In One')).toBeTruthy()
   })
 
   it('toggles between modern and classic views mid-round', () => {

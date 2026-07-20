@@ -175,6 +175,37 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
     window.location.hash = ''
   })
 
+  it('a replay link opened while the app is mounted still enters the viewer (hashchange)', async () => {
+    const { newRound, applyChoice, advanceHole } = await import('./state/store')
+    const { practiceSetup } = await import('./engine/daily')
+    const { decisionsFromScores, encodeReplay } = await import('./engine/replay')
+    let s = newRound(practiceSetup('pebble-beach', 'smokehash'), 'practice', 'dart')
+    let guard = 0
+    while (!s.complete && guard++ < 500) {
+      if (s.hole?.stage === 'done') {
+        s = advanceHole(s)
+        continue
+      }
+      const next = applyChoice(s, 'normal')
+      s = next === s ? applyChoice(s, 'safe') : next
+    }
+    const code = encodeReplay({ seed: s.seed, character: 'dart', decisions: decisionsFromScores(s.scores)! })
+    localStorage.clear()
+    localStorage.setItem('dogleg:tutorial:v1', 'done')
+
+    // app is already sitting on the home screen when the hash arrives
+    render(<App />)
+    expect(screen.getByText('Tee off')).toBeTruthy()
+    act(() => {
+      window.location.hash = `#watch=${code}`
+      window.dispatchEvent(new HashChangeEvent('hashchange'))
+    })
+    expect(screen.getByText('‹ Exit replay')).toBeTruthy()
+    fireEvent.click(screen.getByText('‹ Exit replay'))
+    expect(screen.getByText('Tee off')).toBeTruthy()
+    window.location.hash = ''
+  })
+
   it('toggles between modern and classic views mid-round', () => {
     vi.useFakeTimers()
     render(<App />)

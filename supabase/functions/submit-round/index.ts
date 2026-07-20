@@ -3,11 +3,13 @@
 // Receives { seed, character, decisions, playerId?, playerSecret?, name? },
 // REPLAYS the round with the real game engine (bundled as engine.mjs by
 // `pnpm build:validator`), and writes the engine's score — never the client's
-// claim. Creates the player on first submission (clubhouse-name identity).
+// claim. Identities are normally minted anonymously up front (mint-player);
+// the first posted card claims a clubhouse name onto that same row. Legacy
+// clients with no identity at all still get one created here from a name.
 //
 // deno-lint-ignore-file no-explicit-any
 import { createClient } from 'npm:@supabase/supabase-js@2'
-import { replayRound } from './engine.mjs'
+import { dailySalt, replayRound } from './engine.mjs'
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -57,12 +59,45 @@ Deno.serve(async (req) => {
   const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
 
   // ---- identify or create the player ----
+  // Ordering rule for this block: verify everything — secret, then salt —
+  // BEFORE any write. A submission destined for rejection must not get to
+  // claim a clubhouse name or mint a player row as a side effect.
   let player: { id: string; name: string; secret?: string }
   if (playerId && playerSecret) {
     const { data } = await supabase.from('players').select('id, name, secret').eq('id', playerId).single()
     if (!data || data.secret !== playerSecret) return json(403, { error: 'unknown player' })
+
+    // ---- the salt must be the one THIS player is entitled to ----
+    // The salt reseeds every roll in the round, so a client free to choose it
+    // could replay one decision list under thousands of salts offline and post
+    // the luckiest card — a genuine replay the referee would happily certify.
+    // Exactly one salt is valid per player per day, and we derive it here
+    // rather than trusting the seed. An absent salt is still accepted: that is
+    // the single canonical daily seed with no freedom to grind — the fallback
+    // for clients that could not reach mint-player before teeing off.
+    if (info.mode === 'daily' && info.salt && info.salt !== dailySalt(data.id, info.dateKey!)) {
+      return json(422, { error: 'round rejected: seed is not yours' })
+    }
+
+    if (!data.name) {
+      // an anonymous minted identity posting its first card: the name is
+      // claimed onto THIS row, the one the round's dice were salted for
+      if (!name || !NAME_RE.test(name)) return json(400, { error: 'pick a clubhouse name (2-18 letters/numbers)' })
+      const { error } = await supabase.from('players').update({ name }).eq('id', data.id).is('name', null)
+      if (error) {
+        return json(error.code === '23505' ? 409 : 500, {
+          error: error.code === '23505' ? 'that name is taken' : 'could not claim that name',
+        })
+      }
+      data.name = name
+    }
     player = { id: data.id, name: data.name }
   } else {
+    // A salted seed can never belong to a player that doesn't exist yet: the
+    // salt derives from a server-minted id, and this row hasn't been minted.
+    // Rejected here, before the insert, so the doomed submission can't
+    // reserve a name on its way out.
+    if (info.mode === 'daily' && info.salt) return json(422, { error: 'round rejected: seed is not yours' })
     if (!name || !NAME_RE.test(name)) return json(400, { error: 'pick a clubhouse name (2-18 letters/numbers)' })
     const { data, error } = await supabase.from('players').insert({ name }).select('id, name, secret').single()
     if (error) {

@@ -1,6 +1,6 @@
 import { characterById } from './characters'
 import { COURSES } from './courses'
-import { rngFromString } from './rng'
+import { fnv1a, rngFromString } from './rng'
 import type { CharacterId, Conditions, CourseSpec, Greens, HoleResult } from './types'
 
 /** Daily No. 1 — set this to the real go-live date so launch day is Dogleg No. 1. */
@@ -63,6 +63,24 @@ export function dailyConditions(dateKey: string, course: CourseSpec): Conditions
 /** For practice the round seed itself is the conditions key. */
 export function practiceConditions(seed: string, course: CourseSpec): Conditions {
   return jitteredConditions(seed, course, 12, 3)
+}
+
+/**
+ * The per-player dice salt for a daily. Derived, never chosen: the salt
+ * changes every roll in the round, so a client free to pick one could replay
+ * the same decisions under thousands of salts offline and submit the luckiest
+ * card. Pinning it to the player's id means there is exactly one salt the
+ * referee will accept from you, which is the whole point.
+ *
+ * Keyed on the player *id*, not their secret. Round seeds travel in replay
+ * share links, so a salt derived from the secret would publish a function of
+ * an auth credential. The id is already public and works just as well — the
+ * unforgeability comes from the id being server-minted, not from hiding it.
+ */
+export function dailySalt(playerId: string, dateKey: string): string {
+  const a = fnv1a(`salt:${playerId}:${dateKey}`)
+  const b = fnv1a(`pepper:${dateKey}:${playerId}`)
+  return (a.toString(36) + b.toString(36)).slice(0, 12)
 }
 
 export function dailySetup(now = new Date()): DailySetup {

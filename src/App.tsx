@@ -24,6 +24,7 @@ import {
   type UiMode,
 } from './state/store'
 import { track } from './lib/analytics'
+import { ensureIdentity, loadIdentity } from './lib/leaderboard'
 import { CharacterAvatar } from './ui/Avatars'
 import { GreenView, HoleMap, useMapSize } from './ui/HoleMap'
 import { SideMap } from './ui/SideMap'
@@ -58,6 +59,12 @@ export default function App() {
   useEffect(() => {
     saveRound(round)
   }, [round])
+
+  // mint an anonymous player id early so the daily dice can be salted per
+  // player — long done by the time a human reaches the first tee
+  useEffect(() => {
+    ensureIdentity()
+  }, [])
 
   useEffect(
     () => () => {
@@ -126,7 +133,7 @@ export default function App() {
         setup={start.setup}
         practice={start.mode === 'practice'}
         onPick={(character: CharacterId) => {
-          const r = newRound(start.setup, start.mode, character)
+          const r = newRound(start.setup, start.mode, character, loadIdentity()?.id)
           track('round_started', { mode: start.mode, course: r.courseSlug, puzzle_number: r.puzzleNumber, character })
           setRound(r)
           setSelected(null)

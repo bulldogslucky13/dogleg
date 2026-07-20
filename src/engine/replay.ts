@@ -99,7 +99,8 @@ export function replayRound(seed: string, character: CharacterId | undefined, de
   if (!info) return { ok: false, error: 'invalid seed' }
   if (!Array.isArray(decisions) || decisions.length !== 18) return { ok: false, error: 'need 18 holes of decisions' }
 
-  const rng = rngFromString(seed)
+  // dice ignore the fortune tail — see roundRng in the store for why
+  const rng = rngFromString(splitFortune(seed).base)
   const scores: HoleScore[] = []
   let aggressiveLeft = AGGRESSIVE_BUDGET
   const plan = destinyPlan(info)

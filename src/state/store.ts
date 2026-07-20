@@ -4,7 +4,7 @@ import { startHole, playShot, type HoleInPlay } from '../engine/resolve'
 import { rngFromString, skip, type Rng } from '../engine/rng'
 import type { CharacterId, Choice, Conditions, HoleResult, HoleScore, Stage } from '../engine/types'
 import { courseBySlug } from '../engine/courses'
-import { EMPTY_FORTUNE, encodeFortune, type FortuneState } from '../engine/fortune'
+import { EMPTY_FORTUNE, encodeFortune, splitFortune, type FortuneState } from '../engine/fortune'
 import { destinyPlan, fortuneOddsFor, setupFromSeed } from '../engine/replay'
 import { track } from '../lib/analytics'
 
@@ -173,7 +173,11 @@ export function holeInPlay(state: RoundState): HoleInPlay {
 }
 
 function roundRng(state: RoundState): { rng: Rng; consumed: () => number } {
-  const base = rngFromString(state.seed)
+  // Dice are keyed on the seed WITHOUT the fortune tail. The tail is
+  // client-kept state; if it fed the rng, varying it would reroll the round —
+  // the exact grind the per-player salt exists to prevent. Stripped here and
+  // in replayRound identically, so the referee sees the same dice.
+  const base = rngFromString(splitFortune(state.seed).base)
   skip(base, state.rolls)
   let n = 0
   const rng: Rng = () => {
@@ -495,10 +499,25 @@ function saveStoredFortune(f: StoredFortune): void {
 export function fortuneFor(mode: 'daily' | 'practice'): FortuneState {
   const sf = loadStoredFortune()
   if (mode === 'daily') {
-    const streak = computeStreaks(loadHistory()).dayStreak
+    // The streak multiplier is only claimed by a NAMED identity: the referee
+    // bounds the claim against the player's posted dailies, and an anonymous
+    // player has nothing posted to check against — a claim would be rejected,
+    // not boosted. (They can't be on the board without a name anyway.)
+    const streak = hasNamedIdentity() ? computeStreaks(loadHistory()).dayStreak : 0
     return { ...EMPTY_FORTUNE, ace: sf.d.ace, alb: sf.d.alb, streak }
   }
   return { ace: sf.p.ace, aceK: sf.p.aceK, alb: sf.p.alb, albK: sf.p.albK, streak: 0 }
+}
+
+/** Read the clubhouse identity's name directly (key owned by lib/leaderboard)
+ * — a value import from there would cycle back into this module. */
+function hasNamedIdentity(): boolean {
+  try {
+    const raw = localStorage.getItem('dogleg:player:v1')
+    return raw ? !!(JSON.parse(raw) as { name?: string | null }).name : false
+  } catch {
+    return false
+  }
 }
 
 /** Mirror of replayRound's destiny rule: the round's FIRST qualifying shot

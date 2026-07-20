@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { COURSES } from './courses'
-import { practiceSetup } from './daily'
+import { localDateKey, practiceSetup } from './daily'
 import {
   FORTUNE_CONFIG,
   destinyDue,
@@ -154,5 +154,62 @@ describe('destiny in the engine', () => {
   it('pre-fortune seeds still parse and play (no fortune tail)', () => {
     const info = setupFromSeed('practice:pebble-beach:legacy')!
     expect(info.fortune).toBeNull()
+  })
+
+  it('the fortune tail cannot reroll the dice — counters that leave the odds alone leave the round alone', () => {
+    // The grind this closes: the tail is client-kept, so if it seeded the
+    // rng, replaying one decision list under many tails would deal many
+    // hands. Dice are keyed on the stripped seed; a practice ace counter
+    // below its threshold moves neither the odds nor (now) the dice, so the
+    // rounds must be IDENTICAL.
+    const a = `practice:pebble-beach:grindcheck:${encodeFortune(f({ ace: 10 }))}`
+    const b = `practice:pebble-beach:grindcheck:${encodeFortune(f({ ace: 400 }))}`
+    const decisions: Choice[][] = Array(18)
+      .fill(null)
+      .map(() => ['normal'])
+    for (let guard = 0; guard < 300; guard++) {
+      const ra = replayRound(a, undefined, decisions)
+      const rb = replayRound(b, undefined, decisions)
+      expect(rb.ok).toBe(ra.ok)
+      if (ra.ok && rb.ok) {
+        expect(rb.results).toEqual(ra.results)
+        expect(rb.toPar).toBe(ra.toPar)
+        return
+      }
+      if (!ra.ok) {
+        const m = /hole (\d+): round left unfinished/.exec(ra.error)
+        if (!m) throw new Error(`unexpected: ${ra.error}`)
+        decisions[Number(m[1]) - 1].push('normal')
+      }
+    }
+    throw new Error('probe never finished')
+  })
+
+  it('only a named identity claims the daily streak multiplier', async () => {
+    const map = new Map<string, string>()
+    vi.stubGlobal('localStorage', {
+      get length() {
+        return map.size
+      },
+      clear: () => map.clear(),
+      getItem: (k: string) => map.get(k) ?? null,
+      key: (i: number) => [...map.keys()][i] ?? null,
+      removeItem: (k: string) => void map.delete(k),
+      setItem: (k: string, v: string) => void map.set(k, v),
+    } as Storage)
+    const { fortuneFor } = await import('../state/store')
+    // a played-today history gives a real local streak…
+    localStorage.setItem(
+      'dogleg:history:v1',
+      JSON.stringify([{ dateKey: localDateKey(), puzzleNumber: 1, courseSlug: 'pebble-beach', toPar: 0, results: [] }]),
+    )
+    // …but an anonymous identity must not bake it into the seed: the referee
+    // bounds streak claims by POSTED dailies, and anonymous players have none
+    expect(fortuneFor('daily').streak).toBe(0)
+    localStorage.setItem('dogleg:player:v1', JSON.stringify({ id: 'x', secret: 'y', name: null }))
+    expect(fortuneFor('daily').streak).toBe(0)
+    localStorage.setItem('dogleg:player:v1', JSON.stringify({ id: 'x', secret: 'y', name: 'Cam' }))
+    expect(fortuneFor('daily').streak).toBe(1)
+    vi.unstubAllGlobals()
   })
 })

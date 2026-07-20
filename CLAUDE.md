@@ -35,8 +35,9 @@ managed in the dashboard, so they aren't in version control.
 
 **Fortune** (`src/engine/fortune.ts`): ace/albatross odds + the destiny
 guarantee. Counters ride as a seed tail (`:f…`), so the referee and replay
-links resolve identical luck; conditions always derive from the seed WITHOUT
-the tail. Destiny (forced holeout at the guarantee threshold) is deliberately
+links resolve identical luck; conditions AND dice always derive from the seed
+WITHOUT the tail (the tail is client-kept — dice it could vary would be dice
+you could grind). Destiny (forced holeout at the guarantee threshold) is deliberately
 resolved OUTSIDE the displayed odds — the game's one sanctioned exception to
 "the odds never lie", chosen for surprise. Don't add more exceptions.
 

@@ -79,18 +79,29 @@ Deno.serve(async (req) => {
       return json(422, { error: 'round rejected: seed is not yours' })
     }
 
-    // ---- fortune sanity: a daily claiming a destiny-due counter must have a
-    // posting history that makes it credible (grace: 40% of the guarantee).
-    // The counter itself is client-kept — this stops a fresh account from
-    // faking its way to a guaranteed ace on the board. ----
+    // ---- fortune sanity: the tail is client-kept, so every knob it offers
+    // must be bounded by server-visible history. Dice already ignore the
+    // tail entirely (replayRound strips it before seeding the rng), which
+    // leaves exactly two knobs a daily tail can turn: the streak multiplier
+    // and the destiny guarantee. Both are checked against posted dailies. ----
     if (info.mode === 'daily' && info.fortune) {
       const g = FORTUNE_CONFIG.daily.guaranteeAt
-      if (info.fortune.ace >= g || info.fortune.alb >= g) {
+      const claimsStreak = info.fortune.streak > 0
+      const claimsDestiny = info.fortune.ace >= g || info.fortune.alb >= g
+      if (claimsStreak || claimsDestiny) {
         const { count } = await supabase
           .from('daily_scores')
           .select('*', { count: 'exact', head: true })
           .eq('player_id', data.id)
-        if ((count ?? 0) < Math.floor(g * 0.4)) {
+        const posted = count ?? 0
+        // a streak can't exceed the days actually posted (small grace for
+        // the odd submission that failed)
+        if (info.fortune.streak > posted + 3) {
+          return json(422, { error: 'streak is not credible for this player yet' })
+        }
+        // destiny needs a posting history that makes the counter believable
+        // (grace: 40% of the guarantee)
+        if (claimsDestiny && posted < Math.floor(g * 0.4)) {
           return json(422, { error: 'destiny counter is not credible for this player yet' })
         }
       }
@@ -115,13 +126,13 @@ Deno.serve(async (req) => {
     // Rejected here, before the insert, so the doomed submission can't
     // reserve a name on its way out.
     if (info.mode === 'daily' && info.salt) return json(422, { error: 'round rejected: seed is not yours' })
-    // a brand-new player row has zero posted dailies, so a destiny-due daily
-    // can never be credible here — rejected BEFORE the insert, same ordering
-    // rule as the salt check above
+    // a brand-new player row has zero posted dailies, so neither a streak
+    // multiplier nor a destiny-due counter can ever be credible here —
+    // rejected BEFORE the insert, same ordering rule as the salt check above
     if (info.mode === 'daily' && info.fortune) {
       const g = FORTUNE_CONFIG.daily.guaranteeAt
-      if (info.fortune.ace >= g || info.fortune.alb >= g) {
-        return json(422, { error: 'destiny counter is not credible for this player yet' })
+      if (info.fortune.streak > 3 || info.fortune.ace >= g || info.fortune.alb >= g) {
+        return json(422, { error: 'fortune counters are not credible for this player yet' })
       }
     }
     if (!name || !NAME_RE.test(name)) return json(400, { error: 'pick a clubhouse name (2-18 letters/numbers)' })

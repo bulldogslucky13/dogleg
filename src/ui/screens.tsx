@@ -20,6 +20,7 @@ export function HomeScreen(props: {
   onPractice: (slug: string) => void
   onShowResult: () => void
   onHowToPlay: () => void
+  onHistorySynced?: (h: HistoryEntry[]) => void
 }) {
   const setup = dailySetup()
   const streaks = computeStreaks(props.history)
@@ -140,7 +141,7 @@ export function HomeScreen(props: {
           <p className="fine">Practice rounds don't touch your streak.</p>
         </div>
       )}
-      <AccountPanel />
+      <AccountPanel onHistorySynced={props.onHistorySynced} />
     </div>
   )
 }

@@ -5,8 +5,10 @@ import type { HoleResult, HoleScore } from '../engine/types'
 import {
   buildRecap,
   characterRecords,
+  computeStreaks,
   loadHistory,
   loadRound,
+  mergeHistory,
   migrateLegacyStorage,
   type HistoryEntry,
   type RoundState,
@@ -160,6 +162,54 @@ describe('legacy bp: → dogleg: storage migration', () => {
     )
     expect(loadRound()?.seed).toBe('s')
     expect(loadHistory()).toHaveLength(1)
+  })
+})
+
+describe('mergeHistory (cross-device history sync)', () => {
+  const fakeStorage = (seed: Record<string, string> = {}): Storage => {
+    const map = new Map(Object.entries(seed))
+    return {
+      get length() {
+        return map.size
+      },
+      clear: () => map.clear(),
+      getItem: (k: string) => map.get(k) ?? null,
+      key: (i: number) => [...map.keys()][i] ?? null,
+      removeItem: (k: string) => void map.delete(k),
+      setItem: (k: string, v: string) => void map.set(k, v),
+    }
+  }
+
+  afterEach(() => vi.unstubAllGlobals())
+
+  it('unions server rounds into local history by day, local winning ties, and persists sorted', () => {
+    const local = [entry({ dateKey: '2026-07-02', toPar: 2 })]
+    const storage = fakeStorage({ 'dogleg:history:v1': JSON.stringify(local) })
+    vi.stubGlobal('localStorage', storage)
+    const remote = [
+      entry({ dateKey: '2026-07-01', toPar: -1, character: 'dart' }),
+      entry({ dateKey: '2026-07-02', toPar: 9 }), // same day, different device copy — local wins
+      entry({ dateKey: '2026-07-03', toPar: 1 }),
+    ]
+    const merged = mergeHistory(remote)
+    expect(merged.map((e) => [e.dateKey, e.toPar])).toEqual([
+      ['2026-07-01', -1],
+      ['2026-07-02', 2],
+      ['2026-07-03', 1],
+    ])
+    // persisted, so streaks/records read the same merged view after reload
+    expect(loadHistory()).toEqual(merged)
+    // the synced days bridge into a streak on this device
+    expect(computeStreaks(merged).bestStreak).toBe(3)
+  })
+
+  it('is a no-op when the server has nothing this device lacks', () => {
+    const local = [entry({ dateKey: '2026-07-01' }), entry({ dateKey: '2026-07-02' })]
+    const raw = JSON.stringify(local)
+    const storage = fakeStorage({ 'dogleg:history:v1': raw })
+    vi.stubGlobal('localStorage', storage)
+    expect(mergeHistory([entry({ dateKey: '2026-07-02', toPar: 9 })])).toEqual(local)
+    expect(storage.getItem('dogleg:history:v1')).toBe(raw)
   })
 })
 

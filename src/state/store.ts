@@ -269,6 +269,23 @@ export function loadRound(): RoundState | null {
   }
 }
 
+/** Union server-fetched rounds into local history by day (local wins ties —
+ * the device that played the round holds the authoritative entry). Persists
+ * and returns the merged list so streaks/records pick the new days up. */
+export function mergeHistory(remote: HistoryEntry[]): HistoryEntry[] {
+  const local = loadHistory()
+  const have = new Set(local.map((e) => e.dateKey))
+  const fresh = remote.filter((e) => !have.has(e.dateKey))
+  if (!fresh.length) return local
+  const merged = [...local, ...fresh].sort((a, b) => a.dateKey.localeCompare(b.dateKey))
+  try {
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(merged))
+  } catch {
+    /* private mode */
+  }
+  return merged
+}
+
 export function loadHistory(): HistoryEntry[] {
   migrateLegacyStorage()
   try {

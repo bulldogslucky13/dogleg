@@ -108,6 +108,7 @@ export default function App() {
               : null
           }
           playedToday={playedToday}
+          onHistorySynced={setHistory}
           onTeeOff={() => {
             setPending({ mode: 'daily', setup: dailySetup() })
             setView('pick')

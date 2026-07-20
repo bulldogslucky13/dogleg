@@ -190,6 +190,17 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
       s = next === s ? applyChoice(s, 'safe') : next
     }
     const code = encodeReplay({ seed: s.seed, character: 'dart', decisions: decisionsFromScores(s.scores)! })
+    let s2 = newRound(practiceSetup('st-andrews-old', 'smokehash2'), 'practice', 'greens')
+    guard = 0
+    while (!s2.complete && guard++ < 500) {
+      if (s2.hole?.stage === 'done') {
+        s2 = advanceHole(s2)
+        continue
+      }
+      const next = applyChoice(s2, 'normal')
+      s2 = next === s2 ? applyChoice(s2, 'safe') : next
+    }
+    const code2 = encodeReplay({ seed: s2.seed, character: 'greens', decisions: decisionsFromScores(s2.scores)! })
     localStorage.clear()
     localStorage.setItem('dogleg:tutorial:v1', 'done')
 
@@ -201,7 +212,27 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
       window.dispatchEvent(new HashChangeEvent('hashchange'))
     })
     expect(screen.getByText('‹ Exit replay')).toBeTruthy()
+
+    // a SECOND link while deep in this one restarts cleanly at frame 0 —
+    // the index from the long replay must not read past a shorter one
+    fireEvent.click(screen.getByLabelText('Jump to hole 14'))
+    expect(screen.getByText('Hole 14 of 18')).toBeTruthy()
+    act(() => {
+      window.location.hash = `#watch=${code2}`
+      window.dispatchEvent(new HashChangeEvent('hashchange'))
+    })
+    expect(screen.getByText('Hole 1 of 18')).toBeTruthy()
+
     fireEvent.click(screen.getByText('‹ Exit replay'))
+    expect(screen.getByText('Tee off')).toBeTruthy()
+    window.location.hash = ''
+  })
+
+  it('a truncated replay link shows the friendly error, not the home screen', () => {
+    window.location.hash = '#watch=not-a-real-code'
+    render(<App />)
+    expect(screen.getByText(/That replay link doesn't parse/)).toBeTruthy()
+    fireEvent.click(screen.getByText('Clubhouse'))
     expect(screen.getByText('Tee off')).toBeTruthy()
     window.location.hash = ''
   })

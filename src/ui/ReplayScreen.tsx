@@ -22,6 +22,16 @@ export function ReplayScreen(props: { payload: ReplayPayload; onExit: () => void
   const [mapRef, mapSize] = useMapSize()
 
   const last = frames ? frames.length - 1 : 0
+
+  // A second #watch= link can arrive while this screen is mounted — restart
+  // from the new round's first frame. The effect lands after render, so the
+  // render below also CLAMPS the index: a shorter replay must never read
+  // past its last frame on that first pass.
+  useEffect(() => {
+    setI(0)
+    setPlaying(true)
+  }, [payload])
+
   useEffect(() => {
     if (!playing || !frames) return
     timer.current = window.setTimeout(() => {
@@ -49,12 +59,13 @@ export function ReplayScreen(props: { payload: ReplayPayload; onExit: () => void
     )
   }
 
-  const f = frames[i]
+  const idx = Math.min(i, last)
+  const f = frames[idx]
   const hole = f.hole
   const spec = hole.layout.spec
   const char = characterById(payload.character)
   const holeToPar = f.runningToPar + (hole.score ? hole.score.strokes - spec.par : 0)
-  const done = i >= last
+  const done = idx >= last
   const lastShot = hole.shots.length > 0 ? hole.shots[hole.shots.length - 1] : null
   // first frame index of every hole, for the jump strip
   const holeStarts: number[] = []
@@ -133,13 +144,13 @@ export function ReplayScreen(props: { payload: ReplayPayload; onExit: () => void
       </div>
 
       <div className="replay-controls">
-        <button className="cta ghost slim" onClick={() => setI((v) => Math.max(0, v - 1))} disabled={i === 0}>
+        <button className="cta ghost slim" onClick={() => setI(Math.max(0, idx - 1))} disabled={idx === 0}>
           ‹ Back
         </button>
         <button className="cta slim" onClick={() => (done ? (setI(0), setPlaying(true)) : setPlaying((p) => !p))}>
           {done ? '↻ Watch again' : playing ? '❚❚ Pause' : '▶ Play'}
         </button>
-        <button className="cta ghost slim" onClick={() => setI((v) => Math.min(last, v + 1))} disabled={done}>
+        <button className="cta ghost slim" onClick={() => setI(Math.min(last, idx + 1))} disabled={done}>
           Next ›
         </button>
       </div>
@@ -163,7 +174,7 @@ export function ReplayScreen(props: { payload: ReplayPayload; onExit: () => void
           type="range"
           min={0}
           max={last}
-          value={i}
+          value={idx}
           onChange={(e) => {
             setPlaying(false)
             setI(Number(e.target.value))

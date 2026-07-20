@@ -286,6 +286,14 @@ export function mergeHistory(remote: HistoryEntry[]): HistoryEntry[] {
   return merged
 }
 
+/** True when an unfinished daily on this device is for a day the (synced)
+ * history already shows as completed — e.g. the round was played to the end
+ * on another device. Such a round is stale: resuming it would let the player
+ * replay a day the account has already posted. */
+export function supersededDaily(round: RoundState | null, history: HistoryEntry[]): boolean {
+  return !!round && !round.complete && round.mode === 'daily' && history.some((e) => e.dateKey === round.dateKey)
+}
+
 export function loadHistory(): HistoryEntry[] {
   migrateLegacyStorage()
   try {

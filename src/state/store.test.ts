@@ -10,6 +10,7 @@ import {
   loadRound,
   mergeHistory,
   migrateLegacyStorage,
+  supersededDaily,
   type HistoryEntry,
   type RoundState,
 } from './store'
@@ -210,6 +211,36 @@ describe('mergeHistory (cross-device history sync)', () => {
     vi.stubGlobal('localStorage', storage)
     expect(mergeHistory([entry({ dateKey: '2026-07-02', toPar: 9 })])).toEqual(local)
     expect(storage.getItem('dogleg:history:v1')).toBe(raw)
+  })
+})
+
+describe('supersededDaily (stale unfinished daily after a history sync)', () => {
+  const round = (over: Partial<RoundState>): RoundState => ({
+    mode: 'daily',
+    seed: 's',
+    courseSlug: COURSES[0].slug,
+    cond: { wind: 10, greens: 'Medium', difficulty: 5 },
+    puzzleNumber: 1,
+    dateKey: '2026-07-20',
+    currentHole: 4,
+    scores: Array(18).fill(null),
+    aggressiveLeft: 8,
+    rolls: 9,
+    complete: false,
+    hole: null,
+    ...over,
+  })
+
+  it('flags an unfinished daily whose day the synced history already completed', () => {
+    expect(supersededDaily(round({}), [entry({ dateKey: '2026-07-20' })])).toBe(true)
+  })
+
+  it('leaves everything else alone', () => {
+    const today = [entry({ dateKey: '2026-07-20' })]
+    expect(supersededDaily(null, today)).toBe(false)
+    expect(supersededDaily(round({ mode: 'practice' }), today)).toBe(false)
+    expect(supersededDaily(round({ complete: true }), today)).toBe(false)
+    expect(supersededDaily(round({}), [entry({ dateKey: '2026-07-19' })])).toBe(false)
   })
 })
 

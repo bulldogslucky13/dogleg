@@ -9,7 +9,7 @@
 //
 // deno-lint-ignore-file no-explicit-any
 import { createClient } from 'npm:@supabase/supabase-js@2'
-import { FORTUNE_CONFIG, dailySalt, replayRound } from './engine.mjs'
+import { FORTUNE_CONFIG, dailySalt, destinyDue, replayRound } from './engine.mjs'
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -21,6 +21,13 @@ const json = (status: number, body: unknown) =>
   new Response(JSON.stringify(body), { status, headers: { ...CORS, 'content-type': 'application/json' } })
 
 const NAME_RE = /^[\p{L}\p{N}][\p{L}\p{N} .'_-]{1,17}$/u
+
+/** The calendar day before a YYYY-MM-DD key (pure date math, no timezone). */
+function dayBefore(key: string): string {
+  const [y, m, d] = key.split('-').map(Number)
+  const t = new Date(Date.UTC(y, m - 1, d) - 86_400_000)
+  return `${t.getUTCFullYear()}-${`${t.getUTCMonth() + 1}`.padStart(2, '0')}-${`${t.getUTCDate()}`.padStart(2, '0')}`
+}
 
 function utcDateKey(offsetDays: number): string {
   const d = new Date(Date.now() + offsetDays * 86_400_000)
@@ -56,6 +63,20 @@ Deno.serve(async (req) => {
     if (!allowed.includes(info.dateKey!)) return json(422, { error: 'daily is not for today' })
   }
 
+  // ---- a destined practice round cannot contend for course records ----
+  // Practice fortune counters have no server-visible history AT ALL, so a
+  // destiny-due tail is unverifiable — anyone could forge `:f500.…` and post
+  // a forced ace as a record. And even a legitimately destined round is a
+  // gift, not a record-worthy score. Practice records only accept rounds
+  // whose tail is below every destiny threshold; the round itself still
+  // played fine on the client, it just doesn't claim the CR.
+  if (info.mode === 'practice' && info.fortune) {
+    const due = destinyDue('practice', info.fortune)
+    if (due.ace || due.albatross) {
+      return json(422, { error: 'destined rounds do not contend for course records' })
+    }
+  }
+
   const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
 
   // ---- identify or create the player ----
@@ -86,22 +107,29 @@ Deno.serve(async (req) => {
     // and the destiny guarantee. Both are checked against posted dailies. ----
     if (info.mode === 'daily' && info.fortune) {
       const g = FORTUNE_CONFIG.daily.guaranteeAt
-      const claimsStreak = info.fortune.streak > 0
+      const claimsStreak = info.fortune.streak > 1
       const claimsDestiny = info.fortune.ace >= g || info.fortune.alb >= g
       if (claimsStreak || claimsDestiny) {
-        const { count } = await supabase
+        const { data: rows } = await supabase
           .from('daily_scores')
-          .select('*', { count: 'exact', head: true })
+          .select('date_key')
           .eq('player_id', data.id)
-        const posted = count ?? 0
-        // a streak can't exceed the days actually posted (small grace for
-        // the odd submission that failed)
-        if (info.fortune.streak > posted + 3) {
+          .order('date_key', { ascending: false })
+          .limit(400)
+        const postedKeys = new Set((rows ?? []).map((r: { date_key: string }) => r.date_key))
+        // a streak is CONSECUTIVE posted days, not a lifetime count: walk
+        // back from the day before this submission. The claim may be at most
+        // that run + today (+3 grace for the odd submission that failed) —
+        // scattered old cards can't add up to a loyalty multiplier.
+        let run = 0
+        let cursor = info.dateKey!
+        while (postedKeys.has((cursor = dayBefore(cursor)))) run++
+        if (info.fortune.streak > run + 1 + 3) {
           return json(422, { error: 'streak is not credible for this player yet' })
         }
         // destiny needs a posting history that makes the counter believable
         // (grace: 40% of the guarantee)
-        if (claimsDestiny && posted < Math.floor(g * 0.4)) {
+        if (claimsDestiny && postedKeys.size < Math.floor(g * 0.4)) {
           return json(422, { error: 'destiny counter is not credible for this player yet' })
         }
       }
@@ -128,10 +156,11 @@ Deno.serve(async (req) => {
     if (info.mode === 'daily' && info.salt) return json(422, { error: 'round rejected: seed is not yours' })
     // a brand-new player row has zero posted dailies, so neither a streak
     // multiplier nor a destiny-due counter can ever be credible here —
-    // rejected BEFORE the insert, same ordering rule as the salt check above
+    // rejected BEFORE the insert, same ordering rule as the salt check above.
+    // (Streak bound = the named branch's formula with run 0: 0 + 1 + 3.)
     if (info.mode === 'daily' && info.fortune) {
       const g = FORTUNE_CONFIG.daily.guaranteeAt
-      if (info.fortune.streak > 3 || info.fortune.ace >= g || info.fortune.alb >= g) {
+      if (info.fortune.streak > 4 || info.fortune.ace >= g || info.fortune.alb >= g) {
         return json(422, { error: 'fortune counters are not credible for this player yet' })
       }
     }

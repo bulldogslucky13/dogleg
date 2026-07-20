@@ -499,11 +499,12 @@ function saveStoredFortune(f: StoredFortune): void {
 export function fortuneFor(mode: 'daily' | 'practice'): FortuneState {
   const sf = loadStoredFortune()
   if (mode === 'daily') {
-    // The streak multiplier is only claimed by a NAMED identity: the referee
-    // bounds the claim against the player's posted dailies, and an anonymous
-    // player has nothing posted to check against — a claim would be rejected,
-    // not boosted. (They can't be on the board without a name anyway.)
-    const streak = hasNamedIdentity() ? computeStreaks(loadHistory()).dayStreak : 0
+    // The streak multiplier is only claimed by a NAMED identity, and only
+    // from dailies this device actually POSTED: the referee verifies the
+    // claim against the consecutive run in its daily_scores table, so a
+    // streak built from local-only rounds (anonymous days, offline days)
+    // would be rejected, not boosted. Board loyalty is what's rewarded.
+    const streak = hasNamedIdentity() ? postedStreak() : 0
     return { ...EMPTY_FORTUNE, ace: sf.d.ace, alb: sf.d.alb, streak }
   }
   return { ace: sf.p.ace, aceK: sf.p.aceK, alb: sf.p.alb, albK: sf.p.albK, streak: 0 }
@@ -517,6 +518,26 @@ function hasNamedIdentity(): boolean {
     return raw ? !!(JSON.parse(raw) as { name?: string | null }).name : false
   } catch {
     return false
+  }
+}
+
+/** Streak as the referee can verify it: consecutive POSTED dailies ending
+ * yesterday, plus today's round (the one this claim is being baked into).
+ * The posted set is written by lib/leaderboard on successful submission. */
+function postedStreak(): number {
+  try {
+    const raw = localStorage.getItem('dogleg:posted:v1')
+    const keys = new Set(raw ? (JSON.parse(raw) as string[]) : [])
+    let run = 0
+    let cursor = parseKey(localDateKey())
+    for (;;) {
+      cursor.setDate(cursor.getDate() - 1)
+      if (!keys.has(localDateKey(cursor))) break
+      run++
+    }
+    return run + 1
+  } catch {
+    return 0
   }
 }
 

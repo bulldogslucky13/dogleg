@@ -10,7 +10,7 @@ import type { CharacterId, Choice, Conditions, CourseSpec, HoleResult, HoleScore
 // derives the expected salt with the exact same code the client seeds with.
 export { dailySalt } from './daily'
 // re-exported for the server bundle's fortune verification
-export { FORTUNE_CONFIG } from './fortune'
+export { FORTUNE_CONFIG, destinyDue } from './fortune'
 
 /**
  * Deterministic round replay — the backbone of leaderboard score validation.

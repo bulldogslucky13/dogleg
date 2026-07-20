@@ -198,18 +198,24 @@ describe('destiny in the engine', () => {
       setItem: (k: string, v: string) => void map.set(k, v),
     } as Storage)
     const { fortuneFor } = await import('../state/store')
-    // a played-today history gives a real local streak…
-    localStorage.setItem(
-      'dogleg:history:v1',
-      JSON.stringify([{ dateKey: localDateKey(), puzzleNumber: 1, courseSlug: 'pebble-beach', toPar: 0, results: [] }]),
-    )
-    // …but an anonymous identity must not bake it into the seed: the referee
-    // bounds streak claims by POSTED dailies, and anonymous players have none
-    expect(fortuneFor('daily').streak).toBe(0)
+    const day = (offset: number) => {
+      const d = new Date()
+      d.setDate(d.getDate() + offset)
+      return localDateKey(d)
+    }
+    // the claim is derived from POSTED dailies (what the referee can verify),
+    // never from local-only history — and never for an anonymous identity
+    localStorage.setItem('dogleg:posted:v1', JSON.stringify([day(-1), day(-2)]))
+    expect(fortuneFor('daily').streak).toBe(0) // no identity at all
     localStorage.setItem('dogleg:player:v1', JSON.stringify({ id: 'x', secret: 'y', name: null }))
-    expect(fortuneFor('daily').streak).toBe(0)
+    expect(fortuneFor('daily').streak).toBe(0) // anonymous: nothing posted under a name
     localStorage.setItem('dogleg:player:v1', JSON.stringify({ id: 'x', secret: 'y', name: 'Cam' }))
-    expect(fortuneFor('daily').streak).toBe(1)
+    expect(fortuneFor('daily').streak).toBe(3) // yesterday + the day before + today
+    // a gap breaks the run: consecutive days, not a lifetime count
+    localStorage.setItem('dogleg:posted:v1', JSON.stringify([day(-3), day(-10)]))
+    expect(fortuneFor('daily').streak).toBe(1) // just today
+    localStorage.removeItem('dogleg:posted:v1')
+    expect(fortuneFor('daily').streak).toBe(1) // first-ever post still counts itself
     vi.unstubAllGlobals()
   })
 })

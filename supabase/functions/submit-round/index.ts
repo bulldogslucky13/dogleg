@@ -7,7 +7,7 @@
 //
 // deno-lint-ignore-file no-explicit-any
 import { createClient } from 'npm:@supabase/supabase-js@2'
-import { replayRound } from './engine.mjs'
+import { dailySalt, replayRound } from './engine.mjs'
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -71,6 +71,20 @@ Deno.serve(async (req) => {
       })
     }
     player = { id: data.id, name: data.name, secret: data.secret }
+  }
+
+  // ---- the salt must be the one THIS player is entitled to ----
+  // The salt reseeds every roll in the round, so a client free to choose it
+  // could replay one decision list under thousands of salts offline and post
+  // the luckiest card — a genuine replay the referee would happily certify.
+  // Exactly one salt is valid per player per day, and we derive it here
+  // rather than trusting the seed. An absent salt is fine: that is the single
+  // canonical daily seed with no freedom to grind, which is what players
+  // without an identity (and rounds started before they claimed a name) play.
+  if (info.mode === 'daily' && info.salt) {
+    if (info.salt !== dailySalt(player.id, info.dateKey!)) {
+      return json(422, { error: 'round rejected: seed is not yours' })
+    }
   }
 
   // ---- write the validated score ----

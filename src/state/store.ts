@@ -1,5 +1,5 @@
 import { buildLayout } from '../engine/layout'
-import { practiceSetup, localDateKey, type DailySetup } from '../engine/daily'
+import { dailySalt, practiceSetup, localDateKey, type DailySetup } from '../engine/daily'
 import { startHole, playShot, type HoleInPlay } from '../engine/resolve'
 import { rngFromString, skip, type Rng } from '../engine/rng'
 import type { CharacterId, Choice, Conditions, HoleResult, HoleScore, Stage } from '../engine/types'
@@ -100,17 +100,28 @@ export type UiMode = 'modern' | 'classic'
 
 // ---------------------------------------------------------------------------
 
-export function newRound(setup: DailySetup, mode: 'daily' | 'practice', character?: CharacterId): RoundState {
+export function newRound(
+  setup: DailySetup,
+  mode: 'daily' | 'practice',
+  character?: CharacterId,
+  playerId?: string,
+): RoundState {
   const course = setup.course
   const layout = buildLayout(course.slug, course.holes[0])
   const hole = startHole(layout, setup.cond, character)
   // Daily seeds get a per-player salt: same course, same conditions for
   // everyone, but your OWN dice — so watching someone's replay can't be
   // copied shot-for-shot into your daily. (Practice seeds are unique already.)
-  const salt = Math.random().toString(36).slice(2, 10)
+  //
+  // Derived from the player id, never random: the referee recomputes it and
+  // rejects anything else, so there is exactly one salt you can play under.
+  // A random salt would have let anyone grind offline for a lucky round.
+  // Players with no identity yet play the unsalted daily — one canonical
+  // seed, no freedom to grind, exactly as it was before salts existed.
+  const salt = mode === 'daily' && playerId ? dailySalt(playerId, setup.dateKey) : null
   return {
     mode,
-    seed: mode === 'daily' ? `${setup.seed}:${salt}` : setup.seed,
+    seed: salt ? `${setup.seed}:${salt}` : setup.seed,
     courseSlug: course.slug,
     cond: setup.cond,
     character,

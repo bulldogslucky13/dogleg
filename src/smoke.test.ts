@@ -15,6 +15,7 @@ import { track } from './lib/analytics'
 import { CHARACTERS } from './engine/characters'
 import { COURSES, courseBySlug } from './engine/courses'
 import { dailySetup, practiceSetup, shareText, type DailySetup } from './engine/daily'
+import { setupFromSeed } from './engine/replay'
 import type { Choice } from './engine/types'
 import {
   AGGRESSIVE_BUDGET,
@@ -131,12 +132,25 @@ describe('smoke: the daily is valid and deterministic for every course in rotati
 
   it('two players get their own dice on the same daily (replays are not copyable)', () => {
     const setup = dailySetup(new Date(2026, 6, 25))
-    const a = playRound(newRound(setup, 'daily', 'dart'), aggressivePolicy)
-    const b = playRound(newRound(setup, 'daily', 'dart'), aggressivePolicy)
-    // identical strategy, independent luck — the salted seeds differ
+    // Dice are per *identity*, not per round: the salt is derived from the
+    // player id so the referee can recompute it. Two identities, one strategy.
+    const a = playRound(newRound(setup, 'daily', 'dart', 'player-aaa'), aggressivePolicy)
+    const b = playRound(newRound(setup, 'daily', 'dart', 'player-bbb'), aggressivePolicy)
     expect(a.seed).not.toBe(b.seed)
     const sameOutcome = JSON.stringify(a.scores) === JSON.stringify(b.scores)
     expect(sameOutcome).toBe(false)
+  })
+
+  it('the same player gets the same daily dice twice — no rerolling by replaying', () => {
+    const setup = dailySetup(new Date(2026, 6, 25))
+    // Salts are derived, not drawn. Restarting the daily must not deal a new
+    // hand, or a player could reroll until the round went their way.
+    expect(newRound(setup, 'daily', 'dart', 'player-aaa').seed).toBe(
+      newRound(setup, 'daily', 'dart', 'player-aaa').seed,
+    )
+    // and a player with no identity yet plays the one canonical daily seed —
+    // checked via the parser so a growing seed format doesn't fake a pass
+    expect(setupFromSeed(newRound(setup, 'daily', 'dart').seed)!.salt).toBeUndefined()
   })
 })
 

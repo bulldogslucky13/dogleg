@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { advanceHole, applyChoice, newRound, roundToPar } from '../state/store'
 import { CHARACTERS } from './characters'
 import { COURSES } from './courses'
-import { dailySetup, practiceSetup } from './daily'
+import { dailySalt, dailySetup, practiceSetup } from './daily'
 import { decisionsFromScores, replayRound, setupFromSeed } from './replay'
 import type { CharacterId, Choice } from './types'
 
@@ -96,6 +96,43 @@ describe('replayRound is a perfect mirror of the client store', () => {
     const allAgg = decisions.map((d) => d.map(() => 'aggressive' as Choice))
     const r = replayRound(finished.seed, 'dart', allAgg)
     expect(r.ok).toBe(false)
+  })
+
+  it('binds the daily salt to the player, so luck cannot be ground for', () => {
+    // The attack this guards against: the salt reseeds every roll, so a client
+    // free to pick one replays the same decisions under thousands of salts
+    // offline and posts the luckiest card. The replay is genuine — only the
+    // salt check can catch it. Measured before the fix: 5000/5000 ground salts
+    // accepted, best -10 against an honest average of +2.7.
+    const setup = dailySetup()
+    const playerId = 'a3f1c2d4-0000-4000-8000-abcdefabcdef'
+    const mySalt = dailySalt(playerId, setup.dateKey)
+
+    // the salt my client seeds with is the one the referee derives for me.
+    // Asserted through setupFromSeed rather than string equality so this keeps
+    // testing the property, not the seed's spelling, if the format grows.
+    expect(setupFromSeed(newRound(setup, 'daily', 'dart', playerId).seed)!.salt).toBe(mySalt)
+    expect(dailySalt(playerId, setup.dateKey)).toBe(mySalt) // deterministic
+    expect(dailySalt('someone-else', setup.dateKey)).not.toBe(mySalt) // per-player
+    expect(dailySalt(playerId, '2020-01-01')).not.toBe(mySalt) // per-day
+
+    // every ground salt parses as a valid seed — the referee cannot lean on
+    // replayRound to reject them, which is exactly why it must check the salt
+    let parsedFine = 0
+    for (let i = 0; i < 200; i++) {
+      const info = setupFromSeed(`${setup.seed}:${i.toString(36)}`)
+      if (info) {
+        parsedFine++
+        expect(info.salt).toBe(i.toString(36))
+        // ...and the referee's check is what rejects it
+        expect(info.salt === dailySalt(playerId, setup.dateKey)).toBe(false)
+      }
+    }
+    expect(parsedFine).toBe(200)
+
+    // a player with no identity yet plays the one canonical seed: no salt,
+    // therefore nothing to grind
+    expect(setupFromSeed(newRound(setup, 'daily', 'dart').seed)!.salt).toBeUndefined()
   })
 
   it('a different character cannot ride on the same decisions unnoticed', () => {

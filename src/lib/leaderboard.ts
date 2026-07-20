@@ -87,7 +87,7 @@ export interface SubmitResult {
   rank?: number
   total?: number
   duplicate?: boolean
-  record?: { broken: boolean; toPar: number; holder: string }
+  record?: { broken: boolean; toPar: number; holder: string; character?: CharacterId | null }
 }
 
 /** Submit a finished round. The server replays it and computes the score. */

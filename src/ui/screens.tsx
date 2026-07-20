@@ -130,7 +130,9 @@ export function HomeScreen(props: {
               </span>
               {courseRecs?.get(c.slug) && (
                 <em className="course-cr">
-                  CR {toParLabel(courseRecs.get(c.slug)!.to_par)} · {courseRecs.get(c.slug)!.player_name}
+                  CR {toParLabel(courseRecs.get(c.slug)!.to_par)} ·{' '}
+                  {characterById(courseRecs.get(c.slug)!.character ?? undefined)?.emoji ?? ''}{' '}
+                  {courseRecs.get(c.slug)!.player_name}
                 </em>
               )}
             </button>

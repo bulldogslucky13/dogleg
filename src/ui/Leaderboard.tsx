@@ -94,11 +94,16 @@ export function ScoreBoard(props: { round: RoundState }) {
     return (
       <div className="board-block">
         {rec?.broken && (
-          <div className="record-banner">🏆 New course record — {toParLabel(rec.toPar)} by {player?.name ?? 'you'}</div>
+          <div className="record-banner">
+            🏆 New course record — {toParLabel(rec.toPar)} by {player?.name ?? 'you'}
+            {round.character ? ` ${characterById(round.character)?.emoji ?? ''}` : ''}
+          </div>
         )}
         {rec && !rec.broken && (
           <p className="fine">
-            Course record: {toParLabel(rec.toPar)} · {rec.holder}
+            Course record: {toParLabel(rec.toPar)} ·{' '}
+            {rec.character ? `${characterById(rec.character)?.emoji ?? ''} ` : ''}
+            {rec.holder}
           </p>
         )}
         {nameForm && (

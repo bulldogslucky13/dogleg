@@ -82,18 +82,28 @@ export default function App() {
   }, [])
 
   // a replay link opened while the app is already mounted only fires
-  // hashchange — no reload, so the mount-time hash check never reruns
+  // hashchange — no reload, so the mount-time hash check never reruns.
+  // The reverse matters too: entering a replay pushes a hash history entry,
+  // so the browser Back button REMOVES the hash — leave the replay when
+  // that happens, or Back appears to do nothing. (Re-registered when
+  // `watching` changes so the handler sees the current state.)
   useEffect(() => {
     const onHash = () => {
       const p = watchFromHash()
       if (p) {
         setWatching(p)
         setView('watch')
+        return
+      }
+      if (watching) {
+        setWatching(null)
+        const r = loadRound()
+        setView(r && !r.complete ? 'play' : 'home')
       }
     }
     window.addEventListener('hashchange', onHash)
     return () => window.removeEventListener('hashchange', onHash)
-  }, [])
+  }, [watching])
 
   useEffect(
     () => () => {

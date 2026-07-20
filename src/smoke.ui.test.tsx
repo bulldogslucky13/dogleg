@@ -223,9 +223,13 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
     })
     expect(screen.getByText('Hole 1 of 18')).toBeTruthy()
 
-    fireEvent.click(screen.getByText('‹ Exit replay'))
+    // the browser Back button strips the hash — the app must leave the
+    // replay too, not stay stuck on a URL that no longer says #watch
+    act(() => {
+      window.location.hash = ''
+      window.dispatchEvent(new HashChangeEvent('hashchange'))
+    })
     expect(screen.getByText('Tee off')).toBeTruthy()
-    window.location.hash = ''
   })
 
   it('a truncated replay link shows the friendly error, not the home screen', () => {

@@ -356,18 +356,22 @@ export function ResultScreen(props: {
         <button
           className="cta ghost"
           onClick={async () => {
+            let ok = true
             try {
               await navigator.clipboard.writeText(replayUrl)
             } catch {
+              // clipboard API blocked: select-and-copy fallback, same as the
+              // share card — and like there, no success claim it didn't earn
               const ta = document.createElement('textarea')
               ta.value = replayUrl
               ta.style.position = 'fixed'
               ta.style.opacity = '0'
               document.body.appendChild(ta)
               ta.select()
-              document.execCommand('copy')
+              ok = document.execCommand('copy')
               ta.remove()
             }
+            if (!ok) return
             track('replay_link_copied', { to_par: toPar, mode: props.practice ? 'practice' : 'daily' })
             setCopiedReplay(true)
             setTimeout(() => setCopiedReplay(false), 2000)

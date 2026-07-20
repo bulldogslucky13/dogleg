@@ -3,24 +3,37 @@ import type { CharacterId } from '../engine/types'
 import type { RoundState } from '../state/store'
 import { SUPABASE_ANON_KEY, SUPABASE_URL, backendEnabled } from './backend'
 
-/** Clubhouse identity: a name plus a device-held id/secret pair. No account. */
+/** Clubhouse identity: a device-held id/secret pair, plus a name once the
+ * player has claimed one. Anonymous players carry a nameless identity — the
+ * server mints the id at app start (see ensureIdentity) so their daily dice
+ * can be salted per player, and the name lands on the SAME row when they
+ * first post a card. No merging, no account. */
 export interface Player {
   id: string
   secret: string
-  name: string
+  name: string | null
 }
 
 const PLAYER_KEY = 'dogleg:player:v1'
 
-export function loadPlayer(): Player | null {
+/** Any identity this device holds — named or not. This is what seeds the
+ * daily dice and authenticates submissions. */
+export function loadIdentity(): Player | null {
   try {
     const raw = localStorage.getItem(PLAYER_KEY)
     if (!raw) return null
     const p = JSON.parse(raw) as Player
-    return p.id && p.secret && p.name ? p : null
+    return p.id && p.secret ? { ...p, name: p.name ?? null } : null
   } catch {
     return null
   }
+}
+
+/** The identity once it has a clubhouse name — what the boards and account
+ * panel care about. Null while the player is still anonymous. */
+export function loadPlayer(): Player | null {
+  const p = loadIdentity()
+  return p?.name ? p : null
 }
 
 /** Persist this device's identity (also used by account sync in auth.ts). */
@@ -30,6 +43,38 @@ export function savePlayerIdentity(p: Player): void {
   } catch {
     /* private mode */
   }
+}
+
+let minting: Promise<void> | null = null
+
+/**
+ * Make sure this device has a player id before the daily starts, minting a
+ * nameless one from the server if needed. The id is what the per-player dice
+ * salt derives from — server-minted so nobody can choose (or grind) their
+ * own. Fire-and-forget: by the time a human reaches the first tee the mint
+ * has long finished, and if it hasn't (offline, backend down) the round
+ * simply starts from the unsalted canonical seed, exactly as before.
+ */
+export function ensureIdentity(): void {
+  if (!backendEnabled || minting || loadIdentity()) return
+  minting = (async () => {
+    try {
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/mint-player`, {
+        method: 'POST',
+        headers: REST_HEADERS,
+      })
+      if (!res.ok) return
+      const body = (await res.json()) as { player?: { id: string; secret: string } }
+      // re-check: a submit/sync may have landed an identity while we waited
+      if (body.player?.id && body.player.secret && !loadIdentity()) {
+        savePlayerIdentity({ id: body.player.id, secret: body.player.secret, name: null })
+      }
+    } catch {
+      /* offline — unsalted fallback, still a valid daily */
+    } finally {
+      minting = null
+    }
+  })()
 }
 
 // new-style publishable keys are sent as `apikey` alone (they aren't JWTs)
@@ -90,13 +135,16 @@ export interface SubmitResult {
   record?: { broken: boolean; toPar: number; holder: string; character?: CharacterId | null }
 }
 
-/** Submit a finished round. The server replays it and computes the score. */
+/** Submit a finished round. The server replays it and computes the score.
+ * An anonymous (nameless) identity submits with its id/secret plus the name
+ * being claimed — the name lands on the same player row the round's dice
+ * were salted for. */
 export async function submitRound(round: RoundState, name?: string): Promise<SubmitResult> {
   if (!backendEnabled) return { ok: false, error: 'leaderboard disabled' }
   const decisions = decisionsFromScores(round.scores)
   if (!round.complete || !decisions) return { ok: false, error: 'round not finished' }
-  const player = loadPlayer()
-  if (!player && !name) return { ok: false, error: 'name required' }
+  const player = loadIdentity()
+  if (!player?.name && !name) return { ok: false, error: 'name required' }
   try {
     const res = await fetch(`${SUPABASE_URL}/functions/v1/submit-round`, {
       method: 'POST',
@@ -105,12 +153,18 @@ export async function submitRound(round: RoundState, name?: string): Promise<Sub
         seed: round.seed,
         character: round.character,
         decisions,
-        ...(player ? { playerId: player.id, playerSecret: player.secret } : { name }),
+        ...(player ? { playerId: player.id, playerSecret: player.secret } : {}),
+        ...(name && !player?.name ? { name } : {}),
       }),
     })
     const body = (await res.json()) as SubmitResult & { player?: Player & { secret?: string } }
     if (!res.ok) return { ok: false, error: (body as { error?: string }).error ?? `submit failed (${res.status})` }
-    if (body.player?.secret) savePlayerIdentity({ id: body.player.id, secret: body.player.secret, name: body.player.name })
+    // the server's view of the identity wins: a fresh secret on first-ever
+    // submission, or the name just claimed onto an anonymous id
+    const secret = body.player?.secret ?? player?.secret
+    if (body.player?.id && secret) {
+      savePlayerIdentity({ id: body.player.id, secret, name: body.player.name })
+    }
     return { ...body, ok: true }
   } catch {
     return { ok: false, error: 'network hiccup — your score is safe locally, try again' }

@@ -12,7 +12,11 @@ that validates every submission by REPLAYING the round with the real engine
 (`src/engine/replay.ts`, bundled to `engine.mjs` by `pnpm build:validator`).
 The client (`src/lib/backend.ts`, `src/lib/leaderboard.ts`, `src/ui/
 Leaderboard.tsx`) reads boards with the public key and submits through the
-function; identity is a clubhouse name + device secret, no accounts. Backend
+function; identity is a clubhouse name + device secret, no accounts. The
+`mint-player` function mints an anonymous (nameless) player row at app start
+so every player has a server-minted id — that id salts the daily dice per
+player (`dailySalt`), and the clubhouse name is claimed onto the same row on
+first submission. Never derive the salt from anything client-chosen. Backend
 features disable themselves in tests (`backendEnabled` is false when
 `MODE === 'test'`) so CI never touches the network — keep that property.
 Engine changes that alter odds/resolution require the function to be

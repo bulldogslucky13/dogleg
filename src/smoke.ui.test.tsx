@@ -13,6 +13,8 @@ import { act, cleanup, fireEvent, render, screen, within } from '@testing-librar
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
 import { CHARACTERS } from './engine/characters'
+import { setupFromSeed } from './engine/replay'
+import { loadIdentity, loadPlayer } from './lib/leaderboard'
 
 // jsdom has no ResizeObserver; the map measures itself with one
 class ResizeObserverStub {
@@ -141,5 +143,34 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
     fireEvent.click(screen.getByText(/Modern view/))
     expect(screen.getByText(/Classic view/)).toBeTruthy()
     expect(localStorage.getItem('dogleg:uimode')).toBe('classic')
+  })
+})
+
+describe('smoke: anonymous identity and per-player daily dice', () => {
+  it('a stored identity (named or not) salts the daily seed; none means the canonical seed', () => {
+    // an anonymous minted identity — no name yet — still gets its own dice
+    localStorage.setItem(
+      'dogleg:player:v1',
+      JSON.stringify({ id: 'a3f1c2d4-0000-4000-8000-abcdefabcdef', secret: 's3cret', name: null }),
+    )
+    expect(loadPlayer()).toBeNull() // nameless: the boards don't know them yet
+    expect(loadIdentity()?.id).toBe('a3f1c2d4-0000-4000-8000-abcdefabcdef')
+
+    vi.useFakeTimers()
+    render(<App />)
+    fireEvent.click(screen.getByText('Tee off'))
+    fireEvent.click(screen.getByText(CHARACTERS[0].name))
+    const salted = JSON.parse(localStorage.getItem('dogleg:round:v1') ?? 'null')
+    expect(setupFromSeed(salted.seed)!.salt).toBeTruthy()
+    cleanup()
+
+    // no identity at all (mint never landed): the unsalted canonical seed
+    localStorage.removeItem('dogleg:player:v1')
+    localStorage.removeItem('dogleg:round:v1')
+    render(<App />)
+    fireEvent.click(screen.getByText('Tee off'))
+    fireEvent.click(screen.getByText(CHARACTERS[0].name))
+    const plain = JSON.parse(localStorage.getItem('dogleg:round:v1') ?? 'null')
+    expect(setupFromSeed(plain.seed)!.salt).toBeUndefined()
   })
 })

@@ -18,3 +18,8 @@ verify_jwt = false
 # token with getUser() and 401s, so the gateway check is defence in depth.
 [functions.link-account]
 verify_jwt = true
+
+# Anonymous identity minting. Called before a player has any credentials at
+# all — a JWT gate would defeat its purpose. Rate limits itself per IP.
+[functions.mint-player]
+verify_jwt = false

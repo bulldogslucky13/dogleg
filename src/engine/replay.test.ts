@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { advanceHole, applyChoice, newRound, roundToPar } from '../state/store'
 import { CHARACTERS } from './characters'
 import { COURSES } from './courses'
-import { dailySetup, practiceSetup } from './daily'
+import { dailySalt, dailySetup, practiceSetup } from './daily'
 import { decisionsFromScores, replayRound, setupFromSeed } from './replay'
 import type { CharacterId, Choice } from './types'
 
@@ -53,6 +53,68 @@ describe('replayRound is a perfect mirror of the client store', () => {
     expect(info.course.slug).toBe(setup.course.slug)
     expect(info.cond).toEqual(setup.cond)
     expect(info.puzzleNumber).toBe(setup.puzzleNumber)
+  })
+
+  it('per-player daily salt changes the dice but never the course or conditions', () => {
+    const setup = dailySetup()
+    const salted = setupFromSeed(`${setup.seed}:a1b2c3d4`)!
+    expect(salted.course.slug).toBe(setup.course.slug)
+    expect(salted.cond).toEqual(setup.cond) // conditions are shared — the challenge is the same
+    // the same strategy rolls different dice under different salts
+    const probe = (seed: string) => {
+      // grow decision lists until the replay accepts them — deterministic per seed
+      const decisions: Choice[][] = Array(18).fill(null).map(() => ['normal'])
+      for (let guard = 0; guard < 200; guard++) {
+        const r = replayRound(seed, undefined, decisions)
+        if (r.ok) return r
+        const m = /hole (\d+): round left unfinished/.exec(r.error)
+        if (!m) throw new Error(`unexpected: ${r.error}`)
+        decisions[Number(m[1]) - 1].push('normal')
+      }
+      throw new Error('probe never finished')
+    }
+    const a = probe(`${setup.seed}:saltaaaa`)
+    const b = probe(`${setup.seed}:saltbbbb`)
+    // identical strategies, different luck: the full result sequence differing
+    // (or scores) proves the dice are per-player
+    expect(a.results.join() === b.results.join() && a.toPar === b.toPar).toBe(false)
+  })
+
+  it('binds the daily salt to the player, so luck cannot be ground for', () => {
+    // The attack this guards against: the salt reseeds every roll, so a client
+    // free to pick one replays the same decisions under thousands of salts
+    // offline and posts the luckiest card. The replay is genuine — only the
+    // salt check can catch it. Measured before the fix: 5000/5000 ground salts
+    // accepted, best -10 against an honest average of +2.7.
+    const setup = dailySetup()
+    const playerId = 'a3f1c2d4-0000-4000-8000-abcdefabcdef'
+    const mySalt = dailySalt(playerId, setup.dateKey)
+
+    // the salt my client seeds with is the one the referee derives for me.
+    // Asserted through setupFromSeed rather than string equality so this keeps
+    // testing the property, not the seed's spelling, if the format grows.
+    expect(setupFromSeed(newRound(setup, 'daily', 'dart', playerId).seed)!.salt).toBe(mySalt)
+    expect(dailySalt(playerId, setup.dateKey)).toBe(mySalt) // deterministic
+    expect(dailySalt('someone-else', setup.dateKey)).not.toBe(mySalt) // per-player
+    expect(dailySalt(playerId, '2020-01-01')).not.toBe(mySalt) // per-day
+
+    // every ground salt parses as a valid seed — the referee cannot lean on
+    // replayRound to reject them, which is exactly why it must check the salt
+    let parsedFine = 0
+    for (let i = 0; i < 200; i++) {
+      const info = setupFromSeed(`${setup.seed}:${i.toString(36)}`)
+      if (info) {
+        parsedFine++
+        expect(info.salt).toBe(i.toString(36))
+        // ...and the referee's check is what rejects it
+        expect(info.salt === dailySalt(playerId, setup.dateKey)).toBe(false)
+      }
+    }
+    expect(parsedFine).toBe(200)
+
+    // a player whose identity mint never landed (offline) plays the one
+    // canonical seed: no salt, therefore nothing to grind
+    expect(setupFromSeed(newRound(setup, 'daily', 'dart').seed)!.salt).toBeUndefined()
   })
 
   it('rejects tampered submissions', () => {

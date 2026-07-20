@@ -5,6 +5,10 @@ import { playShot, startHole } from './resolve'
 import { rngFromString } from './rng'
 import type { CharacterId, Choice, Conditions, CourseSpec, HoleResult, HoleScore } from './types'
 
+// Re-exported so it reaches the edge function through engine.mjs: the referee
+// derives the expected salt with the exact same code the client seeds with.
+export { dailySalt } from './daily'
+
 /**
  * Deterministic round replay — the backbone of leaderboard score validation.
  *
@@ -25,17 +29,25 @@ export interface SeedInfo {
   /** daily only */
   dateKey?: string
   puzzleNumber?: number
+  /** daily only: the per-player dice salt, if the seed carried one. Callers
+   * that trust the score MUST check this against `dailySalt(playerId, dateKey)`
+   * — a free-floating salt is a licence to grind for luck. */
+  salt?: string
 }
 
-/** Reconstruct the full round setup from a seed string, or null if invalid. */
+/** Reconstruct the full round setup from a seed string, or null if invalid.
+ * Daily seeds may carry a per-player dice salt (`round:date:slug:salt`) —
+ * the salt changes the rolls, never the course or conditions. Verifying that
+ * the salt belongs to the submitting player is the caller's job; see
+ * `dailySalt` and the submit-round function. */
 export function setupFromSeed(seed: string): SeedInfo | null {
-  const daily = /^round:(\d{4}-\d{2}-\d{2}):([a-z0-9-]+)$/.exec(seed)
+  const daily = /^round:(\d{4}-\d{2}-\d{2}):([a-z0-9-]+?)(?::([a-z0-9]+))?$/.exec(seed)
   if (daily) {
-    const [, dateKey, slug] = daily
+    const [, dateKey, slug, salt] = daily
     const n = puzzleNumberForDateKey(dateKey)
     const course = courseForPuzzle(n)
     if (course.slug !== slug) return null // seed names a course that isn't that day's rotation
-    return { mode: 'daily', course, cond: dailyConditions(dateKey, course), dateKey, puzzleNumber: n }
+    return { mode: 'daily', course, cond: dailyConditions(dateKey, course), dateKey, puzzleNumber: n, salt }
   }
   const practice = /^practice:([a-z0-9-]+):/.exec(seed)
   if (practice) {

@@ -8,13 +8,37 @@
 create table if not exists players (
   id uuid primary key default gen_random_uuid(),
   secret uuid not null default gen_random_uuid(),
-  name text not null,
+  -- null until the player claims a clubhouse name: anonymous identities are
+  -- minted up front (mint-player) so daily dice can be salted per player,
+  -- and the first posted card names this same row
+  name text,
   -- set when a player optionally attaches an email account (cross-device sync)
   user_id uuid unique references auth.users (id),
   created_at timestamptz not null default now()
 );
 create unique index if not exists players_name_ci on players (lower(name));
 alter table players add column if not exists user_id uuid unique references auth.users (id);
+alter table players alter column name drop not null;
+
+-- mint-player rate limiting: one counter per (utc day, hashed ip). The hash
+-- is salted with the day, so rows can't be correlated across days — and the
+-- ip never touches the players table.
+create table if not exists mint_log (
+  day text not null,
+  ip_hash text not null,
+  count int not null default 0,
+  primary key (day, ip_hash)
+);
+
+-- atomic bump, called by the mint-player function (service role)
+create or replace function bump_mint(p_day text, p_ip_hash text) returns int
+language sql as $$
+  insert into mint_log (day, ip_hash, count) values (p_day, p_ip_hash, 1)
+  on conflict (day, ip_hash) do update set count = mint_log.count + 1
+  returning count;
+$$;
+-- functions are EXECUTE-able by public by default; this one is service-role only
+revoke execute on function bump_mint(text, text) from public, anon, authenticated;
 
 create table if not exists daily_scores (
   id bigint generated always as identity primary key,
@@ -44,6 +68,7 @@ create table if not exists course_records (
 alter table players enable row level security;
 alter table daily_scores enable row level security;
 alter table course_records enable row level security;
+alter table mint_log enable row level security;
 
 -- boards are public reading material; players (and their secrets) are not
 drop policy if exists "anyone can read daily scores" on daily_scores;

@@ -94,6 +94,8 @@ jobs:
             --project-ref "$PROJECT_REF" --no-verify-jwt --use-api
           supabase functions deploy link-account \
             --project-ref "$PROJECT_REF" --use-api
+          supabase functions deploy mint-player \
+            --project-ref "$PROJECT_REF" --no-verify-jwt --use-api
 
   deploy:
     needs: functions

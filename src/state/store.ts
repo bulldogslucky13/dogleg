@@ -1,5 +1,5 @@
 import { buildLayout } from '../engine/layout'
-import { practiceSetup, localDateKey, type DailySetup } from '../engine/daily'
+import { dailySalt, practiceSetup, localDateKey, type DailySetup } from '../engine/daily'
 import { startHole, playShot, type HoleInPlay } from '../engine/resolve'
 import { rngFromString, skip, type Rng } from '../engine/rng'
 import type { CharacterId, Choice, Conditions, HoleResult, HoleScore, Stage } from '../engine/types'
@@ -100,13 +100,30 @@ export type UiMode = 'modern' | 'classic'
 
 // ---------------------------------------------------------------------------
 
-export function newRound(setup: DailySetup, mode: 'daily' | 'practice', character?: CharacterId): RoundState {
+export function newRound(
+  setup: DailySetup,
+  mode: 'daily' | 'practice',
+  character?: CharacterId,
+  playerId?: string,
+): RoundState {
   const course = setup.course
   const layout = buildLayout(course.slug, course.holes[0])
   const hole = startHole(layout, setup.cond, character)
+  // Daily seeds get a per-player salt: same course, same conditions for
+  // everyone, but your OWN dice — so watching someone's replay can't be
+  // copied shot-for-shot into your daily. (Practice seeds are unique already.)
+  //
+  // Derived from the player id, never random: the referee recomputes it and
+  // rejects anything else, so there is exactly one salt you can play under.
+  // A random salt would have let anyone grind offline for a lucky round. The
+  // id itself is server-minted — anonymous players get one minted silently at
+  // app start (see ensureIdentity), so they roll their own dice too. Only a
+  // player the backend has never seen (offline, mint failed) falls back to
+  // the unsalted canonical seed — shared dice, but zero freedom to grind.
+  const salt = mode === 'daily' && playerId ? dailySalt(playerId, setup.dateKey) : null
   return {
     mode,
-    seed: setup.seed,
+    seed: salt ? `${setup.seed}:${salt}` : setup.seed,
     courseSlug: course.slug,
     cond: setup.cond,
     character,

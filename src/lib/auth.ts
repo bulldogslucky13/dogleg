@@ -1,6 +1,6 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import { SUPABASE_ANON_KEY, SUPABASE_URL, backendEnabled } from './backend'
-import { loadPlayer, savePlayerIdentity, type Player } from './leaderboard'
+import { loadIdentity, savePlayerIdentity, type Player } from './leaderboard'
 
 /**
  * Optional email accounts (magic links) for cross-device sync. Entirely
@@ -50,7 +50,10 @@ export async function syncAccount(name?: string): Promise<SyncOutcome> {
   const { data } = await supabase.auth.getSession()
   const session = data.session
   if (!session) return { status: 'signedout' }
-  const local = loadPlayer()
+  // the full identity, named or not: an anonymous minted id must be the one
+  // that gets linked (and named), or the daily its dice were salted for
+  // would no longer belong to the player submitting it
+  const local = loadIdentity()
   try {
     const res = await fetch(`${SUPABASE_URL}/functions/v1/link-account`, {
       method: 'POST',

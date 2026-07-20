@@ -175,6 +175,34 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
     window.location.hash = ''
   })
 
+  it('the locker lists archived rounds and its Watch button opens the viewer', async () => {
+    const { newRound, applyChoice, advanceHole, archiveRound } = await import('./state/store')
+    const { practiceSetup } = await import('./engine/daily')
+    let s = newRound(practiceSetup('st-andrews-old', 'smokelocker'), 'practice', 'greens')
+    let guard = 0
+    while (!s.complete && guard++ < 500) {
+      if (s.hole?.stage === 'done') {
+        s = advanceHole(s)
+        continue
+      }
+      const next = applyChoice(s, 'normal')
+      s = next === s ? applyChoice(s, 'safe') : next
+    }
+    archiveRound(s)
+
+    render(<App />)
+    fireEvent.click(screen.getByText(/My rounds/))
+    // lifetime tally in the header, seeded/bumped by the archived round
+    expect(screen.getByText(/1 lifetime round/)).toBeTruthy()
+    // Recent is the default tab; the records shelf lives behind its own tab
+    expect(screen.getByText(/Last 1 round/)).toBeTruthy()
+    expect(screen.getByText(/St Andrews/)).toBeTruthy()
+    fireEvent.click(screen.getByText(/Records · 1/))
+    expect(screen.getByText('Personal bests')).toBeTruthy()
+    fireEvent.click(screen.getAllByText('▶ Watch')[0])
+    expect(screen.getByText('‹ Exit replay')).toBeTruthy()
+  })
+
   it('toggles between modern and classic views mid-round', () => {
     vi.useFakeTimers()
     render(<App />)

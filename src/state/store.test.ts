@@ -163,6 +163,106 @@ describe('legacy bp: → dogleg: storage migration', () => {
   })
 })
 
+describe('pruneArchive retention', () => {
+  const arch = (over: Partial<import('./store').ArchivedRound>): import('./store').ArchivedRound => ({
+    seed: `practice:x:${Math.random()}`,
+    mode: 'practice',
+    courseSlug: 'pebble-beach',
+    dateKey: '2026-07-19',
+    toPar: 2,
+    strokes: 74,
+    results: Array(18).fill('par'),
+    decisions: Array(18).fill(['normal', 'normal']),
+    playedAt: 0,
+    ...over,
+  })
+
+  it('keeps the 10 most recent, personal bests, and course records forever', async () => {
+    const { pruneArchive } = await import('./store')
+    const rounds = [
+      // 12 recent mediocre rounds on the same course, newest last
+      ...Array.from({ length: 12 }, (_x, i) => arch({ seed: `s${i}`, toPar: 5, playedAt: 100 + i })),
+      // an old personal best on another course
+      arch({ seed: 'pr-old', courseSlug: 'st-andrews-old', toPar: -4, playedAt: 1 }),
+      // an ancient confirmed course record, worse than a later personal round
+      arch({ seed: 'cr-ancient', courseSlug: 'oakmont', toPar: -1, courseRecord: true, playedAt: 2 }),
+      arch({ seed: 'oak-better', courseSlug: 'oakmont', toPar: -3, playedAt: 3 }),
+    ]
+    const kept = pruneArchive(rounds)
+    const seeds = new Set(kept.map((r) => r.seed))
+    // 10 most recent of the mediocre pile survive; the 2 oldest drop (unless they're bests)
+    expect(seeds.has('s11')).toBe(true)
+    expect(seeds.has('s2')).toBe(true)
+    expect(seeds.has('s1')).toBe(false)
+    expect(seeds.has('pr-old')).toBe(true) // personal best never ages out
+    expect(seeds.has('cr-ancient')).toBe(true) // course record never ages out
+    expect(seeds.has('oak-better')).toBe(true) // personal best on oakmont too
+    // sorted newest first
+    expect(kept[0].seed).toBe('s11')
+  })
+})
+
+describe('lifetimeRounds', () => {
+  const fakeStorage = (seed: Record<string, string> = {}): Storage => {
+    const map = new Map(Object.entries(seed))
+    return {
+      get length() {
+        return map.size
+      },
+      clear: () => map.clear(),
+      getItem: (k: string) => map.get(k) ?? null,
+      key: (i: number) => [...map.keys()][i] ?? null,
+      removeItem: (k: string) => void map.delete(k),
+      setItem: (k: string, v: string) => void map.set(k, v),
+    }
+  }
+
+  afterEach(() => vi.unstubAllGlobals())
+
+  it('seeds pre-counter players from daily history + archived practice rounds', async () => {
+    const { lifetimeRounds } = await import('./store')
+    const history = [entry({ dateKey: '2026-07-18' }), entry({ dateKey: '2026-07-19' })]
+    const archive = [
+      { seed: 'p1', mode: 'practice', playedAt: 1 },
+      { seed: 'd1', mode: 'daily', playedAt: 2 }, // daily already counted via history
+    ]
+    vi.stubGlobal(
+      'localStorage',
+      fakeStorage({
+        'dogleg:history:v1': JSON.stringify(history),
+        'dogleg:archive:v1': JSON.stringify(archive),
+      }),
+    )
+    expect(lifetimeRounds()).toBe(3) // 2 dailies + 1 practice
+    expect(lifetimeRounds()).toBe(3) // stable on re-read
+  })
+
+  it('archiving a finished round bumps the tally exactly once', async () => {
+    const { archiveRound, lifetimeRounds } = await import('./store')
+    vi.stubGlobal('localStorage', fakeStorage())
+    const shots = [{ stage: 'tee', choice: 'normal', outcome: 'fairway', penalty: false, faced: {}, after: {} }]
+    const round = {
+      mode: 'practice',
+      seed: 'practice:pebble-beach:lifetime',
+      courseSlug: 'pebble-beach',
+      cond: { wind: 10, greens: 'Medium', difficulty: 5 },
+      puzzleNumber: 0,
+      dateKey: '2026-07-19',
+      currentHole: 17,
+      scores: Array(18).fill({ strokes: 4, penalties: 0, result: 'par', note: '', shots }),
+      aggressiveLeft: 8,
+      rolls: 1,
+      complete: true,
+      hole: null,
+    } as unknown as RoundState
+    expect(lifetimeRounds()).toBe(0)
+    archiveRound(round)
+    expect(lifetimeRounds()).toBe(1)
+    archiveRound(round) // same round again — must not double-count
+    expect(lifetimeRounds()).toBe(1)
+  })
+})
+
 describe('characterRecords', () => {
   it('groups daily rounds by character and tracks avg/best', () => {
     const history: HistoryEntry[] = [

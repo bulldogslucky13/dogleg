@@ -10,7 +10,7 @@ import {
   type BoardRow,
   type SubmitResult,
 } from '../lib/leaderboard'
-import type { RoundState } from '../state/store'
+import { markArchiveRecord, type RoundState } from '../state/store'
 
 /**
  * Post-round leaderboard block. Daily rounds land on today's board; practice
@@ -42,6 +42,7 @@ export function ScoreBoard(props: { round: RoundState }) {
     }
     setResult(r)
     setPlayer(loadPlayer())
+    if (r.record?.broken) markArchiveRecord(round.seed) // pin it in the locker forever
     void refreshBoard()
   }
 

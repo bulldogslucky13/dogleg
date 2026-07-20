@@ -527,7 +527,7 @@ export function archiveRound(state: RoundState): void {
   const current = loadArchive()
   // bump the lifetime tally only for genuinely new rounds (and seed the
   // counter from pre-feature data BEFORE this round joins the archive)
-  if (!current.some((r) => r.seed === entry.seed)) bumpLifetimeRounds()
+  if (!current.some((r) => r.seed === entry.seed)) bumpLifetimeRounds(state)
   saveArchive(pruneArchive([entry, ...current.filter((r) => r.seed !== entry.seed)]))
 }
 
@@ -551,8 +551,19 @@ export function lifetimeRounds(): number {
   }
 }
 
-function bumpLifetimeRounds(): void {
+/** Count the round being archived. On the very first bump the counter seeds
+ * from pre-feature data — but recordResult has already written THIS daily
+ * into history by the time we run, so the seed must exclude it or the
+ * player's first counted daily lands as 2. */
+function bumpLifetimeRounds(state: RoundState): void {
   try {
+    const raw = localStorage.getItem(LIFETIME_KEY)
+    if (raw === null) {
+      const history = loadHistory().filter((e) => !(state.mode === 'daily' && e.dateKey === state.dateKey))
+      const seeded = history.length + loadArchive().filter((r) => r.mode === 'practice').length
+      localStorage.setItem(LIFETIME_KEY, String(seeded + 1))
+      return
+    }
     localStorage.setItem(LIFETIME_KEY, String(lifetimeRounds() + 1))
   } catch {
     /* private mode */

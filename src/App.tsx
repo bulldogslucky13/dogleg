@@ -78,6 +78,20 @@ export default function App() {
     ensureIdentity()
   }, [])
 
+  // a replay link opened while the app is already mounted only fires
+  // hashchange — no reload, so the mount-time hash check never reruns
+  useEffect(() => {
+    const onHash = () => {
+      const p = watchFromHash()
+      if (p) {
+        setWatching(p)
+        setView('watch')
+      }
+    }
+    window.addEventListener('hashchange', onHash)
+    return () => window.removeEventListener('hashchange', onHash)
+  }, [])
+
   useEffect(
     () => () => {
       if (animTimer.current) window.clearTimeout(animTimer.current)

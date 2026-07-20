@@ -261,6 +261,36 @@ describe('lifetimeRounds', () => {
     archiveRound(round) // same round again — must not double-count
     expect(lifetimeRounds()).toBe(1)
   })
+
+  it("a player's first counted daily lands as 1, not 2", async () => {
+    // App order is recordResult THEN archiveRound, so by the time the counter
+    // seeds itself, today's daily is already in history — the seed must not
+    // count it a second time (Codex review on the PR)
+    const { archiveRound, lifetimeRounds } = await import('./store')
+    const shots = [{ stage: 'tee', choice: 'normal', outcome: 'fairway', penalty: false, faced: {}, after: {} }]
+    const today = entry({ dateKey: '2026-07-20' })
+    vi.stubGlobal(
+      'localStorage',
+      fakeStorage({ 'dogleg:history:v1': JSON.stringify([entry({ dateKey: '2026-07-19' }), today]) }),
+    )
+    const round = {
+      mode: 'daily',
+      seed: 'round:2026-07-20:pebble-beach:abc123',
+      courseSlug: 'pebble-beach',
+      cond: { wind: 10, greens: 'Medium', difficulty: 5 },
+      puzzleNumber: 2,
+      dateKey: '2026-07-20',
+      currentHole: 17,
+      scores: Array(18).fill({ strokes: 4, penalties: 0, result: 'par', note: '', shots }),
+      aggressiveLeft: 8,
+      rolls: 1,
+      complete: true,
+      hole: null,
+    } as unknown as RoundState
+    archiveRound(round)
+    // yesterday's daily (1) + today's (1) — NOT yesterday + today-from-history + today-from-bump
+    expect(lifetimeRounds()).toBe(2)
+  })
 })
 
 describe('characterRecords', () => {

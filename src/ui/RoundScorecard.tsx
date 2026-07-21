@@ -18,6 +18,10 @@ export function RoundScorecard(props: { round: LoggedRound; onReplay?: () => voi
   const char = characterById(round.character)
   const pars = course?.holes.map((h) => h.par) ?? Array(18).fill(4)
 
+  // Real strokes when the round logged them (blow-up holes past 'triple' can't
+  // be rebuilt from result + par); older result-only rounds fall back.
+  const strokesAt = (hole: number, r: HoleResult) => round.strokesByHole?.[hole] ?? holeStrokes(r, pars[hole])
+
   const rowClass = (r: HoleResult, strokes: number) => {
     if (strokes === 1 || r === 'albatross') return 'sc-row moment'
     if (r === 'eagle' || r === 'birdie') return 'sc-row under'
@@ -35,7 +39,7 @@ export function RoundScorecard(props: { round: LoggedRound; onReplay?: () => voi
       </div>
       {round.results.slice(from, from + 9).map((r, i) => {
         const hole = from + i
-        const strokes = holeStrokes(r, pars[hole])
+        const strokes = strokesAt(hole, r)
         return (
           <div key={hole} className={rowClass(r, strokes)}>
             <span>{hole + 1}</span>
@@ -51,7 +55,7 @@ export function RoundScorecard(props: { round: LoggedRound; onReplay?: () => voi
       <div className="sc-row sc-foot">
         <span>{from === 0 ? 'Out' : 'In'}</span>
         <span>{pars.slice(from, from + 9).reduce((s: number, p: number) => s + p, 0)}</span>
-        <span>{round.results.slice(from, from + 9).reduce((s, r, i) => s + holeStrokes(r, pars[from + i]), 0)}</span>
+        <span>{round.results.slice(from, from + 9).reduce((s, r, i) => s + strokesAt(from + i, r), 0)}</span>
       </div>
     </div>
   )

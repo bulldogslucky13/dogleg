@@ -30,6 +30,11 @@ export interface LoggedRound {
   strokes: number
   /** per-hole scorecard, hole 1-18 */
   results: HoleResult[]
+  /** actual per-hole strokes, hole 1-18. Only freshly logged rounds carry it;
+   * rounds recovered from daily history (results only) omit it and fall back to
+   * result+par. Needed because the engine collapses every diff ≥ 3 into
+   * 'triple', so a blow-up hole can't be reconstructed from its result alone. */
+  strokesByHole?: number[]
 }
 
 const LOG_KEY = 'dogleg:roundlog:v1'
@@ -177,6 +182,7 @@ export function logRound(state: RoundState): void {
     toPar: state.scores.reduce((s, sc, i) => s + ((sc?.strokes ?? 0) - coursePars(state.courseSlug)[i]), 0),
     strokes: state.scores.reduce((s, sc) => s + (sc?.strokes ?? 0), 0),
     results: state.scores.map((s) => s?.result ?? 'triple'),
+    strokesByHole: state.scores.map((s) => s?.strokes ?? 0),
   })
   writeLog({ v: 1, rounds })
 }

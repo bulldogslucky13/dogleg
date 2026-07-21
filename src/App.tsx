@@ -143,6 +143,17 @@ export default function App() {
     return o.kind === 'approach' ? o : null
   }, [hole, selected, animating])
 
+  // Sync can complete from either the home CTA or the locker's account panel;
+  // both must fold the freshly-pulled dailies into the log so stats/trophies
+  // update immediately, not on some later home-screen sync.
+  const handleHistorySynced = (h: HistoryEntry[]) => {
+    setHistory(h)
+    absorbHistory(h) // the round log counts synced dailies too
+    // a synced day supersedes this device's unfinished daily for the
+    // same date — drop it so a refresh can't replay a completed day
+    if (supersededDaily(round, h)) setRound(null)
+  }
+
   if (view === 'home') {
     return (
       <>
@@ -164,13 +175,7 @@ export default function App() {
               : null
           }
           playedToday={playedToday}
-          onHistorySynced={(h) => {
-            setHistory(h)
-            absorbHistory(h) // the round log counts synced dailies too
-            // a synced day supersedes this device's unfinished daily for the
-            // same date — drop it so a refresh can't replay a completed day
-            if (supersededDaily(round, h)) setRound(null)
-          }}
+          onHistorySynced={handleHistorySynced}
           onTeeOff={() => {
             setPending({ mode: 'daily', setup: dailySetup() })
             setView('pick')
@@ -216,6 +221,7 @@ export default function App() {
           setWatching(p)
           setView('watch')
         }}
+        onHistorySynced={handleHistorySynced}
         onBack={() => setView('home')}
       />
     )

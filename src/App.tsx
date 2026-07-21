@@ -514,6 +514,9 @@ export default function App() {
             previewApproach={previewApproach}
             previewChoice={selected}
             size={mapSize}
+            // the signature pill adds a row to the bottom overlay only at the
+            // tee — reserve extra room so it never sits over the tee ball
+            bottomInset={hole.shots.length === 0 && spec.signature ? 46 : 0}
           />
         )}
         {!holeDone && (

@@ -46,11 +46,14 @@ interface Frame {
  * centerline. Margins keep the flag clear of the floating top banner and the
  * tee box clear of the bottom chip overlay at any panel height.
  */
-function cameraFrame(size: MapSize | null): Frame {
+function cameraFrame(size: MapSize | null, bottomInset = 0): Frame {
   const w = size?.w ?? W
   const h = size?.h ?? H
   const yTop = Math.min(84, Math.max(58, h * 0.16))
-  const yBottom = h - Math.min(64, Math.max(42, h * 0.11))
+  // bottomInset reserves extra room for a taller bottom overlay (e.g. the
+  // signature pill adds a second row above the hazard chips), so the tee ball
+  // isn't parked behind it
+  const yBottom = h - Math.min(64, Math.max(42, h * 0.11)) - bottomInset
   return { w, h, cx: w / 2, yTop, yBottom }
 }
 
@@ -290,9 +293,12 @@ export function HoleMap(props: {
   previewChoice: Choice | null
   /** measured panel size (from useMapSize) — omit to fall back to the classic 360×520 frame */
   size?: MapSize | null
+  /** extra bottom room to reserve, in px, when a taller overlay (e.g. the
+   * signature pill) sits over the tee */
+  bottomInset?: number
 }) {
   const { layout, ball } = props
-  const fr = cameraFrame(props.size ?? null)
+  const fr = cameraFrame(props.size ?? null, props.bottomInset ?? 0)
   const view = viewWindow(layout, ball)
   const geo = useGeometry(layout, view, fr)
   const { at, normalAt, uPerYd, greenRx, greenRy } = geo

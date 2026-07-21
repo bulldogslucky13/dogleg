@@ -177,6 +177,35 @@ button {
   color: var(--cream);
 }
 
+/* signature-hole flavor pill: gold-touched so the marquee holes read special */
+.chip.sig {
+  background: rgba(201, 162, 39, 0.16);
+  border-color: rgba(201, 162, 39, 0.55);
+  color: var(--gold);
+  font-style: italic;
+  white-space: normal;
+}
+
+/* the signature sits on its own row above the hazard chips so it can wrap as
+   the hole's headline without squeezing the (single-row) hazard chips */
+.hazard-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+}
+
+.sig-row {
+  display: flex;
+  justify-content: center;
+  max-width: 100%;
+}
+
+.sig-row .chip.sig {
+  max-width: 100%;
+}
+
 .stats-row {
   display: grid;
   grid-template-columns: repeat(3, 1fr);

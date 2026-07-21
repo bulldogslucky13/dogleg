@@ -191,6 +191,9 @@ export function TierBanner(props: { hole: HoleInPlay }) {
 export function HazardChips(props: { hole: HoleInPlay }) {
   const { layout, cond, ball } = props.hole
   const spec = layout.spec
+  // signature flavor rides only on the tee, as a one-off hole intro alongside
+  // the tier banner — persisting it every shot would just be noise
+  const atTee = props.hole.shots.length === 0
   const chips: string[] = []
   if (spec.strokeIndex <= 4) chips.push(`Signature test · SI ${spec.strokeIndex}`)
 
@@ -208,14 +211,30 @@ export function HazardChips(props: { hole: HoleInPlay }) {
   if (cond.wind >= 18) chips.push(`Howling · ${cond.wind} mph`)
   else if (cond.wind >= 12) chips.push(`Breezy · ${cond.wind} mph`)
   if (cond.greens === 'Fast' || cond.greens === 'Firm') chips.push('Slick greens')
-  if (chips.length === 0) return null
+  const sig = atTee ? spec.signature : undefined
+  if (chips.length === 0 && !sig) return null
   return (
-    <div className="chips center">
-      {chips.slice(0, 3).map((c) => (
-        <span key={c} className="chip">
-          {c}
-        </span>
-      ))}
+    // signature rides its own row above the hazard chips: it wraps freely as
+    // the hole's headline, while the hazard chips keep their single-row,
+    // ellipsized layout with the full width to themselves (they'd otherwise
+    // get squeezed to stubs on narrow screens)
+    <div className="hazard-stack">
+      {sig && (
+        <div className="sig-row">
+          <span className="chip sig" title="Signature hole">
+            ⛳ {sig}
+          </span>
+        </div>
+      )}
+      {chips.length > 0 && (
+        <div className="chips center">
+          {chips.slice(0, 3).map((c) => (
+            <span key={c} className="chip">
+              {c}
+            </span>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

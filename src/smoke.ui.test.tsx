@@ -552,6 +552,29 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
     expect(screen.getByText('Hole in One')).toBeTruthy()
   })
 
+  it('renders the signature flavor pill at the tee of a marquee hole', async () => {
+    const { COURSES } = await import('./engine/courses')
+    const { buildLayout } = await import('./engine/layout')
+    const { HazardChips } = await import('./ui/panels')
+
+    const sawgrass = COURSES.find((c) => c.slug === 'tpc-sawgrass')!
+    const spec = sawgrass.holes[16] // the island 17th
+    const hole = {
+      layout: buildLayout(sawgrass.slug, spec),
+      cond: { wind: 10, greens: 'Fast' as const, difficulty: 9 },
+      ball: { pos: 0, lie: 'tee' as const, side: 'center' as const },
+      shots: [], // at the tee: the signature pill shows
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { rerender } = render(<HazardChips hole={hole as any} />)
+    expect(screen.getByText(new RegExp(spec.signature!))).toBeTruthy()
+
+    // once a shot is in the books the flavor pill stands down (tee-only)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    rerender(<HazardChips hole={{ ...hole, shots: [{}] } as any} />)
+    expect(screen.queryByText(new RegExp(spec.signature!))).toBeNull()
+  })
+
   it('toggles between modern and classic views mid-round', () => {
     vi.useFakeTimers()
     render(<App />)

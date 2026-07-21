@@ -31,7 +31,7 @@ import {
 import { absorbHistory, logRound } from './state/stats'
 import { chasing } from './lib/records'
 import { identifyPlayer, track } from './lib/analytics'
-import { clubhouseLine, fetchDailyChoices, groupChoices, type TallyRow } from './lib/decisionStats'
+import { clubhouseLine, fetchHoleChoices, groupChoices, type TallyRow } from './lib/decisionStats'
 import { ensureIdentity, loadIdentity, loadPlayer } from './lib/leaderboard'
 import { CharacterAvatar } from './ui/Avatars'
 import { GreenView, HoleMap, useMapSize } from './ui/HoleMap'
@@ -84,9 +84,11 @@ export default function App() {
   const [splashKey, setSplashKey] = useState(0)
   const [moment, setMoment] = useState<{ kind: MomentKind; holeNumber: number } | null>(null)
   /** Clubhouse decision stats (Layer 2): real tallies of what the field chose
-   * today, alongside the cast sim. Null until fetched (or unavailable) — the
-   * cast block degrades gracefully to cast-only lines in that case. */
-  const [dailyChoices, setDailyChoices] = useState<TallyRow[] | null>(null)
+   * on the CURRENT hole, fetched only after that hole is committed. Null until
+   * fetched (or unavailable) — the cast block degrades gracefully to cast-only
+   * lines in that case. Scoped to the played hole so future-hole tallies never
+   * reach the client ahead of a live decision. */
+  const [holeChoices, setHoleChoices] = useState<TallyRow[] | null>(null)
   const animTimer = useRef<number | null>(null)
   const splashTimer = useRef<number | null>(null)
   const [mapRef, mapSize] = useMapSize()
@@ -106,20 +108,22 @@ export default function App() {
     if (p) identifyPlayer(p.id, p.name)
   }, [])
 
-  // Clubhouse decision stats (Layer 2): for a daily round only, lazily pull
-  // today's real per-hole tallies once so the post-hole recap can show a real
-  // line alongside the cast sim. Fire-and-forget — never blocks the UI, and
-  // fetchDailyChoices itself degrades to null on any failure or in tests.
+  // Clubhouse decision stats (Layer 2): for a daily round only, and ONLY once
+  // the current hole is committed (stage 'done'), fetch that one hole's real
+  // tallies for the post-hole recap. Scoping to the played hole is deliberate —
+  // the client never holds tallies for holes it hasn't reached, so the signal
+  // can't leak ahead of a live decision. Fire-and-forget; fetchHoleChoices
+  // degrades to null on any failure or in tests.
   useEffect(() => {
-    if (!round || round.mode !== 'daily') return
+    if (!round || round.mode !== 'daily' || round.hole?.stage !== 'done') return
     let cancelled = false
-    fetchDailyChoices(round.dateKey).then((rows) => {
-      if (!cancelled) setDailyChoices(rows)
+    fetchHoleChoices(round.dateKey, round.currentHole + 1).then((rows) => {
+      if (!cancelled) setHoleChoices(rows)
     })
     return () => {
       cancelled = true
     }
-  }, [round?.mode, round?.dateKey])
+  }, [round?.mode, round?.dateKey, round?.currentHole, round?.hole?.stage])
 
   // a replay link opened while the app is already mounted only fires
   // hashchange — no reload, so the mount-time hash check never reruns.
@@ -204,12 +208,12 @@ export default function App() {
   // whenever the rows haven't loaded (or the backend is unavailable), in
   // which case the cast lines above stand alone, unchanged.
   const clubhouseTally = useMemo(() => {
-    if (!round || round.mode !== 'daily' || !dailyChoices) return null
+    if (!round || round.mode !== 'daily' || !holeChoices) return null
     const par = courseBySlug(round.courseSlug)?.holes[round.currentHole]?.par
     const stage = par === 3 ? 'approach' : 'tee'
-    const grouped = groupChoices(dailyChoices, round.currentHole + 1, stage)
+    const grouped = groupChoices(holeChoices, round.currentHole + 1, stage)
     return clubhouseLine(grouped, stage)
-  }, [round?.mode, round?.courseSlug, round?.currentHole, dailyChoices])
+  }, [round?.mode, round?.courseSlug, round?.currentHole, holeChoices])
 
   // the swing coach's report replays the whole round's EV model — memoize so unrelated
   // state changes on the result screen don't recompute it

@@ -29,15 +29,18 @@ const REST_HEADERS = {
 const cache = new Map<string, TallyRow[]>()
 const inFlight = new Map<string, Promise<TallyRow[] | null>>()
 
-/** Today's (or any date's) aggregate choice tallies, cached per date key with
- * in-flight de-duplication so multiple callers on the same round share one
- * request. Null on any failure or when the backend is disabled (tests) —
- * callers must degrade to cast-only, never block or crash. */
-export function fetchDailyChoices(dateKey: string): Promise<TallyRow[] | null> {
+/** Aggregate choice counters for ONE hole on a given day, cached per
+ * (date_key, hole) with in-flight de-duplication. Scoped to a single hole on
+ * purpose: this is only ever called once a hole is committed, so the client
+ * never holds tallies for holes it hasn't played yet — the clubhouse signal
+ * can't leak ahead of a live decision. Null on any failure or when the backend
+ * is disabled (tests) — callers degrade to cast-only, never block or crash. */
+export function fetchHoleChoices(dateKey: string, hole: number): Promise<TallyRow[] | null> {
   if (!backendEnabled) return Promise.resolve(null)
-  const cached = cache.get(dateKey)
+  const key = `${dateKey}:${hole}`
+  const cached = cache.get(key)
   if (cached) return Promise.resolve(cached)
-  const existing = inFlight.get(dateKey)
+  const existing = inFlight.get(key)
   if (existing) return existing
 
   const promise = (async (): Promise<TallyRow[] | null> => {
@@ -45,19 +48,20 @@ export function fetchDailyChoices(dateKey: string): Promise<TallyRow[] | null> {
       const url =
         `${SUPABASE_URL}/rest/v1/daily_choice_tallies` +
         `?date_key=eq.${encodeURIComponent(dateKey)}` +
+        `&hole=eq.${hole}` +
         `&select=hole,stage,choice,count,names&limit=1000`
       const res = await fetch(url, { headers: REST_HEADERS })
       if (!res.ok) return null
       const rows = (await res.json()) as TallyRow[]
-      cache.set(dateKey, rows)
+      cache.set(key, rows)
       return rows
     } catch {
       return null // network hiccup — let a later call retry, don't cache the failure
     } finally {
-      inFlight.delete(dateKey)
+      inFlight.delete(key)
     }
   })()
-  inFlight.set(dateKey, promise)
+  inFlight.set(key, promise)
   return promise
 }
 

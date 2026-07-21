@@ -157,7 +157,12 @@ begin
         updated_at = now();
 end;
 $$;
+-- Lock the function down to the one caller: strip the implicit PUBLIC grant
+-- (which covers anon/authenticated), then grant EXECUTE to service_role only —
+-- submit-round runs under the service role. The explicit grant does not rely on
+-- service_role happening to retain a privilege after the revoke.
 revoke all on function bump_choice_tallies(text, text, text, smallint[], text[], text[]) from public, anon, authenticated;
+grant execute on function bump_choice_tallies(text, text, text, smallint[], text[], text[]) to service_role;
 
 -- Optional retention (needs pg_cron): the client only reads TODAY, so prune
 -- anything older than yesterday to keep the table permanently near ~2 days.

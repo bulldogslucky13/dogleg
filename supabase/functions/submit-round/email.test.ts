@@ -43,14 +43,14 @@ describe('sendViaResend', () => {
       return new Response('{}', { status: 200 })
     }) as typeof fetch
 
-    const result = await sendViaResend(fakeFetch, 'key-123', 'Dogleg <rec@dogleg.test>', 'holder@example.com', msg)
+    const result = await sendViaResend(fakeFetch, 'key-123', 'DogLeg <rec@dogleg.test>', 'holder@example.com', msg)
 
     expect(result).toEqual({ ok: true, status: 200 })
     expect(captured!.url).toBe('https://api.resend.com/emails')
     expect(captured!.init.method).toBe('POST')
     expect((captured!.init.headers as Record<string, string>).Authorization).toBe('Bearer key-123')
     expect(JSON.parse(captured!.init.body as string)).toEqual({
-      from: 'Dogleg <rec@dogleg.test>',
+      from: 'DogLeg <rec@dogleg.test>',
       to: 'holder@example.com',
       subject: 'sub',
       html: '<p>html</p>',

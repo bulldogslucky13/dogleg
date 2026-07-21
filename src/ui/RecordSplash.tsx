@@ -49,7 +49,7 @@ export function RecordSplash(props: {
       })
       const outcome = await shareMomentCard(blob, {
         filename: 'dogleg-course-record.png',
-        text: `Reclaimed the course record on ${props.courseName} (${toParLabel(props.toPar)}) — Dogleg`,
+        text: `Reclaimed the course record on ${props.courseName} (${toParLabel(props.toPar)}) — DogLeg`,
         url: `https://${SITE_URL}`,
       })
       if (outcome === 'cancelled') return
@@ -69,7 +69,7 @@ export function RecordSplash(props: {
         <span key={i} className="moment-confetti" style={confettiStyle(i)} aria-hidden />
       ))}
       <div className="record-splash-card" onClick={(e) => e.stopPropagation()}>
-        <div className="moment-kicker">⛳ Dogleg · {props.courseName}</div>
+        <div className="moment-kicker">⛳ DogLeg · {props.courseName}</div>
         <h2 className="record-splash-title">Record reclaimed</h2>
         <p className="record-splash-sub">
           {toParLabel(props.toPar)} takes back the course record

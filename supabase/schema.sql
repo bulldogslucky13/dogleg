@@ -1,4 +1,4 @@
--- Dogleg leaderboard schema. Run once in the Supabase SQL editor (or via CLI).
+-- DogLeg leaderboard schema. Run once in the Supabase SQL editor (or via CLI).
 --
 -- Trust model: the anon key (shipped in the site) can only READ the boards.
 -- All writes go through the submit-round edge function, which replays every

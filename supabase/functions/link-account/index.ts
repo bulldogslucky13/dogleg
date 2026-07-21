@@ -1,4 +1,4 @@
-// Dogleg link-account edge function (Deno).
+// DogLeg link-account edge function (Deno).
 //
 // Ties an authenticated email account (magic link) to a player identity:
 // - device player + fresh account → attach the player to the account

@@ -1,4 +1,4 @@
-// Dogleg submit-round edge function (Deno).
+// DogLeg submit-round edge function (Deno).
 //
 // Receives { seed, character, decisions, playerId?, playerSecret?, name? },
 // REPLAYS the round with the real game engine (bundled as engine.mjs by

@@ -70,7 +70,7 @@ export function buildStealEmail(input: StealEmailInput): { subject: string; text
         <tr>
           <td class="dl-header" style="background-color:#142a1c;padding:28px 32px;">
             <span style="font-family:Georgia,'Times New Roman',serif;font-size:24px;font-weight:700;letter-spacing:0.5px;color:#f4efe3;">
-              &#9971; Dogleg
+              &#9971; DogLeg
             </span>
             <div style="margin-top:4px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:12px;letter-spacing:1.5px;text-transform:uppercase;color:#c9a227;">
               Daily golf strategy
@@ -114,7 +114,7 @@ export function buildStealEmail(input: StealEmailInput): { subject: string; text
               and someone took what&rsquo;s yours. At most one of these per course per day.
             </p>
             <p class="dl-domain" style="margin:10px 0 0;font-size:12px;color:#a9a494;">
-              Dogleg &middot; <a href="https://dogleg.cameronbristol.xyz/" target="_blank" style="color:#2e6329;text-decoration:none;">dogleg.cameronbristol.xyz</a>
+              DogLeg &middot; <a href="https://dogleg.cameronbristol.xyz/" target="_blank" style="color:#2e6329;text-decoration:none;">dogleg.cameronbristol.xyz</a>
             </p>
           </td>
         </tr>

@@ -86,7 +86,7 @@ export function MomentSplash(props: {
       const line = props.kind === 'ace' ? `Hole in one at ${props.courseName} ⛳` : `Albatross at ${props.courseName} 🕊️`
       const opts = {
         filename: `dogleg-${props.kind === 'ace' ? 'hole-in-one' : 'albatross'}.png`,
-        text: `${line}${streakTag(props.streak)} — Dogleg`,
+        text: `${line}${streakTag(props.streak)} — DogLeg`,
         url: `https://${SITE_URL}`,
       }
       // Ready card → no await before shareMomentCard, so navigator.share() fires
@@ -130,7 +130,7 @@ export function MomentSplash(props: {
         <span key={i} className="moment-confetti" style={confettiStyle(i)} aria-hidden />
       ))}
       <div className="moment-card">
-        <div className="moment-kicker">⛳ Dogleg · {props.courseName}</div>
+        <div className="moment-kicker">⛳ DogLeg · {props.courseName}</div>
         <div className="moment-ball" aria-hidden>
           <span />
         </div>

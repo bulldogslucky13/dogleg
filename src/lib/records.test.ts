@@ -95,4 +95,15 @@ describe('the reclaim closes the loop', () => {
   it('winning a record that was never stolen is not a reclaim', () => {
     expect(recordWon('st-andrews-old', -2, 1000)).toBeNull()
   })
+
+  it('a stolen record reclaimed under my name on another device clears the steal', () => {
+    recordWon('pebble-beach', -4, 1000)
+    syncLedger(server([['pebble-beach', 'Hank', -6]]), 'Jackson', 2000, '2026-07-20')
+    expect(chasing('pebble-beach')?.by).toBe('Hank')
+    // the win posts elsewhere; this device only sees the server flip back to us
+    syncLedger(server([['pebble-beach', 'Jackson', -7]]), 'Jackson', 3000, '2026-07-20')
+    expect(chasing('pebble-beach')).toBeNull()
+    expect(pendingSteals()).toHaveLength(0)
+    expect(loadLedger().held['pebble-beach'].toPar).toBe(-7)
+  })
 })

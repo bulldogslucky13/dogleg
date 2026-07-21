@@ -75,11 +75,15 @@ export function ScoreBoard(props: { round: RoundState }) {
         reclaimed = true
       }
     }
-    // the untracked conversion: a round actually posted to a board. Daily cards
-    // and course-record claims both land here. Skip duplicate daily re-posts
-    // (a returning player re-opening today's card auto-submits again, and the
-    // server returns duplicate: true) so re-views don't inflate conversions.
-    if (!r.duplicate) {
+    // the untracked conversion: a round actually WRITTEN to a board. Only
+    // count real writes, so the metric isn't inflated by no-op submits:
+    //  - daily: every non-duplicate post lands on today's board (a returning
+    //    player re-opening today's card auto-submits again → duplicate: true,
+    //    skip it)
+    //  - practice: the round only writes when it breaks the course record;
+    //    ordinary practice completions submit for validation but write nothing
+    const wroteToBoard = round.mode === 'daily' ? !r.duplicate : !!r.record?.broken
+    if (wroteToBoard) {
       track('board_submitted', {
         mode: round.mode,
         course: round.courseSlug,

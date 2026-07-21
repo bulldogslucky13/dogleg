@@ -16,6 +16,7 @@ import { castLinesForHole, castRound } from './engine/cast'
 import { CHARACTERS } from './engine/characters'
 import { COURSES, courseBySlug } from './engine/courses'
 import { dailySetup, forecastSetup, practiceSetup, shareText, type DailySetup } from './engine/daily'
+import { gradeCopy, gradeRound } from './engine/grade'
 import { setupFromSeed } from './engine/replay'
 import { buildLayout } from './engine/layout'
 import type { Choice } from './engine/types'
@@ -330,6 +331,31 @@ describe('smoke: a finished round produces its result artifacts', () => {
     expect(shareText(setup, results, roundToPar(done), 'dart', 1)).not.toContain('streak')
     expect(shareText(setup, results, roundToPar(done), 'dart', 0)).not.toContain('streak')
     expect(card).not.toContain('streak')
+  })
+
+  it('grades the round — the swing coach report identity, determinism, and copy', () => {
+    const setup: DailySetup = dailySetup(new Date(2026, 6, 20))
+    const done = playRound(newRound(setup, 'daily', 'dart'), aggressivePolicy)
+
+    const grade = gradeRound(done)
+    expect(grade).not.toBeNull()
+    expect(grade!.decisionLoss).toBeGreaterThanOrEqual(0)
+    // actualToPar decomposes exactly into expected-best + decision loss + luck + destiny
+    expect(
+      Math.abs(grade!.actualToPar - (grade!.expectedBestToPar + grade!.decisionLoss + grade!.luck + grade!.destinyBonus)),
+    ).toBeLessThan(1e-9)
+
+    // grading is a pure function of the finished round — same input, same output
+    const again = gradeRound(done)
+    expect(again).toEqual(grade)
+
+    const copy = gradeCopy(grade!)
+    expect(copy.headline.length).toBeGreaterThan(0)
+    expect(copy.decisionLine.length).toBeGreaterThan(0)
+    expect(copy.luckLine.length).toBeGreaterThan(0)
+    expect(copy.headline).not.toMatch(/dice/i)
+    expect(copy.decisionLine).not.toMatch(/dice/i)
+    expect(copy.luckLine).not.toMatch(/dice/i)
   })
 })
 

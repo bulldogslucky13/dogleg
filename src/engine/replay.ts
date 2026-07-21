@@ -26,7 +26,7 @@ export { courseBySlug } from './courses'
  * never what the client claims.
  */
 
-const AGGRESSIVE_BUDGET = 8
+export const AGGRESSIVE_BUDGET = 8
 
 export interface SeedInfo {
   mode: 'daily' | 'practice'

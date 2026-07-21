@@ -175,7 +175,7 @@ export function HomeScreen(props: {
       )}
       {loadArchive().length > 0 && (
         <button className="cta ghost" onClick={props.onMyRounds}>
-          🛅 My rounds · locker
+          🏆 Clubhouse · my rounds
         </button>
       )}
       <HandicapChip onTap={props.onStats} />
@@ -208,7 +208,7 @@ function StealCard(props: {
         <>
           <p>
             <b>{one.by}</b> shot <b>{toParLabel(one.theirToPar)}</b> at {courseName(one.courseSlug)}, sliding past
-            your {toParLabel(one.myToPar)}. The clubhouse noticed.
+            your {toParLabel(one.myToPar)}. Word travels fast around here.
           </p>
           <button className="cta steal-cta" onClick={() => props.onWinItBack(one.courseSlug)}>
             Win it back
@@ -281,7 +281,7 @@ export function CharacterPickScreen(props: {
   return (
     <div className="screen pick">
       <button className="home-link" onClick={props.onBack}>
-        ‹ Clubhouse
+        ‹ Teebox
       </button>
       <header>
         <div className="kicker">
@@ -514,7 +514,7 @@ export function ResultScreen(props: {
         </button>
       )}
       <button className="cta ghost" onClick={props.onHome}>
-        Back to the clubhouse
+        Back to the Teebox
       </button>
     </div>
   )

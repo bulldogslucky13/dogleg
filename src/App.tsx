@@ -223,7 +223,7 @@ export default function App() {
         <div className="screen">
           <p className="tagline center">That replay link doesn't parse — maybe it got truncated in the chat?</p>
           <button className="cta" onClick={exitWatch}>
-            Clubhouse
+            Teebox
           </button>
         </div>
       )
@@ -319,7 +319,7 @@ export default function App() {
       <div className="screen">
         <p className="tagline center">Walking to the first tee…</p>
         <button className="cta" onClick={() => setView('home')}>
-          Clubhouse
+          Teebox
         </button>
       </div>
     )
@@ -420,8 +420,8 @@ export default function App() {
         />
       )}
       <div className="top-row">
-        <button className="home-link" onClick={() => setView('home')} aria-label="Back to clubhouse">
-          ‹ Clubhouse
+        <button className="home-link" onClick={() => setView('home')} aria-label="Back to the teebox">
+          ‹ Teebox
         </button>
         {char && (
           <div className="char-chip" title={char.edge}>

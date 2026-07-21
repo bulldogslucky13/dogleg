@@ -1,16 +1,19 @@
 import { useEffect, useState } from 'react'
 import { backendEnabled } from '../lib/backend'
 import { currentEmail, sendMagicLink, signOut, syncAccount } from '../lib/auth'
-import { loadPlayer } from '../lib/leaderboard'
+import { fetchMyHistory, loadPlayer } from '../lib/leaderboard'
+import { mergeHistory, type HistoryEntry } from '../state/store'
 import { Spinner } from './Spinner'
 
 /**
  * Optional account sync, tucked under the home screen. Three states:
  * signed out (email form) → link sent → signed in (synced identity).
  * Magic-link redirects land on the home screen, so this panel also runs
- * the reconcile step that adopts your identity onto a new device.
+ * the reconcile step that adopts your identity onto a new device — and then
+ * pulls the account's submitted rounds into local history so streaks and
+ * "played today" follow the player across devices.
  */
-export function AccountPanel() {
+export function AccountPanel(props: { onHistorySynced?: (h: HistoryEntry[]) => void }) {
   const [open, setOpen] = useState(false)
   const [email, setEmail] = useState('')
   const [sent, setSent] = useState(false)
@@ -20,6 +23,13 @@ export function AccountPanel() {
   const [needsName, setNeedsName] = useState(false)
   const [nameInput, setNameInput] = useState('')
   const [error, setError] = useState<string | null>(null)
+
+  // after any successful sync: pull this player's submitted rounds down and
+  // merge them into local history, so this device's streak catches up
+  const pullHistory = async () => {
+    const remote = await fetchMyHistory()
+    if (remote?.length) props.onHistorySynced?.(mergeHistory(remote))
+  }
 
   // on mount: pick up a magic-link session and reconcile identities
   useEffect(() => {
@@ -35,8 +45,11 @@ export function AccountPanel() {
       } else if (out.player) {
         setPlayerName(out.player.name)
         if (out.status === 'adopted') setOpen(true) // show the win on a new device
+        await pullHistory()
       }
     })()
+    // mount-only: reruns would re-fire the whole reconcile
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   if (!backendEnabled) return null
@@ -60,6 +73,7 @@ export function AccountPanel() {
     if (out.player) {
       setPlayerName(out.player.name)
       setNeedsName(false)
+      await pullHistory()
     } else setError(out.error ?? 'could not claim that name')
   }
 

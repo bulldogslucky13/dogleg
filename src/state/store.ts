@@ -126,10 +126,14 @@ export function newRound(
   // Both modes then carry the player's fortune counters as a seed tail, so
   // ace/albatross odds and destiny replay identically on the server.
   const salt = mode === 'daily' && playerId ? dailySalt(playerId, setup.dateKey) : null
+  // A setup seed is a base seed, but be idempotent if handed one that already
+  // carries a fortune tail (e.g. a round seed fed back in) — strip it before
+  // re-appending, or the seed grows a second `:f…` tail that won't parse.
+  const baseSeed = splitFortune(setup.seed).base
   const fortuneTail = `:${encodeFortune(fortuneFor(mode))}`
   return {
     mode,
-    seed: (salt ? `${setup.seed}:${salt}` : setup.seed) + fortuneTail,
+    seed: (salt ? `${baseSeed}:${salt}` : baseSeed) + fortuneTail,
     courseSlug: course.slug,
     cond: setup.cond,
     character,
@@ -280,6 +284,31 @@ export function loadRound(): RoundState | null {
   } catch {
     return null
   }
+}
+
+/** Union server-fetched rounds into local history by day (local wins ties —
+ * the device that played the round holds the authoritative entry). Persists
+ * and returns the merged list so streaks/records pick the new days up. */
+export function mergeHistory(remote: HistoryEntry[]): HistoryEntry[] {
+  const local = loadHistory()
+  const have = new Set(local.map((e) => e.dateKey))
+  const fresh = remote.filter((e) => !have.has(e.dateKey))
+  if (!fresh.length) return local
+  const merged = [...local, ...fresh].sort((a, b) => a.dateKey.localeCompare(b.dateKey))
+  try {
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(merged))
+  } catch {
+    /* private mode */
+  }
+  return merged
+}
+
+/** True when an unfinished daily on this device is for a day the (synced)
+ * history already shows as completed — e.g. the round was played to the end
+ * on another device. Such a round is stale: resuming it would let the player
+ * replay a day the account has already posted. */
+export function supersededDaily(round: RoundState | null, history: HistoryEntry[]): boolean {
+  return !!round && !round.complete && round.mode === 'daily' && history.some((e) => e.dateKey === round.dateKey)
 }
 
 export function loadHistory(): HistoryEntry[] {

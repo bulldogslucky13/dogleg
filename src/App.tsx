@@ -12,6 +12,7 @@ import {
   buildRecap,
   holeInPlay,
   loadHistory,
+  computeStreaks,
   loadRound,
   loadUiMode,
   recordResult,
@@ -66,6 +67,8 @@ export default function App() {
   const [selected, setSelected] = useState<Choice | null>(null)
   /** where the locker opens: 'stats' when deep-linked from the home handicap chip */
   const [lockerView, setLockerView] = useState<'main' | 'stats'>('main')
+  /** open the locker with the account panel expanded (How to Play's sync line) */
+  const [lockerAccount, setLockerAccount] = useState(false)
   const [uiMode, setUiMode] = useState<UiMode>(loadUiMode)
   const [pending, setPending] = useState<PendingStart | null>(null)
   const [showTutorial, setShowTutorial] = useState(() => !hasSeenTutorial())
@@ -145,16 +148,30 @@ export default function App() {
   if (view === 'home') {
     return (
       <>
-        {showTutorial && <Tutorial onClose={() => setShowTutorial(false)} />}
+        {showTutorial && (
+          <Tutorial
+            onClose={() => setShowTutorial(false)}
+            onSync={() => {
+              // the same account flow as the Locker CTA: land in the locker
+              // with the panel open
+              setShowTutorial(false)
+              setLockerView('main')
+              setLockerAccount(true)
+              setView('rounds')
+            }}
+          />
+        )}
         <HomeScreen
           history={history}
           onHowToPlay={() => setShowTutorial(true)}
           onMyRounds={() => {
             setLockerView('main')
+            setLockerAccount(false)
             setView('rounds')
           }}
           onStats={() => {
             setLockerView('stats')
+            setLockerAccount(false)
             setView('rounds')
           }}
           activeRound={
@@ -204,11 +221,15 @@ export default function App() {
     return (
       <RoundsScreen
         initialView={lockerView}
+        initialAccount={lockerAccount}
         onWatch={(p) => {
           setWatching(p)
           setView('watch')
         }}
-        onBack={() => setView('home')}
+        onBack={() => {
+          setLockerAccount(false)
+          setView('home')
+        }}
       />
     )
   }
@@ -365,6 +386,7 @@ export default function App() {
           dateKey={round.dateKey}
           toPar={toPar}
           character={round.character}
+          streak={computeStreaks(history).dayStreak}
           onClose={() => setMoment(null)}
         />
       )}

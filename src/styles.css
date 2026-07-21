@@ -1218,6 +1218,13 @@ button {
   accent-color: var(--good);
 }
 
+/* the fortune disclosure under streak displays — flavor, not a promo */
+.streak-note {
+  font-style: italic;
+  font-size: 0.72rem;
+  margin-top: -6px;
+}
+
 /* every round entry offers Scorecard, and Replay while the archive holds it */
 .round-actions {
   display: flex;

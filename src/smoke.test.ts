@@ -253,5 +253,12 @@ describe('smoke: a finished round produces its result artifacts', () => {
     expect(card).toContain(`DOGLEG #${setup.puzzleNumber}`)
     expect(card).toContain(setup.course.name)
     expect(card).toContain('Dart Thrower')
+
+    // the streak rides on the result line — but only when it's a brag:
+    // 0 and 1 day streaks are omitted entirely, not shared as "1-day streak"
+    expect(shareText(setup, results, roundToPar(done), 'dart', 12)).toContain('· 12-day streak')
+    expect(shareText(setup, results, roundToPar(done), 'dart', 1)).not.toContain('streak')
+    expect(shareText(setup, results, roundToPar(done), 'dart', 0)).not.toContain('streak')
+    expect(card).not.toContain('streak')
   })
 })

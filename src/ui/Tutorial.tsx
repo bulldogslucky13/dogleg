@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { CharacterAvatar } from './Avatars'
+import { SyncCta } from './RoundsScreen'
 
 const STORAGE_KEY = 'dogleg:tutorial:v1'
 
@@ -85,9 +86,26 @@ const STEPS: Step[] = [
       </>
     ),
   },
+  {
+    title: 'Fortunes',
+    body: (
+      <>
+        Every so often the golf gods simply smile on you: a <b>hole in one</b> or an{' '}
+        <b>albatross</b>, out of pure luck — the best score a hole can give. That's a{' '}
+        <b>Fortune</b>, and it can strike on any hole, any day, for any player. But the
+        golf gods reward the faithful — keep your daily streak alive and your odds of
+        striking a Fortune quietly improve.
+      </>
+    ),
+  },
 ]
 
-export function Tutorial(props: { onClose: () => void }) {
+export function Tutorial(props: {
+  onClose: () => void
+  /** the Fortunes step's one quiet sync line routes here — the same account
+   * flow the Locker CTA opens. This is How to Play's ONLY sync mention. */
+  onSync?: () => void
+}) {
   const [step, setStep] = useState(0)
   const last = step === STEPS.length - 1
 
@@ -117,6 +135,16 @@ export function Tutorial(props: { onClose: () => void }) {
         <div className="kicker">How to play · {step + 1} of {STEPS.length}</div>
         <h2 className="tut-title">{current.title}</h2>
         <div className="tut-body">{current.body}</div>
+        {current.title === 'Fortunes' && props.onSync && (
+          <SyncCta
+            copy="Playing on more than one device? Sync your account to keep your streak and stats with you."
+            trigger="how-to-play"
+            onTap={() => {
+              markSeen()
+              props.onSync!()
+            }}
+          />
+        )}
         <div className="tut-dots" aria-hidden>
           {STEPS.map((_s, i) => (
             <span key={i} className={i === step ? 'on' : ''} />

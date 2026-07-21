@@ -15,6 +15,7 @@ import {
 import { recordWon, type StolenRecord } from '../lib/records'
 import { markArchiveRecord, roundToPar, type RoundState } from '../state/store'
 import { courseBySlug } from '../engine/courses'
+import { track } from '../lib/analytics'
 import { RecordSplash } from './RecordSplash'
 import { SyncCta } from './RoundsScreen'
 
@@ -54,13 +55,32 @@ export function ScoreBoard(props: { round: RoundState }) {
     }
     setResult(r)
     setPlayer(loadPlayer())
+    // naming yourself on a card is the app's core conversion — a device with a
+    // clubhouse name is a returning, ranked player. Fire it before the record
+    // bookkeeping so a name-claim always registers.
+    if (pickedName && !player) track('clubhouse_name_claimed', { via: 'board', mode: round.mode })
+    let reclaimed = false
     if (r.record?.broken) {
       markArchiveRecord(round.seed) // pin it in the locker forever
       // ledger: this record is ours now — and if it had been stolen from
       // us, that's a RECLAIM, which deserves its own moment
       const stolen = recordWon(round.courseSlug, r.record.toPar)
-      if (stolen) setReclaim(stolen)
+      if (stolen) {
+        setReclaim(stolen)
+        reclaimed = true
+      }
     }
+    // the untracked conversion: a round actually posted to a board. Daily cards
+    // and course-record claims both land here.
+    track('board_submitted', {
+      mode: round.mode,
+      course: round.courseSlug,
+      to_par: roundToPar(round),
+      named: !!(pickedName || player),
+      is_record: !!r.record?.broken,
+      reclaim: reclaimed,
+      rank: r.rank ?? null,
+    })
     void refreshBoard()
   }
 

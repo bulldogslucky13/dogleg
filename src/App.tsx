@@ -126,6 +126,30 @@ export default function App() {
     [],
   )
 
+  // Navigation telemetry: one `screen_viewed` per place a player lands, so we
+  // can see who gets past 'play' — into results, replays, the clubhouse. The
+  // clubhouse fires its own finer-grained screen events (see RoundsScreen), so
+  // it's skipped here to avoid double-counting the same landing.
+  useEffect(() => {
+    if (view === 'rounds') return
+    const props: Record<string, unknown> = { screen: view === 'watch' ? 'replay' : view }
+    if ((view === 'play' || view === 'result') && round) {
+      props.mode = round.mode
+      props.course = round.courseSlug
+    }
+    track('screen_viewed', props)
+    // fire on view change only — round/course ride along as context
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view])
+
+  // the tutorial auto-opens on a first visit — that impression is the top of
+  // the activation funnel, worth its own event (manual opens tagged below)
+  useEffect(() => {
+    if (showTutorial) track('tutorial_shown', { trigger: 'auto' })
+    // mount-only: the auto-open decision is made once, at load
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   const playedToday = history.find((e) => e.dateKey === localDateKey()) ?? null
 
   const hole = useMemo(() => (round && !round.complete && round.hole ? holeInPlay(round) : null), [round])
@@ -176,7 +200,10 @@ export default function App() {
         )}
         <HomeScreen
           history={history}
-          onHowToPlay={() => setShowTutorial(true)}
+          onHowToPlay={() => {
+            track('tutorial_shown', { trigger: 'manual' })
+            setShowTutorial(true)
+          }}
           onMyRounds={() => {
             setLockerView('main')
             setLockerAccount(false)
@@ -349,6 +376,15 @@ export default function App() {
     } else if (justScored && parNow === 5 && justScored.strokes === 2) {
       setMoment({ kind: 'albatross', holeNumber: nextRound.currentHole + 1 })
       momentFired = true
+    }
+    if (momentFired) {
+      // the marquee moment — previously only visible if the player shared it
+      track('moment_shown', {
+        kind: parNow === 3 ? 'ace' : 'albatross',
+        mode: nextRound.mode,
+        course: nextRound.courseSlug,
+        hole_number: nextRound.currentHole + 1,
+      })
     }
     const shots = nextRound.hole?.shots ?? []
     const adv = shots[shots.length - 1]?.advantage

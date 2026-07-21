@@ -2,7 +2,7 @@ import { courseBySlug } from './courses'
 import { dailyConditions, courseForPuzzle, practiceConditions, puzzleNumberForDateKey } from './daily'
 import { destinyDue, fortuneShotOdds, splitFortune, type FortuneState, type MomentKind } from './fortune'
 import { buildLayout } from './layout'
-import { playShot, startHole } from './resolve'
+import { playShot, startHole, type HoleInPlay } from './resolve'
 import { rngFromString } from './rng'
 import type { CharacterId, Choice, Conditions, CourseSpec, HoleResult, HoleScore } from './types'
 
@@ -156,4 +156,93 @@ export function replayRound(seed: string, character: CharacterId | undefined, de
 export function decisionsFromScores(scores: (HoleScore | null)[]): Choice[][] | null {
   if (scores.length !== 18 || scores.some((s) => !s)) return null
   return scores.map((s) => s!.shots.map((shot) => shot.choice))
+}
+
+// ---------------------------------------------------------------------------
+// Viewable replays — the same determinism, frame by frame
+// ---------------------------------------------------------------------------
+
+export interface ReplayFrame {
+  /** 0-17 */
+  holeIndex: number
+  /** snapshot after this many shots on the hole (0 = standing on the tee) */
+  shotIndex: number
+  hole: HoleInPlay
+  /** running to-par BEFORE this hole plus strokes so far on it */
+  runningToPar: number
+}
+
+function snapshot(h: HoleInPlay): HoleInPlay {
+  return { ...h, ball: { ...h.ball }, shots: [...h.shots], status: { ...h.status } }
+}
+
+/** Every viewable moment of a round: tee frame + one frame per decision. */
+export function replayFrames(seed: string, character: CharacterId | undefined, decisions: Choice[][]): ReplayFrame[] | null {
+  const outcome = replayRound(seed, character, decisions)
+  if (!outcome.ok) return null
+  const info = outcome.info
+  // re-run, capturing states this time (cheap: one extra pass). Fortune is
+  // mirrored exactly as in replayRound — the dice ignore the fortune tail, the
+  // shot odds carry the boosts, and a due track's first qualifying shot holes
+  // out — or the frames diverge from the validated score.
+  const rng = rngFromString(splitFortune(seed).base)
+  const plan = destinyPlan(info)
+  const fOdds = fortuneOddsFor(info)
+  const frames: ReplayFrame[] = []
+  let runToPar = 0
+  for (let i = 0; i < 18; i++) {
+    const spec = info.course.holes[i]
+    const layout = buildLayout(info.course.slug, spec)
+    const h = startHole(layout, info.cond, character, fOdds)
+    frames.push({ holeIndex: i, shotIndex: 0, hole: snapshot(h), runningToPar: runToPar })
+    decisions[i].forEach((choice, j) => {
+      let destiny: MomentKind | undefined
+      if (plan.ace && spec.par === 3 && h.ball.lie === 'tee') {
+        destiny = 'ace'
+        plan.ace = false
+      } else if (plan.albatross && h.stage === 'second' && choice === 'aggressive' && h.strokes === 1) {
+        destiny = 'albatross'
+        plan.albatross = false
+      }
+      playShot(h, choice, rng, destiny)
+      frames.push({ holeIndex: i, shotIndex: j + 1, hole: snapshot(h), runningToPar: runToPar })
+    })
+    runToPar += h.score!.strokes - spec.par
+  }
+  return frames
+}
+
+export interface ReplayPayload {
+  seed: string
+  character?: CharacterId
+  decisions: Choice[][]
+  /** optional display name of who played it */
+  name?: string
+}
+
+const CHOICE_CHAR: Record<Choice, string> = { safe: 's', normal: 'n', aggressive: 'a' }
+const CHAR_CHOICE: Record<string, Choice> = { s: 'safe', n: 'normal', a: 'aggressive' }
+
+/** Compact, URL-safe replay code: share a round as pure data. */
+export function encodeReplay(p: ReplayPayload): string {
+  const d = p.decisions.map((hole) => hole.map((c) => CHOICE_CHAR[c]).join('')).join('-')
+  const raw = JSON.stringify({ v: 1, s: p.seed, c: p.character ?? '', d, n: p.name ?? '' })
+  // btoa is fine: the payload is ASCII except possibly the name — escape it
+  const b64 = btoa(unescape(encodeURIComponent(raw)))
+  return b64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+}
+
+export function decodeReplay(code: string): ReplayPayload | null {
+  try {
+    const b64 = code.replace(/-/g, '+').replace(/_/g, '/')
+    const raw = decodeURIComponent(escape(atob(b64)))
+    const j = JSON.parse(raw) as { v: number; s: string; c: string; d: string; n?: string }
+    if (j.v !== 1 || typeof j.s !== 'string' || typeof j.d !== 'string') return null
+    const decisions = j.d.split('-').map((hole) => hole.split('').map((ch) => CHAR_CHOICE[ch]))
+    if (decisions.length !== 18 || decisions.some((h) => h.some((c) => !c))) return null
+    const character = j.c === 'fairway' || j.c === 'dart' || j.c === 'greens' ? j.c : undefined
+    return { seed: j.s, character, decisions, name: j.n || undefined }
+  } catch {
+    return null
+  }
 }

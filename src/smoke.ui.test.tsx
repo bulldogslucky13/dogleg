@@ -182,6 +182,113 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
     expect(screen.getByText('Hole in One')).toBeTruthy()
   })
 
+  it('opens a #watch= replay link straight into the viewer', async () => {
+    // build a real finished round through the store, encode it like a share link
+    const { newRound, applyChoice, advanceHole } = await import('./state/store')
+    const { practiceSetup } = await import('./engine/daily')
+    const { decisionsFromScores, encodeReplay } = await import('./engine/replay')
+    let s = newRound(practiceSetup('pebble-beach', 'smokewatch'), 'practice', 'dart')
+    let guard = 0
+    while (!s.complete && guard++ < 500) {
+      if (s.hole?.stage === 'done') {
+        s = advanceHole(s)
+        continue
+      }
+      const next = applyChoice(s, 'normal')
+      s = next === s ? applyChoice(s, 'safe') : next
+    }
+    const code = encodeReplay({
+      seed: s.seed,
+      character: 'dart',
+      decisions: decisionsFromScores(s.scores)!,
+      name: 'Smoke Watcher',
+    })
+    window.location.hash = `#watch=${code}`
+    localStorage.clear()
+    localStorage.setItem('dogleg:tutorial:v1', 'done')
+
+    render(<App />)
+    expect(screen.getByText('‹ Exit replay')).toBeTruthy()
+    expect(screen.getByText(/Smoke Watcher's round/)).toBeTruthy()
+    // stepping forward shows shot state, loudly labeled with the choice made
+    fireEvent.click(screen.getByText('Next ›'))
+    expect(screen.getByText(/1 stroke/)).toBeTruthy()
+    expect(screen.getByText(/Went (safe|normal|aggressive)/)).toBeTruthy()
+    // the hole strip jumps anywhere in the round
+    fireEvent.click(screen.getByLabelText('Jump to hole 14'))
+    expect(screen.getByText('Hole 14 of 18')).toBeTruthy()
+    // exiting cleans the hash and lands home
+    fireEvent.click(screen.getByText('‹ Exit replay'))
+    expect(screen.getByText('Tee off')).toBeTruthy()
+    window.location.hash = ''
+  })
+
+  it('a replay link opened while the app is mounted still enters the viewer (hashchange)', async () => {
+    const { newRound, applyChoice, advanceHole } = await import('./state/store')
+    const { practiceSetup } = await import('./engine/daily')
+    const { decisionsFromScores, encodeReplay } = await import('./engine/replay')
+    let s = newRound(practiceSetup('pebble-beach', 'smokehash'), 'practice', 'dart')
+    let guard = 0
+    while (!s.complete && guard++ < 500) {
+      if (s.hole?.stage === 'done') {
+        s = advanceHole(s)
+        continue
+      }
+      const next = applyChoice(s, 'normal')
+      s = next === s ? applyChoice(s, 'safe') : next
+    }
+    const code = encodeReplay({ seed: s.seed, character: 'dart', decisions: decisionsFromScores(s.scores)! })
+    let s2 = newRound(practiceSetup('st-andrews-old', 'smokehash2'), 'practice', 'greens')
+    guard = 0
+    while (!s2.complete && guard++ < 500) {
+      if (s2.hole?.stage === 'done') {
+        s2 = advanceHole(s2)
+        continue
+      }
+      const next = applyChoice(s2, 'normal')
+      s2 = next === s2 ? applyChoice(s2, 'safe') : next
+    }
+    const code2 = encodeReplay({ seed: s2.seed, character: 'greens', decisions: decisionsFromScores(s2.scores)! })
+    localStorage.clear()
+    localStorage.setItem('dogleg:tutorial:v1', 'done')
+
+    // app is already sitting on the home screen when the hash arrives
+    render(<App />)
+    expect(screen.getByText('Tee off')).toBeTruthy()
+    act(() => {
+      window.location.hash = `#watch=${code}`
+      window.dispatchEvent(new HashChangeEvent('hashchange'))
+    })
+    expect(screen.getByText('‹ Exit replay')).toBeTruthy()
+
+    // a SECOND link while deep in this one restarts cleanly at frame 0 —
+    // the index from the long replay must not read past a shorter one
+    fireEvent.click(screen.getByLabelText('Jump to hole 14'))
+    expect(screen.getByText('Hole 14 of 18')).toBeTruthy()
+    act(() => {
+      window.location.hash = `#watch=${code2}`
+      window.dispatchEvent(new HashChangeEvent('hashchange'))
+    })
+    expect(screen.getByText('Hole 1 of 18')).toBeTruthy()
+
+    // the browser Back button strips the hash — the app must leave the
+    // replay too, not stay stuck on a URL that no longer says #watch
+    act(() => {
+      window.location.hash = ''
+      window.dispatchEvent(new HashChangeEvent('hashchange'))
+    })
+    expect(screen.getByText('Tee off')).toBeTruthy()
+  })
+
+  it('a truncated replay link shows the friendly error, not the home screen', () => {
+    window.location.hash = '#watch=not-a-real-code'
+    render(<App />)
+    expect(screen.getByText(/That replay link doesn't parse/)).toBeTruthy()
+    fireEvent.click(screen.getByText('Clubhouse'))
+    expect(screen.getByText('Tee off')).toBeTruthy()
+    window.location.hash = ''
+  })
+
   it('toggles between modern and classic views mid-round', () => {
     vi.useFakeTimers()
     render(<App />)

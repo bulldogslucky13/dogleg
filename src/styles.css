@@ -1292,6 +1292,96 @@ button {
   .moment-continue {
     animation: none;
   }
+
+/* replay viewer */
+.replay-live {
+  color: var(--accent);
+  cursor: default;
+}
+
+.replay-controls {
+  display: grid;
+  grid-template-columns: 1fr 1.4fr 1fr;
+  gap: 8px;
+}
+
+/* the played choice, loud and color-coded — the whole point of watching */
+.replay-choice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-radius: 999px;
+  font-size: 0.86rem;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  background: rgba(248, 244, 233, 0.96);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
+}
+
+.replay-choice-dot {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+}
+
+.replay-choice.safe {
+  color: #2e6329;
+}
+
+.replay-choice.safe .replay-choice-dot {
+  background: var(--good);
+}
+
+.replay-choice.normal {
+  color: var(--ink);
+}
+
+.replay-choice.normal .replay-choice-dot {
+  background: var(--ink);
+}
+
+.replay-choice.aggressive {
+  color: #a07a12;
+  border: 2px solid var(--gold);
+}
+
+.replay-choice.aggressive .replay-choice-dot {
+  background: var(--gold);
+}
+
+/* hole jump strip */
+.replay-holes {
+  display: grid;
+  grid-template-columns: repeat(9, 1fr);
+  gap: 5px;
+}
+
+.replay-hole {
+  aspect-ratio: 1.15;
+  border: 1.5px solid var(--line);
+  border-radius: 8px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: rgba(29, 43, 32, 0.65);
+}
+
+.replay-hole.on {
+  background: var(--ink);
+  color: var(--cream);
+  border-color: var(--ink);
+}
+
+.replay-scrub {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.replay-scrub input[type='range'] {
+  width: 100%;
+  accent-color: var(--good);
 }
 
 /* leaderboard block: today's board + course records */

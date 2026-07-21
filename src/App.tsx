@@ -14,6 +14,7 @@ import {
   loadRound,
   loadUiMode,
   recordResult,
+  supersededDaily,
   roundToPar,
   saveRound,
   saveUiMode,
@@ -31,17 +32,32 @@ import { SideMap } from './ui/SideMap'
 import { ChoiceCards, ClassicScorecard, HazardChips, HoleComplete, Scorecard, StatusBanner, TierBanner } from './ui/panels'
 import type { MomentKind } from './engine/fortune'
 import { MomentSplash } from './ui/MomentSplash'
+import { decodeReplay, type ReplayPayload } from './engine/replay'
+import { ReplayScreen } from './ui/ReplayScreen'
 import { CharacterPickScreen, HomeScreen, ResultScreen } from './ui/screens'
 import { Tutorial, hasSeenTutorial } from './ui/Tutorial'
 
-type View = 'home' | 'pick' | 'play' | 'result'
+type View = 'home' | 'pick' | 'play' | 'result' | 'watch'
+
+/** a #watch=<code> link opens straight into the replay viewer. 'bad' means
+ * the hash IS a watch link but the code doesn't decode (truncated in a chat,
+ * mangled by an unfurler) — distinct from no watch link at all, so the app
+ * can show the friendly error instead of silently landing home. */
+type WatchState = ReplayPayload | 'bad' | null
+function watchFromHash(): WatchState {
+  const m = /#watch=([A-Za-z0-9_-]+)/.exec(window.location.hash)
+  if (!m) return null
+  return decodeReplay(m[1]) ?? 'bad'
+}
 /** setup is generated when the pick screen opens, so the conditions it shows are the ones you play */
 type PendingStart = { mode: 'daily' | 'practice'; setup: DailySetup }
 
 export default function App() {
   const [round, setRound] = useState<RoundState | null>(() => loadRound())
   const [history, setHistory] = useState<HistoryEntry[]>(() => loadHistory())
+  const [watching, setWatching] = useState<WatchState>(() => watchFromHash())
   const [view, setView] = useState<View>(() => {
+    if (watchFromHash()) return 'watch'
     const r = loadRound()
     return r && !r.complete ? 'play' : 'home'
   })
@@ -68,6 +84,30 @@ export default function App() {
   useEffect(() => {
     ensureIdentity()
   }, [])
+
+  // a replay link opened while the app is already mounted only fires
+  // hashchange — no reload, so the mount-time hash check never reruns.
+  // The reverse matters too: entering a replay pushes a hash history entry,
+  // so the browser Back button REMOVES the hash — leave the replay when
+  // that happens, or Back appears to do nothing. (Re-registered when
+  // `watching` changes so the handler sees the current state.)
+  useEffect(() => {
+    const onHash = () => {
+      const p = watchFromHash()
+      if (p) {
+        setWatching(p)
+        setView('watch')
+        return
+      }
+      if (watching) {
+        setWatching(null)
+        const r = loadRound()
+        setView(r && !r.complete ? 'play' : 'home')
+      }
+    }
+    window.addEventListener('hashchange', onHash)
+    return () => window.removeEventListener('hashchange', onHash)
+  }, [watching])
 
   useEffect(
     () => () => {
@@ -111,6 +151,12 @@ export default function App() {
               : null
           }
           playedToday={playedToday}
+          onHistorySynced={(h) => {
+            setHistory(h)
+            // a synced day supersedes this device's unfinished daily for the
+            // same date — drop it so a refresh can't replay a completed day
+            if (supersededDaily(round, h)) setRound(null)
+          }}
           onTeeOff={() => {
             setPending({ mode: 'daily', setup: dailySetup() })
             setView('pick')
@@ -127,6 +173,25 @@ export default function App() {
         />
       </>
     )
+  }
+
+  if (view === 'watch' && watching) {
+    const exitWatch = () => {
+      window.history.replaceState(null, '', window.location.pathname)
+      setWatching(null)
+      setView('home')
+    }
+    if (watching === 'bad') {
+      return (
+        <div className="screen">
+          <p className="tagline center">That replay link doesn't parse — maybe it got truncated in the chat?</p>
+          <button className="cta" onClick={exitWatch}>
+            Clubhouse
+          </button>
+        </div>
+      )
+    }
+    return <ReplayScreen payload={watching} onExit={exitWatch} />
   }
 
   if (view === 'pick') {

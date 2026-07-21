@@ -140,7 +140,14 @@ export function syncLedger(
   // facts fresh, but only re-surface it on a new day
   for (const [slug, stolen] of Object.entries(ledger.stolen)) {
     const rec = server.get(slug)
-    if (!rec || sameName(rec.player_name, myName)) continue
+    if (!rec) continue
+    if (sameName(rec.player_name, myName)) {
+      // reclaimed under our name (a win posted on another device) — the
+      // adoption pass above already put it back in `held`; drop the stale
+      // steal so chasing()/pendingSteals() stop flagging a record we hold
+      delete ledger.stolen[slug]
+      continue
+    }
     if (rec.player_name !== stolen.by || rec.to_par !== stolen.theirToPar) {
       const newDay = stolen.notifiedOn !== today
       ledger.stolen[slug] = {

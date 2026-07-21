@@ -1379,6 +1379,7 @@ button {
   .moment-continue {
     animation: none;
   }
+}
 
 /* replay viewer */
 .replay-live {

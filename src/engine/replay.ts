@@ -181,10 +181,10 @@ export function replayFrames(seed: string, character: CharacterId | undefined, d
   const outcome = replayRound(seed, character, decisions)
   if (!outcome.ok) return null
   const info = outcome.info
-  // re-run, capturing states this time (cheap: one extra pass). This pass
-  // must mirror replayRound's fortune handling exactly — stripped-seed dice,
-  // honest odds boosts, and the destiny override — or frames diverge from
-  // what the referee (and the original round) resolved.
+  // re-run, capturing states this time (cheap: one extra pass). Fortune is
+  // mirrored exactly as in replayRound — the dice ignore the fortune tail, the
+  // shot odds carry the boosts, and a due track's first qualifying shot holes
+  // out — or the frames diverge from the validated score.
   const rng = rngFromString(splitFortune(seed).base)
   const plan = destinyPlan(info)
   const fOdds = fortuneOddsFor(info)

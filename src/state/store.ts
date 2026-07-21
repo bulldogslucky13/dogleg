@@ -126,10 +126,14 @@ export function newRound(
   // Both modes then carry the player's fortune counters as a seed tail, so
   // ace/albatross odds and destiny replay identically on the server.
   const salt = mode === 'daily' && playerId ? dailySalt(playerId, setup.dateKey) : null
+  // A setup seed is a base seed, but be idempotent if handed one that already
+  // carries a fortune tail (e.g. a round seed fed back in) — strip it before
+  // re-appending, or the seed grows a second `:f…` tail that won't parse.
+  const baseSeed = splitFortune(setup.seed).base
   const fortuneTail = `:${encodeFortune(fortuneFor(mode))}`
   return {
     mode,
-    seed: (salt ? `${setup.seed}:${salt}` : setup.seed) + fortuneTail,
+    seed: (salt ? `${baseSeed}:${salt}` : baseSeed) + fortuneTail,
     courseSlug: course.slug,
     cond: setup.cond,
     character,

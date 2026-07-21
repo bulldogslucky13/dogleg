@@ -3,18 +3,21 @@ import { SUPABASE_ANON_KEY, SUPABASE_URL, backendEnabled } from './backend'
 
 /**
  * Clubhouse decision stats (Layer 2) — real per-hole, per-stage tallies of
- * what the field actually chose, read from `daily_hole_choices`. This is the
- * "real tally" companion to the cast sim in `src/engine/cast.ts`: the cast
- * always renders (it's a pure client-side sim), this degrades to nothing
- * whenever the network/backend isn't available. Never wired anywhere but the
- * post-hole recap — this must not influence a live decision.
+ * what the field actually chose, read from the aggregate counter table
+ * `daily_choice_tallies` (one row per date_key/hole/stage/choice, bumped
+ * atomically server-side — not one row per player). This is the "real tally"
+ * companion to the cast sim in `src/engine/cast.ts`: the cast always renders
+ * (it's a pure client-side sim), this degrades to nothing whenever the
+ * network/backend isn't available. Never wired anywhere but the post-hole
+ * recap — this must not influence a live decision.
  */
 
-export interface DecisionRow {
+export interface TallyRow {
   hole: number
   stage: Stage
   choice: Choice
-  player_name: string
+  count: number
+  names: string[]
 }
 
 // new-style publishable keys are sent as `apikey` alone (they aren't JWTs) —
@@ -23,29 +26,29 @@ const REST_HEADERS = {
   apikey: SUPABASE_ANON_KEY,
 }
 
-const cache = new Map<string, DecisionRow[]>()
-const inFlight = new Map<string, Promise<DecisionRow[] | null>>()
+const cache = new Map<string, TallyRow[]>()
+const inFlight = new Map<string, Promise<TallyRow[] | null>>()
 
-/** Today's (or any date's) posted hole-choice rows, cached per date key with
+/** Today's (or any date's) aggregate choice tallies, cached per date key with
  * in-flight de-duplication so multiple callers on the same round share one
  * request. Null on any failure or when the backend is disabled (tests) —
  * callers must degrade to cast-only, never block or crash. */
-export function fetchDailyChoices(dateKey: string): Promise<DecisionRow[] | null> {
+export function fetchDailyChoices(dateKey: string): Promise<TallyRow[] | null> {
   if (!backendEnabled) return Promise.resolve(null)
   const cached = cache.get(dateKey)
   if (cached) return Promise.resolve(cached)
   const existing = inFlight.get(dateKey)
   if (existing) return existing
 
-  const promise = (async (): Promise<DecisionRow[] | null> => {
+  const promise = (async (): Promise<TallyRow[] | null> => {
     try {
       const url =
-        `${SUPABASE_URL}/rest/v1/daily_hole_choices` +
+        `${SUPABASE_URL}/rest/v1/daily_choice_tallies` +
         `?date_key=eq.${encodeURIComponent(dateKey)}` +
-        `&select=hole,stage,choice,player_name&order=hole.asc&limit=5000`
+        `&select=hole,stage,choice,count,names&limit=1000`
       const res = await fetch(url, { headers: REST_HEADERS })
       if (!res.ok) return null
-      const rows = (await res.json()) as DecisionRow[]
+      const rows = (await res.json()) as TallyRow[]
       cache.set(dateKey, rows)
       return rows
     } catch {
@@ -74,9 +77,11 @@ export interface GroupedChoices {
   byChoice: Record<Choice, GroupedChoice>
 }
 
-/** Tally the rows for one (hole, stage). `hole` is 1-based, matching the
- * schema and `choiceRowsFromReplay`. */
-export function groupChoices(rows: DecisionRow[], hole: number, stage: Stage): GroupedChoices {
+/** Sum the aggregate tally rows for one (hole, stage). `hole` is 1-based,
+ * matching the schema and `choiceRowsFromReplay`. Each row is already a
+ * counter (possibly across many players), so this sums counts and
+ * concatenates the capped name lists rather than counting rows. */
+export function groupChoices(rows: TallyRow[], hole: number, stage: Stage): GroupedChoices {
   const byChoice: Record<Choice, GroupedChoice> = {
     safe: { count: 0, names: [] },
     normal: { count: 0, names: [] },
@@ -85,9 +90,9 @@ export function groupChoices(rows: DecisionRow[], hole: number, stage: Stage): G
   let total = 0
   for (const row of rows) {
     if (row.hole !== hole || row.stage !== stage) continue
-    total++
-    byChoice[row.choice].count++
-    byChoice[row.choice].names.push(row.player_name)
+    total += row.count
+    byChoice[row.choice].count += row.count
+    byChoice[row.choice].names.push(...row.names)
   }
   return { total, byChoice }
 }

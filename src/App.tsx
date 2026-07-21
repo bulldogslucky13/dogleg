@@ -31,7 +31,7 @@ import {
 import { absorbHistory, logRound } from './state/stats'
 import { chasing } from './lib/records'
 import { identifyPlayer, track } from './lib/analytics'
-import { clubhouseLine, fetchDailyChoices, groupChoices, type DecisionRow } from './lib/decisionStats'
+import { clubhouseLine, fetchDailyChoices, groupChoices, type TallyRow } from './lib/decisionStats'
 import { ensureIdentity, loadIdentity, loadPlayer } from './lib/leaderboard'
 import { CharacterAvatar } from './ui/Avatars'
 import { GreenView, HoleMap, useMapSize } from './ui/HoleMap'
@@ -86,7 +86,7 @@ export default function App() {
   /** Clubhouse decision stats (Layer 2): real tallies of what the field chose
    * today, alongside the cast sim. Null until fetched (or unavailable) — the
    * cast block degrades gracefully to cast-only lines in that case. */
-  const [dailyChoices, setDailyChoices] = useState<DecisionRow[] | null>(null)
+  const [dailyChoices, setDailyChoices] = useState<TallyRow[] | null>(null)
   const animTimer = useRef<number | null>(null)
   const splashTimer = useRef<number | null>(null)
   const [mapRef, mapSize] = useMapSize()

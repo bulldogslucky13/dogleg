@@ -1,12 +1,20 @@
 import { describe, expect, it } from 'vitest'
-import { clubhouseLine, groupChoices, type DecisionRow } from './decisionStats'
+import { clubhouseLine, groupChoices, type TallyRow } from './decisionStats'
 
-/** Build n rows for one (hole, stage), split by choice counts. Names are
- * generated in order so `names[0]` for the majority choice is deterministic. */
-function rows(hole: number, stage: DecisionRow['stage'], counts: Partial<Record<DecisionRow['choice'], string[]>>): DecisionRow[] {
-  const out: DecisionRow[] = []
+/** Build aggregate tally rows for one (hole, stage), one row per choice that
+ * has any names, splitting a name list across a leading "capped" row (up to 5
+ * names, matching the server's per-choice name cap) and an overflow row that
+ * carries the remaining count with no names — mirroring what the aggregate
+ * table can actually contain once a choice passes 5 players. */
+function rows(hole: number, stage: TallyRow['stage'], counts: Partial<Record<TallyRow['choice'], string[]>>): TallyRow[] {
+  const out: TallyRow[] = []
   for (const choice of ['safe', 'normal', 'aggressive'] as const) {
-    for (const name of counts[choice] ?? []) out.push({ hole, stage, choice, player_name: name })
+    const names = counts[choice] ?? []
+    if (names.length === 0) continue
+    const capped = names.slice(0, 5)
+    const overflow = names.length - capped.length
+    out.push({ hole, stage, choice, count: capped.length, names: capped })
+    if (overflow > 0) out.push({ hole, stage, choice, count: overflow, names: [] })
   }
   return out
 }
@@ -15,7 +23,7 @@ const names = (prefix: string, n: number) => Array.from({ length: n }, (_, i) =>
 
 describe('groupChoices', () => {
   it('tallies only the rows matching the given hole and stage', () => {
-    const all: DecisionRow[] = [
+    const all: TallyRow[] = [
       ...rows(3, 'tee', { safe: ['Ann'] }),
       ...rows(3, 'putt', { aggressive: ['Bob'] }), // same hole, other stage
       ...rows(4, 'tee', { aggressive: ['Cara'] }), // other hole, same stage
@@ -30,6 +38,19 @@ describe('groupChoices', () => {
   it('n === 0 when nothing was recorded for that hole+stage', () => {
     const grouped = groupChoices([], 1, 'tee')
     expect(grouped.total).toBe(0)
+  })
+
+  it('sums multiple rows for the same choice and concatenates names', () => {
+    const all: TallyRow[] = [
+      { hole: 1, stage: 'tee', choice: 'safe', count: 3, names: ['A1', 'A2', 'A3'] },
+      { hole: 1, stage: 'tee', choice: 'safe', count: 2, names: [] }, // overflow row, no names
+      { hole: 1, stage: 'tee', choice: 'aggressive', count: 1, names: ['B1'] },
+    ]
+    const grouped = groupChoices(all, 1, 'tee')
+    expect(grouped.total).toBe(6)
+    expect(grouped.byChoice.safe.count).toBe(5)
+    expect(grouped.byChoice.safe.names).toEqual(['A1', 'A2', 'A3'])
+    expect(grouped.byChoice.aggressive.count).toBe(1)
   })
 })
 

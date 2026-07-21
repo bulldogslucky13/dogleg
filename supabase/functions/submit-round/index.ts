@@ -221,24 +221,23 @@ Deno.serve(async (req) => {
     const { error } = await supabase.from('daily_scores').insert(row)
     if (error && error.code !== '23505') return json(500, { error: 'could not save score' })
 
-    // ---- clubhouse decision stats (Layer 2): best-effort, fresh inserts only.
-    // Only runs when the score insert above actually landed (no `error` at
-    // all) — a duplicate resubmission skips this too, same "first card
-    // stands" rule as daily_scores. Never fails the submission response: a
-    // tally write hiccup is logged and swallowed, not surfaced to the player. ----
+    // ---- clubhouse decision tallies (Layer 2): best-effort, fresh cards only.
+    // One atomic RPC bumps the aggregate counters for every (hole,stage) this
+    // round played. `!error` means a genuinely new daily card (dupes already
+    // skipped), so no counter is ever double-bumped. A tally hiccup is logged
+    // and swallowed — it never fails the player's submission. ----
     if (!error && info.dateKey && player.name) {
-      const choiceRows = choiceRowsFromReplay(replay.scores).map((r) => ({
-        date_key: info.dateKey,
-        course_slug: info.course.slug,
-        player_id: player.id,
-        player_name: player.name,
-        hole: r.hole,
-        stage: r.stage,
-        choice: r.choice,
-      }))
-      if (choiceRows.length > 0) {
-        const { error: choiceError } = await supabase.from('daily_hole_choices').insert(choiceRows)
-        if (choiceError) console.error('daily_hole_choices insert failed:', choiceError)
+      const rows = choiceRowsFromReplay(replay.scores)
+      if (rows.length > 0) {
+        const { error: tallyError } = await supabase.rpc('bump_choice_tallies', {
+          p_date_key: info.dateKey,
+          p_course_slug: info.course.slug,
+          p_player_name: player.name,
+          p_holes: rows.map((r) => r.hole),
+          p_stages: rows.map((r) => r.stage),
+          p_choices: rows.map((r) => r.choice),
+        })
+        if (tallyError) console.error('bump_choice_tallies failed:', tallyError)
       }
     }
 

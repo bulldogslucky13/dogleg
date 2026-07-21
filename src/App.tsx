@@ -197,15 +197,18 @@ export default function App() {
   }, [round?.mode, round?.dateKey, round?.courseSlug, round?.cond, round?.seed])
 
   // Clubhouse decision stats (Layer 2): the real-tally headline for the CURRENT
-  // hole's tee stage (the headline decision), from today's posted rounds.
+  // hole's opening stage (the headline decision), from today's posted rounds.
+  // Par 3s start in the approach stage — no tee rows ever exist for them.
   // Daily only — practice has no shared field to tally against — and null
   // whenever the rows haven't loaded (or the backend is unavailable), in
   // which case the cast lines above stand alone, unchanged.
   const clubhouseTally = useMemo(() => {
     if (!round || round.mode !== 'daily' || !dailyChoices) return null
-    const grouped = groupChoices(dailyChoices, round.currentHole + 1, 'tee')
-    return clubhouseLine(grouped, 'tee')
-  }, [round?.mode, round?.currentHole, dailyChoices])
+    const par = courseBySlug(round.courseSlug)?.holes[round.currentHole]?.par
+    const stage = par === 3 ? 'approach' : 'tee'
+    const grouped = groupChoices(dailyChoices, round.currentHole + 1, stage)
+    return clubhouseLine(grouped, stage)
+  }, [round?.mode, round?.courseSlug, round?.currentHole, dailyChoices])
 
   const previewWindow = useMemo<[number, number] | null>(() => {
     if (!hole || !selected || animating) return null

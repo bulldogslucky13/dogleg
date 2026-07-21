@@ -17,6 +17,7 @@ import {
   loadUiMode,
   recordResult,
   supersededDaily,
+  tryGradeRound,
   roundToPar,
   saveRound,
   saveUiMode,
@@ -158,6 +159,10 @@ export default function App() {
   const playedToday = history.find((e) => e.dateKey === localDateKey()) ?? null
 
   const hole = useMemo(() => (round && !round.complete && round.hole ? holeInPlay(round) : null), [round])
+
+  // the swing coach's report replays the whole round's EV model — memoize so unrelated
+  // state changes on the result screen don't recompute it
+  const roundGrade = useMemo(() => (round && round.complete ? tryGradeRound(round) : null), [round])
 
   const previewWindow = useMemo<[number, number] | null>(() => {
     if (!hole || !selected || animating) return null
@@ -322,6 +327,8 @@ export default function App() {
       : round && round.mode === 'daily' && round.complete && round.dateKey === entry?.dateKey
         ? round
         : null
+    // the swing coach's report needs the same shot-by-shot record the recap does
+    const grade = recapSource ? roundGrade : null
     return (
       <ResultScreen
         setup={setup}
@@ -329,6 +336,7 @@ export default function App() {
         toPar={toPar}
         practice={isPractice}
         recap={recapSource ? buildRecap(recapSource) : null}
+        grade={grade}
         boardRound={recapSource}
         character={isPractice && round ? round.character : entry?.character}
         history={history}

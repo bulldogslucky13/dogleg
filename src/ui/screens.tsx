@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { CHARACTERS, characterById } from '../engine/characters'
 import { courseBySlug, COURSES } from '../engine/courses'
 import { dailySetup, forecastSetup, RESULT_LABEL, RESULT_SQUARE, shareText, SITE_URL, toParLabel, type DailySetup } from '../engine/daily'
+import { gradeCopy, type RoundGrade } from '../engine/grade'
 import { decisionsFromScores, encodeReplay } from '../engine/replay'
 import type { CharacterId, HoleResult } from '../engine/types'
 import { track } from '../lib/analytics'
@@ -318,6 +319,8 @@ export function ResultScreen(props: {
   practice: boolean
   character?: CharacterId
   recap: RoundRecap | null
+  /** the swing coach's report — decision quality vs. luck, null when ungradeable */
+  grade: RoundGrade | null
   /** the finished round, when it's still in storage — enables board submission */
   boardRound: RoundState | null
   history: HistoryEntry[]
@@ -455,6 +458,24 @@ export function ResultScreen(props: {
               </>
             )}
           </div>
+        </div>
+      )}
+      {props.grade && (
+        <div className="coach-panel">
+          <div className="kicker">The Swing Coach's Report</div>
+          <p className="verdict">{gradeCopy(props.grade).headline}</p>
+          <div className="recap-tiles coach-tiles">
+            <div className="stat">
+              <b>{toParLabel(props.grade.decidedLike)}</b>
+              <span>Decided like</span>
+            </div>
+            <div className="stat">
+              <b>{props.grade.luck < 0 ? '−' : '+'}{Math.abs(props.grade.luck).toFixed(1)}</b>
+              <span>Rub of the green</span>
+            </div>
+          </div>
+          <p className="fine coach-line">{gradeCopy(props.grade).decisionLine}</p>
+          <p className="fine coach-line">{gradeCopy(props.grade).luckLine}</p>
         </div>
       )}
       {props.boardRound && <ScoreBoard round={props.boardRound} />}

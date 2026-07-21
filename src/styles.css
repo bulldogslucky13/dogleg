@@ -2688,6 +2688,28 @@ button {
   }
 }
 
+/* the swing coach's report: decision-quality panel on the result screen */
+.coach-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border: 1.5px solid var(--line);
+  border-radius: 14px;
+  padding: 14px;
+}
+
+.coach-panel .verdict {
+  font-size: 0.92rem;
+}
+
+.coach-tiles {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.coach-line {
+  margin: 0;
+}
+
 /* small chip shown throughout the round */
 .char-chip {
   display: flex;

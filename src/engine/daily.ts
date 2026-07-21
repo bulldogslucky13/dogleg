@@ -96,6 +96,19 @@ export function dailySetup(now = new Date()): DailySetup {
   }
 }
 
+/**
+ * Tomorrow's daily, for the "tomorrow's forecast" retention hook on the
+ * result screen. Must return exactly what `dailySetup` will return once
+ * tomorrow arrives — so tomorrow is computed by calendar arithmetic
+ * (copy the date, bump the day-of-month) rather than adding 24h of
+ * milliseconds, which would skip or double a day across a DST transition.
+ */
+export function forecastSetup(now = new Date()): DailySetup {
+  const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  tomorrow.setDate(tomorrow.getDate() + 1)
+  return dailySetup(tomorrow)
+}
+
 export function practiceSetup(slug: string, seedExtra: string): DailySetup {
   const course = COURSES.find((c) => c.slug === slug) ?? COURSES[0]
   const seed = `practice:${slug}:${seedExtra}`

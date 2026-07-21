@@ -15,8 +15,9 @@ import { track } from './lib/analytics'
 import { castLinesForHole, castRound } from './engine/cast'
 import { CHARACTERS } from './engine/characters'
 import { COURSES, courseBySlug } from './engine/courses'
-import { dailySetup, practiceSetup, shareText, type DailySetup } from './engine/daily'
+import { dailySetup, forecastSetup, practiceSetup, shareText, type DailySetup } from './engine/daily'
 import { setupFromSeed } from './engine/replay'
+import { buildLayout } from './engine/layout'
 import type { Choice } from './engine/types'
 import {
   AGGRESSIVE_BUDGET,
@@ -154,6 +155,34 @@ describe('smoke: the daily is valid and deterministic for every course in rotati
     // canonical daily seed — checked via the parser so a growing seed format
     // doesn't fake a pass
     expect(setupFromSeed(newRound(setup, 'daily', 'dart').seed)!.salt).toBeUndefined()
+  })
+})
+
+describe('smoke: tomorrow\'s forecast previews the exact daily that will land', () => {
+  it('forecastSetup(D) equals dailySetup(tomorrow), by calendar day not +24h', () => {
+    // include a month boundary and a year boundary, plus a plain mid-month day
+    const dates = [
+      new Date(2026, 6, 25), // plain day
+      new Date(2026, 6, 31), // month boundary (Jul → Aug)
+      new Date(2026, 11, 31), // year boundary (Dec 31 → Jan 1)
+      new Date(2027, 1, 28), // Feb 28 → Mar 1 (2027 is not a leap year)
+    ]
+    for (const d of dates) {
+      const tomorrow = new Date(d.getFullYear(), d.getMonth(), d.getDate())
+      tomorrow.setDate(tomorrow.getDate() + 1)
+
+      const forecast = forecastSetup(d)
+      const actualTomorrow = dailySetup(tomorrow)
+      expect(forecast).toEqual(actualTomorrow)
+
+      // it must differ from today's own daily, and carry a real course + conditions
+      const today = dailySetup(d)
+      expect(forecast.dateKey).not.toBe(today.dateKey)
+      expect(forecast.course).toBeTruthy()
+      expect(forecast.cond.wind).toBeGreaterThanOrEqual(3)
+      expect(forecast.cond.difficulty).toBeGreaterThanOrEqual(1)
+      expect(forecast.cond.difficulty).toBeLessThanOrEqual(10)
+    }
   })
 })
 
@@ -301,5 +330,40 @@ describe('smoke: a finished round produces its result artifacts', () => {
     expect(shareText(setup, results, roundToPar(done), 'dart', 1)).not.toContain('streak')
     expect(shareText(setup, results, roundToPar(done), 'dart', 0)).not.toContain('streak')
     expect(card).not.toContain('streak')
+  })
+})
+
+describe('smoke: signature flavor + island geometry decoupling', () => {
+  const base = { number: 8, par: 3, yards: 150, strokeIndex: 4, dogleg: 'S', hazard: 'water' } as const
+
+  it('island geometry follows the explicit flag, never the signature prose', () => {
+    // island:true always rings the green with cross water
+    const flagged = buildLayout('t', { ...base, island: true })
+    expect(flagged.zones.some((z) => z.kind === 'water' && z.side === 'cross')).toBe(true)
+
+    // geometry must ignore the signature string entirely: identical spec with
+    // and without flavor prose yields byte-identical zones (the old regex is gone)
+    const withProse = buildLayout('t', { ...base, island: true, signature: 'All carry to the island — no bailout' })
+    expect(JSON.stringify(withProse.zones)).toBe(JSON.stringify(flagged.zones))
+  })
+
+  it('signatures survive the store pipeline onto the live hole', () => {
+    // Sawgrass 17, the marquee island hole, carries both the flag and the flavor
+    const sawgrass = courseBySlug('tpc-sawgrass')!
+    const h17 = sawgrass.holes[16]
+    expect(h17.island).toBe(true)
+    expect(h17.signature).toBeTruthy()
+    // the exact string the UI pill reads comes straight off the built layout
+    expect(buildLayout(sawgrass.slug, h17).spec.signature).toBe(h17.signature)
+  })
+
+  it('every signature is well-formed and on-tone (no dice/odds talk)', () => {
+    const withSig = COURSES.flatMap((c) => c.holes.filter((h) => h.signature))
+    expect(withSig.length).toBeGreaterThan(20)
+    for (const h of withSig) {
+      expect(h.signature!.length).toBeGreaterThan(4)
+      expect(h.signature!.length).toBeLessThan(90)
+      expect(h.signature!).not.toMatch(/\bdice\b|\bodds\b|\brng\b/i)
+    }
   })
 })

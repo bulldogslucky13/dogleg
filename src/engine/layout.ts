@@ -1,12 +1,28 @@
 import type { HazardZone, HoleLayout, HoleSpec } from './types'
 import { rngFromString } from './rng'
+import { OSM_GEOMETRY } from './geometry'
 
 /**
  * Generate the geometric layout for a hole. Deterministic per course+hole.
  * Zones live on a 1-D line from tee (0) to pin (length), with a side.
  * The SVG map and the odds engine both consume this — single source of truth.
+ *
+ * Real OSM-imported geometry (`geometry.ts`) wins when present; otherwise the
+ * layout is synthesized procedurally from par/yards/dogleg/hazard below.
  */
 export function buildLayout(courseSlug: string, spec: HoleSpec): HoleLayout {
+  const real = OSM_GEOMETRY[`${courseSlug}:${spec.number}`]
+  if (real) {
+    return {
+      spec,
+      length: real.length,
+      zones: real.zones,
+      fairwayFrom: real.fairwayFrom,
+      fairwayTo: real.fairwayTo,
+      greenDepth: real.greenDepth,
+    }
+  }
+
   const rng = rngFromString(`${courseSlug}:${spec.number}:${spec.par}:${spec.yards}:layout`)
   const L = spec.yards
   const zones: HazardZone[] = []
@@ -25,7 +41,7 @@ export function buildLayout(courseSlug: string, spec: HoleSpec): HoleLayout {
   if (spec.par === 3) {
     // par 3: only greenside features (and a carry hazard for water/ocean holes)
     if (spec.hazard === 'water' || spec.hazard === 'ocean') {
-      const island = /island|carry|pond|all carry/i.test(spec.signature ?? '')
+      const island = spec.island ?? false
       if (island || rng() < 0.55) {
         // cross water short of the green
         add({ kind: spec.hazard === 'ocean' ? 'ocean' : 'water', from: Math.max(20, L - 90 - rng() * 40), to: L - greenDepth / 2 - 4, side: 'cross' })

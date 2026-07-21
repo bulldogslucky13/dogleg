@@ -19,6 +19,9 @@ export interface HoleSpec {
   dogleg: Dogleg
   hazard: HazardStyle
   signature?: string
+  /** true = green fully ringed by water (island). Drives layout geometry
+   * explicitly, so signature prose can stay pure flavor. */
+  island?: boolean
 }
 
 export interface CourseSpec {

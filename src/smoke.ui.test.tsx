@@ -13,6 +13,7 @@ import { act, cleanup, fireEvent, render, screen, within } from '@testing-librar
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
 import { CHARACTERS } from './engine/characters'
+import { forecastSetup } from './engine/daily'
 import { setupFromSeed } from './engine/replay'
 import { loadIdentity, loadPlayer } from './lib/leaderboard'
 
@@ -251,6 +252,12 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
         vi.advanceTimersByTime(1500)
       })
     }
+
+    // the result screen (practice or daily) always teases tomorrow's DAILY —
+    // course + conditions only, never seed/dateKey/puzzle number
+    const forecast = forecastSetup()
+    expect(screen.getByText(/Tomorrow/)).toBeTruthy()
+    expect(screen.getAllByText(new RegExp(forecast.course.name)).length).toBeGreaterThan(0)
 
     // play again must route through the pick screen, not lock in the old player
     fireEvent.click(screen.getByText('Play another practice round'))
@@ -577,6 +584,29 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
     expect(screen.queryByText('HOLE IN ONE')).toBeNull()
     // the hole card behind it calls it what it is — not "Eagle"
     expect(screen.getByText('Hole in One')).toBeTruthy()
+  })
+
+  it('renders the signature flavor pill at the tee of a marquee hole', async () => {
+    const { COURSES } = await import('./engine/courses')
+    const { buildLayout } = await import('./engine/layout')
+    const { HazardChips } = await import('./ui/panels')
+
+    const sawgrass = COURSES.find((c) => c.slug === 'tpc-sawgrass')!
+    const spec = sawgrass.holes[16] // the island 17th
+    const hole = {
+      layout: buildLayout(sawgrass.slug, spec),
+      cond: { wind: 10, greens: 'Fast' as const, difficulty: 9 },
+      ball: { pos: 0, lie: 'tee' as const, side: 'center' as const },
+      shots: [], // at the tee: the signature pill shows
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { rerender } = render(<HazardChips hole={hole as any} />)
+    expect(screen.getByText(new RegExp(spec.signature!))).toBeTruthy()
+
+    // once a shot is in the books the flavor pill stands down (tee-only)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    rerender(<HazardChips hole={{ ...hole, shots: [{}] } as any} />)
+    expect(screen.queryByText(new RegExp(spec.signature!))).toBeNull()
   })
 
   it('toggles between modern and classic views mid-round', () => {

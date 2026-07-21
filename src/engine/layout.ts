@@ -1,12 +1,28 @@
 import type { HazardZone, HoleLayout, HoleSpec } from './types'
 import { rngFromString } from './rng'
+import { OSM_GEOMETRY } from './geometry'
 
 /**
  * Generate the geometric layout for a hole. Deterministic per course+hole.
  * Zones live on a 1-D line from tee (0) to pin (length), with a side.
  * The SVG map and the odds engine both consume this — single source of truth.
+ *
+ * Real OSM-imported geometry (`geometry.ts`) wins when present; otherwise the
+ * layout is synthesized procedurally from par/yards/dogleg/hazard below.
  */
 export function buildLayout(courseSlug: string, spec: HoleSpec): HoleLayout {
+  const real = OSM_GEOMETRY[`${courseSlug}:${spec.number}`]
+  if (real) {
+    return {
+      spec,
+      length: real.length,
+      zones: real.zones,
+      fairwayFrom: real.fairwayFrom,
+      fairwayTo: real.fairwayTo,
+      greenDepth: real.greenDepth,
+    }
+  }
+
   const rng = rngFromString(`${courseSlug}:${spec.number}:${spec.par}:${spec.yards}:layout`)
   const L = spec.yards
   const zones: HazardZone[] = []

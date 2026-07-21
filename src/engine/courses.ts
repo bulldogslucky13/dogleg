@@ -1,4 +1,5 @@
 import type { CourseSpec, HoleSpec, Dogleg, HazardStyle } from './types'
+import { OSM_GEOMETRY } from './geometry'
 
 type Row = [3 | 4 | 5, number, number, Dogleg, HazardStyle, string?]
 
@@ -1440,6 +1441,18 @@ export const COURSES: CourseSpec[] = [
     ]),
   },
 ]
+
+// Reconcile hole yardage with imported OSM geometry: where a hole has real
+// geography, its measured length is the single source of truth, so the tuple's
+// yardage (a hand estimate) is snapped to it. Keeps the header, scorecard,
+// course total, and map all agreeing. Automatic — freezing a hole into
+// geometry.ts is the whole process; nothing here needs hand-editing.
+for (const course of COURSES) {
+  for (const hole of course.holes) {
+    const geo = OSM_GEOMETRY[`${course.slug}:${hole.number}`]
+    if (geo) hole.yards = geo.length
+  }
+}
 
 export function courseBySlug(slug: string): CourseSpec | undefined {
   return COURSES.find((c) => c.slug === slug)

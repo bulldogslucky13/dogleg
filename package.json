@@ -12,7 +12,8 @@
     "test:smoke": "vitest run src/smoke.test.ts src/smoke.ui.test.tsx",
     "test:watch": "vitest",
     "typecheck": "tsc -b",
-    "build:validator": "vite build --config vite.validator.config.ts"
+    "build:validator": "vite build --config vite.validator.config.ts",
+    "import:osm": "node scripts/import-osm.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.110.7",

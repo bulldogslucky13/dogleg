@@ -167,6 +167,54 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
     expect(save.currentHole).toBe(0)
   })
 
+  it('a destiny ace fires the HOLE IN ONE splash, which dismisses on tap', () => {
+    vi.useFakeTimers()
+    // a due ace counter → the round's first par-3 tee shot holes out
+    localStorage.setItem(
+      'dogleg:fortune:v1',
+      JSON.stringify({ p: { ace: 999, aceK: 0, alb: 0, albK: 0 }, d: { ace: 0, alb: 0 } }),
+    )
+    render(<App />)
+    fireEvent.click(screen.getByText(/Play unlimited/))
+    const courseButton = screen
+      .getAllByText('Pebble Beach Links')
+      .map((el) => el.closest('button'))
+      .find((b): b is HTMLButtonElement => b !== null)!
+    fireEvent.click(courseButton)
+    fireEvent.click(screen.getByText(CHARACTERS[0].name))
+
+    for (let guard = 0; guard < 200; guard++) {
+      if (screen.queryByText('HOLE IN ONE')) break
+      const advance = screen.queryByText('Next hole') ?? screen.queryByText('Sign the card')
+      if (advance) {
+        fireEvent.click(advance)
+        continue
+      }
+      const card = document.querySelector<HTMLButtonElement>('button.choice')!
+      fireEvent.click(card)
+      fireEvent.click(card)
+      act(() => {
+        vi.advanceTimersByTime(1500)
+      })
+    }
+    expect(screen.getByText('HOLE IN ONE')).toBeTruthy()
+    // the Share button is live immediately…
+    expect(screen.getByText('📸 Share')).toBeTruthy()
+    // …but for five seconds every other tap is swallowed (no accidental skip)
+    fireEvent.click(screen.getByText('HOLE IN ONE'))
+    expect(screen.getByText('HOLE IN ONE')).toBeTruthy()
+    expect(screen.queryByText(/tap to continue playing/)).toBeNull()
+    act(() => {
+      vi.advanceTimersByTime(5100)
+    })
+    // the quiet continue prompt has faded in; now a tap outside Share resumes
+    expect(screen.getByText(/tap to continue playing/)).toBeTruthy()
+    fireEvent.click(screen.getByText('HOLE IN ONE'))
+    expect(screen.queryByText('HOLE IN ONE')).toBeNull()
+    // the hole card behind it calls it what it is — not "Eagle"
+    expect(screen.getByText('Hole in One')).toBeTruthy()
+  })
+
   it('opens a #watch= replay link straight into the viewer', async () => {
     // build a real finished round through the store, encode it like a share link
     const { newRound, applyChoice, advanceHole } = await import('./state/store')

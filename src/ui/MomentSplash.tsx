@@ -34,6 +34,7 @@ export function MomentSplash(props: {
   const [busy, setBusy] = useState(false)
   const [note, setNote] = useState<string | null>(null)
   const noteTimer = useRef<number | undefined>(undefined)
+  const cardBlob = useRef<Blob | null>(null)
 
   useEffect(() => {
     const t = window.setTimeout(() => setLocked(false), 5000)
@@ -41,6 +42,34 @@ export function MomentSplash(props: {
       window.clearTimeout(t)
       window.clearTimeout(noteTimer.current)
     }
+  }, [])
+
+  // Render the share card up front, while the splash sits on screen, so the
+  // Share tap can hand it straight to navigator.share(). Web Share needs the
+  // tap's transient activation; awaiting the card (its lazy react-dom/server
+  // chunk + image loads) inside the click would blow that window on a slow
+  // connection and drop the user to a download. Prewarm failures are fine —
+  // share() regenerates on demand and falls back to clipboard/download.
+  useEffect(() => {
+    let alive = true
+    momentCardBlob({
+      kind: props.kind,
+      holeNumber: props.holeNumber,
+      courseName: props.courseName,
+      dateKey: props.dateKey,
+      toPar: props.toPar,
+      character: props.character,
+      streak: props.streak,
+    })
+      .then((blob) => {
+        if (alive) cardBlob.current = blob
+      })
+      .catch(() => {})
+    return () => {
+      alive = false
+    }
+    // props for a given moment are fixed for the splash's lifetime
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const flash = (message: string) => {
@@ -54,21 +83,27 @@ export function MomentSplash(props: {
     if (busy) return
     setBusy(true)
     try {
-      const blob = await momentCardBlob({
-        kind: props.kind,
-        holeNumber: props.holeNumber,
-        courseName: props.courseName,
-        dateKey: props.dateKey,
-        toPar: props.toPar,
-        character: props.character,
-        streak: props.streak,
-      })
       const line = props.kind === 'ace' ? `Hole in one at ${props.courseName} ⛳` : `Albatross at ${props.courseName} 🕊️`
-      const outcome = await shareMomentCard(blob, {
+      const opts = {
         filename: `dogleg-${props.kind === 'ace' ? 'hole-in-one' : 'albatross'}.png`,
         text: `${line}${streakTag(props.streak)} — Dogleg`,
         url: `https://${SITE_URL}`,
-      })
+      }
+      // Ready card → no await before shareMomentCard, so navigator.share() fires
+      // inside the tap's activation. Only regenerate if the prewarm hasn't landed.
+      const blob =
+        cardBlob.current ??
+        (await momentCardBlob({
+          kind: props.kind,
+          holeNumber: props.holeNumber,
+          courseName: props.courseName,
+          dateKey: props.dateKey,
+          toPar: props.toPar,
+          character: props.character,
+          streak: props.streak,
+        }))
+      cardBlob.current = blob
+      const outcome = await shareMomentCard(blob, opts)
       if (outcome === 'cancelled') return
       track('moment_share_clicked', { method: outcome, kind: props.kind })
       if (outcome === 'clipboard') flash('Copied!')

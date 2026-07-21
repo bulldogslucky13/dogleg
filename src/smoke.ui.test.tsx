@@ -109,9 +109,13 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
     for (let guard = 0; guard < 400; guard++) {
       if (screen.queryByText('Play another practice round')) break
       // practice seeds are time-based, so a natural ace/albatross can fire on
-      // any run — dismiss the splash like a player would and keep going
+      // any run — wait out the splash's 5s advance lock like a player would,
+      // then tap it away and keep going
       const splash = screen.queryByText('HOLE IN ONE') ?? screen.queryByText('ALBATROSS')
       if (splash) {
+        act(() => {
+          vi.advanceTimersByTime(5100)
+        })
         fireEvent.click(splash)
         continue
       }

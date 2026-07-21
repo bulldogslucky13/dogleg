@@ -1,6 +1,6 @@
-# Dogleg — agent guide
+# DogLeg — agent guide
 
-Dogleg is a daily golf strategy game: static Vite + React 19 + TypeScript app,
+DogLeg is a daily golf strategy game: static Vite + React 19 + TypeScript app,
 pnpm. The pure-TypeScript game engine lives in `src/engine/` (odds, layout
 geometry, shot resolution, characters, 49-course library), round state in
 `src/state/store.ts`, UI in `src/ui/` + `src/App.tsx`. Design rationale is in

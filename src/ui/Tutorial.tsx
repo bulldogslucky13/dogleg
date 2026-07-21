@@ -128,7 +128,7 @@ export function Tutorial(props: {
 
   const current = STEPS[step]
   return (
-    <div className="tut-backdrop" role="dialog" aria-modal="true" aria-label="How to play Dogleg">
+    <div className="tut-backdrop" role="dialog" aria-modal="true" aria-label="How to play DogLeg">
       <div className="tut-card">
         <button className="tut-skip" onClick={finish} aria-label="Close tutorial">
           Skip

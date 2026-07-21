@@ -1,11 +1,11 @@
-# ⛳ Dogleg
+# ⛳ DogLeg
 
 **A daily golf strategy game.** One course a day, 18 holes, about 2 minutes a round.
 Pick your player, then every shot is one choice — Safe, Normal, or Aggressive — and
 every choice honestly shifts your odds. You get 8 aggressive plays per round. Spend
 them well and you might break par; the course wins most days.
 
-What makes Dogleg different from games like it:
+What makes DogLeg different from games like it:
 
 - **Pick your player.** Before the round you choose one of three playstyles — the
   **Fairway Finder** (length + accuracy off the tee), the **Dart Thrower** (approach

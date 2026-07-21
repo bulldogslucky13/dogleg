@@ -14,7 +14,7 @@ import {
   loadRoundLog,
   type LoggedRound,
 } from '../state/stats'
-import { lifetimeRounds, loadArchive, type ArchivedRound } from '../state/store'
+import { lifetimeRounds, loadArchive, type ArchivedRound, type HistoryEntry } from '../state/store'
 import { AccountPanel } from './AccountPanel'
 import { RoundScorecard } from './RoundScorecard'
 
@@ -47,6 +47,8 @@ function toLogged(r: ArchivedRound): LoggedRound {
 export function RoundsScreen(props: {
   onWatch: (p: ReplayPayload) => void
   onBack: () => void
+  /** fold synced dailies into the log so locker stats update on sign-in here */
+  onHistorySynced?: (h: HistoryEntry[]) => void
   /** deep-link straight into the stats view (the home handicap chip) */
   initialView?: 'main' | 'stats'
   /** open with the account panel already expanded (How to Play's sync line) */
@@ -278,7 +280,7 @@ export function RoundsScreen(props: {
       {!email && !showAccount && (
         <SyncCta copy="Sync account to save player stats" onTap={() => setShowAccount(true)} trigger="locker" />
       )}
-      {showAccount && <AccountPanel />}
+      {showAccount && <AccountPanel onHistorySynced={props.onHistorySynced} />}
 
       <button className="stats-headline" onClick={() => setView('stats')}>
         <b>{lifetimeRounds()}</b>

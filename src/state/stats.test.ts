@@ -11,9 +11,10 @@ import {
   holeStrokes,
   lifetimeStats,
   loadRoundLog,
+  logRound,
   type LoggedRound,
 } from './stats'
-import { hasFortuneMoment, pruneArchive, type ArchivedRound } from './store'
+import { hasFortuneMoment, pruneArchive, type ArchivedRound, type RoundState } from './store'
 
 const COURSE = COURSES[0]
 const PAR3 = COURSE.holes.findIndex((h) => h.par === 3)
@@ -202,5 +203,34 @@ describe('current handicap — best 10 of the last 30', () => {
     expect(formatAverage(3.42)).toBe('+3.4')
     expect(formatAverage(-1.2)).toBe('−1.2')
     expect(formatAverage(0)).toBe('E')
+  })
+})
+
+describe('a freshly logged round keeps real per-hole strokes', () => {
+  it('a blow-up past triple survives — result stays collapsed, strokes do not', () => {
+    const scores = COURSE.holes.map((h) => ({ strokes: h.par as number, result: 'par' as HoleResult }))
+    // quintuple bogey on the par 5: the engine collapses every diff ≥ 3 into
+    // 'triple', but the real stroke count rides on the score
+    const blowup = COURSE.holes[PAR5].par + 5
+    scores[PAR5] = { strokes: blowup, result: 'triple' }
+    const state = {
+      complete: true,
+      seed: 'blowup',
+      mode: 'practice',
+      courseSlug: COURSE.slug,
+      character: undefined,
+      dateKey: '2026-07-20',
+      scores,
+    } as unknown as RoundState
+
+    logRound(state)
+    const [r] = loadRoundLog()
+
+    expect(r.results[PAR5]).toBe('triple') // the result is still collapsed…
+    expect(r.strokesByHole?.[PAR5]).toBe(blowup) // …but the strokes are exact
+    // result-only reconstruction understates the hole — that's the bug this fixes
+    expect(holeStrokes('triple', COURSE.holes[PAR5].par)).toBeLessThan(blowup)
+    // per-hole strokes reconcile with the round total the scorecard prints
+    expect(r.strokesByHole?.reduce((s, n) => s + n, 0)).toBe(r.strokes)
   })
 })

@@ -2352,6 +2352,22 @@ button {
   color: rgba(29, 43, 32, 0.85);
 }
 
+/* end-of-round retention hook: a quiet teaser for tomorrow's daily */
+.forecast {
+  background: var(--cream);
+  border: 1.5px solid var(--line);
+  border-radius: 12px;
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.forecast p {
+  font-size: 0.86rem;
+  color: rgba(29, 43, 32, 0.85);
+}
+
 /* ---------- first-run tutorial ---------- */
 
 .tut-backdrop {

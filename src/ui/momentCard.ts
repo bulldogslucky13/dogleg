@@ -12,8 +12,11 @@ import { CharacterAvatar } from './Avatars'
  * styles.css by hand; if those change materially, update this to match.
  */
 
+/** the fortune moments, plus the course-record reclaim — same pipeline */
+export type CardKind = MomentKind | 'record'
+
 export type MomentCardProps = {
-  kind: MomentKind
+  kind: CardKind
   holeNumber: number
   courseName: string
   dateKey: string
@@ -21,6 +24,10 @@ export type MomentCardProps = {
   character?: CharacterId
   /** current day streak; joins the meta line when it's 2+ (a brag, not a shrug) */
   streak?: number
+  /** headline/sub override — the record card supplies its own words */
+  copy?: { title: string; sub: string }
+  /** meta-line override (record cards have no single hole to name) */
+  meta?: string
 }
 
 // logical design size (2x'd for export so the PNG stays crisp when shared)
@@ -29,10 +36,12 @@ const H = 675
 const SCALE = 2
 const FONTS = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif"
 
-const PALETTE: Record<MomentKind, { stops: [string, string, string]; confetti: [string, string, string] }> = {
+const PALETTE: Record<CardKind, { stops: [string, string, string]; confetti: [string, string, string] }> = {
   // colors lifted from .moment-backdrop.ace / .albatross and their confetti tints
   ace: { stops: ['#b98a1f', '#7a5a10', '#241c05'], confetti: ['#ffd968', '#c05b4d', '#f4efe3'] },
   albatross: { stops: ['#7c56b8', '#4c3378', '#150d24'], confetti: ['#c9a7ff', '#6fbf66', '#f4efe3'] },
+  // course-record reclaim: clubhouse greens with gold confetti
+  record: { stops: ['#3f7a44', '#26512d', '#0e2415'], confetti: ['#ffd968', '#c9a227', '#f4efe3'] },
 }
 
 export async function momentCardBlob(props: MomentCardProps): Promise<Blob> {
@@ -44,7 +53,7 @@ export async function momentCardBlob(props: MomentCardProps): Promise<Blob> {
   ctx.scale(SCALE, SCALE)
 
   const pal = PALETTE[props.kind]
-  const copy = MOMENT_COPY[props.kind]
+  const copy = props.copy ?? MOMENT_COPY[props.kind as MomentKind]
 
   // backdrop — radial wash centered a touch above the middle, like the CSS
   const bg = ctx.createRadialGradient(W / 2, H * 0.45, 0, W / 2, H * 0.45, W * 0.95)
@@ -143,7 +152,7 @@ export async function momentCardBlob(props: MomentCardProps): Promise<Blob> {
   centered(14, 600)
   const streak = props.streak && props.streak >= 2 ? ` · ${props.streak}-day streak` : ''
   ctx.fillText(
-    `Hole ${props.holeNumber} · ${toParLabel(props.toPar)} on the round · ${shortDate(props.dateKey)}${streak}`,
+    props.meta ?? `Hole ${props.holeNumber} · ${toParLabel(props.toPar)} on the round · ${shortDate(props.dateKey)}${streak}`,
     W / 2,
     metaY,
     W - 48,

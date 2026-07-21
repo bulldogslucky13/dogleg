@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react'
 import { CHARACTERS, characterById } from '../engine/characters'
-import { COURSES } from '../engine/courses'
+import { courseBySlug, COURSES } from '../engine/courses'
 import { dailySetup, RESULT_LABEL, RESULT_SQUARE, shareText, SITE_URL, toParLabel, type DailySetup } from '../engine/daily'
 import { decisionsFromScores, encodeReplay } from '../engine/replay'
 import type { CharacterId, HoleResult } from '../engine/types'
 import { track } from '../lib/analytics'
 import { backendEnabled } from '../lib/backend'
 import { fetchCourseRecords, loadPlayer, type CourseRecord } from '../lib/leaderboard'
+import { dismissSteals, pendingSteals, syncLedger, type StolenRecord } from '../lib/records'
 import { currentHandicap, formatHandicap } from '../state/stats'
 import { characterRecords, computeStreaks, loadArchive, type HistoryEntry, type RoundRecap, type RoundState } from '../state/store'
 import { AccountPanel } from './AccountPanel'
@@ -32,6 +33,7 @@ export function HomeScreen(props: {
   const records = characterRecords(props.history)
   const [showCourses, setShowCourses] = useState(false)
   const [courseRecs, setCourseRecs] = useState<Map<string, CourseRecord> | null>(null)
+  const [steals, setSteals] = useState(() => pendingSteals())
 
   // course records load once when the browser opens — free-play bragging rights
   useEffect(() => {
@@ -39,6 +41,19 @@ export function HomeScreen(props: {
       void fetchCourseRecords().then((r) => setCourseRecs(r ?? new Map()))
     }
   }, [showCourses, courseRecs])
+
+  // the record-stolen check: compare the records this device holds against
+  // the server's holders. Purely a read — the "notification" is derived.
+  useEffect(() => {
+    if (!backendEnabled) return
+    const myName = loadPlayer()?.name ?? null
+    if (!myName) return
+    void fetchCourseRecords().then((recs) => {
+      if (!recs) return
+      syncLedger(recs, myName)
+      setSteals(pendingSteals())
+    })
+  }, [])
   const avgLabel = (avg: number) => (avg > 0 ? `+${avg.toFixed(1)}` : avg.toFixed(1))
   return (
     <div className="screen home">
@@ -54,6 +69,17 @@ export function HomeScreen(props: {
         </h1>
         <p className="tagline">One round. 18 holes. ~2 minutes.</p>
       </header>
+
+      {steals.length > 0 && (
+        <StealCard
+          steals={steals}
+          onDismiss={() => {
+            dismissSteals()
+            setSteals([])
+          }}
+          onWinItBack={props.onPractice}
+        />
+      )}
 
       <div className="today-card">
         <div className="kicker">Today's course</div>
@@ -154,6 +180,66 @@ export function HomeScreen(props: {
       )}
       <HandicapChip onTap={props.onStats} />
       <AccountPanel onHistorySynced={props.onHistorySynced} />
+    </div>
+  )
+}
+
+/**
+ * The record-stolen card — one card no matter how many records fell, never
+ * a queue of banners. Playful, never insulting: the reader should reach for
+ * their putter, not their feelings. "Win it back" deep-links straight into
+ * unlimited play on that course.
+ */
+function StealCard(props: {
+  steals: Array<{ courseSlug: string } & StolenRecord>
+  onDismiss: () => void
+  onWinItBack: (slug: string) => void
+}) {
+  const [expanded, setExpanded] = useState(props.steals.length === 1)
+  const courseName = (slug: string) => courseBySlug(slug)?.name ?? slug
+  const one = props.steals.length === 1 ? props.steals[0] : null
+  return (
+    <div className="steal-card" role="status">
+      <button className="steal-x" onClick={props.onDismiss} aria-label="Dismiss">
+        ✕
+      </button>
+      <div className="kicker">🚨 Course record stolen</div>
+      {one ? (
+        <>
+          <p>
+            <b>{one.by}</b> shot <b>{toParLabel(one.theirToPar)}</b> at {courseName(one.courseSlug)}, sliding past
+            your {toParLabel(one.myToPar)}. The clubhouse noticed.
+          </p>
+          <button className="cta steal-cta" onClick={() => props.onWinItBack(one.courseSlug)}>
+            Win it back
+          </button>
+        </>
+      ) : (
+        <>
+          <p>
+            <b>{props.steals.length} of your course records fell</b> while you were gone.
+            {!expanded && ' The nerve.'}
+          </p>
+          {expanded ? (
+            <div className="steal-list">
+              {props.steals.map((s) => (
+                <div key={s.courseSlug} className="steal-row">
+                  <span>
+                    <b>{courseName(s.courseSlug)}</b> — {s.by}, {toParLabel(s.theirToPar)} (yours: {toParLabel(s.myToPar)})
+                  </span>
+                  <button className="cta ghost slim" onClick={() => props.onWinItBack(s.courseSlug)}>
+                    Win it back
+                  </button>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <button className="cta ghost steal-cta" onClick={() => setExpanded(true)}>
+              See the damage
+            </button>
+          )}
+        </>
+      )}
     </div>
   )
 }

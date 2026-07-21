@@ -1472,6 +1472,135 @@ button {
   accent-color: var(--good);
 }
 
+/* record stolen: the rivalry card on the home screen */
+.steal-card {
+  position: relative;
+  background: var(--ink);
+  color: var(--cream);
+  border-radius: 14px;
+  padding: 16px 40px 16px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.25);
+}
+
+.steal-card .kicker {
+  color: var(--gold);
+}
+
+.steal-card p {
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+
+.steal-x {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  font-size: 0.9rem;
+  color: rgba(244, 239, 227, 0.55);
+  padding: 4px;
+}
+
+.steal-cta {
+  padding: 12px;
+  background: var(--accent);
+  color: var(--paper);
+}
+
+.steal-card .cta.ghost {
+  color: var(--cream);
+  border-color: rgba(244, 239, 227, 0.3);
+}
+
+.steal-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.steal-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 0.85rem;
+}
+
+.steal-row .cta.slim {
+  padding: 6px 10px;
+  font-size: 0.62rem;
+  white-space: nowrap;
+}
+
+/* the target on the wall while chasing a stolen record */
+.chase-chip {
+  margin-top: 5px;
+  display: inline-block;
+  background: rgba(201, 162, 39, 0.16);
+  border: 1px solid rgba(201, 162, 39, 0.5);
+  border-radius: 999px;
+  padding: 3px 10px;
+  font-size: 0.68rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+/* record reclaimed: the fortune splash's little sibling */
+.record-splash-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 58;
+  background: radial-gradient(90% 90% at 50% 45%, rgba(63, 122, 68, 0.92) 0%, rgba(14, 36, 21, 0.95) 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  overflow: hidden;
+  animation: moment-in 0.4s ease both;
+}
+
+.record-splash-card {
+  position: relative;
+  text-align: center;
+  color: var(--paper);
+  max-width: 380px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  text-shadow: 0 2px 14px rgba(0, 0, 0, 0.4);
+}
+
+.record-splash-title {
+  font-size: clamp(2rem, 9vw, 2.9rem);
+  font-weight: 900;
+  text-transform: uppercase;
+  line-height: 0.95;
+  animation: moment-pop 0.5s cubic-bezier(0.2, 1.6, 0.4, 1) both 0.1s;
+}
+
+.record-splash-sub {
+  font-weight: 700;
+  opacity: 0.92;
+}
+
+.record-splash-close {
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  opacity: 0.7;
+  margin-top: 8px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .record-splash-backdrop,
+  .record-splash-title {
+    animation: none;
+  }
+}
+
 /* the fortune disclosure under streak displays — flavor, not a promo */
 .streak-note {
   font-style: italic;

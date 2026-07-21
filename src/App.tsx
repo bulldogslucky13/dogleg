@@ -27,6 +27,7 @@ import {
   type UiMode,
 } from './state/store'
 import { absorbHistory, logRound } from './state/stats'
+import { chasing } from './lib/records'
 import { track } from './lib/analytics'
 import { ensureIdentity, loadIdentity } from './lib/leaderboard'
 import { CharacterAvatar } from './ui/Avatars'
@@ -389,6 +390,9 @@ export default function App() {
 
   const classic = uiMode === 'classic'
   const char = characterById(round.character)
+  // the target on the wall: a stolen record being chased stays visible in
+  // the HUD for the whole unlimited round
+  const chase = round.mode === 'practice' ? chasing(round.courseSlug) : null
 
   // A Fortune shares the day streak, but the daily in progress isn't in
   // `history` until it's signed (recordResult), so counting from history alone
@@ -452,6 +456,7 @@ export default function App() {
         <div className="hole-right">
           <div className={`topar ${toPar < 0 ? 'good' : toPar > 0 ? 'bad' : ''}`}>{toParLabel(toPar)} to par</div>
           <div className="yards">{spec.yards} yards</div>
+          {chase && <div className="chase-chip">🎯 Record {toParLabel(chase.theirToPar)} · {chase.by}</div>}
         </div>
       </header>
 

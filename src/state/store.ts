@@ -5,10 +5,11 @@ import { rngFromString, skip, type Rng } from '../engine/rng'
 import type { CharacterId, Choice, Conditions, HoleResult, HoleScore, Stage } from '../engine/types'
 import { courseBySlug } from '../engine/courses'
 import { EMPTY_FORTUNE, encodeFortune, splitFortune, type FortuneState } from '../engine/fortune'
-import { decisionsFromScores, destinyPlan, fortuneOddsFor, setupFromSeed } from '../engine/replay'
+import { gradeRound } from '../engine/grade'
+import { AGGRESSIVE_BUDGET, decisionsFromScores, destinyPlan, fortuneOddsFor, setupFromSeed } from '../engine/replay'
 import { track } from '../lib/analytics'
 
-export const AGGRESSIVE_BUDGET = 8
+export { AGGRESSIVE_BUDGET }
 
 export interface RoundState {
   mode: 'daily' | 'practice'
@@ -337,7 +338,13 @@ export function saveUiMode(mode: UiMode): void {
   }
 }
 
+/** Round to 2dp for analytics payloads — full float precision is noise in a dashboard. */
+function round2(n: number): number {
+  return Math.round(n * 100) / 100
+}
+
 function trackRoundCompleted(state: RoundState, streaks: Streaks): void {
+  const grade = gradeRound(state)
   track('round_completed', {
     mode: state.mode,
     course: state.courseSlug,
@@ -347,6 +354,13 @@ function trackRoundCompleted(state: RoundState, streaks: Streaks): void {
     aggressive_used: AGGRESSIVE_BUDGET - state.aggressiveLeft,
     current_streak: streaks.dayStreak,
     best_streak: streaks.bestStreak,
+    ...(grade && {
+      decision_loss: round2(grade.decisionLoss),
+      luck: round2(grade.luck),
+      skill_to_par: round2(grade.skillToPar),
+      decided_like: grade.decidedLike,
+      destiny_bonus: round2(grade.destinyBonus),
+    }),
   })
 }
 

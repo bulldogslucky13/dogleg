@@ -12,6 +12,7 @@
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { track } from './lib/analytics'
+import { castLinesForHole, castRound } from './engine/cast'
 import { CHARACTERS } from './engine/characters'
 import { COURSES, courseBySlug } from './engine/courses'
 import { dailySetup, forecastSetup, practiceSetup, shareText, type DailySetup } from './engine/daily'
@@ -265,6 +266,46 @@ describe('smoke: hole-level analytics track progress through the round', () => {
     expect(events).toHaveLength(5)
     expect(events.map((e) => e.hole_number)).toEqual([1, 2, 3, 4, 5])
     expect(s.complete).toBe(false)
+  })
+})
+
+describe('smoke: the clubhouse cast is deterministic, choices-only, for every course', () => {
+  it('is stable, seed-tail-proof, and produces a line per character on every hole', () => {
+    const AGG_BUDGET = 8
+    for (const course of COURSES) {
+      const setup = dailySetup(new Date(2026, 6, 19)) // any daily conditions object will do
+      const seed = `round:2026-07-19:${course.slug}`
+      const cast = castRound({ course, cond: setup.cond, seed })
+      // same seed → identical cast, every time
+      const again = castRound({ course, cond: setup.cond, seed })
+      expect(again).toEqual(cast)
+      // a fortune tail must never change the cast — the cast never mirrors any player's dice
+      const withTail = castRound({ course, cond: setup.cond, seed: `${seed}:f3.1.0.0.5` })
+      expect(withTail).toEqual(cast)
+
+      expect(cast).toHaveLength(CHARACTERS.length)
+      const budgetLeft: Record<string, number> = Object.fromEntries(CHARACTERS.map((c) => [c.id, AGG_BUDGET]))
+      for (let h = 0; h < 18; h++) {
+        // every hole yields a line per character, and the lines name the character
+        const lines = castLinesForHole(cast, h)
+        expect(lines).toHaveLength(CHARACTERS.length)
+        lines.forEach((line, i) => {
+          expect(line).toContain(CHARACTERS[i].name)
+          expect(line.length).toBeGreaterThan(0)
+        })
+      }
+      // aggressive budget (8, tee/second/approach only) is never overspent across the round
+      for (const entry of cast) {
+        let spent = 0
+        for (const holeShots of entry.holes) {
+          for (const shot of holeShots) {
+            const budgeted = shot.stage === 'tee' || shot.stage === 'second' || shot.stage === 'approach'
+            if (shot.choice === 'aggressive' && budgeted) spent += 1
+          }
+        }
+        expect(spent).toBeLessThanOrEqual(budgetLeft[entry.characterId])
+      }
+    }
   })
 })
 

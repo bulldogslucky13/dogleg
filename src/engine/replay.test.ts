@@ -3,7 +3,15 @@ import { advanceHole, applyChoice, newRound, roundToPar } from '../state/store'
 import { CHARACTERS } from './characters'
 import { COURSES } from './courses'
 import { dailySalt, dailySetup, practiceSetup } from './daily'
-import { decisionsFromScores, decodeReplay, encodeReplay, replayFrames, replayRound, setupFromSeed } from './replay'
+import {
+  choiceRowsFromReplay,
+  decisionsFromScores,
+  decodeReplay,
+  encodeReplay,
+  replayFrames,
+  replayRound,
+  setupFromSeed,
+} from './replay'
 import type { CharacterId, Choice } from './types'
 
 /** Play a full round through the real client store, exactly as the UI does. */
@@ -197,5 +205,75 @@ describe('replayRound is a perfect mirror of the client store', () => {
       // scores are computed by the server's replay, not copied from the claim
       expect(typeof swapped.toPar).toBe('number')
     }
+  })
+})
+
+describe('choiceRowsFromReplay: the clubhouse decision stats feed (Layer 2)', () => {
+  it('one row per (hole, stage), holes 1..18, par-3 holes carry no second-shot row', () => {
+    for (let i = 0; i < 9; i++) {
+      const course = COURSES[(i * 5) % COURSES.length]
+      const character = CHARACTERS[i % CHARACTERS.length].id
+      const setup = practiceSetup(course.slug, `choicerows:${i}`)
+      const finished = playThroughStore(setup, 'practice', character)
+      expect(finished.complete).toBe(true)
+
+      const rows = choiceRowsFromReplay(finished.scores)
+      expect(rows.length).toBeGreaterThan(0)
+
+      const seen = new Set<string>()
+      for (const row of rows) {
+        expect(row.hole).toBeGreaterThanOrEqual(1)
+        expect(row.hole).toBeLessThanOrEqual(18)
+        const key = `${row.hole}:${row.stage}`
+        expect(seen.has(key), `duplicate (hole,stage) row: ${key}`).toBe(false)
+        seen.add(key)
+      }
+
+      // par-3 holes never see a 'second' shot in the real game — assert the
+      // feed agrees, for every par-3 on this course
+      course.holes.forEach((h, idx) => {
+        if (h.par === 3) {
+          expect(rows.some((r) => r.hole === idx + 1 && r.stage === 'second')).toBe(false)
+        }
+      })
+    }
+  })
+
+  // Multi-putt (1/2/3 strokes) collapses into a SINGLE 'putt'-stage shot
+  // record in this engine — there's no re-entry, so `putt` can never repeat
+  // within a hole. The stage that genuinely repeats is 'shortgame': a bunker
+  // shot that stays in the trap ('stillin') or flies the green ('across')
+  // loops back to another shortgame decision (see resolve.ts). That's the
+  // real "first-shot-at-a-repeated-stage" case this test exercises.
+  it('a repeated shortgame hole (bunker do-over) rows the FIRST shortgame choice, never a later one', () => {
+    let found = false
+    for (let i = 0; i < 60 && !found; i++) {
+      const course = COURSES[(i * 3) % COURSES.length]
+      const character = CHARACTERS[i % CHARACTERS.length].id
+      const setup = practiceSetup(course.slug, `shortgamerepeat:${i}`)
+      const finished = playThroughStore(setup, 'practice', character)
+      const rows = choiceRowsFromReplay(finished.scores)
+
+      finished.scores.forEach((score, holeIdx) => {
+        if (found || !score) return
+        const shortgames = score.shots.filter((s) => s.stage === 'shortgame')
+        if (shortgames.length < 2) return
+        const row = rows.find((r) => r.hole === holeIdx + 1 && r.stage === 'shortgame')
+        expect(row, `expected a shortgame row for hole ${holeIdx + 1}`).toBeDefined()
+        expect(row!.choice).toBe(shortgames[0].choice) // the OPENING call, not a later re-roll
+        found = true
+      })
+    }
+    expect(found, 'never observed a repeated shortgame hole across 60 sampled rounds').toBe(true)
+  })
+
+  it('defensively skips null entries in a sparse scores array', () => {
+    const setup = practiceSetup(COURSES[0].slug, 'choicerows:sparse')
+    const finished = playThroughStore(setup, 'practice', 'dart')
+    const sparse = [...finished.scores]
+    sparse[3] = null
+    const rows = choiceRowsFromReplay(sparse)
+    expect(rows.some((r) => r.hole === 4)).toBe(false)
+    expect(rows.some((r) => r.hole === 1)).toBe(true)
   })
 })

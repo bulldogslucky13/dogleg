@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { characterById } from './engine/characters'
+import { castLinesForHole, castRound } from './engine/cast'
 import { courseBySlug } from './engine/courses'
 import { dailySetup, localDateKey, practiceSetup, toParLabel, type DailySetup } from './engine/daily'
 import { longOdds } from './engine/odds'
@@ -30,6 +31,7 @@ import {
 import { absorbHistory, logRound } from './state/stats'
 import { chasing } from './lib/records'
 import { identifyPlayer, track } from './lib/analytics'
+import { clubhouseLine, fetchHoleChoices, groupChoices, type TallyRow } from './lib/decisionStats'
 import { ensureIdentity, loadIdentity, loadPlayer } from './lib/leaderboard'
 import { CharacterAvatar } from './ui/Avatars'
 import { GreenView, HoleMap, useMapSize } from './ui/HoleMap'
@@ -81,6 +83,12 @@ export default function App() {
   const [splash, setSplash] = useState<CharacterAdvantage | null>(null)
   const [splashKey, setSplashKey] = useState(0)
   const [moment, setMoment] = useState<{ kind: MomentKind; holeNumber: number } | null>(null)
+  /** Clubhouse decision stats (Layer 2): real tallies of what the field chose
+   * on the CURRENT hole, fetched only after that hole is committed. Null until
+   * fetched (or unavailable) — the cast block degrades gracefully to cast-only
+   * lines in that case. Scoped to the played hole so future-hole tallies never
+   * reach the client ahead of a live decision. */
+  const [holeChoices, setHoleChoices] = useState<TallyRow[] | null>(null)
   const animTimer = useRef<number | null>(null)
   const splashTimer = useRef<number | null>(null)
   const [mapRef, mapSize] = useMapSize()
@@ -99,6 +107,23 @@ export default function App() {
     const p = loadPlayer()
     if (p) identifyPlayer(p.id, p.name)
   }, [])
+
+  // Clubhouse decision stats (Layer 2): for a daily round only, and ONLY once
+  // the current hole is committed (stage 'done'), fetch that one hole's real
+  // tallies for the post-hole recap. Scoping to the played hole is deliberate —
+  // the client never holds tallies for holes it hasn't reached, so the signal
+  // can't leak ahead of a live decision. Fire-and-forget; fetchHoleChoices
+  // degrades to null on any failure or in tests.
+  useEffect(() => {
+    if (!round || round.mode !== 'daily' || round.hole?.stage !== 'done') return
+    let cancelled = false
+    fetchHoleChoices(round.dateKey, round.currentHole + 1).then((rows) => {
+      if (!cancelled) setHoleChoices(rows)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [round?.mode, round?.dateKey, round?.currentHole, round?.hole?.stage])
 
   // a replay link opened while the app is already mounted only fires
   // hashchange — no reload, so the mount-time hash check never reruns.
@@ -159,6 +184,36 @@ export default function App() {
   const playedToday = history.find((e) => e.dateKey === localDateKey()) ?? null
 
   const hole = useMemo(() => (round && !round.complete && round.hole ? holeInPlay(round) : null), [round])
+
+  // Clubhouse cast (Layer 1): a deterministic sim of the game's regular
+  // characters playing today's course, surfaced choices-only in the post-hole
+  // recap — never dice, outcomes, or scores. Computed once per round (keyed
+  // on the round's identity, not currentHole) since it simulates all 18 holes
+  // up front. Daily rounds strip the per-player salt back out of the seed so
+  // every player sees the SAME cast; practice seeds carry no salt, so the
+  // round's own seed is already the right key (castRound strips any fortune
+  // tail itself, for both modes).
+  const cast = useMemo(() => {
+    if (!round) return null
+    const course = courseBySlug(round.courseSlug)
+    if (!course) return null
+    const seed = round.mode === 'daily' ? `round:${round.dateKey}:${round.courseSlug}` : round.seed
+    return castRound({ course, cond: round.cond, seed })
+  }, [round?.mode, round?.dateKey, round?.courseSlug, round?.cond, round?.seed])
+
+  // Clubhouse decision stats (Layer 2): the real-tally headline for the CURRENT
+  // hole's opening stage (the headline decision), from today's posted rounds.
+  // Par 3s start in the approach stage — no tee rows ever exist for them.
+  // Daily only — practice has no shared field to tally against — and null
+  // whenever the rows haven't loaded (or the backend is unavailable), in
+  // which case the cast lines above stand alone, unchanged.
+  const clubhouseTally = useMemo(() => {
+    if (!round || round.mode !== 'daily' || !holeChoices) return null
+    const par = courseBySlug(round.courseSlug)?.holes[round.currentHole]?.par
+    const stage = par === 3 ? 'approach' : 'tee'
+    const grouped = groupChoices(holeChoices, round.currentHole + 1, stage)
+    return clubhouseLine(grouped, stage)
+  }, [round?.mode, round?.courseSlug, round?.currentHole, holeChoices])
 
   // the swing coach's report replays the whole round's EV model — memoize so unrelated
   // state changes on the result screen don't recompute it
@@ -568,6 +623,8 @@ export default function App() {
             runningToPar={toPar}
             last={round.currentHole >= 17}
             onNext={next}
+            castLines={cast ? castLinesForHole(cast, round.currentHole) : undefined}
+            clubhouseTally={clubhouseTally ?? undefined}
           />
         ) : (
           <>

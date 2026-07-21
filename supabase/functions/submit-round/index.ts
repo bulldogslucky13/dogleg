@@ -9,7 +9,7 @@
 //
 // deno-lint-ignore-file no-explicit-any
 import { createClient } from 'npm:@supabase/supabase-js@2'
-import { FORTUNE_CONFIG, courseBySlug, dailySalt, destinyDue, replayRound } from './engine.mjs'
+import { FORTUNE_CONFIG, choiceRowsFromReplay, courseBySlug, dailySalt, destinyDue, replayRound } from './engine.mjs'
 import { buildStealEmail, sendViaResend } from './email.ts'
 
 const CORS = {
@@ -220,6 +220,26 @@ Deno.serve(async (req) => {
     // first card of the day stands; a resubmission is ignored
     const { error } = await supabase.from('daily_scores').insert(row)
     if (error && error.code !== '23505') return json(500, { error: 'could not save score' })
+
+    // ---- clubhouse decision tallies (Layer 2): best-effort, fresh cards only.
+    // One atomic RPC bumps the aggregate counters for every (hole,stage) this
+    // round played. `!error` means a genuinely new daily card (dupes already
+    // skipped), so no counter is ever double-bumped. A tally hiccup is logged
+    // and swallowed — it never fails the player's submission. ----
+    if (!error && info.dateKey && player.name) {
+      const rows = choiceRowsFromReplay(replay.scores)
+      if (rows.length > 0) {
+        const { error: tallyError } = await supabase.rpc('bump_choice_tallies', {
+          p_date_key: info.dateKey,
+          p_course_slug: info.course.slug,
+          p_player_name: player.name,
+          p_holes: rows.map((r) => r.hole),
+          p_stages: rows.map((r) => r.stage),
+          p_choices: rows.map((r) => r.choice),
+        })
+        if (tallyError) console.error('bump_choice_tallies failed:', tallyError)
+      }
+    }
 
     const { count: better } = await supabase
       .from('daily_scores')

@@ -209,11 +209,13 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
     expect(screen.getByText(CHARACTERS[1].name)).toBeTruthy()
   })
 
-  it('re-opening "See today\'s card" still renders the board block after the round left memory', async () => {
+  it('re-opening "See today\'s card" after the round left memory renders without crashing', async () => {
     // played today (history entry exists) but the full round is no longer in
     // the single round slot — the exact state that used to blank the whole
-    // leaderboard on revisit. Board display needs only the day, so the block
-    // must still render (read-only in tests, where the backend is disabled).
+    // leaderboard on revisit. Here (backend disabled) this guards the
+    // integration path: ResultScreen's daily/boardRound-null branch mounts and
+    // the screen renders. That the fallback board actually shows standings is
+    // asserted under an enabled backend in smoke.board.test.tsx.
     const { newRound, applyChoice, advanceHole, recordResult } = await import('./state/store')
     const { dailySetup } = await import('./engine/daily')
     let s = newRound(dailySetup(), 'daily', 'dart')

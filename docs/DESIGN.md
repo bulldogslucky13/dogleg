@@ -1,4 +1,4 @@
-# Dogleg — game design
+# DogLeg — game design
 
 A from-scratch daily golf strategy game inspired by breakpar.xyz (see
 REVERSE-ENGINEERING.md for the study of the original). Static Vite + React +

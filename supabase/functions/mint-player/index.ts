@@ -1,4 +1,4 @@
-// Dogleg mint-player edge function (Deno).
+// DogLeg mint-player edge function (Deno).
 //
 // Mints an anonymous player identity: a nameless players row, returned as
 // { id, secret }. The client calls this at app start so that even a player

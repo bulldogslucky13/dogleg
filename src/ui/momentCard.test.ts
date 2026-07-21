@@ -5,7 +5,7 @@ import { shareMomentCard, type MomentShareEnv } from './momentCard'
 // choice (native sheet → clipboard → download) is pinned without a DOM.
 
 const PNG = new Blob([new Uint8Array([1, 2, 3])], { type: 'image/png' })
-const OPTS = { filename: 'dogleg-hole-in-one.png', text: 'Hole in one ⛳ — Dogleg', url: 'https://dogleg.cameronbristol.xyz' }
+const OPTS = { filename: 'dogleg-hole-in-one.png', text: 'Hole in one ⛳ — DogLeg', url: 'https://dogleg.cameronbristol.xyz' }
 
 class FakeClipboardItem {
   items: Record<string, Blob>

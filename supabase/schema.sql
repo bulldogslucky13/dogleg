@@ -1,4 +1,4 @@
--- Dogleg leaderboard schema. Run once in the Supabase SQL editor (or via CLI).
+-- DogLeg leaderboard schema. Run once in the Supabase SQL editor (or via CLI).
 --
 -- Trust model: the anon key (shipped in the site) can only READ the boards.
 -- All writes go through the submit-round edge function, which replays every
@@ -65,10 +65,23 @@ create table if not exists course_records (
   set_at timestamptz not null default now()
 );
 
+-- One row per record-steal email actually attempted, keyed by day. The row is
+-- inserted BEFORE the send, so a duplicate key means "already emailed today"
+-- and the send is skipped. At-most-once beats at-least-once here: a lost
+-- email on a crashed send is fine, a double email is not.
+create table if not exists record_steal_emails (
+  course_slug text not null,
+  player_id uuid not null references players (id),
+  date_key text not null,
+  sent_at timestamptz not null default now(),
+  primary key (course_slug, player_id, date_key)
+);
+
 alter table players enable row level security;
 alter table daily_scores enable row level security;
 alter table course_records enable row level security;
 alter table mint_log enable row level security;
+alter table record_steal_emails enable row level security;
 
 -- boards are public reading material; players (and their secrets) are not
 drop policy if exists "anyone can read daily scores" on daily_scores;

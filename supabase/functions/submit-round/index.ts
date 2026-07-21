@@ -1,4 +1,4 @@
-// Dogleg submit-round edge function (Deno).
+// DogLeg submit-round edge function (Deno).
 //
 // Receives { seed, character, decisions, playerId?, playerSecret?, name? },
 // REPLAYS the round with the real game engine (bundled as engine.mjs by
@@ -10,6 +10,7 @@
 // deno-lint-ignore-file no-explicit-any
 import { createClient } from 'npm:@supabase/supabase-js@2'
 import { FORTUNE_CONFIG, courseBySlug, dailySalt, destinyDue, replayRound } from './engine.mjs'
+import { buildStealEmail, sendViaResend } from './email.ts'
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -243,7 +244,7 @@ Deno.serve(async (req) => {
   // practice: course records
   const { data: existing } = await supabase
     .from('course_records')
-    .select('to_par, player_name, character')
+    .select('to_par, player_id, player_name, character')
     .eq('course_slug', info.course.slug)
     .maybeSingle()
   const isRecord = !existing || replay.toPar < existing.to_par
@@ -257,6 +258,58 @@ Deno.serve(async (req) => {
       set_at: new Date().toISOString(),
     })
     if (error) return json(500, { error: 'could not save record' })
+
+    // ---- tell the previous holder their record was stolen ----
+    // Best effort, entirely behind env config (no RESEND_API_KEY → no-op),
+    // and never allowed to affect the submission response: the record is
+    // already saved, a broken mailer shouldn't unsave it. Runs as a
+    // background task (EdgeRuntime.waitUntil) so a slow mailer can't hold
+    // the response open — a timed-out client would retry, find its own
+    // record already written, get record.broken: false, and never run its
+    // reclaim bookkeeping. The dedupe insert rides inside the task: still
+    // insert-before-send, still at-most-once.
+    if (existing && existing.player_id !== player.id) {
+      const stolenFrom = existing.player_id
+      const notify = (async () => {
+        const resendKey = Deno.env.get('RESEND_API_KEY')
+        const emailFrom = Deno.env.get('EMAIL_FROM')
+        if (!resendKey || !emailFrom) return
+        // only holders who linked an email account can be reached
+        const { data: prev } = await supabase
+          .from('players')
+          .select('user_id')
+          .eq('id', stolenFrom)
+          .maybeSingle()
+        if (!prev?.user_id) return
+        // dedupe BEFORE sending: one email per holder per course per UTC
+        // day, and a crashed send burns the slot rather than double-mailing
+        const { error: dedupeError } = await supabase.from('record_steal_emails').insert({
+          course_slug: info.course.slug,
+          player_id: stolenFrom,
+          date_key: utcDateKey(0),
+        })
+        if (dedupeError) {
+          if (dedupeError.code !== '23505') {
+            console.error('record-steal email dedupe insert failed:', dedupeError.code)
+          }
+          return
+        }
+        const { data: userData } = await supabase.auth.admin.getUserById(prev.user_id)
+        const email = userData?.user?.email
+        if (!email) return
+        const msg = buildStealEmail({
+          courseName: info.course.name,
+          thiefName: player.name,
+          siteUrl: 'https://dogleg.cameronbristol.xyz',
+        })
+        const sent = await sendViaResend(fetch, resendKey, emailFrom, email, msg)
+        if (!sent.ok) console.error('record-steal email send failed with status', sent.status)
+      })().catch((e) => console.error('record-steal email path threw:', e))
+      const runtime = (globalThis as any).EdgeRuntime
+      if (typeof runtime?.waitUntil === 'function') runtime.waitUntil(notify)
+      // no waitUntil (older local runtime): await rather than lose the send
+      else await notify
+    }
   }
   return json(200, {
     mode: 'practice',

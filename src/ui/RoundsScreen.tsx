@@ -17,6 +17,7 @@ import {
 import { lifetimeRounds, loadArchive, type ArchivedRound, type HistoryEntry } from '../state/store'
 import { AccountPanel } from './AccountPanel'
 import { RoundScorecard } from './RoundScorecard'
+import { track } from '../lib/analytics'
 
 /**
  * My rounds — the locker. Top to bottom: the trophy shelf (lifetime aces and
@@ -69,6 +70,23 @@ export function RoundsScreen(props: {
     }
   }, [])
 
+  // clubhouse navigation telemetry: the locker is the main "place other than
+  // play", so each of its sections gets a `screen_viewed` — entry (clubhouse)
+  // plus stats, the trophy lists, and the records tab.
+  useEffect(() => {
+    const screen =
+      view === 'stats'
+        ? 'clubhouse_stats'
+        : view === 'ace'
+          ? 'clubhouse_aces'
+          : view === 'albatross'
+            ? 'clubhouse_albatrosses'
+            : tab === 'records'
+              ? 'clubhouse_records'
+              : 'clubhouse'
+    track('screen_viewed', { screen })
+  }, [view, tab])
+
   const log = loadRoundLog()
   const archive = loadArchive()
   const stats = lifetimeStats(log)
@@ -87,7 +105,13 @@ export function RoundsScreen(props: {
    * when the archive still holds the decisions */
   const actions = (r: LoggedRound) => (
     <span className="round-actions">
-      <button className="cta ghost slim" onClick={() => setCard(r)}>
+      <button
+        className="cta ghost slim"
+        onClick={() => {
+          track('scorecard_opened', { mode: r.mode, course: r.courseSlug })
+          setCard(r)
+        }}
+      >
         Scorecard
       </button>
       {archived(r.seed) && (

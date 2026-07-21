@@ -3,6 +3,7 @@ import { backendEnabled } from '../lib/backend'
 import { currentEmail, sendMagicLink, signOut, syncAccount } from '../lib/auth'
 import { fetchMyHistory, loadPlayer } from '../lib/leaderboard'
 import { mergeHistory, type HistoryEntry } from '../state/store'
+import { identifyPlayer, track } from '../lib/analytics'
 import { Spinner } from './Spinner'
 
 /**
@@ -39,10 +40,16 @@ export function AccountPanel(props: { onHistorySynced?: (h: HistoryEntry[]) => v
       setSignedInAs(addr)
       if (!addr) return
       const out = await syncAccount()
+      // cross-device sign-in reconciled — status distinguishes a fresh adopt on
+      // a new device from an existing identity re-confirming
+      track('account_synced', { status: out.status })
       if (out.status === 'needsname') {
         setNeedsName(true)
         setOpen(true)
       } else if (out.player) {
+        // signed in on this device — attach its events to the account's stable
+        // player id, stitching this device to the same person in PostHog
+        identifyPlayer(out.player.id, out.player.name)
         setPlayerName(out.player.name)
         if (out.status === 'adopted') setOpen(true) // show the win on a new device
         await pullHistory()
@@ -61,7 +68,11 @@ export function AccountPanel(props: { onHistorySynced?: (h: HistoryEntry[]) => v
     const r = await sendMagicLink(email.trim())
     setBusy(false)
     if (!r.ok) setError(r.error ?? 'could not send the link')
-    else setSent(true)
+    else {
+      // top of the cross-device funnel — email intentionally NOT sent as a prop
+      track('magic_link_sent')
+      setSent(true)
+    }
   }
 
   const claimName = async (e: React.FormEvent) => {
@@ -71,6 +82,8 @@ export function AccountPanel(props: { onHistorySynced?: (h: HistoryEntry[]) => v
     const out = await syncAccount(nameInput.trim())
     setBusy(false)
     if (out.player) {
+      track('clubhouse_name_claimed', { via: 'account' })
+      identifyPlayer(out.player.id, out.player.name)
       setPlayerName(out.player.name)
       setNeedsName(false)
       await pullHistory()
@@ -125,6 +138,7 @@ export function AccountPanel(props: { onHistorySynced?: (h: HistoryEntry[]) => v
                   onClick={async () => {
                     setBusy(true)
                     await signOut()
+                    track('signed_out')
                     setBusy(false)
                     setSignedInAs(null)
                     setSent(false)

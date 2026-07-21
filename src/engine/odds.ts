@@ -272,6 +272,11 @@ function distanceTaper(dist: number): ApproachRow {
 
 export type ApproachMode = 'par3tee' | 'standard' | 'wedge' | 'go'
 
+export interface FortuneShotOdds {
+  acePerShot: number
+  albPerShot: number
+}
+
 export function approachOdds(
   layout: HoleLayout,
   cond: Conditions,
@@ -279,6 +284,7 @@ export function approachOdds(
   choice: Choice,
   mode: ApproachMode,
   character?: CharacterId,
+  fortune?: FortuneShotOdds,
 ): ApproachOddsDetail {
   const m = pressure(layout.spec.strokeIndex, layout.spec.par, cond)
   const lie: LieRow = ball.lie === 'tee' ? 'tee' : (ball.lie as LieRow)
@@ -363,6 +369,13 @@ export function approachOdds(
           : HOLEOUT.approach[choice] * HOLEOUT_LIE[lie]
   holeoutBase *= taper.kickin // jarring it from 220 is rarer than from a wedge
   if (character === 'dart') holeoutBase *= DART_BUFF.holeout
+  // fortune floor: ace odds on par-3 tees, albatross odds on go-for-it shots.
+  // These are honest, displayed odds — destiny (the guarantee) is resolved
+  // outside the distribution, in the shot resolver.
+  if (fortune) {
+    if (mode === 'par3tee') holeoutBase = Math.max(holeoutBase, fortune.acePerShot)
+    if (mode === 'go') holeoutBase = Math.max(holeoutBase, fortune.albPerShot)
+  }
   odds.holeout = holeoutBase
   const scale = 1 - holeoutBase
   odds.kickin *= scale

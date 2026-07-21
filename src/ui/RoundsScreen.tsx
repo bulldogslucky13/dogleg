@@ -145,7 +145,7 @@ export function RoundsScreen(props: {
       <div className="screen rounds">
         {scorecard}
         <button className="home-link" onClick={() => setView('main')}>
-          ‹ Locker
+          ‹ Clubhouse
         </button>
         <header>
           <div className="kicker">
@@ -182,7 +182,7 @@ export function RoundsScreen(props: {
       <div className="screen rounds">
         {scorecard}
         <button className="home-link" onClick={() => setView('main')}>
-          ‹ Locker
+          ‹ Clubhouse
         </button>
         <header>
           <div className="kicker">
@@ -222,7 +222,7 @@ export function RoundsScreen(props: {
               </div>
             ))}
           </div>
-          <p className="dist-ref">Aces and albatrosses live on the trophy shelf in your locker ↑</p>
+          <p className="dist-ref">Aces and albatrosses live on the trophy shelf in your clubhouse ↑</p>
         </section>
 
         <section className="rounds-section">
@@ -255,10 +255,10 @@ export function RoundsScreen(props: {
     <div className="screen rounds">
       {scorecard}
       <button className="home-link" onClick={props.onBack}>
-        ‹ Clubhouse
+        ‹ Teebox
       </button>
       <header>
-        <h2 className="pick-title">My rounds</h2>
+        <h2 className="pick-title">Clubhouse</h2>
       </header>
 
       <div className="trophy-row">
@@ -289,7 +289,7 @@ export function RoundsScreen(props: {
       </button>
 
       {rounds.length === 0 ? (
-        <p className="tagline center">No rounds in the locker yet — go play one and it'll show up here.</p>
+        <p className="tagline center">No rounds in the clubhouse yet — go play one and it'll show up here.</p>
       ) : (
         <>
           <div className="locker-tabs" role="tablist">

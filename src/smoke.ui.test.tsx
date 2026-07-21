@@ -62,7 +62,7 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
     // tapping it lands in the locker with the account panel slot open
     // (AccountPanel itself renders null in tests — backend is off in CI)
     fireEvent.click(screen.getByText(/Playing on more than one device/))
-    expect(screen.getByText('My rounds')).toBeTruthy()
+    expect(screen.getByText('Clubhouse')).toBeTruthy()
   })
 
   it('the streak display carries the fortune disclosure note', () => {
@@ -381,7 +381,7 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
     window.location.hash = '#watch=not-a-real-code'
     render(<App />)
     expect(screen.getByText(/That replay link doesn't parse/)).toBeTruthy()
-    fireEvent.click(screen.getByText('Clubhouse'))
+    fireEvent.click(screen.getByText('Teebox'))
     expect(screen.getByText('Tee off')).toBeTruthy()
     window.location.hash = ''
   })
@@ -402,7 +402,7 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
     archiveRound(s)
 
     render(<App />)
-    fireEvent.click(screen.getByText(/My rounds/))
+    fireEvent.click(screen.getByText(/Clubhouse · my rounds/))
 
     // the trophy shelf sits on top — empty but visible: the zero IS the goal
     expect(screen.getByText('Lifetime Hole in One')).toBeTruthy()
@@ -447,7 +447,7 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
     logRound(s)
 
     render(<App />)
-    fireEvent.click(screen.getByText(/My rounds/))
+    fireEvent.click(screen.getByText(/Clubhouse · my rounds/))
     fireEvent.click(screen.getByText(/Lifetime rounds played/))
 
     // one round in the book: no handicap yet, countdown says how far to go
@@ -485,7 +485,7 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
     )
 
     render(<App />)
-    fireEvent.click(screen.getByText(/My rounds/))
+    fireEvent.click(screen.getByText(/Clubhouse · my rounds/))
     // the ace trophy counted it from stored results alone
     const aceTrophy = screen.getByText('Lifetime Hole in One').closest('button')!
     expect(within(aceTrophy).getByText('1')).toBeTruthy()

@@ -53,7 +53,7 @@ export function ReplayScreen(props: { payload: ReplayPayload; onExit: () => void
       <div className="screen">
         <p className="tagline center">That replay link doesn't parse — maybe it got truncated in the chat?</p>
         <button className="cta" onClick={props.onExit}>
-          Clubhouse
+          Teebox
         </button>
       </div>
     )

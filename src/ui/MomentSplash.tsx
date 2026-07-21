@@ -1,13 +1,20 @@
+import { useEffect, useRef, useState } from 'react'
 import { characterById } from '../engine/characters'
-import { toParLabel } from '../engine/daily'
+import { SITE_URL, toParLabel } from '../engine/daily'
 import { MOMENT_COPY, type MomentKind } from '../engine/fortune'
 import type { CharacterId } from '../engine/types'
+import { track } from '../lib/analytics'
 import { CharacterAvatar } from './Avatars'
+import { momentCardBlob, shareMomentCard } from './momentCard'
 
 /**
  * The full-screen moment: HOLE IN ONE / ALBATROSS. Composed to be
- * screenshotted — course, hole, date, character, branding, fireworks.
- * Stays up until tapped.
+ * shared — course, hole, date, character, branding, fireworks. For the
+ * first five seconds every tap is swallowed (including the double-tap
+ * that committed the shot) so the moment can't be skipped by accident;
+ * only the Share button is live. Then a quiet "tap to continue" fades in
+ * and any tap outside the button resumes play. Sharing never advances
+ * the game.
  */
 export function MomentSplash(props: {
   kind: MomentKind
@@ -21,8 +28,99 @@ export function MomentSplash(props: {
   const copy = MOMENT_COPY[props.kind]
   const char = characterById(props.character)
   const confetti = Array.from({ length: 26 })
+  const [locked, setLocked] = useState(true)
+  const [busy, setBusy] = useState(false)
+  const [note, setNote] = useState<string | null>(null)
+  const noteTimer = useRef<number | undefined>(undefined)
+  const cardBlob = useRef<Blob | null>(null)
+
+  useEffect(() => {
+    const t = window.setTimeout(() => setLocked(false), 5000)
+    return () => {
+      window.clearTimeout(t)
+      window.clearTimeout(noteTimer.current)
+    }
+  }, [])
+
+  // Render the share card up front, while the splash sits on screen, so the
+  // Share tap can hand it straight to navigator.share(). Web Share needs the
+  // tap's transient activation; awaiting the card (its lazy react-dom/server
+  // chunk + image loads) inside the click would blow that window on a slow
+  // connection and drop the user to a download. Prewarm failures are fine —
+  // share() regenerates on demand and falls back to clipboard/download.
+  useEffect(() => {
+    let alive = true
+    momentCardBlob({
+      kind: props.kind,
+      holeNumber: props.holeNumber,
+      courseName: props.courseName,
+      dateKey: props.dateKey,
+      toPar: props.toPar,
+      character: props.character,
+    })
+      .then((blob) => {
+        if (alive) cardBlob.current = blob
+      })
+      .catch(() => {})
+    return () => {
+      alive = false
+    }
+    // props for a given moment are fixed for the splash's lifetime
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const flash = (message: string) => {
+    setNote(message)
+    window.clearTimeout(noteTimer.current)
+    noteTimer.current = window.setTimeout(() => setNote(null), 2000)
+  }
+
+  const share = async (e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (busy) return
+    setBusy(true)
+    try {
+      const line = props.kind === 'ace' ? `Hole in one at ${props.courseName} ⛳` : `Albatross at ${props.courseName} 🕊️`
+      const opts = {
+        filename: `dogleg-${props.kind === 'ace' ? 'hole-in-one' : 'albatross'}.png`,
+        text: `${line} — Dogleg`,
+        url: `https://${SITE_URL}`,
+      }
+      // Ready card → no await before shareMomentCard, so navigator.share() fires
+      // inside the tap's activation. Only regenerate if the prewarm hasn't landed.
+      const blob =
+        cardBlob.current ??
+        (await momentCardBlob({
+          kind: props.kind,
+          holeNumber: props.holeNumber,
+          courseName: props.courseName,
+          dateKey: props.dateKey,
+          toPar: props.toPar,
+          character: props.character,
+        }))
+      cardBlob.current = blob
+      const outcome = await shareMomentCard(blob, opts)
+      if (outcome === 'cancelled') return
+      track('moment_share_clicked', { method: outcome, kind: props.kind })
+      if (outcome === 'clipboard') flash('Copied!')
+      if (outcome === 'download') flash('Saved!')
+    } catch {
+      // card generation failed — leave the celebration up, no dead end
+      flash("Couldn't make the card")
+    } finally {
+      setBusy(false)
+    }
+  }
+
   return (
-    <div className={`moment-backdrop ${props.kind}`} role="dialog" aria-label={copy.title} onClick={props.onClose}>
+    <div
+      className={`moment-backdrop ${props.kind}${locked ? ' locked' : ''}`}
+      role="dialog"
+      aria-label={copy.title}
+      onClick={() => {
+        if (!locked) props.onClose()
+      }}
+    >
       <div className="moment-rays" aria-hidden />
       {confetti.map((_c, i) => (
         <span key={i} className="moment-confetti" style={confettiStyle(i)} aria-hidden />
@@ -45,7 +143,15 @@ export function MomentSplash(props: {
             Hole {props.holeNumber} · {toParLabel(props.toPar)} on the round · {shortDate(props.dateKey)}
           </span>
         </div>
-        <p className="moment-hint">tap to keep playing — screenshot it first</p>
+        <button className="cta moment-share" onClick={share} disabled={busy}>
+          {busy ? 'Making your card…' : '📸 Share'}
+        </button>
+        {note && (
+          <span className="moment-toast" role="status">
+            {note}
+          </span>
+        )}
+        {!locked && <p className="moment-continue">tap to continue playing</p>}
       </div>
     </div>
   )

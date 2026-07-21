@@ -355,6 +355,8 @@ export function ResultScreen(props: {
       : forecast.cond.wind >= 12
         ? `${forecast.cond.wind} mph breeze`
         : `${forecast.cond.wind} mph wind`
+  const windMood = forecast.cond.wind >= 18 ? '💨' : forecast.cond.wind >= 12 ? '🍃' : '☀️'
+  const greensHot = forecast.cond.greens === 'Fast'
   const canNativeShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function'
   const copy = async () => {
     let ok = true
@@ -518,9 +520,18 @@ export function ResultScreen(props: {
         </button>
       )}
       <div className="forecast">
-        <div className="kicker">Up next</div>
-        <p>
-          Tomorrow: {forecast.course.name} — {windTone}, {forecast.cond.greens.toLowerCase()} greens
+        <div className="kicker">Tomorrow's forecast</div>
+        <p className="forecast-line">
+          <b>{forecast.course.name}</b>
+          <span className="chips slim">
+            <span className="chip forecast-chip">
+              {windMood} {windTone}
+            </span>
+            <span className="chip forecast-chip">
+              {greensHot ? '⚡ ' : ''}
+              {forecast.cond.greens.toLowerCase()} greens
+            </span>
+          </span>
         </p>
       </div>
       {props.practice && (

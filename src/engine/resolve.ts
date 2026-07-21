@@ -15,7 +15,7 @@ import type { HazardZone } from './types'
 import type { Rng } from './rng'
 import { pickWeighted } from './rng'
 import { approachAdvantage, longAdvantage, puttAdvantage } from './advantage'
-import { approachOdds, longOdds, puttOdds, shortOdds, type ApproachMode, type ZoneShare } from './odds'
+import { approachOdds, longOdds, puttOdds, shortOdds, type ApproachMode, type FortuneShotOdds, type ZoneShare } from './odds'
 
 /** What a made putt scores relative to par — accounts for every stroke already
  * taken, penalties included. A "birdie look" is only a birdie look if holing out
@@ -50,6 +50,8 @@ export interface HoleInPlay {
   cond: Conditions
   /** round-long playstyle; shifts the odds the whole model sees */
   character?: CharacterId
+  /** per-shot ace/albatross probability floors from the fortune counters */
+  fortuneOdds?: FortuneShotOdds
   stage: Stage
   ball: BallState
   strokes: number
@@ -60,11 +62,17 @@ export interface HoleInPlay {
   score?: HoleScore
 }
 
-export function startHole(layout: HoleLayout, cond: Conditions, character?: CharacterId): HoleInPlay {
+export function startHole(
+  layout: HoleLayout,
+  cond: Conditions,
+  character?: CharacterId,
+  fortuneOdds?: FortuneShotOdds,
+): HoleInPlay {
   return {
     layout,
     cond,
     character,
+    fortuneOdds,
     stage: layout.spec.par === 3 ? 'approach' : 'tee',
     ball: { pos: 0, lie: 'tee', side: 'center' },
     strokes: 0,
@@ -90,10 +98,10 @@ export function oddsFor(h: HoleInPlay, choice: Choice): Odds {
       return longOdds(h.layout, h.cond, h.ball, choice, 'tee', h.character).odds
     case 'second':
       return choice === 'aggressive'
-        ? approachOdds(h.layout, h.cond, h.ball, choice, 'go', h.character).odds
+        ? approachOdds(h.layout, h.cond, h.ball, choice, 'go', h.character, h.fortuneOdds).odds
         : longOdds(h.layout, h.cond, h.ball, choice, 'layup', h.character).odds
     case 'approach':
-      return approachOdds(h.layout, h.cond, h.ball, choice, approachMode(h), h.character).odds
+      return approachOdds(h.layout, h.cond, h.ball, choice, approachMode(h), h.character, h.fortuneOdds).odds
     case 'putt':
       return puttOdds(h.cond, h.ball.puttFeet ?? 20, choice, h.character)
     case 'shortgame':
@@ -177,7 +185,7 @@ function finish(h: HoleInPlay, note: string): void {
 }
 
 /** Apply one decision. Mutates and returns the hole state. */
-export function playShot(h: HoleInPlay, choice: Choice, rng: Rng): HoleInPlay {
+export function playShot(h: HoleInPlay, choice: Choice, rng: Rng, destiny?: 'ace' | 'albatross'): HoleInPlay {
   const faced = facedAll(h)
   const L = h.layout.length
   const spec = h.layout.spec
@@ -189,7 +197,7 @@ export function playShot(h: HoleInPlay, choice: Choice, rng: Rng): HoleInPlay {
     case 'tee':
     case 'second': {
       if (h.stage === 'second' && choice === 'aggressive') {
-        resolveApproach(h, choice, rng, faced, 'go')
+        resolveApproach(h, choice, rng, faced, 'go', destiny)
         return h
       }
       const mode = h.stage === 'tee' ? 'tee' : 'layup'
@@ -253,7 +261,7 @@ export function playShot(h: HoleInPlay, choice: Choice, rng: Rng): HoleInPlay {
     }
 
     case 'approach': {
-      resolveApproach(h, choice, rng, faced, approachMode(h))
+      resolveApproach(h, choice, rng, faced, approachMode(h), destiny)
       return h
     }
 
@@ -379,12 +387,13 @@ function resolveApproach(
   rng: Rng,
   faced: Record<Choice, { summary: OddsSummary; odds: Odds }>,
   mode: ApproachMode,
+  destiny?: 'ace' | 'albatross',
 ): void {
   const L = h.layout.length
   const preBall: BallState = { ...h.ball }
-  const detail = approachOdds(h.layout, h.cond, h.ball, choice, mode, h.character)
+  const detail = approachOdds(h.layout, h.cond, h.ball, choice, mode, h.character, h.fortuneOdds)
   const o = detail.odds
-  const bucket = pickWeighted(rng, {
+  let bucket = pickWeighted(rng, {
     holeout: o.holeout,
     kickin: o.kickin,
     makeable: o.makeable,
@@ -393,9 +402,17 @@ function resolveApproach(
     sand: o.sand,
     water: o.water,
   })
+  // destiny consumed the same roll a normal shot would, then overrides it —
+  // the game's one sanctioned exception to the displayed odds (see fortune.ts)
+  if (destiny === 'ace' && mode === 'par3tee') bucket = 'holeout'
+  if (destiny === 'albatross' && mode === 'go') bucket = 'holeout'
   h.strokes += 1
   const stageWas = h.stage
-  const advantage = approachAdvantage(h.layout, h.cond, preBall, choice, mode, h.character, bucket) ?? undefined
+  const destinyFired = bucket === 'holeout' && destiny !== undefined
+  // a destined shot is fate, not skill — no character-advantage callout for it
+  const advantage = destinyFired
+    ? undefined
+    : (approachAdvantage(h.layout, h.cond, preBall, choice, mode, h.character, bucket) ?? undefined)
   let penalty = false
 
   // the Dart Thrower callout only lands when the result is actually birdie-or-better

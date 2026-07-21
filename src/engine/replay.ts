@@ -1,5 +1,6 @@
 import { courseBySlug } from './courses'
 import { dailyConditions, courseForPuzzle, practiceConditions, puzzleNumberForDateKey } from './daily'
+import { destinyDue, fortuneShotOdds, splitFortune, type FortuneState, type MomentKind } from './fortune'
 import { buildLayout } from './layout'
 import { playShot, startHole, type HoleInPlay } from './resolve'
 import { rngFromString } from './rng'
@@ -8,6 +9,11 @@ import type { CharacterId, Choice, Conditions, CourseSpec, HoleResult, HoleScore
 // Re-exported so it reaches the edge function through engine.mjs: the referee
 // derives the expected salt with the exact same code the client seeds with.
 export { dailySalt } from './daily'
+// re-exported for the server bundle's fortune verification: the referee
+// recomputes days-since-last-ace/albatross from posted cards, which takes
+// the course's pars to tell an ace (eagle on a par 3) from a plain eagle
+export { FORTUNE_CONFIG, destinyDue } from './fortune'
+export { courseBySlug } from './courses'
 
 /**
  * Deterministic round replay — the backbone of leaderboard score validation.
@@ -26,6 +32,8 @@ export interface SeedInfo {
   mode: 'daily' | 'practice'
   course: CourseSpec
   cond: Conditions
+  /** ace/albatross counters carried by the seed; null for pre-fortune seeds */
+  fortune: FortuneState | null
   /** daily only */
   dateKey?: string
   puzzleNumber?: number
@@ -39,23 +47,48 @@ export interface SeedInfo {
  * Daily seeds may carry a per-player dice salt (`round:date:slug:salt`) —
  * the salt changes the rolls, never the course or conditions. Verifying that
  * the salt belongs to the submitting player is the caller's job; see
- * `dailySalt` and the submit-round function. */
+ * `dailySalt` and the submit-round function. Either mode may also carry a
+ * trailing fortune segment (`:f…`); conditions always derive from the seed
+ * WITHOUT that tail, so the pick screen and the round agree. */
 export function setupFromSeed(seed: string): SeedInfo | null {
-  const daily = /^round:(\d{4}-\d{2}-\d{2}):([a-z0-9-]+?)(?::([a-z0-9]+))?$/.exec(seed)
+  const { base, fortune } = splitFortune(seed)
+  const daily = /^round:(\d{4}-\d{2}-\d{2}):([a-z0-9-]+?)(?::([a-z0-9]+))?$/.exec(base)
   if (daily) {
     const [, dateKey, slug, salt] = daily
     const n = puzzleNumberForDateKey(dateKey)
     const course = courseForPuzzle(n)
     if (course.slug !== slug) return null // seed names a course that isn't that day's rotation
-    return { mode: 'daily', course, cond: dailyConditions(dateKey, course), dateKey, puzzleNumber: n, salt }
+    return { mode: 'daily', course, cond: dailyConditions(dateKey, course), fortune, dateKey, puzzleNumber: n, salt }
   }
-  const practice = /^practice:([a-z0-9-]+):/.exec(seed)
+  const practice = /^practice:([a-z0-9-]+):/.exec(base)
   if (practice) {
     const course = courseBySlug(practice[1])
     if (!course) return null
-    return { mode: 'practice', course, cond: practiceConditions(seed, course) }
+    return { mode: 'practice', course, cond: practiceConditions(base, course), fortune }
   }
   return null
+}
+
+/**
+ * Round-scope destiny plan, identical on client and server: when a track's
+ * counter has crossed its threshold, the round's FIRST qualifying shot
+ * (par-3 tee for the ace, par-5 go-attempt for the albatross) holes out.
+ */
+export interface DestinyPlan {
+  ace: boolean
+  albatross: boolean
+}
+
+export function destinyPlan(info: SeedInfo): DestinyPlan {
+  if (!info.fortune) return { ace: false, albatross: false }
+  const due = destinyDue(info.mode, info.fortune)
+  return { ace: due.ace, albatross: due.albatross }
+}
+
+/** The per-shot probability boosts that DO flow through the honest odds. */
+export function fortuneOddsFor(info: SeedInfo): { acePerShot: number; albPerShot: number } | undefined {
+  if (!info.fortune) return undefined
+  return fortuneShotOdds(info.mode, info.fortune)
 }
 
 export type ReplayOutcome =
@@ -69,14 +102,17 @@ export function replayRound(seed: string, character: CharacterId | undefined, de
   if (!info) return { ok: false, error: 'invalid seed' }
   if (!Array.isArray(decisions) || decisions.length !== 18) return { ok: false, error: 'need 18 holes of decisions' }
 
-  const rng = rngFromString(seed)
+  // dice ignore the fortune tail — see roundRng in the store for why
+  const rng = rngFromString(splitFortune(seed).base)
   const scores: HoleScore[] = []
   let aggressiveLeft = AGGRESSIVE_BUDGET
+  const plan = destinyPlan(info)
+  const fOdds = fortuneOddsFor(info)
 
   for (let i = 0; i < 18; i++) {
     const spec = info.course.holes[i]
     const layout = buildLayout(info.course.slug, spec)
-    const h = startHole(layout, info.cond, character)
+    const h = startHole(layout, info.cond, character, fOdds)
     const holeChoices = decisions[i]
     if (!Array.isArray(holeChoices) || holeChoices.length === 0 || holeChoices.length > 20) {
       return { ok: false, error: `hole ${i + 1}: bad decision list` }
@@ -91,7 +127,20 @@ export function replayRound(seed: string, character: CharacterId | undefined, de
         if (aggressiveLeft <= 0) return { ok: false, error: `hole ${i + 1}: aggressive over budget` }
         aggressiveLeft -= 1
       }
-      playShot(h, choice, rng)
+      // destiny: the round's first qualifying shot of a due track holes out.
+      // An albatross attempt only qualifies while the shot is still FOR 2
+      // (h.strokes === 1): after a tee-shot penalty the "go" would finish as
+      // an eagle, so it neither fires nor spends the guarantee — the plan
+      // stays live for the next clean chance.
+      let destiny: MomentKind | undefined
+      if (plan.ace && spec.par === 3 && h.ball.lie === 'tee') {
+        destiny = 'ace'
+        plan.ace = false
+      } else if (plan.albatross && h.stage === 'second' && choice === 'aggressive' && h.strokes === 1) {
+        destiny = 'albatross'
+        plan.albatross = false
+      }
+      playShot(h, choice, rng, destiny)
     }
     if (h.stage !== 'done' || !h.score) return { ok: false, error: `hole ${i + 1}: round left unfinished` }
     scores.push(h.score)
@@ -132,17 +181,30 @@ export function replayFrames(seed: string, character: CharacterId | undefined, d
   const outcome = replayRound(seed, character, decisions)
   if (!outcome.ok) return null
   const info = outcome.info
-  // re-run, capturing states this time (cheap: one extra pass)
-  const rng = rngFromString(seed)
+  // re-run, capturing states this time (cheap: one extra pass). Fortune is
+  // mirrored exactly as in replayRound — the dice ignore the fortune tail, the
+  // shot odds carry the boosts, and a due track's first qualifying shot holes
+  // out — or the frames diverge from the validated score.
+  const rng = rngFromString(splitFortune(seed).base)
+  const plan = destinyPlan(info)
+  const fOdds = fortuneOddsFor(info)
   const frames: ReplayFrame[] = []
   let runToPar = 0
   for (let i = 0; i < 18; i++) {
     const spec = info.course.holes[i]
     const layout = buildLayout(info.course.slug, spec)
-    const h = startHole(layout, info.cond, character)
+    const h = startHole(layout, info.cond, character, fOdds)
     frames.push({ holeIndex: i, shotIndex: 0, hole: snapshot(h), runningToPar: runToPar })
     decisions[i].forEach((choice, j) => {
-      playShot(h, choice, rng)
+      let destiny: MomentKind | undefined
+      if (plan.ace && spec.par === 3 && h.ball.lie === 'tee') {
+        destiny = 'ace'
+        plan.ace = false
+      } else if (plan.albatross && h.stage === 'second' && choice === 'aggressive' && h.strokes === 1) {
+        destiny = 'albatross'
+        plan.albatross = false
+      }
+      playShot(h, choice, rng, destiny)
       frames.push({ holeIndex: i, shotIndex: j + 1, hole: snapshot(h), runningToPar: runToPar })
     })
     runToPar += h.score!.strokes - spec.par

@@ -15,7 +15,7 @@ import {
 import { recordWon, type StolenRecord } from '../lib/records'
 import { markArchiveRecord, roundToPar, type RoundState } from '../state/store'
 import { courseBySlug } from '../engine/courses'
-import { track } from '../lib/analytics'
+import { identifyPlayer, track } from '../lib/analytics'
 import { RecordSplash } from './RecordSplash'
 import { SyncCta } from './RoundsScreen'
 
@@ -54,11 +54,16 @@ export function ScoreBoard(props: { round: RoundState }) {
       return
     }
     setResult(r)
-    setPlayer(loadPlayer())
+    const named = loadPlayer()
+    setPlayer(named)
     // naming yourself on a card is the app's core conversion — a device with a
     // clubhouse name is a returning, ranked player. Fire it before the record
     // bookkeeping so a name-claim always registers.
-    if (pickedName && !player) track('clubhouse_name_claimed', { via: 'board', mode: round.mode })
+    if (pickedName && !player) {
+      track('clubhouse_name_claimed', { via: 'board', mode: round.mode })
+      // just became a known player — attach their events to the stable id
+      if (named) identifyPlayer(named.id, named.name)
+    }
     let reclaimed = false
     if (r.record?.broken) {
       markArchiveRecord(round.seed) // pin it in the locker forever
@@ -71,16 +76,20 @@ export function ScoreBoard(props: { round: RoundState }) {
       }
     }
     // the untracked conversion: a round actually posted to a board. Daily cards
-    // and course-record claims both land here.
-    track('board_submitted', {
-      mode: round.mode,
-      course: round.courseSlug,
-      to_par: roundToPar(round),
-      named: !!(pickedName || player),
-      is_record: !!r.record?.broken,
-      reclaim: reclaimed,
-      rank: r.rank ?? null,
-    })
+    // and course-record claims both land here. Skip duplicate daily re-posts
+    // (a returning player re-opening today's card auto-submits again, and the
+    // server returns duplicate: true) so re-views don't inflate conversions.
+    if (!r.duplicate) {
+      track('board_submitted', {
+        mode: round.mode,
+        course: round.courseSlug,
+        to_par: roundToPar(round),
+        named: !!(pickedName || player),
+        is_record: !!r.record?.broken,
+        reclaim: reclaimed,
+        rank: r.rank ?? null,
+      })
+    }
     void refreshBoard()
   }
 

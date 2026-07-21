@@ -28,8 +28,8 @@ import {
 } from './state/store'
 import { absorbHistory, logRound } from './state/stats'
 import { chasing } from './lib/records'
-import { track } from './lib/analytics'
-import { ensureIdentity, loadIdentity } from './lib/leaderboard'
+import { identifyPlayer, track } from './lib/analytics'
+import { ensureIdentity, loadIdentity, loadPlayer } from './lib/leaderboard'
 import { CharacterAvatar } from './ui/Avatars'
 import { GreenView, HoleMap, useMapSize } from './ui/HoleMap'
 import { SideMap } from './ui/SideMap'
@@ -92,6 +92,11 @@ export default function App() {
   // player — long done by the time a human reaches the first tee
   useEffect(() => {
     ensureIdentity()
+    // a device that already holds a NAMED player is a returning known user —
+    // attach their events to that stable id so cross-device stats line up.
+    // Anonymous (nameless) devices are deliberately left un-identified.
+    const p = loadPlayer()
+    if (p) identifyPlayer(p.id, p.name)
   }, [])
 
   // a replay link opened while the app is already mounted only fires

@@ -13,7 +13,7 @@ import { currentHandicap, formatHandicap } from '../state/stats'
 import { characterRecords, computeStreaks, loadArchive, type HistoryEntry, type RoundRecap, type RoundState } from '../state/store'
 import { AccountPanel } from './AccountPanel'
 import { CharacterAvatar } from './Avatars'
-import { ScoreBoard } from './Leaderboard'
+import { DailyBoardView, ScoreBoard } from './Leaderboard'
 
 export function HomeScreen(props: {
   history: HistoryEntry[]
@@ -478,7 +478,15 @@ export function ResultScreen(props: {
           <p className="fine coach-line">{gradeCopy(props.grade).luckLine}</p>
         </div>
       )}
-      {props.boardRound && <ScoreBoard round={props.boardRound} />}
+      {props.boardRound ? (
+        <ScoreBoard round={props.boardRound} />
+      ) : (
+        // re-opening today's card after the full round left memory (a practice
+        // round took the slot, or a refreshed device only kept the day's
+        // history entry): the card was already posted, so show the standings
+        // read-only rather than dropping the board entirely
+        !props.practice && <DailyBoardView dateKey={props.setup.dateKey} />
+      )}
       {!props.practice && (
         <>
           <div className="stats-row">

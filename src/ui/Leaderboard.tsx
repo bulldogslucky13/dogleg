@@ -243,3 +243,55 @@ function ordinal(n: number): string {
   const v = n % 100
   return `${n}${s[(v - 20) % 10] ?? s[v] ?? s[0]}`
 }
+
+/**
+ * Read-only daily board, shown when today's card is re-opened but the full
+ * round is no longer in memory — e.g. a practice round replaced the single
+ * round slot, or a refreshed device only holds the day's history entry. The
+ * card was already posted when the round finished, so there's nothing to
+ * submit here; the standings just need to still be there.
+ */
+export function DailyBoardView(props: { dateKey: string }) {
+  const [board, setBoard] = useState<BoardRow[] | null>(null)
+  const player = loadPlayer()
+
+  useEffect(() => {
+    if (!backendEnabled) return
+    let cancelled = false
+    void fetchDailyBoard(props.dateKey).then((rows) => {
+      if (!cancelled) setBoard(rows)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [props.dateKey])
+
+  if (!backendEnabled) return null
+
+  return (
+    <div className="board-block">
+      <div className="kicker">Today's board</div>
+      {!board && (
+        <p className="fine">
+          <Spinner />
+          Loading the board…
+        </p>
+      )}
+      {board && board.length > 0 && (
+        <ol className="board-list">
+          {board.slice(0, 10).map((row, i) => (
+            <li key={`${row.player_name}:${i}`} className={player && row.player_name === player.name ? 'me' : ''}>
+              <span className="board-pos">{i + 1}</span>
+              <span className="board-name">
+                {row.player_name}
+                {row.character ? ` ${characterById(row.character)?.emoji ?? ''}` : ''}
+              </span>
+              <b className="board-score">{toParLabel(row.to_par)}</b>
+            </li>
+          ))}
+        </ol>
+      )}
+      {board && board.length === 0 && <p className="fine">Nobody's posted yet — be first.</p>}
+    </div>
+  )
+}

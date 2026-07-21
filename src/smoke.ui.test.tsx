@@ -209,6 +209,33 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
     expect(screen.getByText(CHARACTERS[1].name)).toBeTruthy()
   })
 
+  it('re-opening "See today\'s card" still renders the board block after the round left memory', async () => {
+    // played today (history entry exists) but the full round is no longer in
+    // the single round slot — the exact state that used to blank the whole
+    // leaderboard on revisit. Board display needs only the day, so the block
+    // must still render (read-only in tests, where the backend is disabled).
+    const { newRound, applyChoice, advanceHole, recordResult } = await import('./state/store')
+    const { dailySetup } = await import('./engine/daily')
+    let s = newRound(dailySetup(), 'daily', 'dart')
+    for (let guard = 0; !s.complete && guard < 500; guard++) {
+      if (s.hole?.stage === 'done') {
+        s = advanceHole(s)
+        continue
+      }
+      const next = applyChoice(s, 'normal')
+      s = next === s ? applyChoice(s, 'safe') : next
+    }
+    recordResult(s) // writes today's history; leave the round slot empty
+
+    render(<App />)
+    // home offers the revisit CTA because today is played
+    const revisit = screen.getByText(/See today's card/)
+    fireEvent.click(revisit)
+    // the daily card renders without the round in memory — no crash, and the
+    // result screen is up (the leaderboard used to vanish here entirely)
+    expect(screen.getByText(/Daily No\./)).toBeTruthy()
+  })
+
   it('offers a fresh character pick on "play another practice round"', () => {
     vi.useFakeTimers()
     render(<App />)

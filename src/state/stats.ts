@@ -1,6 +1,6 @@
 import { courseBySlug } from '../engine/courses'
 import type { CharacterId, HoleResult } from '../engine/types'
-import { loadArchive, loadHistory, type RoundState } from './store'
+import { loadArchive, loadHistory, type HistoryEntry, type RoundState } from './store'
 
 /**
  * The round log — one lightweight entry per completed round, forever.
@@ -126,6 +126,40 @@ export function loadRoundLog(): LoggedRound[] {
   rounds.sort((a, b) => a.playedAt - b.playedAt)
   writeLog({ v: 1, rounds })
   return rounds
+}
+
+/**
+ * Fold freshly-synced daily history into the log. Account sync (#32) can
+ * deliver dailies from other devices long after the log first seeded, and
+ * the stats must count them — the log is the single source the numbers
+ * compute from, so it absorbs what sync learns. Dedupes by daily dateKey.
+ */
+export function absorbHistory(entries: HistoryEntry[]): void {
+  const rounds = loadRoundLog()
+  const seen = new Set(rounds.filter((r) => r.mode === 'daily').map((r) => r.dateKey))
+  let added = false
+  for (const h of entries) {
+    if (seen.has(h.dateKey)) continue
+    const pars = coursePars(h.courseSlug)
+    const [y, m, d] = h.dateKey.split('-').map(Number)
+    rounds.push({
+      seed: `hist:${h.dateKey}`,
+      mode: 'daily',
+      courseSlug: h.courseSlug,
+      character: h.character,
+      dateKey: h.dateKey,
+      playedAt: new Date(y, m - 1, d, 12).getTime(),
+      toPar: h.toPar,
+      strokes: pars.reduce((s, p) => s + p, 0) + h.toPar,
+      results: h.results,
+    })
+    seen.add(h.dateKey)
+    added = true
+  }
+  if (added) {
+    rounds.sort((a, b) => a.playedAt - b.playedAt)
+    writeLog({ v: 1, rounds })
+  }
 }
 
 /** Append a just-completed round (call once at completion, like archiveRound). */

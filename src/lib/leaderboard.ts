@@ -1,6 +1,6 @@
 import { decisionsFromScores } from '../engine/replay'
-import type { CharacterId } from '../engine/types'
-import type { RoundState } from '../state/store'
+import type { CharacterId, HoleResult } from '../engine/types'
+import type { HistoryEntry, RoundState } from '../state/store'
 import { SUPABASE_ANON_KEY, SUPABASE_URL, backendEnabled } from './backend'
 
 /** Clubhouse identity: a device-held id/secret pair, plus a name once the
@@ -119,6 +119,41 @@ export async function fetchCourseRecords(): Promise<Map<string, CourseRecord> | 
     if (!res.ok) return null
     const rows = (await res.json()) as CourseRecord[]
     return new Map(rows.map((r) => [r.course_slug, r]))
+  } catch {
+    return null
+  }
+}
+
+/** Every daily this player has posted, as local-history entries. The server
+ * only knows *submitted* rounds, so callers must merge (never replace) into
+ * local history — see mergeHistory in the store. Null on any failure. */
+export async function fetchMyHistory(): Promise<HistoryEntry[] | null> {
+  if (!backendEnabled) return null
+  const player = loadIdentity()
+  if (!player) return null
+  try {
+    const url =
+      `${SUPABASE_URL}/rest/v1/daily_scores` +
+      `?player_id=eq.${encodeURIComponent(player.id)}` +
+      `&select=date_key,puzzle_number,course_slug,character,to_par,results&order=date_key.asc`
+    const res = await fetch(url, { headers: REST_HEADERS })
+    if (!res.ok) return null
+    const rows = (await res.json()) as {
+      date_key: string
+      puzzle_number: number
+      course_slug: string
+      character: CharacterId | null
+      to_par: number
+      results: HoleResult[]
+    }[]
+    return rows.map((r) => ({
+      dateKey: r.date_key,
+      puzzleNumber: r.puzzle_number,
+      courseSlug: r.course_slug,
+      toPar: r.to_par,
+      results: r.results,
+      ...(r.character ? { character: r.character } : {}),
+    }))
   } catch {
     return null
   }

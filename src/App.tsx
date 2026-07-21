@@ -16,6 +16,7 @@ import {
   loadRound,
   loadUiMode,
   recordResult,
+  supersededDaily,
   roundToPar,
   saveRound,
   saveUiMode,
@@ -25,7 +26,7 @@ import {
   type RoundState,
   type UiMode,
 } from './state/store'
-import { logRound } from './state/stats'
+import { absorbHistory, logRound } from './state/stats'
 import { track } from './lib/analytics'
 import { ensureIdentity, loadIdentity } from './lib/leaderboard'
 import { CharacterAvatar } from './ui/Avatars'
@@ -180,6 +181,13 @@ export default function App() {
               : null
           }
           playedToday={playedToday}
+          onHistorySynced={(h) => {
+            setHistory(h)
+            absorbHistory(h) // the round log counts synced dailies too
+            // a synced day supersedes this device's unfinished daily for the
+            // same date — drop it so a refresh can't replay a completed day
+            if (supersededDaily(round, h)) setRound(null)
+          }}
           onTeeOff={() => {
             setPending({ mode: 'daily', setup: dailySetup() })
             setView('pick')

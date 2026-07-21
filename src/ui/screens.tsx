@@ -25,6 +25,7 @@ export function HomeScreen(props: {
   onMyRounds: () => void
   /** deep-link into the locker's lifetime stats view */
   onStats: () => void
+  onHistorySynced?: (h: HistoryEntry[]) => void
 }) {
   const setup = dailySetup()
   const streaks = computeStreaks(props.history)
@@ -152,7 +153,7 @@ export function HomeScreen(props: {
         </button>
       )}
       <HandicapChip onTap={props.onStats} />
-      <AccountPanel />
+      <AccountPanel onHistorySynced={props.onHistorySynced} />
     </div>
   )
 }

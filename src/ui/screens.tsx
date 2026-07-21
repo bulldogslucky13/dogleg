@@ -161,9 +161,13 @@ export function HomeScreen(props: {
  * only, by design: the mechanic is disclosed, the math stays under the
  * hood — never print the multiplier or the ramp. */
 function StreakNote() {
+  // honest by design: the boost only applies to streaks the referee can
+  // verify — dailies posted under a clubhouse name. Anonymous local streaks
+  // don't move the odds (anti-cheat), so the copy says so.
   return (
     <p className="fine streak-note">
-      The golf gods reward the faithful — the longer your streak, the better your odds of striking a Fortune.
+      The golf gods reward the faithful — post your daily cards under a clubhouse name, and the longer your streak,
+      the better your odds of striking a Fortune.
     </p>
   )
 }

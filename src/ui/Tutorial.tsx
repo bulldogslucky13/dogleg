@@ -93,8 +93,9 @@ const STEPS: Step[] = [
         Every so often the golf gods simply smile on you: a <b>hole in one</b> or an{' '}
         <b>albatross</b>, out of pure luck — the best score a hole can give. That's a{' '}
         <b>Fortune</b>, and it can strike on any hole, any day, for any player. But the
-        golf gods reward the faithful — keep your daily streak alive and your odds of
-        striking a Fortune quietly improve.
+        golf gods reward the faithful — post your daily cards under a{' '}
+        <b>clubhouse name</b>, keep your streak alive, and your odds of striking a
+        Fortune quietly improve.
       </>
     ),
   },

@@ -1040,6 +1040,93 @@ button {
   letter-spacing: 0.06em;
 }
 
+/* my rounds locker */
+.locker-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.locker-tab {
+  border: 1.5px solid var(--line);
+  border-radius: 10px;
+  padding: 9px;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(29, 43, 32, 0.6);
+}
+
+.locker-tab.on {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--cream);
+}
+
+.rounds-section {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.round-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1.5px solid var(--line);
+  border-radius: 12px;
+  padding: 9px 12px;
+}
+
+.round-row-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  text-align: left;
+}
+
+.round-row-text b {
+  font-size: 0.88rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.round-row-text span {
+  font-size: 0.72rem;
+  color: rgba(29, 43, 32, 0.6);
+}
+
+.round-badge {
+  font-style: normal;
+  font-size: 0.66rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  border-radius: 6px;
+  padding: 2px 6px;
+}
+
+.round-badge.cr {
+  background: #f3e6bc;
+  color: #8a6d1a;
+}
+
+.round-badge.pr {
+  background: #dcecd4;
+  color: #2e6329;
+}
+
+.round-score {
+  font-size: 0.95rem;
+}
+
+.round-score.good {
+  color: #2e6329;
+}
+
 /* THE moment: hole-in-one / albatross full-screen splash */
 .moment-backdrop {
   position: fixed;

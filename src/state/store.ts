@@ -5,7 +5,7 @@ import { rngFromString, skip, type Rng } from '../engine/rng'
 import type { CharacterId, Choice, Conditions, HoleResult, HoleScore, Stage } from '../engine/types'
 import { courseBySlug } from '../engine/courses'
 import { EMPTY_FORTUNE, encodeFortune, splitFortune, type FortuneState } from '../engine/fortune'
-import { destinyPlan, fortuneOddsFor, setupFromSeed } from '../engine/replay'
+import { decisionsFromScores, destinyPlan, fortuneOddsFor, setupFromSeed } from '../engine/replay'
 import { track } from '../lib/analytics'
 
 export const AGGRESSIVE_BUDGET = 8
@@ -495,6 +495,107 @@ export function computeStreaks(history: HistoryEntry[]): Streaks {
 }
 
 // ---------------------------------------------------------------------------
+// Round archive — the raw material for "My rounds" and replays
+// ---------------------------------------------------------------------------
+
+export interface ArchivedRound {
+  seed: string
+  mode: 'daily' | 'practice'
+  courseSlug: string
+  character?: CharacterId
+  dateKey: string
+  toPar: number
+  strokes: number
+  results: HoleResult[]
+  /** the round's full decision list — enough to replay it forever */
+  decisions: Choice[][]
+  /** confirmed by the server: this round took the course record */
+  courseRecord?: boolean
+  playedAt: number
+}
+
+const ARCHIVE_KEY = 'dogleg:archive:v1'
+
+export function loadArchive(): ArchivedRound[] {
+  try {
+    const raw = localStorage.getItem(ARCHIVE_KEY)
+    return raw ? (JSON.parse(raw) as ArchivedRound[]) : []
+  } catch {
+    return []
+  }
+}
+
+function saveArchive(rounds: ArchivedRound[]): void {
+  try {
+    localStorage.setItem(ARCHIVE_KEY, JSON.stringify(rounds))
+  } catch {
+    /* private mode / quota */
+  }
+}
+
+/**
+ * Retention: the 10 most recent rounds always stay. Beyond that, a round
+ * lives forever if it's your personal best on its course (PR) or a confirmed
+ * course record — records don't age out.
+ */
+export function pruneArchive(rounds: ArchivedRound[]): ArchivedRound[] {
+  const byNewest = [...rounds].sort((a, b) => b.playedAt - a.playedAt)
+  const keep = new Set<ArchivedRound>(byNewest.slice(0, 10))
+  const bestByCourse = new Map<string, ArchivedRound>()
+  for (const r of byNewest) {
+    const best = bestByCourse.get(r.courseSlug)
+    if (!best || r.toPar < best.toPar) bestByCourse.set(r.courseSlug, r)
+  }
+  for (const r of bestByCourse.values()) keep.add(r)
+  for (const r of byNewest) if (r.courseRecord) keep.add(r)
+  return byNewest.filter((r) => keep.has(r))
+}
+
+/** Archive a finished round (call once, when it completes). */
+export function archiveRound(state: RoundState): void {
+  if (!state.complete) return
+  const decisions = decisionsFromScores(state.scores)
+  if (!decisions) return
+  const entry: ArchivedRound = {
+    seed: state.seed,
+    mode: state.mode,
+    courseSlug: state.courseSlug,
+    character: state.character,
+    dateKey: state.dateKey,
+    toPar: roundToPar(state),
+    strokes: state.scores.reduce((s, sc) => s + (sc?.strokes ?? 0), 0),
+    results: state.scores.map((s) => s?.result ?? 'triple'),
+    decisions,
+    playedAt: Date.now(),
+  }
+  const current = loadArchive()
+  // bump the lifetime tally only for genuinely new rounds (and seed the
+  // counter from pre-feature data BEFORE this round joins the archive)
+  if (!current.some((r) => r.seed === entry.seed)) bumpLifetimeRounds(state)
+  saveArchive(pruneArchive([entry, ...current.filter((r) => r.seed !== entry.seed)]))
+}
+
+// ---------------------------------------------------------------------------
+// Lifetime tally — survives archive pruning
+// ---------------------------------------------------------------------------
+
+const LIFETIME_KEY = 'dogleg:lifetime:v1'
+
+/** Completed rounds, ever. Seeded once for pre-counter players from what's
+ * still visible: daily history (kept forever) + archived practice rounds. */
+export function lifetimeRounds(): number {
+  try {
+    const raw = localStorage.getItem(LIFETIME_KEY)
+    if (raw !== null) return Math.max(0, Number(raw) || 0)
+    const seeded = loadHistory().length + loadArchive().filter((r) => r.mode === 'practice').length
+    localStorage.setItem(LIFETIME_KEY, String(seeded))
+    return seeded
+  } catch {
+    return 0
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Fortune counters — the player's march toward an ace / albatross
 // ---------------------------------------------------------------------------
 
@@ -574,6 +675,34 @@ function postedStreak(): number {
   } catch {
     return 0
   }
+}
+
+/** Count the round being archived. On the very first bump the counter seeds
+ * from pre-feature data — but recordResult has already written THIS daily
+ * into history by the time we run, so the seed must exclude it or the
+ * player's first counted daily lands as 2. */
+function bumpLifetimeRounds(state: RoundState): void {
+  try {
+    const raw = localStorage.getItem(LIFETIME_KEY)
+    if (raw === null) {
+      const history = loadHistory().filter((e) => !(state.mode === 'daily' && e.dateKey === state.dateKey))
+      const seeded = history.length + loadArchive().filter((r) => r.mode === 'practice').length
+      localStorage.setItem(LIFETIME_KEY, String(seeded + 1))
+      return
+    }
+    localStorage.setItem(LIFETIME_KEY, String(lifetimeRounds() + 1))
+  } catch {
+    /* private mode */
+  }
+}
+
+/** The server confirmed a course record for this round — pin it forever. */
+export function markArchiveRecord(seed: string): void {
+  const rounds = loadArchive()
+  const hit = rounds.find((r) => r.seed === seed)
+  if (!hit) return
+  hit.courseRecord = true
+  saveArchive(pruneArchive(rounds))
 }
 
 function postedDays(): Set<string> {

@@ -8,6 +8,7 @@ import type { ApproachOdds, CharacterAdvantage, CharacterId, Choice } from './en
 import {
   advanceHole,
   applyChoice,
+  archiveRound,
   buildRecap,
   holeInPlay,
   loadHistory,
@@ -34,10 +35,11 @@ import type { MomentKind } from './engine/fortune'
 import { MomentSplash } from './ui/MomentSplash'
 import { decodeReplay, type ReplayPayload } from './engine/replay'
 import { ReplayScreen } from './ui/ReplayScreen'
+import { RoundsScreen } from './ui/RoundsScreen'
 import { CharacterPickScreen, HomeScreen, ResultScreen } from './ui/screens'
 import { Tutorial, hasSeenTutorial } from './ui/Tutorial'
 
-type View = 'home' | 'pick' | 'play' | 'result' | 'watch'
+type View = 'home' | 'pick' | 'play' | 'result' | 'watch' | 'rounds'
 
 /** a #watch=<code> link opens straight into the replay viewer. 'bad' means
  * the hash IS a watch link but the code doesn't decode (truncated in a chat,
@@ -145,6 +147,7 @@ export default function App() {
         <HomeScreen
           history={history}
           onHowToPlay={() => setShowTutorial(true)}
+          onMyRounds={() => setView('rounds')}
           activeRound={
             round && !round.complete
               ? { mode: round.mode, courseName: courseBySlug(round.courseSlug)?.name ?? '' }
@@ -192,6 +195,18 @@ export default function App() {
       )
     }
     return <ReplayScreen payload={watching} onExit={exitWatch} />
+  }
+
+  if (view === 'rounds') {
+    return (
+      <RoundsScreen
+        onWatch={(p) => {
+          setWatching(p)
+          setView('watch')
+        }}
+        onBack={() => setView('home')}
+      />
+    )
   }
 
   if (view === 'pick') {
@@ -326,6 +341,7 @@ export default function App() {
     if (after.complete) {
       const h = recordResult(after)
       setHistory(h)
+      archiveRound(after) // into the locker — replayable forever if it's a PR/CR
       setResultFor(after.mode)
       setView('result')
     }

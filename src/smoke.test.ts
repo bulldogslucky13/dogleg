@@ -291,7 +291,7 @@ describe('smoke: a finished round produces its result artifacts', () => {
     expect(card).not.toContain('streak')
   })
 
-  it('grades the round — the caddie report identity, determinism, and copy', () => {
+  it('grades the round — the swing coach report identity, determinism, and copy', () => {
     const setup: DailySetup = dailySetup(new Date(2026, 6, 20))
     const done = playRound(newRound(setup, 'daily', 'dart'), aggressivePolicy)
 

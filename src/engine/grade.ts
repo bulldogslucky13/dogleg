@@ -617,7 +617,7 @@ export function gradeCopy(g: RoundGrade): GradeCopy {
   const dl = g.decisionLoss
   const decisionLine =
     dl < 0.5
-      ? 'Caddie-approved. Barely a stroke left on the table.'
+      ? 'Coach-approved. Barely a stroke left on the table.'
       : dl < 1.5
         ? 'A couple of loose calls, nothing shameful.'
         : dl < 3

@@ -211,7 +211,7 @@ greedy-by-Q gap.
 - Numbers are always honest — `gradeCopy` never rounds a bucket boundary to
   flatter the framing, and the headline's `skillToPar` is computed, not
   vibes.
-- The framing is playful, the golf-gods/lip-outs/caddie voice already used
+- The framing is playful, the golf-gods/lip-outs/swing-coach voice already used
   elsewhere in the game's copy (`resolve.ts`'s shot notes, `fortune.ts`'s
   `MOMENT_COPY`) — never clinical ("decisionLoss: 2.3").
   - **"dice" is banned everywhere in this copy**, enforced by test: the game

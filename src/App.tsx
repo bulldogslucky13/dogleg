@@ -160,7 +160,7 @@ export default function App() {
 
   const hole = useMemo(() => (round && !round.complete && round.hole ? holeInPlay(round) : null), [round])
 
-  // the caddie's report replays the whole round's EV model — memoize so unrelated
+  // the swing coach's report replays the whole round's EV model — memoize so unrelated
   // state changes on the result screen don't recompute it
   const roundGrade = useMemo(() => (round && round.complete ? gradeRound(round) : null), [round])
 
@@ -327,7 +327,7 @@ export default function App() {
       : round && round.mode === 'daily' && round.complete && round.dateKey === entry?.dateKey
         ? round
         : null
-    // the caddie's report needs the same shot-by-shot record the recap does
+    // the swing coach's report needs the same shot-by-shot record the recap does
     const grade = recapSource ? roundGrade : null
     return (
       <ResultScreen

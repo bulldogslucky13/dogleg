@@ -219,15 +219,15 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
       })
     }
 
-    // the caddie's report renders on the finished result screen — playful
+    // the swing coach's report renders on the finished result screen — playful
     // golf voice only, dice are never named (see CLAUDE.md copy rule). Query
     // via the container (not getByText) since the headline copy and the
     // tile label can both contain "decided like", which would otherwise
     // trip getByText's "multiple matches" guard.
-    const caddiePanel = document.querySelector('.caddie-panel')
-    expect(caddiePanel).toBeTruthy()
-    expect(caddiePanel!.textContent).toMatch(/decided like/i)
-    expect(caddiePanel!.textContent).not.toMatch(/dice/i)
+    const coachPanel = document.querySelector('.coach-panel')
+    expect(coachPanel).toBeTruthy()
+    expect(coachPanel!.textContent).toMatch(/decided like/i)
+    expect(coachPanel!.textContent).not.toMatch(/dice/i)
 
     // the result screen (practice or daily) always teases tomorrow's DAILY —
     // course + conditions only, never seed/dateKey/puzzle number

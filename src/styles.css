@@ -2659,8 +2659,8 @@ button {
   }
 }
 
-/* the caddie's report: decision-quality panel on the result screen */
-.caddie-panel {
+/* the swing coach's report: decision-quality panel on the result screen */
+.coach-panel {
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -2669,15 +2669,15 @@ button {
   padding: 14px;
 }
 
-.caddie-panel .verdict {
+.coach-panel .verdict {
   font-size: 0.92rem;
 }
 
-.caddie-tiles {
+.coach-tiles {
   grid-template-columns: repeat(2, 1fr);
 }
 
-.caddie-line {
+.coach-line {
   margin: 0;
 }
 

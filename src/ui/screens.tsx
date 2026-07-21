@@ -319,7 +319,7 @@ export function ResultScreen(props: {
   practice: boolean
   character?: CharacterId
   recap: RoundRecap | null
-  /** the caddie's report — decision quality vs. luck, null when ungradeable */
+  /** the swing coach's report — decision quality vs. luck, null when ungradeable */
   grade: RoundGrade | null
   /** the finished round, when it's still in storage — enables board submission */
   boardRound: RoundState | null
@@ -461,10 +461,10 @@ export function ResultScreen(props: {
         </div>
       )}
       {props.grade && (
-        <div className="caddie-panel">
-          <div className="kicker">The caddie's report</div>
+        <div className="coach-panel">
+          <div className="kicker">The Swing Coach's Report</div>
           <p className="verdict">{gradeCopy(props.grade).headline}</p>
-          <div className="recap-tiles caddie-tiles">
+          <div className="recap-tiles coach-tiles">
             <div className="stat">
               <b>{toParLabel(props.grade.decidedLike)}</b>
               <span>Decided like</span>
@@ -474,8 +474,8 @@ export function ResultScreen(props: {
               <span>Rub of the green</span>
             </div>
           </div>
-          <p className="fine caddie-line">{gradeCopy(props.grade).decisionLine}</p>
-          <p className="fine caddie-line">{gradeCopy(props.grade).luckLine}</p>
+          <p className="fine coach-line">{gradeCopy(props.grade).decisionLine}</p>
+          <p className="fine coach-line">{gradeCopy(props.grade).luckLine}</p>
         </div>
       )}
       {props.boardRound && <ScoreBoard round={props.boardRound} />}

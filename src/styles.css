@@ -186,6 +186,26 @@ button {
   white-space: normal;
 }
 
+/* the signature sits on its own row above the hazard chips so it can wrap as
+   the hole's headline without squeezing the (single-row) hazard chips */
+.hazard-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+}
+
+.sig-row {
+  display: flex;
+  justify-content: center;
+  max-width: 100%;
+}
+
+.sig-row .chip.sig {
+  max-width: 100%;
+}
+
 .stats-row {
   display: grid;
   grid-template-columns: repeat(3, 1fr);

@@ -214,17 +214,27 @@ export function HazardChips(props: { hole: HoleInPlay }) {
   const sig = atTee ? spec.signature : undefined
   if (chips.length === 0 && !sig) return null
   return (
-    <div className="chips center">
+    // signature rides its own row above the hazard chips: it wraps freely as
+    // the hole's headline, while the hazard chips keep their single-row,
+    // ellipsized layout with the full width to themselves (they'd otherwise
+    // get squeezed to stubs on narrow screens)
+    <div className="hazard-stack">
       {sig && (
-        <span className="chip sig" title="Signature hole">
-          ⛳ {sig}
-        </span>
+        <div className="sig-row">
+          <span className="chip sig" title="Signature hole">
+            ⛳ {sig}
+          </span>
+        </div>
       )}
-      {chips.slice(0, 3).map((c) => (
-        <span key={c} className="chip">
-          {c}
-        </span>
-      ))}
+      {chips.length > 0 && (
+        <div className="chips center">
+          {chips.slice(0, 3).map((c) => (
+            <span key={c} className="chip">
+              {c}
+            </span>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

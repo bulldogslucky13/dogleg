@@ -70,6 +70,70 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
     expect(screen.getByText(/golf gods reward the faithful/)).toBeTruthy()
   })
 
+  it('a stolen record raises the rivalry card; Win it back tees up that course with the chase chip', () => {
+    localStorage.setItem(
+      'dogleg:records:v1',
+      JSON.stringify({
+        v: 1,
+        held: {},
+        stolen: {
+          'pebble-beach': { by: 'Hank', theirToPar: -6, myToPar: -4, at: 1, notifiedOn: '2026-07-19', dismissed: false },
+        },
+      }),
+    )
+    render(<App />)
+    expect(screen.getByText(/Course record stolen/i)).toBeTruthy()
+    expect(screen.getByText('Hank')).toBeTruthy()
+    // straight into unlimited play on THAT course — no menus
+    fireEvent.click(screen.getByText('Win it back'))
+    expect(screen.getByText('Pick your player')).toBeTruthy()
+    expect(screen.getAllByText(/Pebble Beach Links/).length).toBeGreaterThan(0)
+    fireEvent.click(screen.getByText(CHARACTERS[0].name))
+    // the target stays on the wall for the whole chase
+    expect(screen.getByText(/🎯 Record/)).toBeTruthy()
+    expect(screen.getAllByText(/Hank/).length).toBeGreaterThan(0)
+  })
+
+  it('the reclaim splash celebrates, offers the share, and dismisses without advancing anything', async () => {
+    // rendered directly: in the app it fires from the referee's record
+    // confirmation, which never happens in tests (backend off in CI)
+    const { RecordSplash } = await import('./ui/RecordSplash')
+    const onClose = vi.fn()
+    render(
+      <RecordSplash
+        courseName="Pebble Beach Links"
+        courseSlug="pebble-beach"
+        dateKey="2026-07-20"
+        toPar={-6}
+        character="dart"
+        takenFrom="Hank"
+        onClose={onClose}
+      />,
+    )
+    expect(screen.getByText('Record reclaimed')).toBeTruthy()
+    expect(screen.getByText(/takes back the course record from Hank/)).toBeTruthy()
+    expect(screen.getByText('📸 Share')).toBeTruthy()
+    fireEvent.click(screen.getByText('Back to the scorecard'))
+    expect(onClose).toHaveBeenCalled()
+  })
+
+  it('multiple fallen records stack into one expandable summary — never queued banners', () => {
+    const steal = (by: string) => ({ by, theirToPar: -6, myToPar: -4, at: 1, notifiedOn: '2026-07-19', dismissed: false })
+    localStorage.setItem(
+      'dogleg:records:v1',
+      JSON.stringify({ v: 1, held: {}, stolen: { 'pebble-beach': steal('Hank'), 'st-andrews-old': steal('Marge') } }),
+    )
+    render(<App />)
+    expect(screen.getByText(/2 of your course records fell/)).toBeTruthy()
+    // one card, not two
+    expect(screen.getAllByText(/Course record stolen/i)).toHaveLength(1)
+    fireEvent.click(screen.getByText('See the damage'))
+    expect(screen.getAllByText('Win it back')).toHaveLength(2)
+    // dismiss stands down the whole card and it stays down
+    fireEvent.click(screen.getByLabelText('Dismiss'))
+    expect(screen.queryByText(/course records fell/)).toBeNull()
+  })
+
   it('walks home → pick → play and commits a real shot', () => {
     vi.useFakeTimers() // the shot animation uses setTimeout; keep the test synchronous
     render(<App />)

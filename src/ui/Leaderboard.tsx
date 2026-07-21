@@ -4,13 +4,19 @@ import { Spinner } from './Spinner'
 import { toParLabel } from '../engine/daily'
 import { backendEnabled } from '../lib/backend'
 import {
+  fetchCourseRecords,
   fetchDailyBoard,
   loadPlayer,
   submitRound,
   type BoardRow,
+  type CourseRecord,
   type SubmitResult,
 } from '../lib/leaderboard'
-import { markArchiveRecord, type RoundState } from '../state/store'
+import { recordWon, type StolenRecord } from '../lib/records'
+import { markArchiveRecord, roundToPar, type RoundState } from '../state/store'
+import { courseBySlug } from '../engine/courses'
+import { RecordSplash } from './RecordSplash'
+import { SyncCta } from './RoundsScreen'
 
 /**
  * Post-round leaderboard block. Daily rounds land on today's board; practice
@@ -25,6 +31,12 @@ export function ScoreBoard(props: { round: RoundState }) {
   const [result, setResult] = useState<SubmitResult | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [board, setBoard] = useState<BoardRow[] | null>(null)
+  /** set when this round took BACK a record that had been stolen from us */
+  const [reclaim, setReclaim] = useState<StolenRecord | null>(null)
+  /** the standing record, fetched for unnamed players so beating it can
+   * become the claim-a-name moment */
+  const [standing, setStanding] = useState<CourseRecord | null>(null)
+  const nameInputRef = useRef<HTMLInputElement>(null)
   const sent = useRef(false)
 
   const refreshBoard = async () => {
@@ -42,7 +54,13 @@ export function ScoreBoard(props: { round: RoundState }) {
     }
     setResult(r)
     setPlayer(loadPlayer())
-    if (r.record?.broken) markArchiveRecord(round.seed) // pin it in the locker forever
+    if (r.record?.broken) {
+      markArchiveRecord(round.seed) // pin it in the locker forever
+      // ledger: this record is ours now — and if it had been stolen from
+      // us, that's a RECLAIM, which deserves its own moment
+      const stolen = recordWon(round.courseSlug, r.record.toPar)
+      if (stolen) setReclaim(stolen)
+    }
     void refreshBoard()
   }
 
@@ -53,6 +71,11 @@ export function ScoreBoard(props: { round: RoundState }) {
     if (player && !sent.current && round.complete) {
       sent.current = true
       void submit()
+    }
+    // an unnamed player's practice round might have beaten the standing
+    // record — fetch it so the claim form can say so
+    if (!player && round.mode === 'practice') {
+      void fetchCourseRecords().then((recs) => setStanding(recs?.get(round.courseSlug) ?? null))
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -68,6 +91,7 @@ export function ScoreBoard(props: { round: RoundState }) {
       }}
     >
       <input
+        ref={nameInputRef}
         value={name}
         onChange={(e) => setName(e.target.value)}
         placeholder="Clubhouse name"
@@ -92,8 +116,22 @@ export function ScoreBoard(props: { round: RoundState }) {
 
   if (round.mode === 'practice') {
     const rec = result?.record
+    // an unnamed player just outscored the standing record (or set the first
+    // one) — beating it is the natural moment to claim a name and defend it
+    const beatsStanding = !player && !result && (!standing || roundToPar(round) < standing.to_par)
     return (
       <div className="board-block">
+        {reclaim && (
+          <RecordSplash
+            courseName={courseBySlug(round.courseSlug)?.name ?? round.courseSlug}
+            courseSlug={round.courseSlug}
+            dateKey={round.dateKey}
+            toPar={roundToPar(round)}
+            character={round.character}
+            takenFrom={reclaim.by}
+            onClose={() => setReclaim(null)}
+          />
+        )}
         {rec?.broken && (
           <div className="record-banner">
             🏆 New course record — {toParLabel(rec.toPar)} by {player?.name ?? 'you'}
@@ -110,7 +148,15 @@ export function ScoreBoard(props: { round: RoundState }) {
         {nameForm && (
           <>
             <div className="kicker">Course records</div>
-            <p className="fine">Pick a clubhouse name to claim course records with your rounds.</p>
+            {beatsStanding && standing ? (
+              <SyncCta
+                copy={`That round beats ${standing.player_name}'s course record — claim a clubhouse name to take it and defend it.`}
+                trigger="record-claim"
+                onTap={() => nameInputRef.current?.focus()}
+              />
+            ) : (
+              <p className="fine">Pick a clubhouse name to claim course records with your rounds.</p>
+            )}
             {nameForm}
           </>
         )}

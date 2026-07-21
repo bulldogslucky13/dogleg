@@ -16,6 +16,7 @@ import { CHARACTERS } from './engine/characters'
 import { COURSES, courseBySlug } from './engine/courses'
 import { dailySetup, forecastSetup, practiceSetup, shareText, type DailySetup } from './engine/daily'
 import { setupFromSeed } from './engine/replay'
+import { buildLayout } from './engine/layout'
 import type { Choice } from './engine/types'
 import {
   AGGRESSIVE_BUDGET,
@@ -288,5 +289,40 @@ describe('smoke: a finished round produces its result artifacts', () => {
     expect(shareText(setup, results, roundToPar(done), 'dart', 1)).not.toContain('streak')
     expect(shareText(setup, results, roundToPar(done), 'dart', 0)).not.toContain('streak')
     expect(card).not.toContain('streak')
+  })
+})
+
+describe('smoke: signature flavor + island geometry decoupling', () => {
+  const base = { number: 8, par: 3, yards: 150, strokeIndex: 4, dogleg: 'S', hazard: 'water' } as const
+
+  it('island geometry follows the explicit flag, never the signature prose', () => {
+    // island:true always rings the green with cross water
+    const flagged = buildLayout('t', { ...base, island: true })
+    expect(flagged.zones.some((z) => z.kind === 'water' && z.side === 'cross')).toBe(true)
+
+    // geometry must ignore the signature string entirely: identical spec with
+    // and without flavor prose yields byte-identical zones (the old regex is gone)
+    const withProse = buildLayout('t', { ...base, island: true, signature: 'All carry to the island — no bailout' })
+    expect(JSON.stringify(withProse.zones)).toBe(JSON.stringify(flagged.zones))
+  })
+
+  it('signatures survive the store pipeline onto the live hole', () => {
+    // Sawgrass 17, the marquee island hole, carries both the flag and the flavor
+    const sawgrass = courseBySlug('tpc-sawgrass')!
+    const h17 = sawgrass.holes[16]
+    expect(h17.island).toBe(true)
+    expect(h17.signature).toBeTruthy()
+    // the exact string the UI pill reads comes straight off the built layout
+    expect(buildLayout(sawgrass.slug, h17).spec.signature).toBe(h17.signature)
+  })
+
+  it('every signature is well-formed and on-tone (no dice/odds talk)', () => {
+    const withSig = COURSES.flatMap((c) => c.holes.filter((h) => h.signature))
+    expect(withSig.length).toBeGreaterThan(20)
+    for (const h of withSig) {
+      expect(h.signature!.length).toBeGreaterThan(4)
+      expect(h.signature!.length).toBeLessThan(90)
+      expect(h.signature!).not.toMatch(/\bdice\b|\bodds\b|\brng\b/i)
+    }
   })
 })

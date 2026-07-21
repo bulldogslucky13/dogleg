@@ -177,6 +177,15 @@ button {
   color: var(--cream);
 }
 
+/* signature-hole flavor pill: gold-touched so the marquee holes read special */
+.chip.sig {
+  background: rgba(201, 162, 39, 0.16);
+  border-color: rgba(201, 162, 39, 0.55);
+  color: var(--gold);
+  font-style: italic;
+  white-space: normal;
+}
+
 .stats-row {
   display: grid;
   grid-template-columns: repeat(3, 1fr);

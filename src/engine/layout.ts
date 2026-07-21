@@ -25,7 +25,7 @@ export function buildLayout(courseSlug: string, spec: HoleSpec): HoleLayout {
   if (spec.par === 3) {
     // par 3: only greenside features (and a carry hazard for water/ocean holes)
     if (spec.hazard === 'water' || spec.hazard === 'ocean') {
-      const island = /island|carry|pond|all carry/i.test(spec.signature ?? '')
+      const island = spec.island ?? false
       if (island || rng() < 0.55) {
         // cross water short of the green
         add({ kind: spec.hazard === 'ocean' ? 'ocean' : 'water', from: Math.max(20, L - 90 - rng() * 40), to: L - greenDepth / 2 - 4, side: 'cross' })

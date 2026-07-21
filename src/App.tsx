@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { characterById } from './engine/characters'
 import { courseBySlug } from './engine/courses'
 import { dailySetup, localDateKey, practiceSetup, toParLabel, type DailySetup } from './engine/daily'
-import { gradeRound } from './engine/grade'
 import { longOdds } from './engine/odds'
 import { LOOK_LABEL, madePuttLook, oddsFor } from './engine/resolve'
 import type { ApproachOdds, CharacterAdvantage, CharacterId, Choice } from './engine/types'
@@ -18,6 +17,7 @@ import {
   loadUiMode,
   recordResult,
   supersededDaily,
+  tryGradeRound,
   roundToPar,
   saveRound,
   saveUiMode,
@@ -162,7 +162,7 @@ export default function App() {
 
   // the swing coach's report replays the whole round's EV model — memoize so unrelated
   // state changes on the result screen don't recompute it
-  const roundGrade = useMemo(() => (round && round.complete ? gradeRound(round) : null), [round])
+  const roundGrade = useMemo(() => (round && round.complete ? tryGradeRound(round) : null), [round])
 
   const previewWindow = useMemo<[number, number] | null>(() => {
     if (!hole || !selected || animating) return null

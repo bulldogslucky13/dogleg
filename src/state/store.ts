@@ -343,8 +343,17 @@ function round2(n: number): number {
   return Math.round(n * 100) / 100
 }
 
+/** Grading is display-layer analysis — it must never abort the end-of-round flow. */
+export function tryGradeRound(state: RoundState): ReturnType<typeof gradeRound> {
+  try {
+    return gradeRound(state)
+  } catch {
+    return null
+  }
+}
+
 function trackRoundCompleted(state: RoundState, streaks: Streaks): void {
-  const grade = gradeRound(state)
+  const grade = tryGradeRound(state)
   track('round_completed', {
     mode: state.mode,
     course: state.courseSlug,

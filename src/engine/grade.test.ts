@@ -130,6 +130,25 @@ describe('gradeRound: determinism', () => {
   })
 })
 
+describe('gradeRound: malformed input', () => {
+  it('returns null instead of throwing when a shot record is corrupted', () => {
+    // stale/partially-corrupted localStorage rounds are parsed but never
+    // validated — grading must degrade to "ungradeable", not crash the
+    // end-of-round flow (analytics + result screen)
+    const base = buildInput(practiceSeed(0, 'det'), 'dart', mixed)
+    const corrupt = (mutate: (s: Record<string, unknown>) => void) => {
+      const input = JSON.parse(JSON.stringify(base)) as typeof base
+      mutate(input.scores[4]!.shots[0] as unknown as Record<string, unknown>)
+      return gradeRound(input)
+    }
+    expect(corrupt((s) => delete s.faced)).toBeNull()
+    expect(corrupt((s) => delete (s.faced as Record<string, unknown>).aggressive)).toBeNull()
+    expect(corrupt((s) => ((s.faced as Record<string, { odds?: unknown }>).safe.odds = undefined))).toBeNull()
+    expect(corrupt((s) => delete s.after)).toBeNull()
+    expect(corrupt((s) => delete s.stage)).toBeNull()
+  })
+})
+
 // ---------------------------------------------------------------------------
 // 2. Identity (telescoping)
 // ---------------------------------------------------------------------------

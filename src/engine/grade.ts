@@ -480,6 +480,10 @@ export function gradeRound(input: GradeInput): RoundGrade | null {
     let prevBall: BallState = { pos: 0, lie: 'tee', side: 'center' }
     for (let k = 0; k < n; k++) {
       const shot = shots[k]
+      // a loaded round is only parsed, never validated — stale or corrupted
+      // storage must make the round ungradeable, not crash the result flow
+      if (!shot || !shot.stage || !shot.choice || !shot.after || !shot.faced) return null
+      if (CHOICES.some((c) => !shot.faced[c]?.odds)) return null
       const stageK = shot.stage
       const ballK = prevBall
       const budgeted = stageK === 'tee' || stageK === 'second' || stageK === 'approach'
@@ -564,6 +568,9 @@ export function gradeRound(input: GradeInput): RoundGrade | null {
   }
 
   const skillToPar = actualToPar - totalLuck - totalDestinyBonus
+  // malformed odds values (wrong types, missing buckets) surface as NaN in
+  // the sums — an ungradeable round, not one worth showing
+  if (![totalDecisionLoss, totalLuck, totalDestinyBonus, expectedBestToPar, skillToPar].every(Number.isFinite)) return null
   return {
     holes: holeGrades,
     decisionLoss: totalDecisionLoss,

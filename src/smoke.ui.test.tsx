@@ -13,6 +13,7 @@ import { act, cleanup, fireEvent, render, screen, within } from '@testing-librar
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
 import { CHARACTERS } from './engine/characters'
+import { forecastSetup } from './engine/daily'
 import { setupFromSeed } from './engine/replay'
 import { loadIdentity, loadPlayer } from './lib/leaderboard'
 
@@ -217,6 +218,12 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
         vi.advanceTimersByTime(1500)
       })
     }
+
+    // the result screen (practice or daily) always teases tomorrow's DAILY —
+    // course + conditions only, never seed/dateKey/puzzle number
+    const forecast = forecastSetup()
+    expect(screen.getByText(/Tomorrow/)).toBeTruthy()
+    expect(screen.getAllByText(new RegExp(forecast.course.name)).length).toBeGreaterThan(0)
 
     // play again must route through the pick screen, not lock in the old player
     fireEvent.click(screen.getByText('Play another practice round'))

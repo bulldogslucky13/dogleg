@@ -4,7 +4,7 @@ import { destinyDue, fortuneShotOdds, splitFortune, type FortuneState, type Mome
 import { buildLayout } from './layout'
 import { playShot, startHole, type HoleInPlay } from './resolve'
 import { rngFromString } from './rng'
-import type { CharacterId, Choice, Conditions, CourseSpec, HoleResult, HoleScore } from './types'
+import type { CharacterId, Choice, Conditions, CourseSpec, HoleResult, HoleScore, Stage } from './types'
 
 // Re-exported so it reaches the edge function through engine.mjs: the referee
 // derives the expected salt with the exact same code the client seeds with.
@@ -156,6 +156,38 @@ export function replayRound(seed: string, character: CharacterId | undefined, de
 export function decisionsFromScores(scores: (HoleScore | null)[]): Choice[][] | null {
   if (scores.length !== 18 || scores.some((s) => !s)) return null
   return scores.map((s) => s!.shots.map((shot) => shot.choice))
+}
+
+// ---------------------------------------------------------------------------
+// Clubhouse decision stats (Layer 2) — one row per (hole, stage) actually
+// played, for daily_hole_choices
+// ---------------------------------------------------------------------------
+
+export interface ChoiceRow {
+  hole: number
+  stage: Stage
+  choice: Choice
+}
+
+/** One row per (hole, stage) a validated round actually played: the FIRST
+ * shot at that stage, in play order — a multi-putt hole's putt row is the
+ * OPENING putt's choice, and re-entering approach after a penalty doesn't
+ * mint a second row. `hole` is 1-based (scores[i] => hole i+1), matching the
+ * daily_hole_choices schema. Defensive against null entries (the array type
+ * some callers hold, e.g. an in-progress round's scores, permits them) even
+ * though a validated replay's `scores` is always fully populated. */
+export function choiceRowsFromReplay(scores: (HoleScore | null | undefined)[]): ChoiceRow[] {
+  const rows: ChoiceRow[] = []
+  scores.forEach((score, i) => {
+    if (!score) return
+    const seenStages = new Set<Stage>()
+    for (const shot of score.shots) {
+      if (seenStages.has(shot.stage)) continue
+      seenStages.add(shot.stage)
+      rows.push({ hole: i + 1, stage: shot.stage, choice: shot.choice })
+    }
+  })
+  return rows
 }
 
 // ---------------------------------------------------------------------------

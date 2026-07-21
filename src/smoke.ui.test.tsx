@@ -161,6 +161,37 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
     expect(save.hole.strokes).toBeGreaterThanOrEqual(1)
   })
 
+  it('shows the clubhouse cast — choices only — on the post-hole recap', () => {
+    vi.useFakeTimers()
+    render(<App />)
+
+    fireEvent.click(screen.getByText('Tee off'))
+    fireEvent.click(screen.getByText(CHARACTERS[0].name))
+
+    // play out hole 1, however many shots it takes, to the post-hole recap
+    for (let guard = 0; guard < 30; guard++) {
+      if (screen.queryByText('Next hole') || screen.queryByText('Sign the card')) break
+      // a natural ace/albatross can fire on any run — dismiss it like a player would
+      const splash = screen.queryByText('HOLE IN ONE') ?? screen.queryByText('ALBATROSS')
+      if (splash) {
+        act(() => {
+          vi.advanceTimersByTime(5100)
+        })
+        fireEvent.click(splash)
+        continue
+      }
+      const card = document.querySelector<HTMLButtonElement>('button.choice')!
+      fireEvent.click(card)
+      fireEvent.click(card)
+      act(() => {
+        vi.advanceTimersByTime(1500)
+      })
+    }
+
+    expect(screen.getByText(/The clubhouse cast/)).toBeTruthy()
+    expect(screen.getAllByText(CHARACTERS[0].name).length).toBeGreaterThan(0)
+  })
+
   it('resumes an in-progress round from storage straight into play', () => {
     vi.useFakeTimers()
     const first = render(<App />)

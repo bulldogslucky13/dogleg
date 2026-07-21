@@ -382,7 +382,20 @@ export function ClassicScorecard(props: { course: CourseSpec; scores: (HoleScore
 // Hole-complete panel
 // ---------------------------------------------------------------------------
 
-export function HoleComplete(props: { score: HoleScore; par: number; runningToPar: number; last: boolean; onNext: () => void }) {
+export function HoleComplete(props: {
+  score: HoleScore
+  par: number
+  runningToPar: number
+  last: boolean
+  onNext: () => void
+  /** "the clubhouse cast" lines for this hole — choices only, no outcomes.
+   * Undefined/empty hides the block (e.g. non-daily rounds with no cast to show). */
+  castLines?: string[]
+  /** Real clubhouse tally for this hole's headline (tee) decision — e.g.
+   * "9 of 12 laid up." Undefined/unavailable renders nothing extra; the cast
+   * lines above stand alone unchanged. Post-commit only, never a live signal. */
+  clubhouseTally?: string
+}) {
   const { score } = props
   return (
     <div className="hole-complete">
@@ -393,6 +406,24 @@ export function HoleComplete(props: { score: HoleScore; par: number; runningToPa
       <div className="hc-running">
         Running <b>{toParLabel(props.runningToPar)}</b>
       </div>
+      {props.castLines && props.castLines.length > 0 && (
+        <div className="cast-block">
+          {props.clubhouseTally && (
+            <div className="clubhouse-tally">
+              <h4>From the clubhouse</h4>
+              <div className="cast-line">{props.clubhouseTally}</div>
+            </div>
+          )}
+          <h4>
+            The clubhouse cast <span className="cast-hint">(the game's regulars)</span>
+          </h4>
+          {props.castLines.map((line, i) => (
+            <div key={i} className="cast-line">
+              {line}
+            </div>
+          ))}
+        </div>
+      )}
       <details className="hc-odds">
         <summary>See the odds you faced</summary>
         <OddsRecap score={score} par={props.par} />

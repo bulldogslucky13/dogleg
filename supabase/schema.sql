@@ -76,3 +76,27 @@ create policy "anyone can read daily scores" on daily_scores for select using (t
 drop policy if exists "anyone can read course records" on course_records;
 create policy "anyone can read course records" on course_records for select using (true);
 -- no insert/update/delete policies anywhere: only the service role writes
+
+-- Clubhouse decision stats (Layer 2): one row per (hole, stage) a submitted
+-- daily round actually played — the FIRST shot at that stage, in play order
+-- (see choiceRowsFromReplay). Populated best-effort by submit-round right
+-- after a FRESH daily_scores insert (first card of the day stands; a
+-- resubmission is skipped, same as the score itself). Public read, like the
+-- boards above; only the service role writes.
+create table if not exists daily_hole_choices (
+  id bigint generated always as identity primary key,
+  date_key text not null,
+  course_slug text not null,
+  player_id uuid not null references players (id),
+  player_name text not null,
+  hole smallint not null check (hole between 1 and 18),
+  stage text not null check (stage in ('tee', 'second', 'approach', 'putt', 'shortgame')),
+  choice text not null check (choice in ('safe', 'normal', 'aggressive')),
+  created_at timestamptz not null default now(),
+  unique (date_key, player_id, hole, stage)
+);
+create index if not exists daily_hole_choices_lookup
+  on daily_hole_choices (date_key, hole, stage);
+alter table daily_hole_choices enable row level security;
+drop policy if exists "anyone can read daily hole choices" on daily_hole_choices;
+create policy "anyone can read daily hole choices" on daily_hole_choices for select using (true);

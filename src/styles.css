@@ -773,6 +773,48 @@ button {
   display: none;
 }
 
+.cast-block {
+  text-align: left;
+  margin-top: 4px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.cast-block h4 {
+  font-size: 0.72rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(29, 43, 32, 0.55);
+}
+
+.cast-hint {
+  text-transform: none;
+  letter-spacing: normal;
+  font-weight: 400;
+  opacity: 0.8;
+}
+
+.cast-line {
+  font-size: 0.85rem;
+  color: rgba(29, 43, 32, 0.85);
+}
+
+.clubhouse-tally {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-bottom: 8px;
+  margin-bottom: 2px;
+  border-bottom: 1px dashed var(--line);
+}
+
+.clubhouse-tally .cast-line {
+  font-weight: 600;
+}
+
 .recap {
   text-align: left;
   margin-top: 10px;

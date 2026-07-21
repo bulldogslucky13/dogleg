@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { characterById } from './engine/characters'
+import { castLinesForHole, castRound } from './engine/cast'
 import { courseBySlug } from './engine/courses'
 import { dailySetup, localDateKey, practiceSetup, toParLabel, type DailySetup } from './engine/daily'
 import { longOdds } from './engine/odds'
@@ -29,6 +30,7 @@ import {
 import { absorbHistory, logRound } from './state/stats'
 import { chasing } from './lib/records'
 import { identifyPlayer, track } from './lib/analytics'
+import { clubhouseLine, fetchDailyChoices, groupChoices, type DecisionRow } from './lib/decisionStats'
 import { ensureIdentity, loadIdentity, loadPlayer } from './lib/leaderboard'
 import { CharacterAvatar } from './ui/Avatars'
 import { GreenView, HoleMap, useMapSize } from './ui/HoleMap'
@@ -80,6 +82,10 @@ export default function App() {
   const [splash, setSplash] = useState<CharacterAdvantage | null>(null)
   const [splashKey, setSplashKey] = useState(0)
   const [moment, setMoment] = useState<{ kind: MomentKind; holeNumber: number } | null>(null)
+  /** Clubhouse decision stats (Layer 2): real tallies of what the field chose
+   * today, alongside the cast sim. Null until fetched (or unavailable) — the
+   * cast block degrades gracefully to cast-only lines in that case. */
+  const [dailyChoices, setDailyChoices] = useState<DecisionRow[] | null>(null)
   const animTimer = useRef<number | null>(null)
   const splashTimer = useRef<number | null>(null)
   const [mapRef, mapSize] = useMapSize()
@@ -98,6 +104,21 @@ export default function App() {
     const p = loadPlayer()
     if (p) identifyPlayer(p.id, p.name)
   }, [])
+
+  // Clubhouse decision stats (Layer 2): for a daily round only, lazily pull
+  // today's real per-hole tallies once so the post-hole recap can show a real
+  // line alongside the cast sim. Fire-and-forget — never blocks the UI, and
+  // fetchDailyChoices itself degrades to null on any failure or in tests.
+  useEffect(() => {
+    if (!round || round.mode !== 'daily') return
+    let cancelled = false
+    fetchDailyChoices(round.dateKey).then((rows) => {
+      if (!cancelled) setDailyChoices(rows)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [round?.mode, round?.dateKey])
 
   // a replay link opened while the app is already mounted only fires
   // hashchange — no reload, so the mount-time hash check never reruns.
@@ -158,6 +179,33 @@ export default function App() {
   const playedToday = history.find((e) => e.dateKey === localDateKey()) ?? null
 
   const hole = useMemo(() => (round && !round.complete && round.hole ? holeInPlay(round) : null), [round])
+
+  // Clubhouse cast (Layer 1): a deterministic sim of the game's regular
+  // characters playing today's course, surfaced choices-only in the post-hole
+  // recap — never dice, outcomes, or scores. Computed once per round (keyed
+  // on the round's identity, not currentHole) since it simulates all 18 holes
+  // up front. Daily rounds strip the per-player salt back out of the seed so
+  // every player sees the SAME cast; practice seeds carry no salt, so the
+  // round's own seed is already the right key (castRound strips any fortune
+  // tail itself, for both modes).
+  const cast = useMemo(() => {
+    if (!round) return null
+    const course = courseBySlug(round.courseSlug)
+    if (!course) return null
+    const seed = round.mode === 'daily' ? `round:${round.dateKey}:${round.courseSlug}` : round.seed
+    return castRound({ course, cond: round.cond, seed })
+  }, [round?.mode, round?.dateKey, round?.courseSlug, round?.cond, round?.seed])
+
+  // Clubhouse decision stats (Layer 2): the real-tally headline for the CURRENT
+  // hole's tee stage (the headline decision), from today's posted rounds.
+  // Daily only — practice has no shared field to tally against — and null
+  // whenever the rows haven't loaded (or the backend is unavailable), in
+  // which case the cast lines above stand alone, unchanged.
+  const clubhouseTally = useMemo(() => {
+    if (!round || round.mode !== 'daily' || !dailyChoices) return null
+    const grouped = groupChoices(dailyChoices, round.currentHole + 1, 'tee')
+    return clubhouseLine(grouped, 'tee')
+  }, [round?.mode, round?.currentHole, dailyChoices])
 
   const previewWindow = useMemo<[number, number] | null>(() => {
     if (!hole || !selected || animating) return null
@@ -557,6 +605,8 @@ export default function App() {
             runningToPar={toPar}
             last={round.currentHole >= 17}
             onNext={next}
+            castLines={cast ? castLinesForHole(cast, round.currentHole) : undefined}
+            clubhouseTally={clubhouseTally ?? undefined}
           />
         ) : (
           <>

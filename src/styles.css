@@ -2352,6 +2352,35 @@ button {
   color: rgba(29, 43, 32, 0.85);
 }
 
+/* end-of-round retention hook: a playful teaser for tomorrow's daily */
+.forecast {
+  background: var(--cream);
+  border: 1.5px solid rgba(201, 162, 39, 0.45);
+  border-radius: 12px;
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.forecast .kicker {
+  color: rgba(201, 162, 39, 0.9);
+}
+
+.forecast-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  font-size: 0.86rem;
+  color: rgba(29, 43, 32, 0.85);
+}
+
+.forecast-chip {
+  font-size: 0.72rem;
+  padding: 3px 9px;
+}
+
 /* ---------- first-run tutorial ---------- */
 
 .tut-backdrop {

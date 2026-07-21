@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { CHARACTERS, characterById } from '../engine/characters'
 import { courseBySlug, COURSES } from '../engine/courses'
-import { dailySetup, RESULT_LABEL, RESULT_SQUARE, shareText, SITE_URL, toParLabel, type DailySetup } from '../engine/daily'
+import { dailySetup, forecastSetup, RESULT_LABEL, RESULT_SQUARE, shareText, SITE_URL, toParLabel, type DailySetup } from '../engine/daily'
 import { gradeCopy, type RoundGrade } from '../engine/grade'
 import { decisionsFromScores, encodeReplay } from '../engine/replay'
 import type { CharacterId, HoleResult } from '../engine/types'
@@ -349,6 +349,17 @@ export function ResultScreen(props: {
     })
     return `https://${SITE_URL}/#watch=${code}`
   })()
+  // tomorrow's daily, teased in golf-forecast tone — course + conditions only,
+  // never the seed/dateKey/puzzle number or anything outcome-derived
+  const forecast = forecastSetup()
+  const windTone =
+    forecast.cond.wind >= 18
+      ? `${forecast.cond.wind} mph gusts`
+      : forecast.cond.wind >= 12
+        ? `${forecast.cond.wind} mph breeze`
+        : `${forecast.cond.wind} mph wind`
+  const windMood = forecast.cond.wind >= 18 ? '💨' : forecast.cond.wind >= 12 ? '🍃' : '☀️'
+  const greensHot = forecast.cond.greens === 'Fast'
   const canNativeShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function'
   const copy = async () => {
     let ok = true
@@ -529,6 +540,21 @@ export function ResultScreen(props: {
           {copiedReplay ? 'Replay link copied ✓' : '🎬 Copy replay link — let them watch it'}
         </button>
       )}
+      <div className="forecast">
+        <div className="kicker">Tomorrow's forecast</div>
+        <p className="forecast-line">
+          <b>{forecast.course.name}</b>
+          <span className="chips slim">
+            <span className="chip forecast-chip">
+              {windMood} {windTone}
+            </span>
+            <span className="chip forecast-chip">
+              {greensHot ? '⚡ ' : ''}
+              {forecast.cond.greens.toLowerCase()} greens
+            </span>
+          </span>
+        </p>
+      </div>
       {props.practice && (
         <button className="cta" onClick={props.onPracticeAgain}>
           Play another practice round

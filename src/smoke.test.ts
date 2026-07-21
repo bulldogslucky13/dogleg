@@ -14,7 +14,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { track } from './lib/analytics'
 import { CHARACTERS } from './engine/characters'
 import { COURSES, courseBySlug } from './engine/courses'
-import { dailySetup, practiceSetup, shareText, type DailySetup } from './engine/daily'
+import { dailySetup, forecastSetup, practiceSetup, shareText, type DailySetup } from './engine/daily'
 import { gradeCopy, gradeRound } from './engine/grade'
 import { setupFromSeed } from './engine/replay'
 import type { Choice } from './engine/types'
@@ -154,6 +154,34 @@ describe('smoke: the daily is valid and deterministic for every course in rotati
     // canonical daily seed — checked via the parser so a growing seed format
     // doesn't fake a pass
     expect(setupFromSeed(newRound(setup, 'daily', 'dart').seed)!.salt).toBeUndefined()
+  })
+})
+
+describe('smoke: tomorrow\'s forecast previews the exact daily that will land', () => {
+  it('forecastSetup(D) equals dailySetup(tomorrow), by calendar day not +24h', () => {
+    // include a month boundary and a year boundary, plus a plain mid-month day
+    const dates = [
+      new Date(2026, 6, 25), // plain day
+      new Date(2026, 6, 31), // month boundary (Jul → Aug)
+      new Date(2026, 11, 31), // year boundary (Dec 31 → Jan 1)
+      new Date(2027, 1, 28), // Feb 28 → Mar 1 (2027 is not a leap year)
+    ]
+    for (const d of dates) {
+      const tomorrow = new Date(d.getFullYear(), d.getMonth(), d.getDate())
+      tomorrow.setDate(tomorrow.getDate() + 1)
+
+      const forecast = forecastSetup(d)
+      const actualTomorrow = dailySetup(tomorrow)
+      expect(forecast).toEqual(actualTomorrow)
+
+      // it must differ from today's own daily, and carry a real course + conditions
+      const today = dailySetup(d)
+      expect(forecast.dateKey).not.toBe(today.dateKey)
+      expect(forecast.course).toBeTruthy()
+      expect(forecast.cond.wind).toBeGreaterThanOrEqual(3)
+      expect(forecast.cond.difficulty).toBeGreaterThanOrEqual(1)
+      expect(forecast.cond.difficulty).toBeLessThanOrEqual(10)
+    }
   })
 })
 

@@ -496,7 +496,7 @@ export default function App() {
         </div>
         <div className="hole-right">
           <div className={`topar ${toPar < 0 ? 'good' : toPar > 0 ? 'bad' : ''}`}>{toParLabel(toPar)} to par</div>
-          <div className="yards">{spec.yards} yards</div>
+          <div className="yards">{hole.layout.length} yards</div>
           {chase && <div className="chase-chip">🎯 Record {toParLabel(chase.theirToPar)} · {chase.by}</div>}
         </div>
       </header>

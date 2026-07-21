@@ -165,7 +165,17 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
       })
     }
     expect(screen.getByText('HOLE IN ONE')).toBeTruthy()
-    expect(screen.getByText(/tap to keep playing/)).toBeTruthy()
+    // the Share button is live immediately…
+    expect(screen.getByText('📸 Share')).toBeTruthy()
+    // …but for five seconds every other tap is swallowed (no accidental skip)
+    fireEvent.click(screen.getByText('HOLE IN ONE'))
+    expect(screen.getByText('HOLE IN ONE')).toBeTruthy()
+    expect(screen.queryByText(/tap to continue playing/)).toBeNull()
+    act(() => {
+      vi.advanceTimersByTime(5100)
+    })
+    // the quiet continue prompt has faded in; now a tap outside Share resumes
+    expect(screen.getByText(/tap to continue playing/)).toBeTruthy()
     fireEvent.click(screen.getByText('HOLE IN ONE'))
     expect(screen.queryByText('HOLE IN ONE')).toBeNull()
     // the hole card behind it calls it what it is — not "Eagle"

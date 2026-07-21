@@ -280,7 +280,7 @@ export function RoundsScreen(props: {
       {!email && !showAccount && (
         <SyncCta copy="Sync account to save player stats" onTap={() => setShowAccount(true)} trigger="locker" />
       )}
-      {showAccount && <AccountPanel onHistorySynced={props.onHistorySynced} />}
+      {showAccount && <AccountPanel onHistorySynced={props.onHistorySynced} defaultOpen={props.initialAccount} />}
 
       <button className="stats-headline" onClick={() => setView('stats')}>
         <b>{lifetimeRounds()}</b>

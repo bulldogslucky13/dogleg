@@ -390,6 +390,17 @@ export default function App() {
   const classic = uiMode === 'classic'
   const char = characterById(round.character)
 
+  // A Fortune shares the day streak, but the daily in progress isn't in
+  // `history` until it's signed (recordResult), so counting from history alone
+  // would share yesterday's streak — a fresh 2-day streak would read as 1.
+  // Count today's daily provisionally so the shared brag matches the moment.
+  const activeDaily = round.mode === 'daily' && round.dateKey === localDateKey()
+  const shareStreak = computeStreaks(
+    activeDaily && !history.some((h) => h.dateKey === round.dateKey)
+      ? [...history, { dateKey: round.dateKey, puzzleNumber: round.puzzleNumber, courseSlug: round.courseSlug, toPar, results: [], character: round.character }]
+      : history,
+  ).dayStreak
+
   return (
     <div className={`screen play${classic ? ' classic' : ''}`}>
       {moment && (
@@ -400,7 +411,7 @@ export default function App() {
           dateKey={round.dateKey}
           toPar={toPar}
           character={round.character}
-          streak={computeStreaks(history).dayStreak}
+          streak={shareStreak}
           onClose={() => setMoment(null)}
         />
       )}

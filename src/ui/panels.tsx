@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import type { Choice, CourseSpec, HoleScore, OddsSummary, Stage } from '../engine/types'
 import type { HoleInPlay } from '../engine/resolve'
 import { LOOK_LABEL, madePuttLook, oddsFor, summarize } from '../engine/resolve'
@@ -397,6 +398,8 @@ export function HoleComplete(props: {
   clubhouseTally?: string
 }) {
   const { score } = props
+  const [clubhouseOpen, setClubhouseOpen] = useState(false)
+  const hasClubhouse = (props.castLines?.length ?? 0) > 0
   return (
     <div className="hole-complete">
       {/* a holed first stroke is scorewise an eagle (par 3) but nobody calls it that */}
@@ -406,14 +409,44 @@ export function HoleComplete(props: {
       <div className="hc-running">
         Running <b>{toParLabel(props.runningToPar)}</b>
       </div>
-      {props.castLines && props.castLines.length > 0 && (
+      {hasClubhouse && (
+        <button className="clubhouse-trigger" onClick={() => setClubhouseOpen(true)}>
+          🏌 See what the clubhouse did
+        </button>
+      )}
+      <details className="hc-odds">
+        <summary>See the odds you faced</summary>
+        <OddsRecap score={score} par={props.par} />
+      </details>
+      <button className="cta" onClick={props.onNext}>
+        {props.last ? 'Sign the card' : 'Next hole'}
+      </button>
+      {clubhouseOpen && hasClubhouse && (
+        <ClubhouseModal
+          castLines={props.castLines!}
+          clubhouseTally={props.clubhouseTally}
+          onClose={() => setClubhouseOpen(false)}
+        />
+      )}
+    </div>
+  )
+}
+
+/** Post-hole peek at what everyone else did on this hole — the real clubhouse
+ * tally (when today's field has posted enough) over the game's cast of regulars.
+ * Choices only, opened on demand from the recap; never a live pre-shot signal. */
+function ClubhouseModal(props: { castLines: string[]; clubhouseTally?: string; onClose: () => void }) {
+  return (
+    <div className="clubhouse-backdrop" role="dialog" aria-label="What the clubhouse did" onClick={props.onClose}>
+      <div className="clubhouse-sheet" onClick={(e) => e.stopPropagation()}>
+        <div className="kicker">The clubhouse</div>
+        {props.clubhouseTally && (
+          <div className="clubhouse-tally">
+            <h4>From today's field</h4>
+            <div className="cast-line">{props.clubhouseTally}</div>
+          </div>
+        )}
         <div className="cast-block">
-          {props.clubhouseTally && (
-            <div className="clubhouse-tally">
-              <h4>From the clubhouse</h4>
-              <div className="cast-line">{props.clubhouseTally}</div>
-            </div>
-          )}
           <h4>
             The clubhouse cast <span className="cast-hint">(the game's regulars)</span>
           </h4>
@@ -423,14 +456,10 @@ export function HoleComplete(props: {
             </div>
           ))}
         </div>
-      )}
-      <details className="hc-odds">
-        <summary>See the odds you faced</summary>
-        <OddsRecap score={score} par={props.par} />
-      </details>
-      <button className="cta" onClick={props.onNext}>
-        {props.last ? 'Sign the card' : 'Next hole'}
-      </button>
+        <button className="cta" onClick={props.onClose}>
+          Close
+        </button>
+      </div>
     </div>
   )
 }

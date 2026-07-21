@@ -188,6 +188,9 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
       })
     }
 
+    // the cast is hidden behind a trigger on the recap — not a live signal
+    expect(screen.queryByText(/The clubhouse cast/)).toBeNull()
+    fireEvent.click(screen.getByText(/See what the clubhouse did/))
     expect(screen.getByText(/The clubhouse cast/)).toBeTruthy()
     expect(screen.getAllByText(CHARACTERS[0].name).length).toBeGreaterThan(0)
   })

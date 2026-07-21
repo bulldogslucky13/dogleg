@@ -773,11 +773,48 @@ button {
   display: none;
 }
 
+.clubhouse-trigger {
+  align-self: center;
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(29, 43, 32, 0.7);
+  background: none;
+  border: none;
+  padding: 6px 2px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.clubhouse-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 55;
+  background: rgba(10, 20, 14, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.clubhouse-sheet {
+  width: 100%;
+  max-width: 400px;
+  max-height: calc(100dvh - 40px);
+  overflow-y: auto;
+  background: var(--paper);
+  border-radius: 18px;
+  padding: 20px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.5);
+}
+
 .cast-block {
   text-align: left;
-  margin-top: 4px;
-  padding-top: 10px;
-  border-top: 1px solid var(--line);
   display: flex;
   flex-direction: column;
   gap: 6px;

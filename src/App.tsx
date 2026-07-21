@@ -25,6 +25,7 @@ import {
   type RoundState,
   type UiMode,
 } from './state/store'
+import { absorbHistory, logRound } from './state/stats'
 import { track } from './lib/analytics'
 import { ensureIdentity, loadIdentity } from './lib/leaderboard'
 import { CharacterAvatar } from './ui/Avatars'
@@ -64,6 +65,8 @@ export default function App() {
     return r && !r.complete ? 'play' : 'home'
   })
   const [selected, setSelected] = useState<Choice | null>(null)
+  /** where the locker opens: 'stats' when deep-linked from the home handicap chip */
+  const [lockerView, setLockerView] = useState<'main' | 'stats'>('main')
   const [uiMode, setUiMode] = useState<UiMode>(loadUiMode)
   const [pending, setPending] = useState<PendingStart | null>(null)
   const [showTutorial, setShowTutorial] = useState(() => !hasSeenTutorial())
@@ -140,6 +143,17 @@ export default function App() {
     return o.kind === 'approach' ? o : null
   }, [hole, selected, animating])
 
+  // Sync can complete from either the home CTA or the locker's account panel;
+  // both must fold the freshly-pulled dailies into the log so stats/trophies
+  // update immediately, not on some later home-screen sync.
+  const handleHistorySynced = (h: HistoryEntry[]) => {
+    setHistory(h)
+    absorbHistory(h) // the round log counts synced dailies too
+    // a synced day supersedes this device's unfinished daily for the
+    // same date — drop it so a refresh can't replay a completed day
+    if (supersededDaily(round, h)) setRound(null)
+  }
+
   if (view === 'home') {
     return (
       <>
@@ -147,19 +161,21 @@ export default function App() {
         <HomeScreen
           history={history}
           onHowToPlay={() => setShowTutorial(true)}
-          onMyRounds={() => setView('rounds')}
+          onMyRounds={() => {
+            setLockerView('main')
+            setView('rounds')
+          }}
+          onStats={() => {
+            setLockerView('stats')
+            setView('rounds')
+          }}
           activeRound={
             round && !round.complete
               ? { mode: round.mode, courseName: courseBySlug(round.courseSlug)?.name ?? '' }
               : null
           }
           playedToday={playedToday}
-          onHistorySynced={(h) => {
-            setHistory(h)
-            // a synced day supersedes this device's unfinished daily for the
-            // same date — drop it so a refresh can't replay a completed day
-            if (supersededDaily(round, h)) setRound(null)
-          }}
+          onHistorySynced={handleHistorySynced}
           onTeeOff={() => {
             setPending({ mode: 'daily', setup: dailySetup() })
             setView('pick')
@@ -200,10 +216,12 @@ export default function App() {
   if (view === 'rounds') {
     return (
       <RoundsScreen
+        initialView={lockerView}
         onWatch={(p) => {
           setWatching(p)
           setView('watch')
         }}
+        onHistorySynced={handleHistorySynced}
         onBack={() => setView('home')}
       />
     )
@@ -342,6 +360,7 @@ export default function App() {
       const h = recordResult(after)
       setHistory(h)
       archiveRound(after) // into the locker — replayable forever if it's a PR/CR
+      logRound(after) // into the round log — scorecard + stats material, forever
       setResultFor(after.mode)
       setView('result')
     }

@@ -108,6 +108,13 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
     // animation lock actually clears between decisions.
     for (let guard = 0; guard < 400; guard++) {
       if (screen.queryByText('Play another practice round')) break
+      // practice seeds are time-based, so a natural ace/albatross can fire on
+      // any run — dismiss the splash like a player would and keep going
+      const splash = screen.queryByText('HOLE IN ONE') ?? screen.queryByText('ALBATROSS')
+      if (splash) {
+        fireEvent.click(splash)
+        continue
+      }
       const advance = screen.queryByText('Next hole') ?? screen.queryByText('Sign the card')
       if (advance) {
         fireEvent.click(advance)
@@ -306,15 +313,98 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
 
     render(<App />)
     fireEvent.click(screen.getByText(/My rounds/))
-    // lifetime tally in the header, seeded/bumped by the archived round
-    expect(screen.getByText(/1 lifetime round/)).toBeTruthy()
-    // Recent is the default tab; the records shelf lives behind its own tab
+
+    // the trophy shelf sits on top — empty but visible: the zero IS the goal
+    expect(screen.getByText('Lifetime Hole in One')).toBeTruthy()
+    expect(screen.getByText('Lifetime Albatross')).toBeTruthy()
+    // anonymous player → the sync CTA shows (backend is off in tests, no session)
+    expect(screen.getByText('Sync account to save player stats')).toBeTruthy()
+    // the lifetime headline is tappable into the stats view
+    expect(screen.getByText(/Lifetime rounds played/)).toBeTruthy()
+
+    // Recent is the default tab; every row offers Scorecard (+ Replay while archived)
     expect(screen.getByText(/Last 1 round/)).toBeTruthy()
     expect(screen.getByText(/St Andrews/)).toBeTruthy()
     fireEvent.click(screen.getByText(/Records · 1/))
     expect(screen.getByText('Personal bests')).toBeTruthy()
-    fireEvent.click(screen.getAllByText('▶ Watch')[0])
+
+    // the universal scorecard opens from any row, with Replay beside it
+    fireEvent.click(screen.getAllByText('Scorecard')[0])
+    expect(screen.getByText('Out')).toBeTruthy()
+    expect(screen.getByText('In')).toBeTruthy()
+    fireEvent.click(screen.getByText('Close'))
+    expect(screen.queryByText('Out')).toBeNull()
+
+    fireEvent.click(screen.getAllByText('▶ Replay')[0])
     expect(screen.getByText('‹ Exit replay')).toBeTruthy()
+  })
+
+  it('the stats view computes the handicap countdown and opens the lowest round scorecard', async () => {
+    const { newRound, applyChoice, advanceHole, archiveRound } = await import('./state/store')
+    const { logRound } = await import('./state/stats')
+    const { practiceSetup } = await import('./engine/daily')
+    let s = newRound(practiceSetup('st-andrews-old', 'smokestats'), 'practice', 'greens')
+    let guard = 0
+    while (!s.complete && guard++ < 500) {
+      if (s.hole?.stage === 'done') {
+        s = advanceHole(s)
+        continue
+      }
+      const next = applyChoice(s, 'normal')
+      s = next === s ? applyChoice(s, 'safe') : next
+    }
+    archiveRound(s)
+    logRound(s)
+
+    render(<App />)
+    fireEvent.click(screen.getByText(/My rounds/))
+    fireEvent.click(screen.getByText(/Lifetime rounds played/))
+
+    // one round in the book: no handicap yet, countdown says how far to go
+    expect(screen.getByText('Handicap: Not yet established')).toBeTruthy()
+    expect(screen.getByText(/Play 9 more rounds to establish your handicap/)).toBeTruthy()
+    // the score distribution renders from the log
+    expect(screen.getByText('Pars')).toBeTruthy()
+    expect(screen.getByText('Birdies')).toBeTruthy()
+    // the lowest round is listed and opens its scorecard
+    expect(screen.getByText(/Lowest round/)).toBeTruthy()
+    fireEvent.click(screen.getAllByText('Scorecard')[0])
+    expect(screen.getByText('Out')).toBeTruthy()
+  })
+
+  it('an ace round shows on the trophy shelf and its list opens the scorecard', () => {
+    // an archived round whose results hold a par-3 eagle — that IS an ace
+    const results = Array(18).fill('par')
+    results[7] = 'eagle' // St Andrews hole 8 is a par 3
+    localStorage.setItem(
+      'dogleg:archive:v1',
+      JSON.stringify([
+        {
+          seed: 'practice:st-andrews-old:acetest',
+          mode: 'practice',
+          courseSlug: 'st-andrews-old',
+          character: 'dart',
+          dateKey: '2026-07-20',
+          toPar: -2,
+          strokes: 70,
+          results,
+          decisions: Array(18).fill(['normal']),
+          playedAt: 1000,
+        },
+      ]),
+    )
+
+    render(<App />)
+    fireEvent.click(screen.getByText(/My rounds/))
+    // the ace trophy counted it from stored results alone
+    const aceTrophy = screen.getByText('Lifetime Hole in One').closest('button')!
+    expect(within(aceTrophy).getByText('1')).toBeTruthy()
+    fireEvent.click(aceTrophy)
+    expect(screen.getByText(/Every hole in one/)).toBeTruthy()
+    expect(screen.getByText(/Hole 8/)).toBeTruthy()
+    // its scorecard flags the ace on the hole it happened
+    fireEvent.click(screen.getByText('Scorecard'))
+    expect(screen.getByText('ACE')).toBeTruthy()
   })
 
   it('toggles between modern and classic views mid-round', () => {

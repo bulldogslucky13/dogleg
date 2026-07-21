@@ -7,6 +7,7 @@ import type { CharacterId, HoleResult } from '../engine/types'
 import { track } from '../lib/analytics'
 import { backendEnabled } from '../lib/backend'
 import { fetchCourseRecords, loadPlayer, type CourseRecord } from '../lib/leaderboard'
+import { currentHandicap, formatHandicap } from '../state/stats'
 import { characterRecords, computeStreaks, loadArchive, type HistoryEntry, type RoundRecap, type RoundState } from '../state/store'
 import { AccountPanel } from './AccountPanel'
 import { CharacterAvatar } from './Avatars'
@@ -22,6 +23,8 @@ export function HomeScreen(props: {
   onShowResult: () => void
   onHowToPlay: () => void
   onMyRounds: () => void
+  /** deep-link into the locker's lifetime stats view */
+  onStats: () => void
 }) {
   const setup = dailySetup()
   const streaks = computeStreaks(props.history)
@@ -147,8 +150,21 @@ export function HomeScreen(props: {
           🛅 My rounds · locker
         </button>
       )}
+      <HandicapChip onTap={props.onStats} />
       <AccountPanel />
     </div>
+  )
+}
+
+/** The home page's quiet handicap line. Hidden entirely until the handicap
+ * is established — the empty state lives in the locker, not here. */
+function HandicapChip(props: { onTap: () => void }) {
+  const hcap = currentHandicap()
+  if (!hcap.established) return null
+  return (
+    <button className="hcap-chip" onClick={props.onTap}>
+      Current handicap <b>{formatHandicap(hcap.value)}</b> ›
+    </button>
   )
 }
 

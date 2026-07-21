@@ -24,6 +24,7 @@ import {
   type RoundState,
   type UiMode,
 } from './state/store'
+import { logRound } from './state/stats'
 import { track } from './lib/analytics'
 import { ensureIdentity, loadIdentity } from './lib/leaderboard'
 import { CharacterAvatar } from './ui/Avatars'
@@ -63,6 +64,8 @@ export default function App() {
     return r && !r.complete ? 'play' : 'home'
   })
   const [selected, setSelected] = useState<Choice | null>(null)
+  /** where the locker opens: 'stats' when deep-linked from the home handicap chip */
+  const [lockerView, setLockerView] = useState<'main' | 'stats'>('main')
   const [uiMode, setUiMode] = useState<UiMode>(loadUiMode)
   const [pending, setPending] = useState<PendingStart | null>(null)
   const [showTutorial, setShowTutorial] = useState(() => !hasSeenTutorial())
@@ -146,7 +149,14 @@ export default function App() {
         <HomeScreen
           history={history}
           onHowToPlay={() => setShowTutorial(true)}
-          onMyRounds={() => setView('rounds')}
+          onMyRounds={() => {
+            setLockerView('main')
+            setView('rounds')
+          }}
+          onStats={() => {
+            setLockerView('stats')
+            setView('rounds')
+          }}
           activeRound={
             round && !round.complete
               ? { mode: round.mode, courseName: courseBySlug(round.courseSlug)?.name ?? '' }
@@ -193,6 +203,7 @@ export default function App() {
   if (view === 'rounds') {
     return (
       <RoundsScreen
+        initialView={lockerView}
         onWatch={(p) => {
           setWatching(p)
           setView('watch')
@@ -335,6 +346,7 @@ export default function App() {
       const h = recordResult(after)
       setHistory(h)
       archiveRound(after) // into the locker — replayable forever if it's a PR/CR
+      logRound(after) // into the round log — scorecard + stats material, forever
       setResultFor(after.mode)
       setView('result')
     }

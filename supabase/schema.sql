@@ -117,6 +117,19 @@ create table if not exists daily_choice_tallies (
 );
 -- the PK (date_key first) already serves the day-scoped client read; no extra index.
 
+-- Known/accepted gap: this policy is a flat public read, so any anon-key
+-- holder can query `hole=eq.N` for a hole they haven't personally reached
+-- yet — the client's post-hole-only fetch (fetchHoleChoices) is a UX
+-- courtesy, not enforcement. True enforcement would need server-tracked
+-- per-player hole progress, which nothing today provides (round state is
+-- local-only until the final validated submit-round replay, and that
+-- replay writes all 18 holes' tallies in one shot at round end — so in
+-- practice every hole's tallies for the day exist as soon as the first
+-- player finishes, not gated by hole order at all). Accepted because the
+-- worst case is a spoiler (seeing what the field did on a hole before
+-- playing it), not an exploit: nothing here affects the odds, the score,
+-- or the leaderboard. Revisit only if that trust model changes (e.g. real
+-- money/ranking stakes).
 alter table daily_choice_tallies enable row level security;
 drop policy if exists "anyone can read daily choice tallies" on daily_choice_tallies;
 create policy "anyone can read daily choice tallies" on daily_choice_tallies for select using (true);

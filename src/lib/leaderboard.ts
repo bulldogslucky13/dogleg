@@ -135,6 +135,21 @@ export interface SubmitResult {
   record?: { broken: boolean; toPar: number; holder: string; character?: CharacterId | null }
 }
 
+/** Date keys of dailies this device has successfully posted to the board.
+ * Read by the store when baking a fortune streak into a daily seed. */
+const POSTED_KEY = 'dogleg:posted:v1'
+
+function recordPostedDaily(dateKey: string): void {
+  try {
+    const raw = localStorage.getItem(POSTED_KEY)
+    const keys = raw ? (JSON.parse(raw) as string[]) : []
+    if (!keys.includes(dateKey)) keys.push(dateKey)
+    localStorage.setItem(POSTED_KEY, JSON.stringify(keys.slice(-400)))
+  } catch {
+    /* private mode */
+  }
+}
+
 /** Submit a finished round. The server replays it and computes the score.
  * An anonymous (nameless) identity submits with its id/secret plus the name
  * being claimed — the name lands on the same player row the round's dice
@@ -165,6 +180,11 @@ export async function submitRound(round: RoundState, name?: string): Promise<Sub
     if (body.player?.id && secret) {
       savePlayerIdentity({ id: body.player.id, secret, name: body.player.name })
     }
+    // remember which dailies actually POSTED — the fortune streak claim is
+    // derived from this set so the client never claims a streak the referee's
+    // daily_scores table can't corroborate (duplicates count: the card for
+    // that day is on the board either way)
+    if (round.mode === 'daily') recordPostedDaily(round.dateKey)
     return { ...body, ok: true }
   } catch {
     return { ok: false, error: 'network hiccup — your score is safe locally, try again' }

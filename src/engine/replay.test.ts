@@ -7,8 +7,13 @@ import { decisionsFromScores, decodeReplay, encodeReplay, replayFrames, replayRo
 import type { CharacterId, Choice } from './types'
 
 /** Play a full round through the real client store, exactly as the UI does. */
-function playThroughStore(setup: ReturnType<typeof practiceSetup>, mode: 'daily' | 'practice', character: CharacterId) {
-  let state = newRound(setup, mode, character)
+function playThroughStore(
+  setup: ReturnType<typeof practiceSetup>,
+  mode: 'daily' | 'practice',
+  character: CharacterId,
+  playerId?: string,
+) {
+  let state = newRound(setup, mode, character, playerId)
   let guard = 0
   while (!state.complete && guard++ < 500) {
     const stage = state.hole?.stage
@@ -165,7 +170,10 @@ describe('replayRound is a perfect mirror of the client store', () => {
     // seed verbatim, so the frames builder must accept it like the referee does
     const setup = dailySetup()
     const playerId = 'a3f1c2d4-0000-4000-8000-abcdefabcdef'
-    const round = playThroughStore({ ...setup, seed: newRound(setup, 'daily', 'dart', playerId).seed }, 'daily', 'dart')
+    // the playerId goes through newRound itself: pre-fortune this test fed a
+    // pre-salted seed back through the setup, but newRound now also appends
+    // the fortune tail, and doing that twice builds a seed no referee accepts
+    const round = playThroughStore(setup, 'daily', 'dart', playerId)
     const decisions = decisionsFromScores(round.scores)!
     const decoded = decodeReplay(encodeReplay({ seed: round.seed, character: 'dart', decisions }))!
     expect(decoded.seed).toBe(round.seed)

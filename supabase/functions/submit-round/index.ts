@@ -9,7 +9,7 @@
 //
 // deno-lint-ignore-file no-explicit-any
 import { createClient } from 'npm:@supabase/supabase-js@2'
-import { dailySalt, replayRound } from './engine.mjs'
+import { FORTUNE_CONFIG, courseBySlug, dailySalt, destinyDue, replayRound } from './engine.mjs'
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -21,6 +21,13 @@ const json = (status: number, body: unknown) =>
   new Response(JSON.stringify(body), { status, headers: { ...CORS, 'content-type': 'application/json' } })
 
 const NAME_RE = /^[\p{L}\p{N}][\p{L}\p{N} .'_-]{1,17}$/u
+
+/** The calendar day before a YYYY-MM-DD key (pure date math, no timezone). */
+function dayBefore(key: string): string {
+  const [y, m, d] = key.split('-').map(Number)
+  const t = new Date(Date.UTC(y, m - 1, d) - 86_400_000)
+  return `${t.getUTCFullYear()}-${`${t.getUTCMonth() + 1}`.padStart(2, '0')}-${`${t.getUTCDate()}`.padStart(2, '0')}`
+}
 
 function utcDateKey(offsetDays: number): string {
   const d = new Date(Date.now() + offsetDays * 86_400_000)
@@ -56,6 +63,20 @@ Deno.serve(async (req) => {
     if (!allowed.includes(info.dateKey!)) return json(422, { error: 'daily is not for today' })
   }
 
+  // ---- a destined practice round cannot contend for course records ----
+  // Practice fortune counters have no server-visible history AT ALL, so a
+  // destiny-due tail is unverifiable — anyone could forge `:f500.…` and post
+  // a forced ace as a record. And even a legitimately destined round is a
+  // gift, not a record-worthy score. Practice records only accept rounds
+  // whose tail is below every destiny threshold; the round itself still
+  // played fine on the client, it just doesn't claim the CR.
+  if (info.mode === 'practice' && info.fortune) {
+    const due = destinyDue('practice', info.fortune)
+    if (due.ace || due.albatross) {
+      return json(422, { error: 'destined rounds do not contend for course records' })
+    }
+  }
+
   const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
 
   // ---- identify or create the player ----
@@ -79,6 +100,70 @@ Deno.serve(async (req) => {
       return json(422, { error: 'round rejected: seed is not yours' })
     }
 
+    // ---- fortune sanity: the tail is client-kept, so every knob it offers
+    // must be bounded by server-visible history. Dice already ignore the
+    // tail entirely (replayRound strips it before seeding the rng), which
+    // leaves exactly two knobs a daily tail can turn: the streak multiplier
+    // and the destiny guarantee. Both are checked against posted dailies. ----
+    if (info.mode === 'daily' && info.fortune) {
+      const g = FORTUNE_CONFIG.daily.guaranteeAt
+      const claimsStreak = info.fortune.streak > 1
+      const claimsAceDestiny = info.fortune.ace >= g
+      const claimsAlbDestiny = info.fortune.alb >= g
+      if (claimsStreak || claimsAceDestiny || claimsAlbDestiny) {
+        const { data: rows } = await supabase
+          .from('daily_scores')
+          .select('date_key, course_slug, results')
+          .eq('player_id', data.id)
+          .order('date_key', { ascending: false })
+          .limit(400)
+        const postedKeys = new Set((rows ?? []).map((r: { date_key: string }) => r.date_key))
+        // a streak is CONSECUTIVE posted days, not a lifetime count: walk
+        // back from the day before this submission. The claim may be at most
+        // that run + today (+3 grace for the odd submission that failed) —
+        // scattered old cards can't add up to a loyalty multiplier.
+        let run = 0
+        let cursor = info.dateKey!
+        while (postedKeys.has((cursor = dayBefore(cursor)))) run++
+        if (info.fortune.streak > run + 1 + 3) {
+          return json(422, { error: 'streak is not credible for this player yet' })
+        }
+        // destiny is only honored when the referee can RECOMPUTE the drought
+        // from posted cards: count posted dailies since the last one that
+        // contained the moment (ace = eagle result on a par 3; an albatross
+        // result on a par 5 is the 2). A claim of >= guaranteeAt needs a
+        // recomputed drought within a small grace of it — a client cannot
+        // manufacture a destiny holeout out of a short or fabricated history.
+        if (claimsAceDestiny || claimsAlbDestiny) {
+          let sinceAce = 0
+          let sinceAlb = 0
+          let aceDone = false
+          let albDone = false
+          for (const row of (rows ?? []) as { course_slug: string; results: string[] | null }[]) {
+            const course = courseBySlug(row.course_slug)
+            const results = row.results ?? []
+            const hasAce = !!course && results.some((r, i) => r === 'eagle' && course.holes[i]?.par === 3)
+            const hasAlb = !!course && results.some((r, i) => r === 'albatross' && course.holes[i]?.par === 5)
+            if (!aceDone) {
+              if (hasAce) aceDone = true
+              else sinceAce++
+            }
+            if (!albDone) {
+              if (hasAlb) albDone = true
+              else sinceAlb++
+            }
+          }
+          const GRACE = 5 // a few locally-completed-but-unposted dailies
+          if (claimsAceDestiny && sinceAce < g - GRACE) {
+            return json(422, { error: 'destiny counter is not credible for this player yet' })
+          }
+          if (claimsAlbDestiny && sinceAlb < g - GRACE) {
+            return json(422, { error: 'destiny counter is not credible for this player yet' })
+          }
+        }
+      }
+    }
+
     if (!data.name) {
       // an anonymous minted identity posting its first card: the name is
       // claimed onto THIS row, the one the round's dice were salted for
@@ -98,6 +183,16 @@ Deno.serve(async (req) => {
     // Rejected here, before the insert, so the doomed submission can't
     // reserve a name on its way out.
     if (info.mode === 'daily' && info.salt) return json(422, { error: 'round rejected: seed is not yours' })
+    // a brand-new player row has zero posted dailies, so neither a streak
+    // multiplier nor a destiny-due counter can ever be credible here —
+    // rejected BEFORE the insert, same ordering rule as the salt check above.
+    // (Streak bound = the named branch's formula with run 0: 0 + 1 + 3.)
+    if (info.mode === 'daily' && info.fortune) {
+      const g = FORTUNE_CONFIG.daily.guaranteeAt
+      if (info.fortune.streak > 4 || info.fortune.ace >= g || info.fortune.alb >= g) {
+        return json(422, { error: 'fortune counters are not credible for this player yet' })
+      }
+    }
     if (!name || !NAME_RE.test(name)) return json(400, { error: 'pick a clubhouse name (2-18 letters/numbers)' })
     const { data, error } = await supabase.from('players').insert({ name }).select('id, name, secret').single()
     if (error) {

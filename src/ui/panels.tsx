@@ -386,7 +386,8 @@ export function HoleComplete(props: { score: HoleScore; par: number; runningToPa
   const { score } = props
   return (
     <div className="hole-complete">
-      <div className="hc-result">{RESULT_LABEL[score.result]}</div>
+      {/* a holed first stroke is scorewise an eagle (par 3) but nobody calls it that */}
+      <div className="hc-result">{score.strokes === 1 ? 'Hole in One' : RESULT_LABEL[score.result]}</div>
       {score.penalties > 0 && <div className="hc-pen">{score.penalties} penalty stroke{score.penalties > 1 ? 's' : ''}</div>}
       <div className="hc-note">“{score.note}”</div>
       <div className="hc-running">

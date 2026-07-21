@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { characterById } from '../engine/characters'
-import { SITE_URL, toParLabel } from '../engine/daily'
+import { SITE_URL, streakTag, toParLabel } from '../engine/daily'
 import { MOMENT_COPY, type MomentKind } from '../engine/fortune'
 import type { CharacterId } from '../engine/types'
 import { track } from '../lib/analytics'
@@ -23,6 +23,8 @@ export function MomentSplash(props: {
   dateKey: string
   toPar: number
   character?: CharacterId
+  /** current day streak — rides along on shares when it's worth bragging about */
+  streak?: number
   onClose: () => void
 }) {
   const copy = MOMENT_COPY[props.kind]
@@ -57,6 +59,7 @@ export function MomentSplash(props: {
       dateKey: props.dateKey,
       toPar: props.toPar,
       character: props.character,
+      streak: props.streak,
     })
       .then((blob) => {
         if (alive) cardBlob.current = blob
@@ -83,7 +86,7 @@ export function MomentSplash(props: {
       const line = props.kind === 'ace' ? `Hole in one at ${props.courseName} ⛳` : `Albatross at ${props.courseName} 🕊️`
       const opts = {
         filename: `dogleg-${props.kind === 'ace' ? 'hole-in-one' : 'albatross'}.png`,
-        text: `${line} — Dogleg`,
+        text: `${line}${streakTag(props.streak)} — Dogleg`,
         url: `https://${SITE_URL}`,
       }
       // Ready card → no await before shareMomentCard, so navigator.share() fires
@@ -97,6 +100,7 @@ export function MomentSplash(props: {
           dateKey: props.dateKey,
           toPar: props.toPar,
           character: props.character,
+          streak: props.streak,
         }))
       cardBlob.current = blob
       const outcome = await shareMomentCard(blob, opts)

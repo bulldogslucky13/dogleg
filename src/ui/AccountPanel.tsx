@@ -13,8 +13,8 @@ import { Spinner } from './Spinner'
  * pulls the account's submitted rounds into local history so streaks and
  * "played today" follow the player across devices.
  */
-export function AccountPanel(props: { onHistorySynced?: (h: HistoryEntry[]) => void }) {
-  const [open, setOpen] = useState(false)
+export function AccountPanel(props: { onHistorySynced?: (h: HistoryEntry[]) => void; defaultOpen?: boolean }) {
+  const [open, setOpen] = useState(props.defaultOpen ?? false)
   const [email, setEmail] = useState('')
   const [sent, setSent] = useState(false)
   const [busy, setBusy] = useState(false)

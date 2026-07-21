@@ -51,11 +51,13 @@ export function RoundsScreen(props: {
   onHistorySynced?: (h: HistoryEntry[]) => void
   /** deep-link straight into the stats view (the home handicap chip) */
   initialView?: 'main' | 'stats'
+  /** open with the account panel already expanded (How to Play's sync line) */
+  initialAccount?: boolean
 }) {
   const [view, setView] = useState<LockerView>(props.initialView ?? 'main')
   const [tab, setTab] = useState<'recent' | 'records'>('recent')
   const [card, setCard] = useState<LoggedRound | null>(null)
-  const [showAccount, setShowAccount] = useState(false)
+  const [showAccount, setShowAccount] = useState(props.initialAccount ?? false)
   const [email, setEmail] = useState<string | null>(null)
   useEffect(() => {
     let live = true
@@ -278,7 +280,7 @@ export function RoundsScreen(props: {
       {!email && !showAccount && (
         <SyncCta copy="Sync account to save player stats" onTap={() => setShowAccount(true)} trigger="locker" />
       )}
-      {showAccount && <AccountPanel onHistorySynced={props.onHistorySynced} />}
+      {showAccount && <AccountPanel onHistorySynced={props.onHistorySynced} defaultOpen={props.initialAccount} />}
 
       <button className="stats-headline" onClick={() => setView('stats')}>
         <b>{lifetimeRounds()}</b>

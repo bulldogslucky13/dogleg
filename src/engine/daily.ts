@@ -136,7 +136,18 @@ export function toParLabel(toPar: number): string {
 export const SITE_URL = 'dogleg.cameronbristol.xyz'
 
 /** Share card in the classic Break Par format, with the character in the rank line's slot. */
-export function shareText(setup: DailySetup, results: HoleResult[], toPar: number, character?: CharacterId): string {
+/** "12-day streak", or nothing at all: a 0 or 1 day streak isn't a brag. */
+export function streakTag(streak?: number): string {
+  return streak && streak >= 2 ? ` · ${streak}-day streak` : ''
+}
+
+export function shareText(
+  setup: DailySetup,
+  results: HoleResult[],
+  toPar: number,
+  character?: CharacterId,
+  streak?: number,
+): string {
   const rows: string[] = []
   for (let i = 0; i < 18; i += 9) {
     rows.push(results.slice(i, i + 9).map((r) => RESULT_SQUARE[r]).join(''))
@@ -149,7 +160,7 @@ export function shareText(setup: DailySetup, results: HoleResult[], toPar: numbe
   return [
     `DOGLEG #${setup.puzzleNumber} ⛳`,
     `${setup.course.name} (Par ${par})`,
-    `${par + toPar} (${toParLabel(toPar)})`,
+    `${par + toPar} (${toParLabel(toPar)})${streakTag(streak)}`,
     '',
     rows[0],
     rows[1],

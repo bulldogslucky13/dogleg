@@ -48,6 +48,28 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
     expect(screen.getByText('One round, one goal')).toBeTruthy()
   })
 
+  it('How to Play ends on Fortunes, whose sync line opens the account flow', () => {
+    render(<App />)
+    fireEvent.click(screen.getByText('How to play'))
+    // walk to the last step — Fortunes
+    while (screen.queryByText('Next')) fireEvent.click(screen.getByText('Next'))
+    expect(screen.getByText('Fortunes')).toBeTruthy()
+    // (the phrase also lives in the home streak note behind the overlay)
+    expect(screen.getAllByText(/golf gods reward the faithful/).length).toBeGreaterThan(0)
+    // no numbers anywhere: the multiplier and the ramp stay under the hood
+    expect(screen.queryByText(/[0-9]+(x|×|%)/)).toBeNull()
+    // the one quiet sync line routes to the same account flow as the locker CTA
+    // tapping it lands in the locker with the account panel slot open
+    // (AccountPanel itself renders null in tests — backend is off in CI)
+    fireEvent.click(screen.getByText(/Playing on more than one device/))
+    expect(screen.getByText('My rounds')).toBeTruthy()
+  })
+
+  it('the streak display carries the fortune disclosure note', () => {
+    render(<App />)
+    expect(screen.getByText(/golf gods reward the faithful/)).toBeTruthy()
+  })
+
   it('walks home → pick → play and commits a real shot', () => {
     vi.useFakeTimers() // the shot animation uses setTimeout; keep the test synchronous
     render(<App />)
@@ -109,9 +131,13 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
     for (let guard = 0; guard < 400; guard++) {
       if (screen.queryByText('Play another practice round')) break
       // practice seeds are time-based, so a natural ace/albatross can fire on
-      // any run — dismiss the splash like a player would and keep going
+      // any run — wait out the splash's 5s advance lock like a player would,
+      // then tap it away and keep going
       const splash = screen.queryByText('HOLE IN ONE') ?? screen.queryByText('ALBATROSS')
       if (splash) {
+        act(() => {
+          vi.advanceTimersByTime(5100)
+        })
         fireEvent.click(splash)
         continue
       }
@@ -405,6 +431,54 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
     // its scorecard flags the ace on the hole it happened
     fireEvent.click(screen.getByText('Scorecard'))
     expect(screen.getByText('ACE')).toBeTruthy()
+  })
+
+  it('a destiny ace fires the HOLE IN ONE splash, which dismisses on tap', () => {
+    vi.useFakeTimers()
+    // a due ace counter → the round's first par-3 tee shot holes out
+    localStorage.setItem(
+      'dogleg:fortune:v1',
+      JSON.stringify({ p: { ace: 999, aceK: 0, alb: 0, albK: 0 }, d: { ace: 0, alb: 0 } }),
+    )
+    render(<App />)
+    fireEvent.click(screen.getByText(/Play unlimited/))
+    const courseButton = screen
+      .getAllByText('Pebble Beach Links')
+      .map((el) => el.closest('button'))
+      .find((b): b is HTMLButtonElement => b !== null)!
+    fireEvent.click(courseButton)
+    fireEvent.click(screen.getByText(CHARACTERS[0].name))
+
+    for (let guard = 0; guard < 200; guard++) {
+      if (screen.queryByText('HOLE IN ONE')) break
+      const advance = screen.queryByText('Next hole') ?? screen.queryByText('Sign the card')
+      if (advance) {
+        fireEvent.click(advance)
+        continue
+      }
+      const card = document.querySelector<HTMLButtonElement>('button.choice')!
+      fireEvent.click(card)
+      fireEvent.click(card)
+      act(() => {
+        vi.advanceTimersByTime(1500)
+      })
+    }
+    expect(screen.getByText('HOLE IN ONE')).toBeTruthy()
+    // the Share button is live immediately…
+    expect(screen.getByText('📸 Share')).toBeTruthy()
+    // …but for five seconds every other tap is swallowed (no accidental skip)
+    fireEvent.click(screen.getByText('HOLE IN ONE'))
+    expect(screen.getByText('HOLE IN ONE')).toBeTruthy()
+    expect(screen.queryByText(/tap to continue playing/)).toBeNull()
+    act(() => {
+      vi.advanceTimersByTime(5100)
+    })
+    // the quiet continue prompt has faded in; now a tap outside Share resumes
+    expect(screen.getByText(/tap to continue playing/)).toBeTruthy()
+    fireEvent.click(screen.getByText('HOLE IN ONE'))
+    expect(screen.queryByText('HOLE IN ONE')).toBeNull()
+    // the hole card behind it calls it what it is — not "Eagle"
+    expect(screen.getByText('Hole in One')).toBeTruthy()
   })
 
   it('toggles between modern and classic views mid-round', () => {

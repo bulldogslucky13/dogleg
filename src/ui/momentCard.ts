@@ -19,6 +19,8 @@ export type MomentCardProps = {
   dateKey: string
   toPar: number
   character?: CharacterId
+  /** current day streak; joins the meta line when it's 2+ (a brag, not a shrug) */
+  streak?: number
 }
 
 // logical design size (2x'd for export so the PNG stays crisp when shared)
@@ -139,8 +141,9 @@ export async function momentCardBlob(props: MomentCardProps): Promise<Blob> {
   softShadow()
   ctx.fillStyle = 'rgba(248, 244, 233, 0.92)'
   centered(14, 600)
+  const streak = props.streak && props.streak >= 2 ? ` · ${props.streak}-day streak` : ''
   ctx.fillText(
-    `Hole ${props.holeNumber} · ${toParLabel(props.toPar)} on the round · ${shortDate(props.dateKey)}`,
+    `Hole ${props.holeNumber} · ${toParLabel(props.toPar)} on the round · ${shortDate(props.dateKey)}${streak}`,
     W / 2,
     metaY,
     W - 48,

@@ -83,6 +83,7 @@ export function HomeScreen(props: {
           <span>Best to par</span>
         </div>
       </div>
+      <StreakNote />
       {records.length > 0 && (
         <div className="char-records">
           {records.map((r) => {
@@ -157,6 +158,21 @@ export function HomeScreen(props: {
   )
 }
 
+/** The fortune disclosure, wherever the current streak is shown. Flavor
+ * only, by design: the mechanic is disclosed, the math stays under the
+ * hood — never print the multiplier or the ramp. */
+function StreakNote() {
+  // honest by design: the boost only applies to streaks the referee can
+  // verify — dailies posted under a clubhouse name. Anonymous local streaks
+  // don't move the odds (anti-cheat), so the copy says so.
+  return (
+    <p className="fine streak-note">
+      The golf gods reward the faithful — post your daily cards under a clubhouse name, and the longer your streak,
+      the better your odds of striking a Fortune.
+    </p>
+  )
+}
+
 /** The home page's quiet handicap line. Hidden entirely until the handicap
  * is established — the empty state lives in the locker, not here. */
 function HandicapChip(props: { onTap: () => void }) {
@@ -228,7 +244,7 @@ export function ResultScreen(props: {
   const streaks = computeStreaks(props.history)
   const broke = toPar < 0
   const char = characterById(props.character)
-  const text = shareText(props.setup, results, toPar, props.character)
+  const text = shareText(props.setup, results, toPar, props.character, streaks.dayStreak)
   // a replay link IS the round: seed + decisions, re-run by the viewer's engine
   const replayUrl = (() => {
     if (!props.boardRound) return null
@@ -346,20 +362,23 @@ export function ResultScreen(props: {
       )}
       {props.boardRound && <ScoreBoard round={props.boardRound} />}
       {!props.practice && (
-        <div className="stats-row">
-          <div className="stat">
-            <b>{streaks.dayStreak}</b>
-            <span>Day streak</span>
+        <>
+          <div className="stats-row">
+            <div className="stat">
+              <b>{streaks.dayStreak}</b>
+              <span>Day streak</span>
+            </div>
+            <div className="stat">
+              <b>{streaks.played}</b>
+              <span>Rounds</span>
+            </div>
+            <div className="stat">
+              <b>{streaks.brokePar}</b>
+              <span>Broke par</span>
+            </div>
           </div>
-          <div className="stat">
-            <b>{streaks.played}</b>
-            <span>Rounds</span>
-          </div>
-          <div className="stat">
-            <b>{streaks.brokePar}</b>
-            <span>Broke par</span>
-          </div>
-        </div>
+          <StreakNote />
+        </>
       )}
       {!props.practice && (
         <div className="share-block">

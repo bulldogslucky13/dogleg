@@ -22,6 +22,7 @@ export function HomeScreen(props: {
   onShowResult: () => void
   onHowToPlay: () => void
   onMyRounds: () => void
+  onHistorySynced?: (h: HistoryEntry[]) => void
 }) {
   const setup = dailySetup()
   const streaks = computeStreaks(props.history)
@@ -147,7 +148,7 @@ export function HomeScreen(props: {
           🛅 My rounds · locker
         </button>
       )}
-      <AccountPanel />
+      <AccountPanel onHistorySynced={props.onHistorySynced} />
     </div>
   )
 }

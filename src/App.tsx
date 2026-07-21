@@ -15,6 +15,7 @@ import {
   loadRound,
   loadUiMode,
   recordResult,
+  supersededDaily,
   roundToPar,
   saveRound,
   saveUiMode,
@@ -150,6 +151,12 @@ export default function App() {
               : null
           }
           playedToday={playedToday}
+          onHistorySynced={(h) => {
+            setHistory(h)
+            // a synced day supersedes this device's unfinished daily for the
+            // same date — drop it so a refresh can't replay a completed day
+            if (supersededDaily(round, h)) setRound(null)
+          }}
           onTeeOff={() => {
             setPending({ mode: 'daily', setup: dailySetup() })
             setView('pick')

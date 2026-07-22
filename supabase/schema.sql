@@ -187,7 +187,12 @@ $$;
 revoke all on function bump_choice_tallies(text, text, text, smallint[], text[], text[]) from public, anon, authenticated;
 grant execute on function bump_choice_tallies(text, text, text, smallint[], text[], text[]) to service_role;
 
--- Optional retention (needs pg_cron): the client only reads TODAY, so prune
--- anything older than yesterday to keep the table permanently near ~2 days.
--- select cron.schedule('prune-choice-tallies', '17 8 * * *',
---   $$delete from daily_choice_tallies where date_key < to_char((now() at time zone 'utc')::date - 2, 'YYYY-MM-DD')$$);
+-- Retention (pg_cron, enabled on the project 2026-07-22): the client only
+-- reads TODAY's date_key (fetchHoleChoices), so anything older than yesterday
+-- is dead weight — prune daily to keep the table permanently at ~2-3 days
+-- (~600 rows). cron.schedule() by name is an upsert, so re-running this file
+-- updates the job in place instead of duplicating it. The job runs as the
+-- scheduling role (postgres), which owns the table.
+create extension if not exists pg_cron;
+select cron.schedule('prune-choice-tallies', '17 8 * * *',
+  $$delete from public.daily_choice_tallies where date_key < to_char((now() at time zone 'utc')::date - 2, 'YYYY-MM-DD')$$);

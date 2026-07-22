@@ -12,7 +12,7 @@ import {
   type CourseRecord,
   type SubmitResult,
 } from '../lib/leaderboard'
-import { recordWon, type StolenRecord } from '../lib/records'
+import { recordWon } from '../lib/records'
 import { markArchiveRecord, roundToPar, type RoundState } from '../state/store'
 import { courseBySlug } from '../engine/courses'
 import { identifyPlayer, track } from '../lib/analytics'
@@ -32,8 +32,8 @@ export function ScoreBoard(props: { round: RoundState }) {
   const [result, setResult] = useState<SubmitResult | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [board, setBoard] = useState<BoardRow[] | null>(null)
-  /** set when this round took BACK a record that had been stolen from us */
-  const [reclaim, setReclaim] = useState<StolenRecord | null>(null)
+  /** set when this round took the course record — reclaim or fresh break */
+  const [celebrate, setCelebrate] = useState<{ takenFrom: string | null } | null>(null)
   /** the standing record, fetched for unnamed players so beating it can
    * become the claim-a-name moment */
   const [standing, setStanding] = useState<CourseRecord | null>(null)
@@ -67,13 +67,12 @@ export function ScoreBoard(props: { round: RoundState }) {
     let reclaimed = false
     if (r.record?.broken) {
       markArchiveRecord(round.seed) // pin it in the locker forever
-      // ledger: this record is ours now — and if it had been stolen from
-      // us, that's a RECLAIM, which deserves its own moment
+      // ledger: this record is ours now. Every confirmed break gets the
+      // celebration — a reclaim names who it came back from, a fresh break
+      // gets the plain-glory variant.
       const stolen = recordWon(round.courseSlug, r.record.toPar)
-      if (stolen) {
-        setReclaim(stolen)
-        reclaimed = true
-      }
+      reclaimed = !!stolen
+      setCelebrate({ takenFrom: stolen?.by ?? null })
     }
     // the untracked conversion: a round actually WRITTEN to a board. Only
     // count real writes, so the metric isn't inflated by no-op submits:
@@ -154,15 +153,15 @@ export function ScoreBoard(props: { round: RoundState }) {
     const beatsStanding = !player && !result && (!standing || roundToPar(round) < standing.to_par)
     return (
       <div className="board-block">
-        {reclaim && (
+        {celebrate && (
           <RecordSplash
             courseName={courseBySlug(round.courseSlug)?.name ?? round.courseSlug}
             courseSlug={round.courseSlug}
             dateKey={round.dateKey}
             toPar={roundToPar(round)}
             character={round.character}
-            takenFrom={reclaim.by}
-            onClose={() => setReclaim(null)}
+            takenFrom={celebrate.takenFrom ?? undefined}
+            onClose={() => setCelebrate(null)}
           />
         )}
         {rec?.broken && (

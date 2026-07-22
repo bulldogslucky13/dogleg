@@ -85,6 +85,131 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
     expect(screen.getByText(/golf gods reward the faithful/)).toBeTruthy()
   })
 
+  it('a replayable round raises a ghost: stakes on the pick, pace chip through the round', async () => {
+    vi.useFakeTimers()
+    // archive a real store-played round on Pebble Beach — the ghost target
+    const { newRound, applyChoice, advanceHole, archiveRound, roundToPar } = await import('./state/store')
+    const { practiceSetup } = await import('./engine/daily')
+    let s = newRound(practiceSetup('pebble-beach', 'smokeghost'), 'practice', 'dart')
+    let guard = 0
+    while (!s.complete && guard++ < 500) {
+      if (s.hole?.stage === 'done') {
+        s = advanceHole(s)
+        continue
+      }
+      const next = applyChoice(s, 'normal')
+      s = next === s ? applyChoice(s, 'safe') : next
+    }
+    archiveRound(s)
+    const target = roundToPar(s)
+
+    render(<App />)
+    fireEvent.click(screen.getByText(/Play unlimited/))
+    const courseButton = screen
+      .getAllByText('Pebble Beach Links')
+      .map((el) => el.closest('button'))
+      .find((b): b is HTMLButtonElement => b !== null)!
+    fireEvent.click(courseButton)
+
+    // the ghost loads async (record fetch → local fallback) — flush it
+    await act(async () => {})
+    // the tale of the tape names the chase before the tee shot, card included
+    expect(screen.getByText(/The ghost: your best round here/)).toBeTruthy()
+    expect(document.querySelector('.ghost-grid')).not.toBeNull()
+    fireEvent.click(screen.getByText(CHARACTERS[0].name))
+    await act(async () => {})
+
+    // pace chip is up from the first tee (chasing state before any hole closes)
+    expect(screen.getByText(/chasing your best/)).toBeTruthy()
+
+    // play hole 1 to completion — the chip flips to a live pace comparison
+    for (let g = 0; g < 30; g++) {
+      if (screen.queryByText('Next hole') || screen.queryByText('Sign the card')) break
+      const splash = screen.queryByText('HOLE IN ONE') ?? screen.queryByText('ALBATROSS')
+      if (splash) {
+        act(() => {
+          vi.advanceTimersByTime(5100)
+        })
+        fireEvent.click(splash)
+        continue
+      }
+      const card = document.querySelector<HTMLButtonElement>('button.choice')!
+      fireEvent.click(card)
+      fireEvent.click(card)
+      act(() => {
+        vi.advanceTimersByTime(1500)
+      })
+    }
+    expect(screen.getByText(/vs your best|even with your best/)).toBeTruthy()
+    void target // (the exact diff depends on live dice — presence is the contract)
+  })
+
+  it('the ghost ball renders faded on the map, and never when it overlaps the live ball', async () => {
+    const { HoleMap } = await import('./ui/HoleMap')
+    const { buildLayout } = await import('./engine/layout')
+    const { COURSES } = await import('./engine/courses')
+    const layout = buildLayout(COURSES[0].slug, COURSES[0].holes[0])
+    const ball = { pos: 150, lie: 'fairway' as const, side: 'center' as const }
+    const { rerender } = render(
+      <HoleMap
+        layout={layout}
+        ball={ball}
+        ghostBall={{ pos: 240, lie: 'fairway', side: 'left' }}
+        previewWindow={null}
+        previewApproach={null}
+        previewChoice={null}
+      />,
+    )
+    expect(document.querySelector('circle.ghost-ball')).not.toBeNull()
+    // identical position → the ghost yields to the live ball
+    rerender(
+      <HoleMap
+        layout={layout}
+        ball={ball}
+        ghostBall={{ ...ball }}
+        previewWindow={null}
+        previewApproach={null}
+        previewChoice={null}
+      />,
+    )
+    expect(document.querySelector('circle.ghost-ball')).toBeNull()
+  })
+
+  it('reduced motion drops the ghost ball but keeps the pace tracker', async () => {
+    // scoped by hand — vi.unstubAllGlobals would also tear down the file-wide
+    // ResizeObserver stub and break every later map render
+    ;(window as unknown as { matchMedia: unknown }).matchMedia = () => ({ matches: true })
+    const { newRound, applyChoice, advanceHole, archiveRound } = await import('./state/store')
+    const { practiceSetup } = await import('./engine/daily')
+    let s = newRound(practiceSetup('pebble-beach', 'smokeghost-rm'), 'practice', 'dart')
+    let guard = 0
+    while (!s.complete && guard++ < 500) {
+      if (s.hole?.stage === 'done') {
+        s = advanceHole(s)
+        continue
+      }
+      const next = applyChoice(s, 'normal')
+      s = next === s ? applyChoice(s, 'safe') : next
+    }
+    archiveRound(s)
+
+    render(<App />)
+    fireEvent.click(screen.getByText(/Play unlimited/))
+    const courseButton = screen
+      .getAllByText('Pebble Beach Links')
+      .map((el) => el.closest('button'))
+      .find((b): b is HTMLButtonElement => b !== null)!
+    fireEvent.click(courseButton)
+    await act(async () => {})
+    fireEvent.click(screen.getByText(CHARACTERS[0].name))
+    await act(async () => {})
+
+    // the pace tracker (the feature) stays; the ghost ball (theater) is gone
+    expect(screen.getByText(/chasing/)).toBeTruthy()
+    expect(document.querySelector('circle.ghost-ball')).toBeNull()
+    delete (window as unknown as { matchMedia?: unknown }).matchMedia
+  })
+
   it('a stolen record raises the rivalry card; Win it back tees up that course with the chase chip', () => {
     localStorage.setItem(
       'dogleg:records:v1',

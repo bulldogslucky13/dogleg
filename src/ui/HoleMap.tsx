@@ -296,6 +296,9 @@ export function HoleMap(props: {
   /** extra bottom room to reserve, in px, when a taller overlay (e.g. the
    * signature pill) sits over the tee */
   bottomInset?: number
+  /** the record-round ghost's ball for this hole/shot — faded, ambient,
+   * never reconciled with the live ball (pace race, not an overlay) */
+  ghostBall?: BallState | null
 }) {
   const { layout, ball } = props
   const fr = cameraFrame(props.size ?? null, props.bottomInset ?? 0)
@@ -326,26 +329,32 @@ export function HoleMap(props: {
     return groves
   }, [layout])
 
-  // ---- ball position (truth-anchored) ----
-  const ballPt: Pt = (() => {
-    if (ball.lie === 'green') return greenPt
-    const anchored = ball.zoneId ? places.get(ball.zoneId) : null
+  // ---- ball position (truth-anchored) — shared by the live ball and the
+  // record-round ghost, so both sit on the same geometry ----
+  const placeBall = (b: BallState): Pt => {
+    if (b.lie === 'green') return greenPt
+    const anchored = b.zoneId ? places.get(b.zoneId) : null
     if (anchored) return { x: anchored.anchor.x, y: anchored.anchor.y - 2 }
-    if (ball.pos > L) {
+    if (b.pos > L) {
       // across the green — long side
-      const sideX = ball.side === 'left' ? -1 : ball.side === 'right' ? 1 : 0.6
+      const sideX = b.side === 'left' ? -1 : b.side === 'right' ? 1 : 0.6
       return { x: greenPt.x + sideX * greenRx * 0.5, y: greenPt.y - greenRy - 4 * uPerYd }
     }
-    if ((ball.lie === 'fringe' || ball.lie === 'sand') && ball.pos > L - 42) {
+    if ((b.lie === 'fringe' || b.lie === 'sand') && b.pos > L - 42) {
       // greenside but not in a mapped zone: sit just off the green edge
-      const sideX = ball.side === 'left' ? -1 : 1
+      const sideX = b.side === 'left' ? -1 : 1
       return { x: greenPt.x + sideX * (greenRx + 4 * uPerYd), y: greenPt.y + greenRy * 0.45 }
     }
-    const offYd = (ball.side === 'left' ? 1 : ball.side === 'right' ? -1 : 0) * (ball.lie === 'rough' || ball.lie === 'trees' ? 20 : 10)
-    const bn = normalAt(Math.min(ball.pos, L - 1))
-    const p = at(ball.pos)
+    const offYd = (b.side === 'left' ? 1 : b.side === 'right' ? -1 : 0) * (b.lie === 'rough' || b.lie === 'trees' ? 20 : 10)
+    const bn = normalAt(Math.min(b.pos, L - 1))
+    const p = at(b.pos)
     return { x: p.x + bn.x * offYd * uPerYd, y: p.y + bn.y * offYd * uPerYd }
-  })()
+  }
+  const ballPt: Pt = placeBall(ball)
+  // the ghost never competes with the live ball: skip it when the two would
+  // overlap, and render it under everything the player reads for decisions
+  const ghostPt: Pt | null = props.ghostBall ? placeBall(props.ghostBall) : null
+  const ghostVisible = ghostPt && Math.hypot(ghostPt.x - ballPt.x, ghostPt.y - ballPt.y) > 8
 
   // ---- zones ----
   const zoneEls = layout.zones.map((z) => {
@@ -576,6 +585,23 @@ export function HoleMap(props: {
         </g>
       )}
 
+      {/* the record round's ghost — atmosphere, drawn under the live ball.
+          Divergence from the player's ball is expected and never reconciled:
+          the pace chip is the truth, this is the record-setter walking the
+          course on their own luck. */}
+      {ghostVisible && ghostPt && (
+        <circle
+          className="ghost-ball"
+          cx={ghostPt.x}
+          cy={ghostPt.y}
+          r={ballR * 0.9}
+          fill="#f4efe3"
+          stroke="#26301f"
+          strokeWidth={1.2}
+          strokeDasharray="2 2"
+          opacity={0.45}
+        />
+      )}
       {/* ball */}
       {ball.lie !== 'green' && ball.pos > 0 && (
         <g className="ballwrap">

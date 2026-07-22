@@ -29,6 +29,7 @@ import {
   type UiMode,
 } from './state/store'
 import { absorbHistory, logRound } from './state/stats'
+import { ghostBallAt, ghostNoun, loadGhost, paceLabel, paceVs, type Ghost } from './state/ghost'
 import { chasing } from './lib/records'
 import { identifyPlayer, track } from './lib/analytics'
 import { clubhouseLine, fetchHoleChoices, groupChoices, type TallyRow } from './lib/decisionStats'
@@ -184,6 +185,37 @@ export default function App() {
   const playedToday = history.find((e) => e.dateKey === localDateKey()) ?? null
 
   const hole = useMemo(() => (round && !round.complete && round.hole ? holeInPlay(round) : null), [round])
+
+  // The ghost: loaded once per unlimited round — one fetch for the true
+  // record round (the referee keeps what it verified), falling back to the
+  // player's own best; then two replay passes, milliseconds. Kept through
+  // the result screen so the final margin can be told. Purely derived;
+  // never touches the live rng.
+  const [ghost, setGhost] = useState<Ghost | null>(null)
+  useEffect(() => {
+    if (round?.mode !== 'practice') {
+      setGhost(null)
+      return
+    }
+    let live = true
+    // drop the previous attempt's ghost before the new one loads — otherwise
+    // a slow or null-returning fetch lets the old course's pace chip, ball,
+    // and early-hole comparisons render against the new round
+    setGhost(null)
+    void loadGhost(round.courseSlug, round.seed).then((g) => {
+      if (live) setGhost(g)
+    })
+    return () => {
+      live = false
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [round?.seed])
+  // reduced motion drops the ghost ball (theater) but keeps the pace tracker
+  // (the feature); jsdom has no matchMedia, hence the guard
+  const reducedMotion = useMemo(
+    () => typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+    [],
+  )
 
   // Clubhouse cast (Layer 1): a deterministic sim of the game's regular
   // characters playing today's course, surfaced choices-only in the post-hole
@@ -393,6 +425,11 @@ export default function App() {
         recap={recapSource ? buildRecap(recapSource) : null}
         grade={grade}
         boardRound={recapSource}
+        ghostClose={
+          isPractice && round && ghost
+            ? { margin: roundToPar(round) - ghost.toPar, kind: ghost.kind, holder: ghost.holder }
+            : null
+        }
         character={isPractice && round ? round.character : entry?.character}
         history={history}
         onHome={() => setView('home')}
@@ -560,7 +597,24 @@ export default function App() {
         <div className="hole-right">
           <div className={`topar ${toPar < 0 ? 'good' : toPar > 0 ? 'bad' : ''}`}>{toParLabel(toPar)} to par</div>
           <div className="yards">{hole.layout.length} yards</div>
-          {chase && <div className="chase-chip">🎯 Record {toParLabel(chase.theirToPar)} · {chase.by}</div>}
+          {ghost &&
+            (() => {
+              const pace = paceVs(ghost, round.scores, round.courseSlug)
+              return (
+                <div className={`pace-chip ${pace.state}`}>
+                  👻{' '}
+                  {pace.holesCompared === 0
+                    ? `chasing ${ghostNoun(ghost)} · ${toParLabel(ghost.toPar)}`
+                    : paceLabel(pace, ghost)}
+                </div>
+              )
+            })()}
+          {/* the stolen record stays on the wall unless the ghost IS that record —
+              a personal-best fallback ghost races "your best", so the real target
+              (holder + score) must stay visible for a "win it back" attempt */}
+          {chase && (!ghost || ghost.kind === 'personal') && (
+            <div className="chase-chip">🎯 Record {toParLabel(chase.theirToPar)} · {chase.by}</div>
+          )}
         </div>
       </header>
 
@@ -573,6 +627,9 @@ export default function App() {
           <HoleMap
             layout={hole.layout}
             ball={hole.ball}
+            ghostBall={
+              ghost && !reducedMotion ? ghostBallAt(ghost, round.currentHole, hole.shots.length) : null
+            }
             previewWindow={previewWindow}
             previewApproach={previewApproach}
             previewChoice={selected}

@@ -2637,6 +2637,81 @@ button {
   }
 }
 
+/* ---------- play rating badge + explainer ---------- */
+
+/* tappable variant of a chip: inherits .chip / .chip.dark, adds the affordance */
+.rating-chip {
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.rating-chip-info {
+  font-size: 0.82em;
+  opacity: 0.7;
+}
+
+.rating-chip:hover .rating-chip-info,
+.rating-chip:focus-visible .rating-chip-info {
+  opacity: 1;
+}
+
+.rating-card .tut-body.rating-body {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.rating-scale {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 8px;
+  background: var(--cream-dim);
+}
+
+.rating-scale-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 3px 8px;
+  border-radius: 7px;
+  font-size: 0.82rem;
+}
+
+.rating-scale-row.on {
+  background: rgba(201, 162, 39, 0.18);
+  font-weight: 800;
+}
+
+.rating-scale-n {
+  min-width: 1.4em;
+  text-align: center;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.rating-scale-cut {
+  color: rgba(29, 43, 32, 0.72);
+  font-variant-numeric: tabular-nums;
+}
+
+.rating-scale-row.on .rating-scale-cut {
+  color: inherit;
+}
+
+.rating-foot {
+  font-size: 0.86rem;
+  color: rgba(29, 43, 32, 0.66);
+}
+
 /* ---------- characters ---------- */
 
 .screen.pick {

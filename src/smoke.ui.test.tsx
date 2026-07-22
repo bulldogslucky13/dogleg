@@ -43,6 +43,20 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
     expect(screen.getByText('How to play')).toBeTruthy()
   })
 
+  it('the Play Rating badge opens and closes its methodology explainer', () => {
+    render(<App />)
+    // today-card shows the tappable Play Rating chip
+    const badge = screen.getByRole('button', { name: /Play Rating \d+\/10/ })
+    fireEvent.click(badge)
+    // modal explains the simulation-derived rating
+    expect(screen.getByRole('dialog', { name: /Play Rating/i })).toBeTruthy()
+    expect(screen.getByText(/how hard this course plays/i)).toBeTruthy()
+    expect(screen.getByText(/simulate/i)).toBeTruthy()
+    // dismisses cleanly
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }))
+    expect(screen.queryByRole('dialog', { name: /Play Rating/i })).toBeNull()
+  })
+
   it('shows the tutorial to a first-time visitor', () => {
     localStorage.removeItem('dogleg:tutorial:v1')
     render(<App />)

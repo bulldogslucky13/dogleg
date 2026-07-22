@@ -85,6 +85,49 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
     expect(screen.getByText(/golf gods reward the faithful/)).toBeTruthy()
   })
 
+  it('the Par 3 tab shows its one-time intro, lists the shorts, and tees one up', async () => {
+    render(<App />)
+    fireEvent.click(screen.getByText(/Play unlimited/))
+    // default tab is the championship rotation — the shorts stay out of sight
+    expect(screen.queryByText('Cobblestone Creek')).toBeNull()
+
+    fireEvent.click(screen.getByText('Par 3 Courses'))
+    // first visit: the how-the-shorts-play explainer, dismissed once, gone for good
+    expect(screen.getByText(/Nothing but one-shotters/)).toBeTruthy()
+    fireEvent.click(screen.getByText(/Got it/))
+    expect(screen.queryByText(/Nothing but one-shotters/)).toBeNull()
+
+    // all three shorts, with their real hole counts on the row
+    expect(screen.getByText('Cobblestone Creek')).toBeTruthy()
+    expect(screen.getByText('PGA Frisco — The Swing')).toBeTruthy()
+    expect(screen.getByText('Palm Beach Par 3')).toBeTruthy()
+    expect(screen.getByText(/9 holes/)).toBeTruthy()
+    expect(screen.getByText(/10 holes/)).toBeTruthy()
+
+    // flipping back and forth doesn't resurrect the intro
+    fireEvent.click(screen.getByText('Courses'))
+    expect(screen.getByText('Pebble Beach Links')).toBeTruthy()
+    fireEvent.click(screen.getByText('Par 3 Courses'))
+    expect(screen.queryByText(/Nothing but one-shotters/)).toBeNull()
+
+    // tee up a short course: pick screen → first tee of hole 1
+    const courseButton = screen
+      .getAllByText('Palm Beach Par 3')
+      .map((el) => el.closest('button'))
+      .find((b): b is HTMLButtonElement => b !== null)!
+    fireEvent.click(courseButton)
+    await act(async () => {})
+    // the Fairway Finder sits out the shorts (his edge is the driver) —
+    // only the Dart Thrower and Greens Keeper are pickable
+    expect(screen.queryByText('Fairway Finder')).toBeNull()
+    expect(screen.getByText('Dart Thrower')).toBeTruthy()
+    expect(screen.getByText('Greens Keeper')).toBeTruthy()
+    fireEvent.click(screen.getByText(CHARACTERS[1].name))
+    await act(async () => {})
+    // a par-3 course round is live: the map header shows the practice tag
+    expect(screen.getAllByText(/Palm Beach Par 3/).length).toBeGreaterThan(0)
+  })
+
   it('a replayable round raises a ghost: stakes on the pick, pace chip through the round', async () => {
     vi.useFakeTimers()
     // archive a real store-played round on Pebble Beach — the ghost target

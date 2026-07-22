@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { CHARACTERS, characterById } from '../engine/characters'
-import { courseBySlug, COURSES, playRatingFor } from '../engine/courses'
+import { courseBySlug, COURSES, PAR3_COURSES, playRatingFor } from '../engine/courses'
 import { dailySetup, forecastSetup, RESULT_LABEL, RESULT_SQUARE, shareText, SITE_URL, toParLabel, type DailySetup } from '../engine/daily'
 import { gradeCopy, type RoundGrade } from '../engine/grade'
 import { decisionsFromScores, encodeReplay } from '../engine/replay'
@@ -35,6 +35,7 @@ export function HomeScreen(props: {
   const streaks = computeStreaks(props.history)
   const records = characterRecords(props.history)
   const [showCourses, setShowCourses] = useState(false)
+  const [courseTab, setCourseTab] = useState<'courses' | 'par3'>('courses')
   const [courseRecs, setCourseRecs] = useState<Map<string, CourseRecord> | null>(null)
   const [steals, setSteals] = useState(() => pendingSteals())
 
@@ -158,11 +159,33 @@ export function HomeScreen(props: {
       </button>
       {showCourses && (
         <div className="course-list">
-          {COURSES.map((c) => (
+          <div className="course-tabs" role="tablist" aria-label="Course type">
+            <button
+              role="tab"
+              aria-selected={courseTab === 'courses'}
+              className={`course-tab${courseTab === 'courses' ? ' active' : ''}`}
+              onClick={() => setCourseTab('courses')}
+            >
+              Courses
+            </button>
+            <button
+              role="tab"
+              aria-selected={courseTab === 'par3'}
+              className={`course-tab${courseTab === 'par3' ? ' active' : ''}`}
+              onClick={() => {
+                setCourseTab('par3')
+                track('course_tab_selected', { tab: 'par3' })
+              }}
+            >
+              Par 3 Courses
+            </button>
+          </div>
+          {courseTab === 'par3' && <Par3Intro />}
+          {(courseTab === 'par3' ? PAR3_COURSES : COURSES).map((c) => (
             <button key={c.slug} className="course-row" onClick={() => props.onPractice(c.slug)}>
               <b>{c.name}</b>
               <span>
-                {c.location} · Play Rating {playRatingFor(c.slug)}/10
+                {c.location} · {c.holes.length} holes · Play Rating {playRatingFor(c.slug)}/10
               </span>
               {courseRecs?.get(c.slug) && (
                 <em className="course-cr">
@@ -183,6 +206,61 @@ export function HomeScreen(props: {
       )}
       <HandicapChip onTap={props.onStats} />
       <AccountPanel onHistorySynced={props.onHistorySynced} />
+    </div>
+  )
+}
+
+const PAR3_INTRO_KEY = 'dogleg:par3intro:v1'
+
+/**
+ * First visit to the Par 3 tab: a one-time explainer for how the shorts play
+ * differently. Dismiss persists; storage-blocked browsers just see it again.
+ */
+function Par3Intro() {
+  const [seen, setSeen] = useState(() => {
+    try {
+      return localStorage.getItem(PAR3_INTRO_KEY) === '1'
+    } catch {
+      return false
+    }
+  })
+  if (seen) return null
+  return (
+    <div className="par3-intro" role="note">
+      <div className="kicker">⛳ New: par-3 courses</div>
+      <p>
+        <b>Nothing but one-shotters</b> — real short courses at their real length (9, 10, or 18
+        holes), straight off the club's scorecard.
+      </p>
+      <ul>
+        <li>
+          <b>The flag matters.</b> A sucker pin pays the hunt and punishes the miss; a friendly flag
+          is green light. Watch the tee chips.
+        </li>
+        <li>
+          <b>The wind swirls.</b> Gusts change hole to hole out here — check before you pick a line.
+        </li>
+        <li>
+          <b>Deuces are the badge.</b> Twos get counted on your recap.
+        </li>
+        <li>
+          <b>Aces are earned, never owed.</b> Out here a hole-in-one is pure odds — no guaranteed
+          moment, and these rounds don't move your countdown on the big courses.
+        </li>
+      </ul>
+      <button
+        className="cta ghost slim"
+        onClick={() => {
+          try {
+            localStorage.setItem(PAR3_INTRO_KEY, '1')
+          } catch {
+            /* storage blocked: show it again next time */
+          }
+          setSeen(true)
+        }}
+      >
+        Got it — show me the tees
+      </button>
     </div>
   )
 }
@@ -348,7 +426,7 @@ export function CharacterPickScreen(props: {
           {props.practice ? 'Practice round' : "Today's round"} · {course.name}
         </div>
         <h2 className="pick-title">Pick your player</h2>
-        <p className="tagline">One edge, all 18 holes. Choose for the course in front of you:</p>
+        <p className="tagline">One edge, all {course.holes.length} holes. Choose for the course in front of you:</p>
       </header>
       {props.practice && <GhostStakes courseSlug={course.slug} />}
       <div className="chips center">
@@ -358,7 +436,10 @@ export function CharacterPickScreen(props: {
         <PlayRatingChip slug={course.slug} />
       </div>
       <div className="char-cards">
-        {CHARACTERS.map((c) => (
+        {/* the Fairway Finder's whole edge is the driver, and a par-3 short
+         * course never lets him unsheathe it — a zero-edge pick would be a
+         * trap, so he sits these out. */}
+        {CHARACTERS.filter((c) => !(course.par3Course && c.id === 'fairway')).map((c) => (
           <button key={c.id} className={`char-card ${c.id}`} onClick={() => props.onPick(c.id)}>
             <CharacterAvatar id={c.id} size={84} />
             <b>{c.name}</b>
@@ -367,6 +448,7 @@ export function CharacterPickScreen(props: {
           </button>
         ))}
       </div>
+      {course.par3Course && <p className="fine">The Fairway Finder sat this one out — no drivers on a par-3 course.</p>}
       <p className="fine">Your player shifts the real odds — you'll see it in every bar.</p>
     </div>
   )
@@ -514,6 +596,12 @@ export function ResultScreen(props: {
               </>
             )}
           </div>
+          {props.recap.deuces !== null && (
+            <div className="stat">
+              <b>{props.recap.deuces}</b>
+              <span>Deuce{props.recap.deuces === 1 ? '' : 's'}</span>
+            </div>
+          )}
           <div className="stat">
             <b>{props.recap.aggressiveUsed}/8</b>
             <span>Aggressive used</span>

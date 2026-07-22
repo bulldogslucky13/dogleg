@@ -35,12 +35,33 @@ export interface CourseSpec {
   wind: number
   blurb: string
   holes: HoleSpec[]
+  /** true = a par-3 short course: unlimited play only, never in the daily
+   * rotation, and fortune (destiny + ace-odds boosts) stays out of it. May
+   * have fewer than 18 holes — round length follows `holes.length`. */
+  par3Course?: boolean
+}
+
+/**
+ * Where the flag sits on a par 3. A per-round, seed-derived slice of the
+ * conditions: the tier drives the odds (hunting a tucked pin pays better and
+ * punishes harder; an open pin is green-light), the side is for the map and
+ * copy. Never on par 4s/5s — approach variety there comes from position.
+ */
+export interface PinPosition {
+  tier: 'open' | 'middle' | 'tucked'
+  side: 'left' | 'center' | 'right'
 }
 
 export interface Conditions {
   wind: number
   greens: Greens
   difficulty: number
+  /** par-3 hole number → today's pin. Absent on pre-pin saves: those rounds
+   * play (and replay) with no pin modifier, exactly as they were dealt. */
+  pins?: Record<number, PinPosition>
+  /** hole number → wind delta (mph) on top of `wind`. Par-3 short courses
+   * only — the shorts lean into the weather, hole by hole. */
+  gusts?: Record<number, number>
 }
 
 // ---------- Geometry ----------
@@ -67,6 +88,10 @@ export interface HoleLayout {
   fairwayTo: number
   /** green depth in yards (front edge = length - greenDepth/2) */
   greenDepth: number
+  /** today's flag on a par 3, when the round's conditions carry one */
+  pin?: PinPosition
+  /** this hole's wind delta (mph) on a par-3 short course, from Conditions.gusts */
+  gust?: number
 }
 
 // ---------- Ball / stage state ----------

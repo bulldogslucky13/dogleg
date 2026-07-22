@@ -12,6 +12,15 @@
  * sanctioned exception to "the odds never lie", chosen to keep the moment a
  * total surprise. Everything else here (the small probability boosts) flows
  * through the honest odds like any other number.
+ *
+ * Par-3 short courses (CourseSpec.par3Course) are OUTSIDE fortune entirely:
+ * no destiny, no per-shot boosts, and their rounds don't move the drought
+ * counters (see destinyPlan/fortuneOddsFor in replay.ts and
+ * updateFortuneAfterRound in the store). With 9-18 ace chances per round,
+ * any of those hooks would turn the shorts into an ace farm. Aces there ride
+ * the base HOLEOUT.par3Tee odds alone — simulated per-round ace chance lands
+ * at ~1-in-70 (aggressive, 18 holes) through ~1-in-380 (safe, 9 holes),
+ * rare enough to stay special, common enough to actually happen.
  */
 export const FORTUNE_CONFIG = {
   practice: {

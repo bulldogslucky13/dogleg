@@ -1,5 +1,5 @@
 import { characterById } from './characters'
-import { COURSES } from './courses'
+import { COURSES, courseBySlug } from './courses'
 import { fnv1a, rngFromString } from './rng'
 import type { CharacterId, Conditions, CourseSpec, Greens, HoleResult } from './types'
 
@@ -53,16 +53,37 @@ function jitteredConditions(rngKey: string, course: CourseSpec, windSpan: number
   const wind = Math.max(3, Math.round(course.wind + (rng() - 0.5) * windSpan))
   const greens = GREEN_BUMP[course.greens][Math.floor(rng() * 3)]
   const difficulty = Math.max(1, Math.min(10, Math.round(course.difficulty + (rng() - 0.5) * diffSpan)))
-  return { wind, greens, difficulty }
+  // Pin draws come AFTER the classic three, so every pre-pin seed keeps the
+  // exact wind/greens/difficulty it always had — only par 3s grow a flag.
+  const pins: Conditions['pins'] = {}
+  for (const h of course.holes) {
+    if (h.par !== 3) continue
+    const tierRoll = rng()
+    const sideRoll = rng()
+    pins[h.number] = {
+      tier: tierRoll < 0.3 ? 'open' : tierRoll < 0.7 ? 'middle' : 'tucked',
+      side: sideRoll < 0.4 ? 'left' : sideRoll < 0.6 ? 'center' : 'right',
+    }
+  }
+  const cond: Conditions = { wind, greens, difficulty, pins }
+  if (course.par3Course) {
+    // The shorts lean into the weather: a per-hole gust rides on the base
+    // wind, mostly a puff, occasionally a real blast, sometimes a lull.
+    const gusts: Conditions['gusts'] = {}
+    for (const h of course.holes) gusts[h.number] = Math.round((rng() - 0.3) * 10)
+    cond.gusts = gusts
+  }
+  return cond
 }
 
 export function dailyConditions(dateKey: string, course: CourseSpec): Conditions {
   return jitteredConditions(`daily:${dateKey}:${course.slug}`, course, 10, 2)
 }
 
-/** For practice the round seed itself is the conditions key. */
+/** For practice the round seed itself is the conditions key. Par-3 shorts
+ * draw from a gustier band — wind is half their personality. */
 export function practiceConditions(seed: string, course: CourseSpec): Conditions {
-  return jitteredConditions(seed, course, 12, 3)
+  return jitteredConditions(seed, course, course.par3Course ? 18 : 12, 3)
 }
 
 /**
@@ -110,7 +131,8 @@ export function forecastSetup(now = new Date()): DailySetup {
 }
 
 export function practiceSetup(slug: string, seedExtra: string): DailySetup {
-  const course = COURSES.find((c) => c.slug === slug) ?? COURSES[0]
+  // courseBySlug spans the par-3 shorts too — anything playable can be practiced
+  const course = courseBySlug(slug) ?? COURSES[0]
   const seed = `practice:${slug}:${seedExtra}`
   return {
     course,
@@ -162,7 +184,7 @@ export function shareText(
   streak?: number,
 ): string {
   const rows: string[] = []
-  for (let i = 0; i < 18; i += 9) {
+  for (let i = 0; i < results.length; i += 9) {
     rows.push(results.slice(i, i + 9).map((r) => RESULT_SQUARE[r]).join(''))
   }
   const par = setup.course.holes.reduce((s, h) => s + h.par, 0)
@@ -175,8 +197,7 @@ export function shareText(
     `${setup.course.name} (Par ${par})`,
     `${par + toPar} (${toParLabel(toPar)})${streakTag(streak)}`,
     '',
-    rows[0],
-    rows[1],
+    ...rows,
     ...(char ? [`${char.emoji} ${char.name}`] : []),
     '',
     `🐦 ${birdies}  ·  ⛳ ${pars}  ·  😬 ${overs}`,

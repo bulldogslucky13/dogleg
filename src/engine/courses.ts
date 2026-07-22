@@ -1444,12 +1444,111 @@ export const COURSES: CourseSpec[] = [
   },
 ]
 
+/**
+ * Par-3 short courses — unlimited play only, never part of the daily rotation
+ * (the rotation is COURSES order; adding here can't shift anyone's daily).
+ * Hole yardages and handicap ranks come straight from each club's published
+ * scorecard (longest tees; where a card lists two yardages the longer plays).
+ * Real courses keep real hole counts: 9, 10, and 18-hole rounds all work.
+ *
+ * Stroke indexes are the scorecard's handicap RANKS spread over 1-18 (rank r
+ * of n holes → si ≈ 1 + (r-1)·17/(n-1)), because the pressure model reads
+ * strokeIndex on a 1-18 scale — a 9-hole card's raw 1-9 ranks would make the
+ * whole course read as one long gauntlet.
+ */
+export const PAR3_COURSES: CourseSpec[] = [
+  {
+    slug: 'cobblestone-creek',
+    name: 'Cobblestone Creek',
+    location: 'Norman, Oklahoma',
+    difficulty: 4,
+    greens: 'Medium',
+    wind: 12,
+    blurb: 'Nine one-shotters on the Oklahoma plains — two of them 225-yard brutes.',
+    par3Course: true,
+    holes: holes([
+      // black tees, 1479 yards — scorecard ranks 7,8,4,1,6,5,2,9,3;
+      // hazards follow the OSM-imported geometry (see geometry.ts)
+      [3, 176, 13, 'S', 'sand'],
+      [3, 150, 15, 'S', 'sand'],
+      [3, 168, 7, 'S', 'sand'],
+      [3, 225, 1, 'S', 'water', 'All of 225 yards, creek crossing mid-flight — the longest short hole in town'],
+      [3, 108, 11, 'S', 'none'],
+      [3, 150, 9, 'S', 'water'],
+      [3, 185, 3, 'S', 'sand'],
+      [3, 92, 17, 'S', 'sand'],
+      [3, 225, 5, 'S', 'sand'],
+    ]),
+  },
+  {
+    slug: 'the-swing',
+    name: 'PGA Frisco — The Swing',
+    location: 'Frisco, Texas',
+    difficulty: 2,
+    greens: 'Fast',
+    wind: 9,
+    blurb: 'Ten wedges under the Frisco lights — bunkers everywhere, excuses nowhere.',
+    par3Course: true,
+    holes: holes([
+      // 770 yards over ten holes — ranks derived from yardage (card lists none)
+      [3, 75, 10, 'S', 'sand'],
+      [3, 77, 5, 'S', 'sand'],
+      [3, 88, 3, 'S', 'sand'],
+      [3, 70, 14, 'S', 'sand'],
+      [3, 103, 1, 'S', 'sand', 'The long one — a full swing at last, sand all around'],
+      [3, 77, 7, 'S', 'none'],
+      [3, 69, 16, 'S', 'sand'],
+      [3, 71, 12, 'S', 'sand'],
+      [3, 64, 18, 'S', 'none'],
+      [3, 76, 9, 'S', 'sand'],
+    ]),
+  },
+  {
+    slug: 'palm-beach-par-3',
+    name: 'Palm Beach Par 3',
+    location: 'Palm Beach, Florida',
+    difficulty: 4,
+    greens: 'Medium',
+    wind: 14,
+    blurb: 'Eighteen postcard par 3s squeezed between the Atlantic and the Intracoastal.',
+    par3Course: true,
+    holes: holes([
+      // black tees, 2572 yards — dual-yardage holes play the longer number;
+      // hazards follow the OSM-imported geometry: the Atlantic rides 4-8,
+      // lakes flank the openers and the run home
+      [3, 167, 7, 'S', 'water'],
+      [3, 126, 13, 'S', 'water'],
+      [3, 196, 3, 'S', 'water'],
+      [3, 211, 1, 'S', 'ocean', 'The card says 211 — carry the water with the Atlantic hard on your left'],
+      [3, 176, 5, 'S', 'ocean'],
+      [3, 128, 11, 'S', 'ocean'],
+      [3, 108, 15, 'S', 'ocean', 'A flip wedge with the Atlantic breathing down your right'],
+      [3, 133, 9, 'S', 'ocean'],
+      [3, 81, 17, 'S', 'sand'],
+      [3, 112, 18, 'S', 'sand'],
+      [3, 108, 16, 'S', 'sand'],
+      [3, 126, 12, 'S', 'sand'],
+      [3, 171, 6, 'S', 'sand'],
+      [3, 129, 10, 'S', 'sand'],
+      [3, 156, 4, 'S', 'water'],
+      [3, 117, 14, 'S', 'water'],
+      [3, 148, 8, 'S', 'water'],
+      [3, 179, 2, 'S', 'water'],
+    ]),
+  },
+]
+
+/** Every playable course: the daily-rotation library plus the par-3 courses. */
+export const ALL_COURSES: CourseSpec[] = [...COURSES, ...PAR3_COURSES]
+
 // Reconcile hole yardage with imported OSM geometry: where a hole has real
 // geography, its measured length is the single source of truth, so the tuple's
 // yardage (a hand estimate) is snapped to it. Keeps the header, scorecard,
 // course total, and map all agreeing. Automatic — freezing a hole into
 // geometry.ts is the whole process; nothing here needs hand-editing.
-for (const course of COURSES) {
+// (Par-3 course geometry is authored the other way around — zones normalized
+// to the published scorecard yardage — so this snap is a no-op there.)
+for (const course of ALL_COURSES) {
   for (const hole of course.holes) {
     const geo = OSM_GEOMETRY[`${course.slug}:${hole.number}`]
     if (geo) hole.yards = geo.length
@@ -1457,7 +1556,7 @@ for (const course of COURSES) {
 }
 
 export function courseBySlug(slug: string): CourseSpec | undefined {
-  return COURSES.find((c) => c.slug === slug)
+  return ALL_COURSES.find((c) => c.slug === slug)
 }
 
 /**

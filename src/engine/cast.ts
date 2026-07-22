@@ -84,9 +84,9 @@ function simulateCharacter(characterId: CharacterId, course: CourseSpec, cond: C
   const policy = CAST_POLICIES[characterId]
   let budgetLeft = AGGRESSIVE_BUDGET
   const holes: CastShot[][] = []
-  for (let i = 0; i < 18; i++) {
+  for (let i = 0; i < course.holes.length; i++) {
     const spec = course.holes[i]
-    const layout = buildLayout(course.slug, spec)
+    const layout = buildLayout(course.slug, spec, cond)
     const h = startHole(layout, cond, characterId) // no fortuneOdds: honest, dice-only sim
     const shots: CastShot[] = []
     while (h.stage !== 'done') {
@@ -100,13 +100,18 @@ function simulateCharacter(characterId: CharacterId, course: CourseSpec, cond: C
   return { characterId, holes }
 }
 
-/** Simulate the whole cast's 18-hole rounds for one day's course+conditions.
+/** Simulate the whole cast's rounds for one day's course+conditions.
  * Pure and deterministic: same setup in, same choices out, always. */
 export function castRound(setup: CastSetup): CastResult {
   // defensive strip — a daily/practice seed shouldn't carry a fortune tail by
   // the time it gets here, but the cast must never let one leak into the dice
   const base = splitFortune(setup.seed).base
-  return CHARACTERS.map((c) => simulateCharacter(c.id, setup.course, setup.cond, base))
+  // The Fairway Finder sits out the par-3 shorts as an NPC too: his whole
+  // personality (and his edge) is the driver, and the pick screen already
+  // benches him there — a cast line for a player you can't be would read
+  // as a bug, not a rival.
+  const roster = CHARACTERS.filter((c) => !(setup.course.par3Course && c.id === 'fairway'))
+  return roster.map((c) => simulateCharacter(c.id, setup.course, setup.cond, base))
 }
 
 const CHOICE_VERB: Record<Choice, string> = {
@@ -141,10 +146,17 @@ export function castLinesForHole(cast: CastResult, holeIndex: number): string[] 
     const spec = CHARACTERS.find((c) => c.id === entry.characterId)!
     const shots = entry.holes[holeIndex]
     const headline = shots[0]
-    const wentAgainLater = headline.choice !== 'aggressive' && shots.slice(1).some((s) => s.choice === 'aggressive')
     const verb = CHOICE_VERB[headline.choice]
     const suffix = stageSuffix(headline.stage)
-    const flavor = wentAgainLater ? ' — then went flag-hunting again before the hole was out' : ''
+    // Flavor names what actually happened after the opener — a charged putt
+    // is not "flag-hunting", and "again" only fits if the opener attacked too.
+    const laterAgg = shots.slice(1).filter((s) => s.choice === 'aggressive')
+    let flavor = ''
+    if (headline.choice !== 'aggressive' && laterAgg.length > 0) {
+      flavor = laterAgg.every((s) => s.stage === 'putt')
+        ? ' — then charged the putt'
+        : ' — then went flag-hunting before the hole was out'
+    }
     return `${spec.emoji} ${spec.name} ${verb} ${suffix}${flavor}.`
   })
 }

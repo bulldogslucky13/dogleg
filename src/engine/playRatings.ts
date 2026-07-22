@@ -75,6 +75,9 @@ export const PLAY_RATINGS: Record<string, number> = {
   'muirfield-village': 10,
   'old-wick-links': 2,
   'chambers-bay': 7,
+  'cobblestone-creek': 5,
+  'the-swing': 1,
+  'palm-beach-par-3': 8,
 }
 
 /** avg score-to-par measured per course, kept for the methodology disclaimer. */
@@ -128,4 +131,7 @@ export const PLAY_INDEX: Record<string, number> = {
   'muirfield-village': 3.076,
   'old-wick-links': -0.451,
   'chambers-bay': 1.503,
+  'cobblestone-creek': 0.798,
+  'the-swing': -1.132,
+  'palm-beach-par-3': 1.957,
 }

@@ -14,11 +14,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { track } from './lib/analytics'
 import { castLinesForHole, castRound } from './engine/cast'
 import { CHARACTERS } from './engine/characters'
-import { COURSES, courseBySlug, playRatingFor } from './engine/courses'
+import { COURSES, PAR3_COURSES, courseBySlug, playRatingFor } from './engine/courses'
 import { PLAY_RATINGS } from './engine/playRatings'
-import { dailySetup, forecastSetup, practiceSetup, shareText, type DailySetup } from './engine/daily'
+import { courseForPuzzle, dailySetup, forecastSetup, practiceSetup, shareText, type DailySetup } from './engine/daily'
 import { gradeCopy, gradeRound } from './engine/grade'
-import { setupFromSeed } from './engine/replay'
+import { decisionsFromScores, destinyPlan, fortuneOddsFor, replayRound, setupFromSeed } from './engine/replay'
+import { approachOdds } from './engine/odds'
+import { pinChip } from './engine/resolve'
 import { buildLayout } from './engine/layout'
 import type { Choice } from './engine/types'
 import {
@@ -66,10 +68,11 @@ const aggressivePolicy = (s: RoundState): Choice => {
 
 function expectCompleteAndSane(s: RoundState): void {
   expect(s.complete).toBe(true)
-  expect(s.scores).toHaveLength(18)
-  expect(s.scores.every((sc) => sc !== null)).toBe(true)
   const course = courseBySlug(s.courseSlug)!
-  for (let i = 0; i < 18; i++) {
+  // round length is the course's real hole count (par-3 shorts run 9/10)
+  expect(s.scores).toHaveLength(course.holes.length)
+  expect(s.scores.every((sc) => sc !== null)).toBe(true)
+  for (let i = 0; i < course.holes.length; i++) {
     const sc = s.scores[i]!
     // 1..(par+5): the engine caps blowups well before double digits
     expect(sc.strokes).toBeGreaterThanOrEqual(1)
@@ -106,6 +109,135 @@ describe('smoke: every course is playable start to finish', () => {
   })
 })
 
+describe('smoke: par-3 short courses play start to finish at their real length', () => {
+  it('completes a full round on every par-3 course (9-, 10-, and 18-hole)', () => {
+    PAR3_COURSES.forEach((course, i) => {
+      const character = CHARACTERS[i % CHARACTERS.length].id
+      const setup = practiceSetup(course.slug, 'smoke-par3')
+      const done = playRound(newRound(setup, 'practice', character), normalPolicy)
+      expectCompleteAndSane(done)
+      expect(done.scores).toHaveLength(course.holes.length)
+      expect(course.holes.every((h) => h.par === 3)).toBe(true)
+    })
+  })
+
+  it('validates by replay at its real hole count (the referee path)', () => {
+    for (const course of PAR3_COURSES) {
+      const setup = practiceSetup(course.slug, 'smoke-par3-replay')
+      const done = playRound(newRound(setup, 'practice', 'dart'), normalPolicy)
+      const decisions = decisionsFromScores(done.scores)
+      expect(decisions).not.toBeNull()
+      const replay = replayRound(done.seed, 'dart', decisions!)
+      expect(replay.ok).toBe(true)
+      if (replay.ok) expect(replay.toPar).toBe(roundToPar(done))
+    }
+  })
+
+  it('never enters the daily rotation', () => {
+    for (let n = 1; n <= 2 * COURSES.length; n++) {
+      expect(courseForPuzzle(n).par3Course).toBeUndefined()
+    }
+  })
+
+  it('fortune stays out of the shorts: no destiny, no boosts — even with a monster drought', () => {
+    // counters far past every practice threshold: a normal course would owe destiny…
+    const bigCourse = setupFromSeed('practice:pebble-beach:x:f5000.0.5000.0.0')!
+    expect(destinyPlan(bigCourse)).toEqual({ ace: true, albatross: true })
+    expect(fortuneOddsFor(bigCourse)).toBeDefined()
+    // …but a par-3 short never pays it, and never boosts the per-shot odds
+    for (const course of PAR3_COURSES) {
+      const info = setupFromSeed(`practice:${course.slug}:x:f5000.0.5000.0.0`)!
+      expect(destinyPlan(info)).toEqual({ ace: false, albatross: false })
+      expect(fortuneOddsFor(info)).toBeUndefined()
+    }
+  })
+
+  it('conditions carry pins for every par 3 and gusts only on the shorts', () => {
+    // shorts: every hole has a pin and a gust, both deterministic per seed
+    for (const course of PAR3_COURSES) {
+      const cond = practiceSetup(course.slug, 'smoke-cond').cond
+      const again = practiceSetup(course.slug, 'smoke-cond').cond
+      expect(again).toEqual(cond)
+      for (const h of course.holes) {
+        expect(cond.pins?.[h.number]).toBeDefined()
+        expect(typeof cond.gusts?.[h.number]).toBe('number')
+      }
+    }
+    // rotation courses: pins on par 3s only, never gusts
+    const daily = dailySetup().cond
+    const course = dailySetup().course
+    for (const h of course.holes) {
+      if (h.par === 3) expect(daily.pins?.[h.number]).toBeDefined()
+      else expect(daily.pins?.[h.number]).toBeUndefined()
+    }
+    expect(daily.gusts).toBeUndefined()
+  })
+
+  it('a finished short-course round counts its deuces; big courses stay null', () => {
+    const done = playRound(newRound(practiceSetup('the-swing', 'smoke-deuce'), 'practice', 'dart'), normalPolicy)
+    const recap = buildRecap(done)!
+    const expected = done.scores.filter((s) => s?.strokes === 2).length
+    expect(recap.deuces).toBe(expected)
+    const big = playRound(newRound(practiceSetup('pebble-beach', 'smoke-deuce'), 'practice', 'dart'), normalPolicy)
+    expect(buildRecap(big)!.deuces).toBeNull()
+  })
+})
+
+describe('smoke: pin positions are an honest risk/reward axis on par-3 tees', () => {
+  const spec = { number: 1, par: 3, yards: 150, strokeIndex: 9, dogleg: 'S', hazard: 'sand' } as const
+  const cond = { wind: 10, greens: 'Medium', difficulty: 5 } as const
+  const ball = { pos: 0, lie: 'tee', side: 'center' } as const
+
+  function oddsWithPin(tier: 'open' | 'middle' | 'tucked', choice: 'safe' | 'normal' | 'aggressive') {
+    const pinned = { ...cond, pins: { 1: { tier, side: 'center' as const } } }
+    const layout = buildLayout('pin-smoke', { ...spec }, pinned)
+    expect(layout.pin?.tier).toBe(tier)
+    return approachOdds(layout, pinned, { ...ball }, choice, 'par3tee').odds
+  }
+
+  it('every pin tier still sums to 1 for every choice', () => {
+    for (const tier of ['open', 'middle', 'tucked'] as const) {
+      for (const choice of ['safe', 'normal', 'aggressive'] as const) {
+        const o = oddsWithPin(tier, choice)
+        const total = o.holeout + o.kickin + o.makeable + o.lag + o.fringe + o.sand + o.water
+        expect(total).toBeCloseTo(1, 6)
+      }
+    }
+  })
+
+  it('a tucked pin pays the hunt and shelters the bail; holeout (ace) odds never move', () => {
+    const aggTucked = oddsWithPin('tucked', 'aggressive')
+    const aggMiddle = oddsWithPin('middle', 'aggressive')
+    const safeTucked = oddsWithPin('tucked', 'safe')
+    const safeMiddle = oddsWithPin('middle', 'safe')
+    // hunting a tucked flag: closer looks AND more trouble
+    expect(aggTucked.kickin).toBeGreaterThan(aggMiddle.kickin)
+    expect(aggTucked.fringe + aggTucked.sand + aggTucked.water).toBeGreaterThan(
+      aggMiddle.fringe + aggMiddle.sand + aggMiddle.water,
+    )
+    // bailing to the fat side: fewer looks, safer miss profile
+    expect(safeTucked.kickin).toBeLessThan(safeMiddle.kickin)
+    expect(safeTucked.fringe + safeTucked.sand + safeTucked.water).toBeLessThanOrEqual(
+      safeMiddle.fringe + safeMiddle.sand + safeMiddle.water + 1e-9,
+    )
+    // the ace math is pin-proof (the par-3 course tuning depends on this)
+    expect(aggTucked.holeout).toBeCloseTo(aggMiddle.holeout, 10)
+  })
+
+  it('the pin-framing chip names the flag and the trouble around it', () => {
+    // this procedural sand par 3 grows greenside bunkers on three sides
+    // (deterministic layout seed), so the tucked-left flag reads as surrounded
+    const pinned = { ...cond, pins: { 1: { tier: 'tucked' as const, side: 'left' as const } } }
+    const layout = buildLayout('pin-smoke', { ...spec }, pinned)
+    expect(pinChip(layout)).toBe('Sucker pin left · trouble all around')
+    // same flag with trouble only on its own side: the short-side warning
+    const oneSide = { ...layout, zones: layout.zones.filter((z) => z.side === 'left') }
+    expect(pinChip(oneSide)).toBe('Sucker pin left · short-sided')
+    // no pin (par 4s, pre-pin saves): nothing to say
+    expect(pinChip(buildLayout('pin-smoke', { ...spec }))).toBeNull()
+  })
+})
+
 describe('smoke: the daily is valid and deterministic for every course in rotation', () => {
   it('produces a sane, stable setup for each of the next 49 days', () => {
     // one day per course: the rotation is COURSES[(n - 1) % COURSES.length]
@@ -127,7 +259,7 @@ describe('smoke: the daily is valid and deterministic for every course in rotati
     // The badge reads playRatingFor(slug); the generated table must cover every
     // course in the rotation, and the value must be a sane 1..10. This is the
     // display-only rating, kept separate from the engine's `difficulty` knob.
-    for (const c of COURSES) {
+    for (const c of [...COURSES, ...PAR3_COURSES]) {
       expect(PLAY_RATINGS, `missing Play Rating for ${c.slug} — run pnpm gen:ratings`).toHaveProperty(c.slug)
       const r = playRatingFor(c.slug)
       expect(Number.isInteger(r)).toBe(true)
@@ -323,6 +455,25 @@ describe('smoke: the clubhouse cast is deterministic, choices-only, for every co
       }
     }
   })
+
+  it('benches the Fairway Finder on par-3 courses and keeps the lines honest', () => {
+    for (const course of PAR3_COURSES) {
+      const setup = practiceSetup(course.slug, 'smoke-cast-par3')
+      const cast = castRound({ course, cond: setup.cond, seed: setup.seed })
+      // same roster the pick screen offers: dart + greens, no zero-edge NPC
+      expect(cast.map((c) => c.characterId)).toEqual(['dart', 'greens'])
+      for (let h = 0; h < course.holes.length; h++) {
+        const lines = castLinesForHole(cast, h)
+        expect(lines).toHaveLength(2)
+        for (const line of lines) {
+          expect(line).not.toContain('Fairway Finder')
+          // a charged putt is never described as flag-hunting, and the opener
+          // on a one-shotter is always the shot into the green
+          expect(line).not.toContain('flag-hunting again')
+        }
+      }
+    }
+  })
 })
 
 describe('smoke: a finished round produces its result artifacts', () => {
@@ -400,7 +551,7 @@ describe('smoke: signature flavor + island geometry decoupling', () => {
   })
 
   it('every signature is well-formed and on-tone (no dice/odds talk)', () => {
-    const withSig = COURSES.flatMap((c) => c.holes.filter((h) => h.signature))
+    const withSig = [...COURSES, ...PAR3_COURSES].flatMap((c) => c.holes.filter((h) => h.signature))
     expect(withSig.length).toBeGreaterThan(20)
     for (const h of withSig) {
       expect(h.signature!.length).toBeGreaterThan(4)

@@ -4,7 +4,7 @@ import { castLinesForHole, castRound } from './engine/cast'
 import { courseBySlug } from './engine/courses'
 import { dailySetup, localDateKey, practiceSetup, toParLabel, type DailySetup } from './engine/daily'
 import { longOdds } from './engine/odds'
-import { LOOK_LABEL, madePuttLook, oddsFor } from './engine/resolve'
+import { LOOK_LABEL, madePuttLook, oddsFor, pinChip } from './engine/resolve'
 import type { ApproachOdds, CharacterAdvantage, CharacterId, Choice } from './engine/types'
 import {
   advanceHole,
@@ -589,7 +589,10 @@ export default function App() {
               <span className="chip">
                 {course.name} · {modeTag}
               </span>
-              <span className="chip">{round.cond.wind} mph</span>
+              <span className="chip">
+                {round.cond.wind + (hole.layout.gust ?? 0)} mph
+                {(hole.layout.gust ?? 0) >= 4 ? ' · gusting' : (hole.layout.gust ?? 0) <= -3 ? ' · a lull' : ''}
+              </span>
               <span className="chip">{round.cond.greens.toLowerCase()} greens</span>
             </div>
           </div>
@@ -620,7 +623,7 @@ export default function App() {
 
       <div ref={mapRef} className={`map-wrap${classic && hole.stage !== 'putt' ? ' side' : ''}`}>
         {hole.stage === 'putt' ? (
-          <GreenView feet={hole.ball.puttFeet ?? 20} holeNumber={spec.number} greens={round.cond.greens} size={mapSize} />
+          <GreenView feet={hole.ball.puttFeet ?? 20} holeNumber={spec.number} greens={round.cond.greens} pin={hole.layout.pin} size={mapSize} />
         ) : classic ? (
           <SideMap layout={hole.layout} ball={hole.ball} />
         ) : (
@@ -662,6 +665,7 @@ export default function App() {
                   {LOOK_LABEL[madePuttLook(hole.strokes, spec.par)].chip} · ~{hole.ball.puttFeet} ft
                 </span>
                 <span className="chip">{round.cond.greens} green</span>
+                {pinChip(hole.layout) && <span className="chip">{pinChip(hole.layout)}</span>}
               </div>
             ) : (
               // wind/greens/hazards live on the map at every stage — the hole
@@ -678,7 +682,7 @@ export default function App() {
             score={hole.score!}
             par={spec.par}
             runningToPar={toPar}
-            last={round.currentHole >= 17}
+            last={round.currentHole >= course.holes.length - 1}
             onNext={next}
             castLines={cast ? castLinesForHole(cast, round.currentHole) : undefined}
             clubhouseTally={clubhouseTally ?? undefined}

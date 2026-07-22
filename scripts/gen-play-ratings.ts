@@ -42,7 +42,9 @@ registerHooks({
 // imports must be reached via `await import` from inside the running body.
 import type { Choice, Conditions } from '../src/engine/types.ts'
 import type { HoleInPlay } from '../src/engine/resolve.ts'
-const { COURSES } = await import('../src/engine/courses.ts')
+const { COURSES, PAR3_COURSES } = await import('../src/engine/courses.ts')
+// rate everything playable — the par-3 shorts get a display rating too
+const RATED = [...COURSES, ...PAR3_COURSES]
 const { buildLayout } = await import('../src/engine/layout.ts')
 const { oddsFor, playShot, startHole } = await import('../src/engine/resolve.ts')
 const { rngFromString } = await import('../src/engine/rng.ts')
@@ -92,12 +94,12 @@ const smart: Policy = (h, aggLeft) => {
 }
 
 function simRound(courseIdx: number, cond: Conditions, seed: string): number {
-  const course = COURSES[courseIdx]
+  const course = RATED[courseIdx]
   const rng = rngFromString(seed)
   let toPar = 0
   let aggLeft = 8
   for (const spec of course.holes) {
-    const layout = buildLayout(course.slug, spec)
+    const layout = buildLayout(course.slug, spec, cond)
     const h = startHole(layout, cond)
     let guard = 0
     while (h.stage !== 'done' && guard++ < 20) {
@@ -119,7 +121,7 @@ function simRound(courseIdx: number, cond: Conditions, seed: string): number {
  * the same mean.
  */
 function playIndex(courseIdx: number): number {
-  const course = COURSES[courseIdx]
+  const course = RATED[courseIdx]
   const cond: Conditions = { wind: course.wind, greens: course.greens, difficulty: course.difficulty }
   let total = 0
   for (let i = 0; i < N; i++) total += simRound(courseIdx, cond, `playrating:${course.slug}:${i}`)
@@ -134,7 +136,7 @@ interface Row {
   rating: number
 }
 
-const rows: Row[] = COURSES.map((c, i) => {
+const rows: Row[] = RATED.map((c, i) => {
   const index = playIndex(i)
   return { slug: c.slug, name: c.name, difficulty: c.difficulty, index, rating: ratingFromIndex(index) }
 })
@@ -142,7 +144,7 @@ const rows: Row[] = COURSES.map((c, i) => {
 // Print the ranked table (hardest first) so a human can sanity-check.
 const ranked = [...rows].sort((a, b) => b.index - a.index)
 // eslint-disable-next-line no-console
-console.log(`\nPlay Rating — ${COURSES.length} courses, N=${N}/course, smart policy\n`)
+console.log(`\nPlay Rating — ${RATED.length} courses, N=${N}/course, smart policy\n`)
 ranked.forEach((r, i) => {
   const delta = r.rating - r.difficulty
   const flag = Math.abs(delta) >= 2 ? `  <-- was difficulty ${r.difficulty} (${delta > 0 ? '+' : ''}${delta})` : ''
@@ -161,11 +163,11 @@ if (process.argv.includes('--print')) {
 }
 
 // Emit the generated module (slugs in COURSES order for a stable diff).
-const ratingsEntries = COURSES.map((c) => {
+const ratingsEntries = RATED.map((c) => {
   const r = rows.find((x) => x.slug === c.slug)!
   return `  '${c.slug}': ${r.rating},`
 }).join('\n')
-const indexEntries = COURSES.map((c) => {
+const indexEntries = RATED.map((c) => {
   const r = rows.find((x) => x.slug === c.slug)!
   return `  '${c.slug}': ${r.index.toFixed(3)},`
 }).join('\n')

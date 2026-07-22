@@ -1655,6 +1655,61 @@ button {
   white-space: nowrap;
 }
 
+/* ghost pace — the ahead/behind state is the emotional core: color + sign,
+   legible at a glance, one chip, no crowding */
+.pace-chip {
+  margin-top: 5px;
+  display: inline-block;
+  border-radius: 999px;
+  padding: 3px 10px;
+  font-size: 0.68rem;
+  font-weight: 800;
+  white-space: nowrap;
+  border: 1px solid var(--line);
+  background: var(--cream-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.pace-chip.ahead {
+  background: #dcecd4;
+  border-color: rgba(78, 138, 72, 0.5);
+  color: #2e6329;
+}
+
+.pace-chip.behind {
+  background: rgba(192, 91, 77, 0.12);
+  border-color: rgba(192, 91, 77, 0.45);
+  color: #9c3f33;
+}
+
+/* the pre-round stakes strip: quick, names the chase, never delays the tee */
+.ghost-stakes {
+  border: 1.5px dashed var(--line);
+  border-radius: 12px;
+  padding: 9px 12px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-align: center;
+  color: rgba(29, 43, 32, 0.75);
+}
+
+.ghost-stakes.cr {
+  border-color: rgba(201, 162, 39, 0.6);
+  background: rgba(201, 162, 39, 0.08);
+}
+
+.ghost-close {
+  font-weight: 700;
+}
+
+/* the ghost ball is atmosphere — reduced motion drops it entirely (the pace
+   chip stays: that's the feature) */
+@media (prefers-reduced-motion: reduce) {
+  .ghost-ball {
+    display: none;
+  }
+}
+
 /* record reclaimed: the fortune splash's little sibling */
 .record-splash-backdrop {
   position: fixed;

@@ -9,6 +9,7 @@ import { track } from '../lib/analytics'
 import { backendEnabled } from '../lib/backend'
 import { fetchCourseRecords, loadPlayer, type CourseRecord } from '../lib/leaderboard'
 import { dismissSteals, pendingSteals, syncLedger, type StolenRecord } from '../lib/records'
+import type { GhostTarget } from '../state/ghost'
 import { currentHandicap, formatHandicap } from '../state/stats'
 import { characterRecords, computeStreaks, loadArchive, type HistoryEntry, type RoundRecap, type RoundState } from '../state/store'
 import { AccountPanel } from './AccountPanel'
@@ -275,6 +276,8 @@ function HandicapChip(props: { onTap: () => void }) {
 export function CharacterPickScreen(props: {
   setup: DailySetup
   practice: boolean
+  /** the round being chased in unlimited play, when one is replayable */
+  ghost?: GhostTarget | null
   onPick: (c: CharacterId) => void
   onBack: () => void
 }) {
@@ -291,6 +294,14 @@ export function CharacterPickScreen(props: {
         <h2 className="pick-title">Pick your player</h2>
         <p className="tagline">One edge, all 18 holes. Choose for the course in front of you:</p>
       </header>
+      {props.ghost && (
+        <div className={`ghost-stakes${props.ghost.isCourseRecord ? ' cr' : ''}`}>
+          👻{' '}
+          {props.ghost.isCourseRecord
+            ? `The ghost is your course record — ${toParLabel(props.ghost.toPar)}. Defend the pace.`
+            : `The ghost is your best here — ${toParLabel(props.ghost.toPar)}. Race it.`}
+        </div>
+      )}
       <div className="chips center">
         <span className="chip">{course.holes.reduce((s, h) => s + h.yards, 0).toLocaleString()} yards</span>
         <span className="chip">Wind {cond.wind} mph</span>
@@ -323,6 +334,8 @@ export function ResultScreen(props: {
   grade: RoundGrade | null
   /** the finished round, when it's still in storage — enables board submission */
   boardRound: RoundState | null
+  /** the ghost race's quiet close: final margin vs the chased round */
+  ghostClose?: { margin: number; isCourseRecord: boolean } | null
   history: HistoryEntry[]
   onHome: () => void
   onPracticeAgain: () => void
@@ -412,6 +425,18 @@ export function ResultScreen(props: {
               ? 'The course won today — barely.'
               : 'The course won today.'}
       </p>
+      {props.ghostClose && props.ghostClose.margin > 0 && (
+        <p className="fine ghost-close">
+          👻 {props.ghostClose.margin} off {props.ghostClose.isCourseRecord ? 'the record' : 'your best'} — so
+          close, again. The ghost will be waiting.
+        </p>
+      )}
+      {props.ghostClose && props.ghostClose.margin === 0 && (
+        <p className="fine ghost-close">
+          👻 Matched {props.ghostClose.isCourseRecord ? 'the record' : 'your best'} to the stroke — ties don't take
+          it. One better.
+        </p>
+      )}
       <div className="emoji-grid">
         <div>{results.slice(0, 9).map((r, i) => (
           <span key={i}>{RESULT_SQUARE[r]}</span>

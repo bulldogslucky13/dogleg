@@ -9,19 +9,20 @@ import { toParLabel } from '../engine/daily'
  * Distinct from the daily Wind/Greens conditions, which vary day to day — the
  * Play Rating is a stable property of the course itself.
  */
-export function PlayRatingChip(props: { slug: string; dark?: boolean }) {
+export function PlayRatingChip(props: { slug: string; dark?: boolean; className?: string; suffix?: string }) {
   const [open, setOpen] = useState(false)
   const rating = playRatingFor(props.slug)
   return (
     <>
       <button
         type="button"
-        className={`chip rating-chip${props.dark ? ' dark' : ''}`}
+        className={`chip rating-chip${props.dark ? ' dark' : ''}${props.className ? ` ${props.className}` : ''}`}
         onClick={() => setOpen(true)}
         aria-haspopup="dialog"
         title="How is Play Rating calculated?"
       >
-        Play Rating {rating}/10<span className="rating-chip-info" aria-hidden>ⓘ</span>
+        Play Rating {rating}/10{props.suffix ? ` ${props.suffix}` : ''}
+        <span className="rating-chip-info" aria-hidden>ⓘ</span>
       </button>
       {open && <PlayRatingModal slug={props.slug} onClose={() => setOpen(false)} />}
     </>

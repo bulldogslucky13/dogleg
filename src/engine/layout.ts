@@ -1,4 +1,4 @@
-import type { HazardZone, HoleLayout, HoleSpec } from './types'
+import type { Conditions, HazardZone, HoleLayout, HoleSpec } from './types'
 import { rngFromString } from './rng'
 import { OSM_GEOMETRY } from './geometry'
 
@@ -9,8 +9,14 @@ import { OSM_GEOMETRY } from './geometry'
  *
  * Real OSM-imported geometry (`geometry.ts`) wins when present; otherwise the
  * layout is synthesized procedurally from par/yards/dogleg/hazard below.
+ *
+ * `cond` is optional round context: when the round's conditions carry a pin
+ * for this hole (par 3s only), it rides on the layout so the odds engine and
+ * the map read the same flag. Geometry itself never varies with conditions.
  */
-export function buildLayout(courseSlug: string, spec: HoleSpec): HoleLayout {
+export function buildLayout(courseSlug: string, spec: HoleSpec, cond?: Conditions): HoleLayout {
+  const pin = spec.par === 3 ? cond?.pins?.[spec.number] : undefined
+  const gust = cond?.gusts?.[spec.number]
   const real = OSM_GEOMETRY[`${courseSlug}:${spec.number}`]
   if (real) {
     return {
@@ -20,6 +26,8 @@ export function buildLayout(courseSlug: string, spec: HoleSpec): HoleLayout {
       fairwayFrom: real.fairwayFrom,
       fairwayTo: real.fairwayTo,
       greenDepth: real.greenDepth,
+      pin,
+      gust,
     }
   }
 
@@ -54,7 +62,7 @@ export function buildLayout(courseSlug: string, spec: HoleSpec): HoleLayout {
       add({ kind: 'bunker', from: L - 16, to: L - 2, side: 'right' })
       if (rng() < 0.5) add({ kind: 'bunker', from: L - 34, to: L - 20, side: 'cross' })
     }
-    return { spec, length: L, zones, fairwayFrom: 0, fairwayTo: 0, greenDepth }
+    return { spec, length: L, zones, fairwayFrom: 0, fairwayTo: 0, greenDepth, pin, gust }
   }
 
   // --- par 4 / par 5 ---

@@ -51,6 +51,17 @@ const STEPS: Step[] = [
     ),
   },
   {
+    title: 'Watch the flag',
+    body: (
+      <>
+        On par 3s, the day's <b>pin position</b> is part of the call. A <b>sucker pin</b>{' '}
+        pays the aggressive hunt with closer looks — and punishes the miss harder. A{' '}
+        <b>friendly flag</b> is green light for everyone. The chips at the tee tell you
+        which one you're facing, and the odds bar always tells the truth about it.
+      </>
+    ),
+  },
+  {
     title: 'Pick your player',
     body: (
       <>

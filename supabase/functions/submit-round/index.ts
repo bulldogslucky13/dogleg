@@ -9,7 +9,16 @@
 //
 // deno-lint-ignore-file no-explicit-any
 import { createClient } from 'npm:@supabase/supabase-js@2'
-import { FORTUNE_CONFIG, choiceRowsFromReplay, courseBySlug, dailySalt, destinyDue, replayRound, seasonForDate } from './engine.mjs'
+import {
+  FORTUNE_CONFIG,
+  choiceRowsFromReplay,
+  courseBySlug,
+  dailySalt,
+  destinyDue,
+  fortuneEligible,
+  replayRound,
+  seasonForDate,
+} from './engine.mjs'
 import { buildStealEmail, sendViaResend } from './email.ts'
 
 const CORS = {
@@ -83,7 +92,11 @@ Deno.serve(async (req) => {
   // gift, not a record-worthy score. Practice records only accept rounds
   // whose tail is below every destiny threshold; the round itself still
   // played fine on the client, it just doesn't claim the CR.
-  if (info.mode === 'practice' && info.fortune) {
+  // Fortune-ineligible courses (par-3 shorts) never fire destiny regardless
+  // of the tail — the engine ignores fortune there entirely — so a due tail
+  // on such a seed is inert, not a forged gift. (Current clients omit the
+  // tail on those courses; this guard also accepts any that still carry one.)
+  if (info.mode === 'practice' && info.fortune && fortuneEligible(info.course)) {
     const due = destinyDue('practice', info.fortune)
     if (due.ace || due.albatross) {
       return json(422, { error: 'destined rounds do not contend for course records' })

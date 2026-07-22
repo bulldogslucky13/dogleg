@@ -438,10 +438,10 @@ function deltaForShot(shot: ShotRecord): number {
 // ---------------------------------------------------------------------------
 
 export function gradeRound(input: GradeInput): RoundGrade | null {
-  if (!input || !Array.isArray(input.scores) || input.scores.length !== 18) return null
+  if (!input || !Array.isArray(input.scores)) return null
   if (input.scores.some((s) => !s || !Array.isArray(s.shots) || s.shots.length === 0)) return null
   const course = courseBySlug(input.courseSlug)
-  if (!course) return null
+  if (!course || input.scores.length !== course.holes.length) return null
 
   const info = setupFromSeed(input.seed)
   const fOdds = info ? fortuneOddsFor(info) : undefined
@@ -457,9 +457,9 @@ export function gradeRound(input: GradeInput): RoundGrade | null {
   let expectedBestToPar = 0
   let actualToPar = 0
 
-  for (let h = 0; h < 18; h++) {
+  for (let h = 0; h < course.holes.length; h++) {
     const spec = course.holes[h]
-    const layout = buildLayout(course.slug, spec)
+    const layout = buildLayout(course.slug, spec, cond)
     const score = input.scores[h]!
     const shots = score.shots
     const n = shots.length

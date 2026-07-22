@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { CHARACTERS, characterById } from '../engine/characters'
-import { courseBySlug, COURSES, playRatingFor } from '../engine/courses'
+import { characterById, playableCharacters } from '../engine/characters'
+import { courseBySlug, COURSES, PAR3_COURSES, playRatingFor } from '../engine/courses'
 import { dailySetup, forecastSetup, RESULT_LABEL, RESULT_SQUARE, shareText, SITE_URL, toParLabel, type DailySetup } from '../engine/daily'
 import { gradeCopy, type RoundGrade } from '../engine/grade'
 import { decisionsFromScores, encodeReplay } from '../engine/replay'
@@ -36,6 +36,7 @@ export function HomeScreen(props: {
   const streaks = computeStreaks(props.history)
   const records = characterRecords(props.history)
   const [showCourses, setShowCourses] = useState(false)
+  const [courseTab, setCourseTab] = useState<'courses' | 'par3'>('courses')
   const [courseRecs, setCourseRecs] = useState<Map<string, CourseRecord> | null>(null)
   const [seasonRecs, setSeasonRecs] = useState<Map<string, CourseRecord> | null>(null)
   const [steals, setSteals] = useState(() => pendingSteals())
@@ -161,41 +162,84 @@ export function HomeScreen(props: {
         </button>
       )}
 
+      {props.playedToday && <ForecastCard today={props.playedToday} />}
+
       <button className="cta ghost" onClick={() => setShowCourses((v) => !v)}>
         Play unlimited · Browse courses
       </button>
       {showCourses && (
         <div className="course-list">
-          <p className="season-countdown">
-            ⏳ {season.name} ends in {seasonCountdown(season)} — season records are up for grabs
-          </p>
-          {COURSES.map((c) => {
-            const sr = seasonRecs?.get(c.slug)
-            const at = courseRecs?.get(c.slug)
-            return (
+          <div className="course-tabs" role="tablist" aria-label="Course type">
+            <button
+              role="tab"
+              aria-selected={courseTab === 'courses'}
+              className={`course-tab${courseTab === 'courses' ? ' active' : ''}`}
+              onClick={() => setCourseTab('courses')}
+            >
+              Courses
+            </button>
+            <button
+              role="tab"
+              aria-selected={courseTab === 'par3'}
+              className={`course-tab${courseTab === 'par3' ? ' active' : ''}`}
+              onClick={() => {
+                setCourseTab('par3')
+                track('course_tab_selected', { tab: 'par3' })
+              }}
+            >
+              Par 3 Courses
+            </button>
+          </div>
+          {courseTab === 'par3' && <Par3Intro />}
+          {courseTab === 'courses' && (
+            <p className="season-countdown">
+              ⏳ {season.name} ends in {seasonCountdown(season)} — season records are up for grabs
+            </p>
+          )}
+          {courseTab === 'courses' &&
+            COURSES.map((c) => {
+              const sr = seasonRecs?.get(c.slug)
+              const at = courseRecs?.get(c.slug)
+              return (
+                <button key={c.slug} className="course-row" onClick={() => props.onPractice(c.slug)}>
+                  <b>{c.name}</b>
+                  <span>
+                    {c.location} · Play Rating {playRatingFor(c.slug)}/10
+                  </span>
+                  {seasonRecs &&
+                    (sr ? (
+                      <em className="course-cr">
+                        Season {toParLabel(sr.to_par)} · {characterById(sr.character ?? undefined)?.emoji ?? ''}{' '}
+                        {sr.player_name}
+                      </em>
+                    ) : (
+                      <em className="course-cr open">Season record open — be the first</em>
+                    ))}
+                  {at && (
+                    <em className="course-cr alltime">
+                      All-time {toParLabel(at.to_par)} · {characterById(at.character ?? undefined)?.emoji ?? ''}{' '}
+                      {at.player_name}
+                    </em>
+                  )}
+                </button>
+              )
+            })}
+          {courseTab === 'par3' &&
+            PAR3_COURSES.map((c) => (
               <button key={c.slug} className="course-row" onClick={() => props.onPractice(c.slug)}>
                 <b>{c.name}</b>
                 <span>
-                  {c.location} · Play Rating {playRatingFor(c.slug)}/10
+                  {c.location} · {c.holes.length} holes · Play Rating {playRatingFor(c.slug)}/10
                 </span>
-                {seasonRecs &&
-                  (sr ? (
-                    <em className="course-cr">
-                      Season {toParLabel(sr.to_par)} · {characterById(sr.character ?? undefined)?.emoji ?? ''}{' '}
-                      {sr.player_name}
-                    </em>
-                  ) : (
-                    <em className="course-cr open">Season record open — be the first</em>
-                  ))}
-                {at && (
-                  <em className="course-cr alltime">
-                    All-time {toParLabel(at.to_par)} · {characterById(at.character ?? undefined)?.emoji ?? ''}{' '}
-                    {at.player_name}
+                {courseRecs?.get(c.slug) && (
+                  <em className="course-cr">
+                    CR {toParLabel(courseRecs.get(c.slug)!.to_par)} ·{' '}
+                    {characterById(courseRecs.get(c.slug)!.character ?? undefined)?.emoji ?? ''}{' '}
+                    {courseRecs.get(c.slug)!.player_name}
                   </em>
                 )}
               </button>
-            )
-          })}
+            ))}
           <p className="fine">Practice rounds don't touch your streak.</p>
         </div>
       )}
@@ -206,6 +250,102 @@ export function HomeScreen(props: {
       )}
       <HandicapChip onTap={props.onStats} />
       <AccountPanel onHistorySynced={props.onHistorySynced} />
+    </div>
+  )
+}
+
+const PAR3_INTRO_KEY = 'dogleg:par3intro:v1'
+
+/**
+ * First visit to the Par 3 tab: a one-time explainer for how the shorts play
+ * differently. Dismiss persists; storage-blocked browsers just see it again.
+ */
+function Par3Intro() {
+  const [seen, setSeen] = useState(() => {
+    try {
+      return localStorage.getItem(PAR3_INTRO_KEY) === '1'
+    } catch {
+      return false
+    }
+  })
+  if (seen) return null
+  return (
+    <div className="par3-intro" role="note">
+      <div className="kicker">⛳ New: par-3 courses</div>
+      <p>
+        <b>Nothing but one-shotters</b> — real short courses at their real length (9, 10, or 18
+        holes), straight off the club's scorecard.
+      </p>
+      <ul>
+        <li>
+          <b>The flag matters.</b> A sucker pin pays the hunt and punishes the miss; a friendly flag
+          is green light. Watch the tee chips.
+        </li>
+        <li>
+          <b>The wind swirls.</b> Gusts change hole to hole out here — check before you pick a line.
+        </li>
+        <li>
+          <b>Every hole is real.</b> Lengths off the club's own scorecard, hazards mapped from
+          satellite imagery — not made up.
+        </li>
+      </ul>
+      <button
+        className="cta ghost slim"
+        onClick={() => {
+          try {
+            localStorage.setItem(PAR3_INTRO_KEY, '1')
+          } catch {
+            /* storage blocked: show it again next time */
+          }
+          setSeen(true)
+        }}
+      >
+        Got it — show me the tees
+      </button>
+    </div>
+  )
+}
+
+/**
+ * Tomorrow's daily, teased in golf-forecast tone — course + conditions only,
+ * never the seed/dateKey/puzzle number or anything outcome-derived. Shown on
+ * the home screen once today's round is in the books, so it reads as "you're
+ * done — here's what's on the tee tomorrow".
+ */
+export function ForecastCard(props: { today: HistoryEntry }) {
+  const forecast = forecastSetup()
+  const windTone =
+    forecast.cond.wind >= 18
+      ? `${forecast.cond.wind} mph gusts`
+      : forecast.cond.wind >= 12
+        ? `${forecast.cond.wind} mph breeze`
+        : `${forecast.cond.wind} mph wind`
+  const windMood = forecast.cond.wind >= 18 ? '💨' : forecast.cond.wind >= 12 ? '🍃' : '☀️'
+  const greensHot = forecast.cond.greens === 'Fast'
+
+  // how tomorrow's Play Rating compares to today's — only call it out when the
+  // swing is real (±2), so the tease isn't noise on an ordinary rotation day.
+  // today's score nudges which emoji lands: a rough day sharpens the harder
+  // read into dread, a hot one softens the easier read into relief.
+  const ratingDelta = playRatingFor(forecast.course.slug) - playRatingFor(props.today.courseSlug)
+  const roughToday = props.today.toPar >= 3
+  const hotToday = props.today.toPar <= -2
+  const outlookEmoji =
+    ratingDelta >= 2 ? (roughToday ? '😩' : '😬') : ratingDelta <= -2 ? (hotToday ? '😮‍💨' : '😅') : undefined
+
+  return (
+    <div className="forecast">
+      <div className="kicker">Tomorrow's forecast</div>
+      <div className="forecast-line">
+        <b>{forecast.course.name}</b>
+        <span className="chips slim">
+          <span className="chip forecast-chip">
+            {windMood} {windTone} · {greensHot ? '⚡ ' : ''}
+            {forecast.cond.greens.toLowerCase()} greens
+          </span>
+          <PlayRatingChip slug={forecast.course.slug} className="forecast-chip" suffix={outlookEmoji} />
+        </span>
+      </div>
     </div>
   )
 }
@@ -371,7 +511,7 @@ export function CharacterPickScreen(props: {
           {props.practice ? 'Practice round' : "Today's round"} · {course.name}
         </div>
         <h2 className="pick-title">Pick your player</h2>
-        <p className="tagline">One edge, all 18 holes. Choose for the course in front of you:</p>
+        <p className="tagline">One edge, all {course.holes.length} holes. Choose for the course in front of you:</p>
       </header>
       {props.practice && <GhostStakes courseSlug={course.slug} />}
       <div className="chips center">
@@ -381,7 +521,10 @@ export function CharacterPickScreen(props: {
         <PlayRatingChip slug={course.slug} />
       </div>
       <div className="char-cards">
-        {CHARACTERS.map((c) => (
+        {/* playableCharacters benches the Fairway Finder on par-3 courses —
+         * his edge is the driver, and a zero-edge pick would be a trap.
+         * Shared with the clubhouse cast (cast.ts) so the two rosters can't drift. */}
+        {playableCharacters(course).map((c) => (
           <button key={c.id} className={`char-card ${c.id}`} onClick={() => props.onPick(c.id)}>
             <CharacterAvatar id={c.id} size={84} />
             <b>{c.name}</b>
@@ -390,6 +533,7 @@ export function CharacterPickScreen(props: {
           </button>
         ))}
       </div>
+      {course.par3Course && <p className="fine">The Fairway Finder sat this one out — no drivers on a par-3 course.</p>}
       <p className="fine">Your player shifts the real odds — you'll see it in every bar.</p>
     </div>
   )
@@ -434,17 +578,6 @@ export function ResultScreen(props: {
     })
     return `https://${SITE_URL}/#watch=${code}`
   })()
-  // tomorrow's daily, teased in golf-forecast tone — course + conditions only,
-  // never the seed/dateKey/puzzle number or anything outcome-derived
-  const forecast = forecastSetup()
-  const windTone =
-    forecast.cond.wind >= 18
-      ? `${forecast.cond.wind} mph gusts`
-      : forecast.cond.wind >= 12
-        ? `${forecast.cond.wind} mph breeze`
-        : `${forecast.cond.wind} mph wind`
-  const windMood = forecast.cond.wind >= 18 ? '💨' : forecast.cond.wind >= 12 ? '🍃' : '☀️'
-  const greensHot = forecast.cond.greens === 'Fast'
   const canNativeShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function'
   const copy = async () => {
     let ok = true
@@ -537,6 +670,12 @@ export function ResultScreen(props: {
               </>
             )}
           </div>
+          {props.recap.deuces !== null && (
+            <div className="stat">
+              <b>{props.recap.deuces}</b>
+              <span>Deuce{props.recap.deuces === 1 ? '' : 's'}</span>
+            </div>
+          )}
           <div className="stat">
             <b>{props.recap.aggressiveUsed}/8</b>
             <span>Aggressive used</span>
@@ -644,21 +783,6 @@ export function ResultScreen(props: {
           {copiedReplay ? 'Replay link copied ✓' : '🎬 Copy replay link — let them watch it'}
         </button>
       )}
-      <div className="forecast">
-        <div className="kicker">Tomorrow's forecast</div>
-        <p className="forecast-line">
-          <b>{forecast.course.name}</b>
-          <span className="chips slim">
-            <span className="chip forecast-chip">
-              {windMood} {windTone}
-            </span>
-            <span className="chip forecast-chip">
-              {greensHot ? '⚡ ' : ''}
-              {forecast.cond.greens.toLowerCase()} greens
-            </span>
-          </span>
-        </p>
-      </div>
       {props.practice && (
         <button className="cta" onClick={props.onPracticeAgain}>
           Play another practice round

@@ -62,6 +62,49 @@ export interface HoleInPlay {
   score?: HoleScore
 }
 
+/** First-tee copy for a par 3's pin, or null when there's nothing to flag. */
+export function pinTeeNote(pin: HoleLayout['pin']): string | null {
+  if (!pin || pin.tier === 'middle') return null
+  const side = pin.side === 'center' ? '' : ` ${pin.side}`
+  if (pin.tier === 'tucked') return `Sucker pin, tucked${side || ' tight'} — hunt it or take the fat of the green.`
+  return `Friendly flag${side} — green light.`
+}
+
+/** Which directions bite a greenside miss — feeds the pin-framing chip. */
+function greensideTrouble(layout: HoleLayout): string[] {
+  const L = layout.length
+  const dirs = new Set<string>()
+  for (const z of layout.zones) {
+    if (z.kind === 'trees' || z.kind === 'deeprough') continue
+    if (z.to < L - 30) continue // well short of the green: not a greenside miss
+    if (z.side === 'left') dirs.add('left')
+    else if (z.side === 'right') dirs.add('right')
+    else if (z.side === 'cross') dirs.add(z.to > L + 2 ? 'behind' : 'short')
+  }
+  return [...dirs]
+}
+
+/**
+ * The pin-framing chip: where today's flag sits and what a miss costs, in one
+ * compact pill ("Sucker pin left · short-sided", "Pin · trouble all around").
+ * "Short-sided" = the flag hides on the same side as the trouble, so the miss
+ * you're most likely to make hunting it is the one with no green to work with.
+ * Null when there's nothing worth saying (a plain middle pin, no trouble).
+ */
+export function pinChip(layout: HoleLayout): string | null {
+  const pin = layout.pin
+  if (!pin) return null
+  const name = pin.tier === 'tucked' ? 'Sucker pin' : pin.tier === 'open' ? 'Friendly flag' : 'Pin'
+  const side = pin.side === 'center' ? '' : ` ${pin.side}`
+  const dirs = greensideTrouble(layout)
+  let trouble = ''
+  if (dirs.length >= 3) trouble = ' · trouble all around'
+  else if (pin.side !== 'center' && dirs.includes(pin.side)) trouble = ' · short-sided'
+  else if (dirs.length > 0) trouble = ` · trouble ${dirs.join(' & ')}`
+  const label = `${name}${side}${trouble}`
+  return label === 'Pin' ? null : label
+}
+
 export function startHole(
   layout: HoleLayout,
   cond: Conditions,
@@ -78,7 +121,7 @@ export function startHole(
     strokes: 0,
     penalties: 0,
     shots: [],
-    status: { tone: 'even', title: `Hole ${layout.spec.number}`, note: 'Pick your line.' },
+    status: { tone: 'even', title: `Hole ${layout.spec.number}`, note: pinTeeNote(layout.pin) ?? 'Pick your line.' },
   }
 }
 
@@ -431,10 +474,30 @@ function resolveApproach(
     return
   }
   if (bucket === 'makeable' || bucket === 'lag') {
-    const feet =
-      bucket === 'makeable'
+    // Pin-aware distance on par-3 tees: your putt length is measured to the
+    // FLAG, and your aim decided how close you tried to land. Safe plays the
+    // fat middle, so a tucked pin leaves it longer looks; an open pin is
+    // reachable even playing safe. Constant shifts only — no extra rolls, so
+    // replay determinism is untouched.
+    const pin = mode === 'par3tee' ? h.layout.pin : undefined
+    const pinFeet =
+      pin?.tier === 'tucked'
+        ? choice === 'safe'
+          ? 5
+          : choice === 'normal'
+            ? 2
+            : 0
+        : pin?.tier === 'open'
+          ? choice === 'safe'
+            ? -2
+            : -1
+          : 0
+    const feet = Math.max(
+      3,
+      (bucket === 'makeable'
         ? Math.round(5 + rng() * (choice === 'aggressive' ? 8 : 13))
-        : Math.round(24 + rng() * (choice === 'safe' ? 22 : 32))
+        : Math.round(24 + rng() * (choice === 'safe' ? 22 : 32))) + pinFeet,
+    )
     h.ball = { pos: L, lie: 'green', side: 'center', puttFeet: feet }
     h.stage = 'putt'
     // name the look off what a make actually scores, penalties included

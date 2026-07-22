@@ -29,7 +29,7 @@ function genDecisions(seed: string, character: CharacterId | undefined, policy: 
   let aggLeft = 8
   for (let i = 0; i < 18; i++) {
     const spec = info.course.holes[i]
-    const layout = buildLayout(info.course.slug, spec)
+    const layout = buildLayout(info.course.slug, spec, info.cond)
     const h = startHole(layout, info.cond, character, fOdds)
     const holeChoices: Choice[] = []
     let guard = 0
@@ -301,7 +301,7 @@ describe('gradeRound: drift guard', () => {
 
     for (let hIdx = 0; hIdx < 18; hIdx++) {
       const spec = info.course.holes[hIdx]
-      const layout = buildLayout(info.course.slug, spec)
+      const layout = buildLayout(info.course.slug, spec, info.cond)
       let ball: BallState = { pos: 0, lie: 'tee', side: 'center' }
       const shots = outcome.scores[hIdx].shots
       for (const shot of shots) {

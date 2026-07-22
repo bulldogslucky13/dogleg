@@ -18,12 +18,13 @@ const clamp01 = (x: number) => Math.max(0, Math.min(1, x))
 /**
  * Hole pressure factor 0..1: how much this hole+conditions punish a miss.
  * Same shape as the original game (SI 46%, course difficulty 30%, wind 13%, par-3 4%).
+ * `gust` is the hole's wind delta (par-3 short courses), riding the wind term.
  */
-export function pressure(strokeIndex: number, par: number, cond: Conditions): number {
+export function pressure(strokeIndex: number, par: number, cond: Conditions, gust = 0): number {
   return clamp01(
     0.46 * (1 - (strokeIndex - 1) / 17) +
       0.3 * ((cond.difficulty - 5) / 5) +
-      0.13 * ((cond.wind - 10) / 40) +
+      0.13 * ((cond.wind + gust - 10) / 40) +
       (par === 3 ? 0.04 : 0),
   )
 }
@@ -123,7 +124,7 @@ export function longOdds(
   mode: 'tee' | 'layup',
   character?: CharacterId,
 ): LongOddsDetail {
-  const m = pressure(layout.spec.strokeIndex, layout.spec.par, cond)
+  const m = pressure(layout.spec.strokeIndex, layout.spec.par, cond, layout.gust ?? 0)
   const base = { ...(mode === 'tee' ? TEE_BASE : LAYUP_BASE)[choice] }
 
   // Difficulty shifts position quality for everyone…
@@ -286,7 +287,7 @@ export function approachOdds(
   character?: CharacterId,
   fortune?: FortuneShotOdds,
 ): ApproachOddsDetail {
-  const m = pressure(layout.spec.strokeIndex, layout.spec.par, cond)
+  const m = pressure(layout.spec.strokeIndex, layout.spec.par, cond, layout.gust ?? 0)
   const lie: LieRow = ball.lie === 'tee' ? 'tee' : (ball.lie as LieRow)
   const row = { ...APPROACH_BASE[lie][choice] }
 
@@ -305,6 +306,38 @@ export function approachOdds(
   // they just never turn a miss into a blow-up. Danger scaling lives in the hazard split.
   const scrambleGrowth = choice === 'safe' ? 0.55 : choice === 'normal' ? 0.7 : 1.9
   row.scramble *= 1 + scrambleGrowth * m
+
+  // Today's pin, par-3 tees only. The tier is a pure risk/reward axis on the
+  // green-hitting buckets: aggressive HUNTS the flag (a tucked pin pays it
+  // better and punishes its miss harder), safe plays the fat side (a tucked
+  // pin costs it looks but shelters its miss). Holeout odds are deliberately
+  // untouched — pin placement never moves the ace math (see fortune.ts).
+  const pin = layout.pin
+  if (mode === 'par3tee' && pin && pin.tier !== 'middle') {
+    if (pin.tier === 'tucked') {
+      if (choice === 'aggressive') {
+        row.kickin *= 1.3
+        row.scramble *= 1.35
+      } else if (choice === 'normal') {
+        row.kickin *= 0.9
+        row.scramble *= 1.12
+      } else {
+        row.kickin *= 0.75
+        row.lag *= 1.1
+        row.scramble *= 0.92
+      }
+    } else {
+      // open: green light for everyone, biggest for the flag hunter
+      if (choice === 'aggressive') {
+        row.kickin *= 1.12
+        row.scramble *= 0.9
+      } else if (choice === 'normal') {
+        row.kickin *= 1.08
+      } else {
+        row.kickin *= 1.15
+      }
+    }
+  }
 
   if (mode === 'wedge') {
     // A layup earns a wedge look — the attacking layup (normal) earns a better one.
@@ -466,7 +499,7 @@ const SAND_BASE: Record<
 }
 
 export function shortOdds(layout: HoleLayout, cond: Conditions, ball: BallState, choice: Choice): ShortOdds {
-  const m = pressure(layout.spec.strokeIndex, layout.spec.par, cond)
+  const m = pressure(layout.spec.strokeIndex, layout.spec.par, cond, layout.gust ?? 0)
   const odds: ShortOdds = {
     kind: 'short',
     holeout: 0,

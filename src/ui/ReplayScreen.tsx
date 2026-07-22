@@ -112,7 +112,7 @@ export function ReplayScreen(props: { payload: ReplayPayload; onExit: () => void
 
       <div ref={mapRef} className="map-wrap">
         {hole.stage === 'putt' ? (
-          <GreenView feet={hole.ball.puttFeet ?? 20} holeNumber={spec.number} greens={hole.cond.greens} size={mapSize} />
+          <GreenView feet={hole.ball.puttFeet ?? 20} holeNumber={spec.number} greens={hole.cond.greens} pin={hole.layout.pin} size={mapSize} />
         ) : (
           <HoleMap
             layout={hole.layout}
@@ -182,7 +182,7 @@ export function ReplayScreen(props: { payload: ReplayPayload; onExit: () => void
           aria-label="Replay position"
         />
         <span className="fine">
-          Hole {f.holeIndex + 1} of 18{done ? ` — final: ${toParLabel(frames[last].runningToPar + (frames[last].hole.score ? frames[last].hole.score.strokes - frames[last].hole.layout.spec.par : 0))}` : ''}
+          Hole {f.holeIndex + 1} of {frames[last].holeIndex + 1}{done ? ` — final: ${toParLabel(frames[last].runningToPar + (frames[last].hole.score ? frames[last].hole.score.strokes - frames[last].hole.layout.spec.par : 0))}` : ''}
         </span>
       </div>
     </div>

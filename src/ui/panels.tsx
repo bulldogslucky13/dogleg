@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { Choice, CourseSpec, HoleScore, OddsSummary, Stage } from '../engine/types'
 import type { HoleInPlay } from '../engine/resolve'
-import { LOOK_LABEL, madePuttLook, oddsFor, summarize } from '../engine/resolve'
+import { LOOK_LABEL, madePuttLook, oddsFor, pinChip, summarize } from '../engine/resolve'
 import { pressure } from '../engine/odds'
 import { RESULT_LABEL, toParLabel } from '../engine/daily'
 
@@ -68,7 +68,7 @@ export function stageName(stage: Stage, par: number, lie?: string): string {
 }
 
 function riskTag(h: HoleInPlay, choice: Choice, summary: OddsSummary): { tone: 'good' | 'warn' | 'bad'; text: string } {
-  const m = pressure(h.layout.spec.strokeIndex, h.layout.spec.par, h.cond)
+  const m = pressure(h.layout.spec.strokeIndex, h.layout.spec.par, h.cond, h.layout.gust ?? 0)
   const tier = m < 0.34 ? 0 : m < 0.6 ? 1 : 2
   if (h.stage === 'putt') {
     if (choice === 'safe') return { tone: 'good', text: 'Lag it close' }
@@ -174,7 +174,7 @@ export function StatusBanner(props: { hole: HoleInPlay }) {
 
 export function TierBanner(props: { hole: HoleInPlay }) {
   const spec = props.hole.layout.spec
-  const m = pressure(spec.strokeIndex, spec.par, props.hole.cond)
+  const m = pressure(spec.strokeIndex, spec.par, props.hole.cond, props.hole.layout.gust ?? 0)
   const tier =
     m < 0.34
       ? { cls: 'good', text: 'Gettable — green light' }
@@ -195,23 +195,48 @@ export function HazardChips(props: { hole: HoleInPlay }) {
   // signature flavor rides only on the tee, as a one-off hole intro alongside
   // the tier banner — persisting it every shot would just be noise
   const atTee = props.hole.shots.length === 0
-  const chips: string[] = []
-  if (spec.strokeIndex <= 4) chips.push(`Signature test · SI ${spec.strokeIndex}`)
+  // Only three chips fit the row. Odds-DRIVING chips (today's pin, a
+  // gust-carrying hole's wind — the only wind display on phones) claim their
+  // slots first; flavor chips (SI, dogleg, greens) fill whatever's left.
+  // Display order stays as authored — priority only decides who survives.
+  const chips: { text: string; keep?: boolean }[] = []
+  if (spec.strokeIndex <= 4) chips.push({ text: `Signature test · SI ${spec.strokeIndex}` })
 
-  // geometry-honest hazard chips: only what is actually still in front of the ball
+  // geometry-honest hazard chips: only what is actually still in front of the
+  // ball. Live water/ocean is a penalty threat — it keeps its slot too.
   const ahead = layout.zones.filter((z) => z.to > ball.pos + 2)
-  if (ahead.some((z) => z.kind === 'ocean')) chips.push('Ocean in play')
+  if (ahead.some((z) => z.kind === 'ocean')) chips.push({ text: 'Ocean in play', keep: true })
   else if (ahead.some((z) => z.kind === 'water')) {
     const cross = ahead.find((z) => z.kind === 'water' && z.side === 'cross')
-    chips.push(cross ? `Water crosses at ${Math.round(cross.from - ball.pos)} yds` : 'Water in play')
+    chips.push({ text: cross ? `Water crosses at ${Math.round(cross.from - ball.pos)} yds` : 'Water in play', keep: true })
   } else if (layout.zones.some((z) => z.kind === 'water' || z.kind === 'ocean')) {
-    chips.push('Water behind you — out of play')
-  } else if (ahead.some((z) => z.kind === 'bunker')) chips.push('Bunkers guard it')
-  if (spec.dogleg === 'L') chips.push('Dogleg left')
-  if (spec.dogleg === 'R') chips.push('Dogleg right')
-  if (cond.wind >= 18) chips.push(`Howling · ${cond.wind} mph`)
-  else if (cond.wind >= 12) chips.push(`Breezy · ${cond.wind} mph`)
-  if (cond.greens === 'Fast' || cond.greens === 'Firm') chips.push('Slick greens')
+    chips.push({ text: 'Water behind you — out of play' })
+  } else if (ahead.some((z) => z.kind === 'bunker')) chips.push({ text: 'Bunkers guard it' })
+  if (spec.dogleg === 'L') chips.push({ text: 'Dogleg left' })
+  if (spec.dogleg === 'R') chips.push({ text: 'Dogleg right' })
+  // today's flag on a par 3, framed against the greenside trouble — the
+  // tucked ones are the decision ("Sucker pin left · short-sided")
+  if (atTee) {
+    const pin = pinChip(layout)
+    if (pin) chips.push({ text: pin, keep: true })
+  }
+  // par-3 shorts carry a per-hole gust on top of the day's wind — and show it
+  // ALWAYS there (a gust-carrying hole), because it's driving the odds every
+  // hole and it changes hole to hole. Big courses keep the ≥12mph threshold.
+  const wind = cond.wind + (layout.gust ?? 0)
+  const gustHole = layout.gust !== undefined
+  if (wind >= 18) chips.push({ text: `Howling · ${wind} mph`, keep: gustHole })
+  else if (wind >= 12) chips.push({ text: `Breezy · ${wind} mph`, keep: gustHole })
+  else if (gustHole) chips.push({ text: `Wind · ${wind} mph`, keep: true })
+  if (cond.greens === 'Fast' || cond.greens === 'Firm') chips.push({ text: 'Slick greens' })
+
+  // keep-flagged chips claim slots first, the rest fill in authored order
+  const kept = new Set(chips.filter((c) => c.keep).slice(0, 3))
+  for (const c of chips) {
+    if (kept.size >= 3) break
+    kept.add(c)
+  }
+  const shown = chips.filter((c) => kept.has(c))
   const sig = atTee ? spec.signature : undefined
   if (chips.length === 0 && !sig) return null
   return (
@@ -227,11 +252,11 @@ export function HazardChips(props: { hole: HoleInPlay }) {
           </span>
         </div>
       )}
-      {chips.length > 0 && (
+      {shown.length > 0 && (
         <div className="chips center">
-          {chips.slice(0, 3).map((c) => (
-            <span key={c} className="chip">
-              {c}
+          {shown.map((c) => (
+            <span key={c.text} className="chip">
+              {c.text}
             </span>
           ))}
         </div>
@@ -319,7 +344,7 @@ export function Scorecard(props: { course: CourseSpec; scores: (HoleScore | null
   const { course, scores, currentHole } = props
   const offset = currentHole < 9 ? 0 : 9
   const nine = course.holes.slice(offset, offset + 9)
-  const left = 18 - scores.filter(Boolean).length
+  const left = course.holes.length - scores.filter(Boolean).length
   const row = (label: string, vals: (string | number)[], scoreRow = false) => (
     <div className={`sc-line${scoreRow ? ' sc-scores' : ''}`}>
       <span className="sc-label">{label}</span>
@@ -351,7 +376,7 @@ export function Scorecard(props: { course: CourseSpec; scores: (HoleScore | null
   return (
     <div className="scorecard">
       <div className="sc-head">
-        <span>Round card · {offset === 0 ? 'Front nine' : 'Back nine'}</span>
+        <span>Round card{course.holes.length > 9 ? ` · ${offset === 0 ? 'Front nine' : 'Back nine'}` : ''}</span>
         <b>{left === 0 ? 'Round complete' : `${left} hole${left === 1 ? '' : 's'} left`}</b>
       </div>
       {row('Hole', nine.map((h) => h.number))}
@@ -388,11 +413,11 @@ export function ClassicScorecard(props: { course: CourseSpec; scores: (HoleScore
   return (
     <div className="classic-scorecard">
       <div className="csc-grid">{course.holes.slice(0, 9).map((_, i) => cell(i))}</div>
-      <div className="csc-grid">{course.holes.slice(9).map((_, i) => cell(i + 9))}</div>
+      {course.holes.length > 9 && <div className="csc-grid">{course.holes.slice(9).map((_, i) => cell(i + 9))}</div>}
       <div className="csc-foot">
         <span>Front {front || '–'}</span>
         <span className="csc-legend">○ under · □ over</span>
-        <span>Back {back || '–'}</span>
+        {course.holes.length > 9 ? <span>Back {back || '–'}</span> : <span />}
       </div>
     </div>
   )

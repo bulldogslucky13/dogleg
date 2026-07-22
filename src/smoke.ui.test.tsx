@@ -13,9 +13,11 @@ import { act, cleanup, fireEvent, render, screen, within } from '@testing-librar
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
 import { CHARACTERS } from './engine/characters'
-import { forecastSetup } from './engine/daily'
+import { playRatingFor } from './engine/courses'
+import { forecastSetup, localDateKey } from './engine/daily'
 import { setupFromSeed } from './engine/replay'
 import { loadIdentity, loadPlayer } from './lib/leaderboard'
+import type { HistoryEntry } from './state/store'
 
 // jsdom has no ResizeObserver; the map measures itself with one
 class ResizeObserverStub {
@@ -41,6 +43,45 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
     render(<App />)
     expect(screen.getByText('Tee off')).toBeTruthy()
     expect(screen.getByText('How to play')).toBeTruthy()
+    // tomorrow's forecast is held back until today's round is in the books
+    expect(screen.queryByText(/Tomorrow's forecast/)).toBeNull()
+  })
+
+  it("teases tomorrow's forecast on home only once today's round is played", () => {
+    // seed a finished daily for today so the home screen's playedToday selector
+    // fires without walking a full round through the UI — only dateKey is
+    // load-bearing here, so the rest of the entry can be arbitrary
+    const entry: HistoryEntry = {
+      dateKey: localDateKey(),
+      puzzleNumber: 1,
+      courseSlug: 'pebble-beach',
+      toPar: 0,
+      results: [],
+      character: CHARACTERS[0].id,
+    }
+    localStorage.setItem('dogleg:history:v1', JSON.stringify([entry]))
+    render(<App />)
+    // the forecast now lives on home, next to the "See today's card" CTA —
+    // course + conditions only, never seed/dateKey/puzzle number
+    const forecast = forecastSetup()
+    expect(screen.getByText(/Tomorrow's forecast/)).toBeTruthy()
+    expect(screen.getAllByText(new RegExp(forecast.course.name)).length).toBeGreaterThan(0)
+
+    // the forecast's Play Rating chip carries a personalized outlook emoji —
+    // comparing tomorrow's rating to today's — appended right on the button
+    const tomorrowRating = playRatingFor(forecast.course.slug)
+    const ratingButtons = screen.getAllByRole('button', { name: new RegExp(`Play Rating ${tomorrowRating}/10`) })
+    expect(ratingButtons.length).toBeGreaterThan(0)
+    const ratingDelta = tomorrowRating - playRatingFor(entry.courseSlug)
+    const forecastButton = ratingButtons.find((b) => b.closest('.forecast'))!
+    expect(forecastButton).toBeTruthy()
+    if (ratingDelta >= 2) {
+      expect(forecastButton.textContent).toMatch(/😬|😩/)
+    } else if (ratingDelta <= -2) {
+      expect(forecastButton.textContent).toMatch(/😅|😮/)
+    } else {
+      expect(forecastButton.textContent).not.toMatch(/😬|😩|😅|😮/)
+    }
   })
 
   it('the Play Rating badge opens and closes its methodology explainer', () => {
@@ -473,12 +514,6 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
     expect(coachPanel).toBeTruthy()
     expect(coachPanel!.textContent).toMatch(/decided like/i)
     expect(coachPanel!.textContent).not.toMatch(/dice/i)
-
-    // the result screen (practice or daily) always teases tomorrow's DAILY —
-    // course + conditions only, never seed/dateKey/puzzle number
-    const forecast = forecastSetup()
-    expect(screen.getByText(/Tomorrow/)).toBeTruthy()
-    expect(screen.getAllByText(new RegExp(forecast.course.name)).length).toBeGreaterThan(0)
 
     // play again must route through the pick screen, not lock in the old player
     fireEvent.click(screen.getByText('Play another practice round'))

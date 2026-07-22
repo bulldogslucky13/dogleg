@@ -154,6 +154,8 @@ export function HomeScreen(props: {
         </button>
       )}
 
+      {props.playedToday && <ForecastCard today={props.playedToday} />}
+
       <button className="cta ghost" onClick={() => setShowCourses((v) => !v)}>
         Play unlimited · Browse courses
       </button>
@@ -261,6 +263,50 @@ function Par3Intro() {
       >
         Got it — show me the tees
       </button>
+    </div>
+  )
+}
+
+/**
+ * Tomorrow's daily, teased in golf-forecast tone — course + conditions only,
+ * never the seed/dateKey/puzzle number or anything outcome-derived. Shown on
+ * the home screen once today's round is in the books, so it reads as "you're
+ * done — here's what's on the tee tomorrow".
+ */
+export function ForecastCard(props: { today: HistoryEntry }) {
+  const forecast = forecastSetup()
+  const windTone =
+    forecast.cond.wind >= 18
+      ? `${forecast.cond.wind} mph gusts`
+      : forecast.cond.wind >= 12
+        ? `${forecast.cond.wind} mph breeze`
+        : `${forecast.cond.wind} mph wind`
+  const windMood = forecast.cond.wind >= 18 ? '💨' : forecast.cond.wind >= 12 ? '🍃' : '☀️'
+  const greensHot = forecast.cond.greens === 'Fast'
+
+  // how tomorrow's Play Rating compares to today's — only call it out when the
+  // swing is real (±2), so the tease isn't noise on an ordinary rotation day.
+  // today's score nudges which emoji lands: a rough day sharpens the harder
+  // read into dread, a hot one softens the easier read into relief.
+  const ratingDelta = playRatingFor(forecast.course.slug) - playRatingFor(props.today.courseSlug)
+  const roughToday = props.today.toPar >= 3
+  const hotToday = props.today.toPar <= -2
+  const outlookEmoji =
+    ratingDelta >= 2 ? (roughToday ? '😩' : '😬') : ratingDelta <= -2 ? (hotToday ? '😮‍💨' : '😅') : undefined
+
+  return (
+    <div className="forecast">
+      <div className="kicker">Tomorrow's forecast</div>
+      <div className="forecast-line">
+        <b>{forecast.course.name}</b>
+        <span className="chips slim">
+          <span className="chip forecast-chip">
+            {windMood} {windTone} · {greensHot ? '⚡ ' : ''}
+            {forecast.cond.greens.toLowerCase()} greens
+          </span>
+          <PlayRatingChip slug={forecast.course.slug} className="forecast-chip" suffix={outlookEmoji} />
+        </span>
+      </div>
     </div>
   )
 }
@@ -493,17 +539,6 @@ export function ResultScreen(props: {
     })
     return `https://${SITE_URL}/#watch=${code}`
   })()
-  // tomorrow's daily, teased in golf-forecast tone — course + conditions only,
-  // never the seed/dateKey/puzzle number or anything outcome-derived
-  const forecast = forecastSetup()
-  const windTone =
-    forecast.cond.wind >= 18
-      ? `${forecast.cond.wind} mph gusts`
-      : forecast.cond.wind >= 12
-        ? `${forecast.cond.wind} mph breeze`
-        : `${forecast.cond.wind} mph wind`
-  const windMood = forecast.cond.wind >= 18 ? '💨' : forecast.cond.wind >= 12 ? '🍃' : '☀️'
-  const greensHot = forecast.cond.greens === 'Fast'
   const canNativeShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function'
   const copy = async () => {
     let ok = true
@@ -709,21 +744,6 @@ export function ResultScreen(props: {
           {copiedReplay ? 'Replay link copied ✓' : '🎬 Copy replay link — let them watch it'}
         </button>
       )}
-      <div className="forecast">
-        <div className="kicker">Tomorrow's forecast</div>
-        <p className="forecast-line">
-          <b>{forecast.course.name}</b>
-          <span className="chips slim">
-            <span className="chip forecast-chip">
-              {windMood} {windTone}
-            </span>
-            <span className="chip forecast-chip">
-              {greensHot ? '⚡ ' : ''}
-              {forecast.cond.greens.toLowerCase()} greens
-            </span>
-          </span>
-        </p>
-      </div>
       {props.practice && (
         <button className="cta" onClick={props.onPracticeAgain}>
           Play another practice round

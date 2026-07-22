@@ -27,6 +27,13 @@
  *
  * This is a build-time tool. Output is meant to be reviewed and committed as
  * static data — nothing here runs in the app or touches the network at runtime.
+ *
+ * FOLLOW-UP after committing new/updated geometry: run `pnpm gen:ratings` and
+ * review the printed table. A course's displayed Play Rating is measured from
+ * how it plays in the engine (see scripts/gen-play-ratings.ts), so swapping
+ * procedural geometry for real geometry changes its difficulty — the whole
+ * point of the pull — and the rating must be regenerated to reflect it, or the
+ * badge will keep showing the old procedural number.
  */
 
 // Let --compare import the engine's extensionless TS modules (./rng etc.) —

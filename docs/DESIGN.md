@@ -101,11 +101,33 @@ normative outcome is out-and-on (updown/twochip), with `stillin` (failed escape 
 and repeat, capped at 4% for the blast-out) and rare `across` (thinned over the green to
 the opposite fringe, ≤1% safe / ~5-8% flop). Tests pin all of these.
 
+## Difficulty vs. Play Rating
+
+Two different numbers, deliberately kept apart:
+
+- **`difficulty`** (in `courses.ts`, 1–10) is a *gameplay input*. It is 30% of the
+  hole `pressure` term in `odds.ts`, and it carries a hidden daily ±1 jitter
+  (`daily.ts`). Because the leaderboard referee replays every round with the real
+  engine, changing a course's `difficulty` shifts the odds and would require the
+  `submit-round` function to be redeployed. It is no longer shown to players.
+- **Play Rating** (`playRatings.ts`, 1–10) is a *display-only* measure of how hard a
+  course actually plays. It is generated offline by `scripts/gen-play-ratings.ts`,
+  which simulates many full rounds through the real engine with a fixed "smart"
+  reference policy and buckets the average score-to-par by fixed thresholds. Because
+  it never feeds the engine, it can tell the honest truth about a course (including
+  where reputation and the engine's modeling diverge — e.g. low-wind parkland courses
+  play easier here than their real-world name) without touching odds or the referee.
+
+The badge in the UI shows Play Rating; a tap opens a modal explaining the method
+(`src/ui/PlayRating.tsx`). Regenerate with `pnpm gen:ratings` whenever the engine
+odds/resolution or the course library change, and review the printed ranked table.
+
 ## Modules
 
 - `src/engine/rng.ts` — fnv1a hash + mulberry32 streams
 - `src/engine/types.ts` — shared types
-- `src/engine/courses.ts` — course specs
+- `src/engine/courses.ts` — course specs (+ `playRatingFor` accessor)
+- `src/engine/playRatings.ts` — GENERATED display Play Ratings (see `scripts/gen-play-ratings.ts`)
 - `src/engine/layout.ts` — hole spec → geometric layout (zones, carries, green)
 - `src/engine/odds.ts` — computeOdds(ballState, choice): buckets + hazard split, all
   geometry-gated; pure

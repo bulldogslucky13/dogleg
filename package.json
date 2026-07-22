@@ -13,6 +13,7 @@
     "test:watch": "vitest",
     "typecheck": "tsc -b",
     "build:validator": "vite build --config vite.validator.config.ts",
+    "gen:ratings": "node scripts/gen-play-ratings.ts",
     "import:osm": "node scripts/import-osm.ts"
   },
   "dependencies": {

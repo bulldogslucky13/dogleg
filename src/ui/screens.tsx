@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { CHARACTERS, characterById } from '../engine/characters'
-import { courseBySlug, COURSES } from '../engine/courses'
+import { courseBySlug, COURSES, playRatingFor } from '../engine/courses'
 import { dailySetup, forecastSetup, RESULT_LABEL, RESULT_SQUARE, shareText, SITE_URL, toParLabel, type DailySetup } from '../engine/daily'
 import { gradeCopy, type RoundGrade } from '../engine/grade'
 import { decisionsFromScores, encodeReplay } from '../engine/replay'
@@ -14,6 +14,7 @@ import { characterRecords, computeStreaks, loadArchive, type HistoryEntry, type 
 import { AccountPanel } from './AccountPanel'
 import { CharacterAvatar } from './Avatars'
 import { DailyBoardView, ScoreBoard } from './Leaderboard'
+import { PlayRatingChip } from './PlayRating'
 
 export function HomeScreen(props: {
   history: HistoryEntry[]
@@ -91,7 +92,7 @@ export function HomeScreen(props: {
         <div className="chips">
           <span className="chip dark">Wind {setup.cond.wind}</span>
           <span className="chip dark">Greens {setup.cond.greens}</span>
-          <span className="chip dark">Difficulty {setup.cond.difficulty}/10</span>
+          <PlayRatingChip slug={setup.course.slug} dark />
         </div>
         <p className="blurb">{setup.course.blurb}</p>
       </div>
@@ -160,7 +161,7 @@ export function HomeScreen(props: {
             <button key={c.slug} className="course-row" onClick={() => props.onPractice(c.slug)}>
               <b>{c.name}</b>
               <span>
-                {c.location} · Difficulty {c.difficulty}/10
+                {c.location} · Play Rating {playRatingFor(c.slug)}/10
               </span>
               {courseRecs?.get(c.slug) && (
                 <em className="course-cr">
@@ -295,7 +296,7 @@ export function CharacterPickScreen(props: {
         <span className="chip">{course.holes.reduce((s, h) => s + h.yards, 0).toLocaleString()} yards</span>
         <span className="chip">Wind {cond.wind} mph</span>
         <span className="chip">{cond.greens} greens</span>
-        <span className="chip">Difficulty {cond.difficulty}/10</span>
+        <PlayRatingChip slug={course.slug} />
       </div>
       <div className="char-cards">
         {CHARACTERS.map((c) => (

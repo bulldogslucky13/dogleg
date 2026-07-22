@@ -14,7 +14,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { track } from './lib/analytics'
 import { castLinesForHole, castRound } from './engine/cast'
 import { CHARACTERS } from './engine/characters'
-import { COURSES, courseBySlug } from './engine/courses'
+import { COURSES, courseBySlug, playRatingFor } from './engine/courses'
+import { PLAY_RATINGS } from './engine/playRatings'
 import { dailySetup, forecastSetup, practiceSetup, shareText, type DailySetup } from './engine/daily'
 import { gradeCopy, gradeRound } from './engine/grade'
 import { setupFromSeed } from './engine/replay'
@@ -120,6 +121,21 @@ describe('smoke: the daily is valid and deterministic for every course in rotati
       expect(a.puzzleNumber).toBeGreaterThanOrEqual(1)
       expect(a.seed).toContain(a.dateKey)
     }
+  })
+
+  it('every course has a display Play Rating in 1..10 (generated table covers rotation)', () => {
+    // The badge reads playRatingFor(slug); the generated table must cover every
+    // course in the rotation, and the value must be a sane 1..10. This is the
+    // display-only rating, kept separate from the engine's `difficulty` knob.
+    for (const c of COURSES) {
+      expect(PLAY_RATINGS, `missing Play Rating for ${c.slug} — run pnpm gen:ratings`).toHaveProperty(c.slug)
+      const r = playRatingFor(c.slug)
+      expect(Number.isInteger(r)).toBe(true)
+      expect(r).toBeGreaterThanOrEqual(1)
+      expect(r).toBeLessThanOrEqual(10)
+    }
+    // Falls back to base difficulty for an unknown slug rather than throwing.
+    expect(playRatingFor('no-such-course')).toBeGreaterThanOrEqual(1)
   })
 
   it('replaying the same seed with the same choices gives the identical round', () => {

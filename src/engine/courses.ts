@@ -1,5 +1,6 @@
 import type { CourseSpec, HoleSpec, Dogleg, HazardStyle } from './types'
 import { OSM_GEOMETRY } from './geometry'
+import { PLAY_RATINGS } from './playRatings'
 
 type Row = [3 | 4 | 5, number, number, Dogleg, HazardStyle, string?, boolean?]
 
@@ -1457,4 +1458,16 @@ for (const course of COURSES) {
 
 export function courseBySlug(slug: string): CourseSpec | undefined {
   return COURSES.find((c) => c.slug === slug)
+}
+
+/**
+ * A course's display-only Play Rating (1–10): how hard the course actually
+ * plays, measured by simulation (see scripts/gen-play-ratings.ts). This is
+ * deliberately separate from the internal `difficulty` field, which feeds the
+ * odds engine and carries a hidden daily jitter. Falls back to `difficulty`
+ * for any course missing from the generated table (e.g. a brand-new course
+ * added before `pnpm gen:ratings` is re-run).
+ */
+export function playRatingFor(slug: string): number {
+  return PLAY_RATINGS[slug] ?? courseBySlug(slug)?.difficulty ?? 5
 }

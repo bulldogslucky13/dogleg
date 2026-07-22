@@ -665,7 +665,10 @@ export default function App() {
                   {LOOK_LABEL[madePuttLook(hole.strokes, spec.par)].chip} · ~{hole.ball.puttFeet} ft
                 </span>
                 <span className="chip">{round.cond.greens} green</span>
-                {pinChip(hole.layout) && <span className="chip">{pinChip(hole.layout)}</span>}
+                {(() => {
+                  const pin = pinChip(hole.layout)
+                  return pin && <span className="chip">{pin}</span>
+                })()}
               </div>
             ) : (
               // wind/greens/hazards live on the map at every stage — the hole

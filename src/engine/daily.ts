@@ -1,6 +1,6 @@
 import { characterById } from './characters'
 import { COURSES, courseBySlug } from './courses'
-import { fnv1a, rngFromString } from './rng'
+import { fnv1a, rngFromString, type Rng } from './rng'
 import type { CharacterId, Conditions, CourseSpec, Greens, HoleResult } from './types'
 
 /** Daily No. 1 — set this to the real go-live date so launch day is DogLeg No. 1. */
@@ -46,15 +46,17 @@ const GREEN_BUMP: Record<Greens, Greens[]> = {
   Fast: ['Firm', 'Fast', 'Fast'],
 }
 
-/** Conditions jitter shared by daily and practice — and by the server-side
- * validator, which must reconstruct the exact conditions from the seed alone. */
-function jitteredConditions(rngKey: string, course: CourseSpec, windSpan: number, diffSpan: number): Conditions {
-  const rng = rngFromString(rngKey)
-  const wind = Math.max(3, Math.round(course.wind + (rng() - 0.5) * windSpan))
-  const greens = GREEN_BUMP[course.greens][Math.floor(rng() * 3)]
-  const difficulty = Math.max(1, Math.min(10, Math.round(course.difficulty + (rng() - 0.5) * diffSpan)))
-  // Pin draws come AFTER the classic three, so every pre-pin seed keeps the
-  // exact wind/greens/difficulty it always had — only par 3s grow a flag.
+/**
+ * Draws today's pin on every par-3 hole, plus a per-hole gust on par-3 short
+ * courses — from whatever rng stream the caller hands in. Split out from
+ * `jitteredConditions` so a caller that wants the classic wind/greens/
+ * difficulty held at a FIXED base value (e.g. the Play Rating generator,
+ * which deliberately excludes daily jitter from its difficulty measure — see
+ * scripts/gen-play-ratings.ts) can still draw realistic pin/gust variance per
+ * simulated round, instead of silently simulating every round with a
+ * middle-tier pin and zero gust.
+ */
+export function pinsAndGusts(rng: Rng, course: CourseSpec): Pick<Conditions, 'pins' | 'gusts'> {
   const pins: Conditions['pins'] = {}
   for (const h of course.holes) {
     if (h.par !== 3) continue
@@ -65,15 +67,24 @@ function jitteredConditions(rngKey: string, course: CourseSpec, windSpan: number
       side: sideRoll < 0.4 ? 'left' : sideRoll < 0.6 ? 'center' : 'right',
     }
   }
-  const cond: Conditions = { wind, greens, difficulty, pins }
-  if (course.par3Course) {
-    // The shorts lean into the weather: a per-hole gust rides on the base
-    // wind, mostly a puff, occasionally a real blast, sometimes a lull.
-    const gusts: Conditions['gusts'] = {}
-    for (const h of course.holes) gusts[h.number] = Math.round((rng() - 0.3) * 10)
-    cond.gusts = gusts
-  }
-  return cond
+  if (!course.par3Course) return { pins }
+  // The shorts lean into the weather: a per-hole gust rides on the base
+  // wind, mostly a puff, occasionally a real blast, sometimes a lull.
+  const gusts: Conditions['gusts'] = {}
+  for (const h of course.holes) gusts[h.number] = Math.round((rng() - 0.3) * 10)
+  return { pins, gusts }
+}
+
+/** Conditions jitter shared by daily and practice — and by the server-side
+ * validator, which must reconstruct the exact conditions from the seed alone. */
+function jitteredConditions(rngKey: string, course: CourseSpec, windSpan: number, diffSpan: number): Conditions {
+  const rng = rngFromString(rngKey)
+  const wind = Math.max(3, Math.round(course.wind + (rng() - 0.5) * windSpan))
+  const greens = GREEN_BUMP[course.greens][Math.floor(rng() * 3)]
+  const difficulty = Math.max(1, Math.min(10, Math.round(course.difficulty + (rng() - 0.5) * diffSpan)))
+  // Pin/gust draws come AFTER the classic three, so every pre-pin seed keeps
+  // the exact wind/greens/difficulty it always had — only par 3s grow a flag.
+  return { wind, greens, difficulty, ...pinsAndGusts(rng, course) }
 }
 
 export function dailyConditions(dateKey: string, course: CourseSpec): Conditions {

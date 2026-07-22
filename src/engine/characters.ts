@@ -1,4 +1,4 @@
-import type { CharacterId } from './types'
+import type { CharacterId, CourseSpec } from './types'
 
 export interface CharacterSpec {
   id: CharacterId
@@ -35,6 +35,18 @@ export const CHARACTERS: CharacterSpec[] = [
 
 export function characterById(id: CharacterId | undefined): CharacterSpec | null {
   return CHARACTERS.find((c) => c.id === id) ?? null
+}
+
+/**
+ * The roster a player can actually pick (and the cast can actually play) on
+ * a given course. The Fairway Finder's whole edge is the driver — a par-3
+ * short course never gives him one to swing — so he sits those out. Single
+ * source of truth for BOTH the pick screen (CharacterPickScreen) and the
+ * clubhouse cast simulation (castRound): they must never drift apart, or a
+ * player could see a rival in the clubhouse they were never offered to play.
+ */
+export function playableCharacters(course: Pick<CourseSpec, 'par3Course'>): CharacterSpec[] {
+  return CHARACTERS.filter((c) => !(course.par3Course && c.id === 'fairway'))
 }
 
 /**

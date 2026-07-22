@@ -259,6 +259,65 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
     expect(document.querySelector('circle.ghost-ball')).toBeNull()
   })
 
+  it('GreenView places the cup at the real pin — every tier/side combo, no crash, no NaN geometry', async () => {
+    const { GreenView } = await import('./ui/HoleMap')
+    const sides = ['left', 'center', 'right'] as const
+    const tiers = ['open', 'middle', 'tucked'] as const
+    const cupOffset = (feet: number, pin?: { tier: (typeof tiers)[number]; side: (typeof sides)[number] }) => {
+      const { container, unmount } = render(<GreenView feet={feet} holeNumber={1} greens="Fast" pin={pin} />)
+      const green = container.querySelector('ellipse[fill="url(#gsurf)"]')!
+      const cup = container.querySelector('ellipse[rx="7"]')!
+      const centerX = Number(green.getAttribute('cx'))
+      const greenRx = Number(green.getAttribute('rx'))
+      const cupX = Number(cup.getAttribute('cx'))
+      const svg = container.querySelector('svg.holemap')!
+      unmount()
+      return { cupX, centerX, greenRx, ariaLabel: svg.getAttribute('aria-label') }
+    }
+
+    // par 4/5 putts (and pre-pin saves) carry no pin at all — no crash, no NaN
+    for (const feet of [4, 20, 45]) {
+      const { cupX } = cupOffset(feet)
+      expect(Number.isFinite(cupX)).toBe(true)
+    }
+
+    // every par-3 pin combo: the cup always lands inside the drawn green —
+    // never off in NaN-land — and a tucked pin hides further from center
+    // than an open one on the same side (PIN_OFFSET_FRAC, shared with the map)
+    for (const tier of tiers) {
+      for (const side of sides) {
+        const r = cupOffset(22, { tier, side })
+        expect(r.ariaLabel).toBe('22 foot putt')
+        expect(Number.isFinite(r.cupX)).toBe(true)
+        expect(Math.abs(r.cupX - r.centerX)).toBeLessThanOrEqual(r.greenRx)
+      }
+    }
+    for (const side of ['left', 'right'] as const) {
+      const tucked = cupOffset(22, { tier: 'tucked', side })
+      const open = cupOffset(22, { tier: 'open', side })
+      expect(Math.abs(tucked.cupX - tucked.centerX)).toBeGreaterThan(Math.abs(open.cupX - open.centerX))
+    }
+  })
+
+  it("the tier banner's risk read includes the hole's gust, matching the real odds bar", async () => {
+    // par-3 short courses carry a per-hole gust (layout.gust) that the odds
+    // engine's pressure() factors in on every quoted percentage — the banner
+    // and risk tags must read the same pressure, or the UI tells the player
+    // one thing while the odds bar it's standing next to tells another.
+    const { TierBanner } = await import('./ui/panels')
+    const { buildLayout } = await import('./engine/layout')
+    const { startHole } = await import('./engine/resolve')
+    const spec = { number: 1, par: 3 as const, yards: 150, strokeIndex: 1, dogleg: 'S' as const, hazard: 'none' as const }
+    const baseCond = { wind: 10, greens: 'Medium' as const, difficulty: 2 }
+    const calm = startHole(buildLayout('gust-smoke', spec, { ...baseCond, gusts: { 1: 0 } }), baseCond)
+    const gusty = startHole(buildLayout('gust-smoke', spec, { ...baseCond, gusts: { 1: 7 } }), baseCond)
+    render(<TierBanner hole={calm} />)
+    expect(screen.getByText('Gettable — green light')).toBeTruthy()
+    cleanup()
+    render(<TierBanner hole={gusty} />)
+    expect(screen.getByText('Pick your moment')).toBeTruthy()
+  })
+
   it('reduced motion drops the ghost ball but keeps the pace tracker', async () => {
     // scoped by hand — vi.unstubAllGlobals would also tear down the file-wide
     // ResizeObserver stub and break every later map render

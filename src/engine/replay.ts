@@ -1,6 +1,6 @@
 import { courseBySlug } from './courses'
 import { dailyConditions, courseForPuzzle, practiceConditions, puzzleNumberForDateKey } from './daily'
-import { destinyDue, fortuneShotOdds, splitFortune, type FortuneState, type MomentKind } from './fortune'
+import { destinyDue, fortuneEligible, fortuneShotOdds, splitFortune, type FortuneState, type MomentKind } from './fortune'
 import { buildLayout } from './layout'
 import { playShot, startHole, type HoleInPlay } from './resolve'
 import { rngFromString } from './rng'
@@ -83,14 +83,14 @@ export function destinyPlan(info: SeedInfo): DestinyPlan {
   // Par-3 short courses sit outside fortune entirely: eighteen ace chances a
   // round would let a due destiny be cashed on the cheapest tee in the game.
   // Aces there are pure odds — see the par-3 paragraph in fortune.ts.
-  if (!info.fortune || info.course.par3Course) return { ace: false, albatross: false }
+  if (!info.fortune || !fortuneEligible(info.course)) return { ace: false, albatross: false }
   const due = destinyDue(info.mode, info.fortune)
   return { ace: due.ace, albatross: due.albatross }
 }
 
 /** The per-shot probability boosts that DO flow through the honest odds. */
 export function fortuneOddsFor(info: SeedInfo): { acePerShot: number; albPerShot: number } | undefined {
-  if (!info.fortune || info.course.par3Course) return undefined
+  if (!info.fortune || !fortuneEligible(info.course)) return undefined
   return fortuneShotOdds(info.mode, info.fortune)
 }
 

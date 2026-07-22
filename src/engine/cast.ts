@@ -1,4 +1,4 @@
-import { CHARACTERS } from './characters'
+import { CHARACTERS, playableCharacters } from './characters'
 import { splitFortune } from './fortune'
 import { buildLayout } from './layout'
 import { playShot, startHole, type HoleInPlay } from './resolve'
@@ -106,11 +106,10 @@ export function castRound(setup: CastSetup): CastResult {
   // defensive strip — a daily/practice seed shouldn't carry a fortune tail by
   // the time it gets here, but the cast must never let one leak into the dice
   const base = splitFortune(setup.seed).base
-  // The Fairway Finder sits out the par-3 shorts as an NPC too: his whole
-  // personality (and his edge) is the driver, and the pick screen already
-  // benches him there — a cast line for a player you can't be would read
-  // as a bug, not a rival.
-  const roster = CHARACTERS.filter((c) => !(setup.course.par3Course && c.id === 'fairway'))
+  // Same roster the pick screen offers — playableCharacters is the single
+  // source of truth, so the cast can never include a rival the player was
+  // never offered to play.
+  const roster = playableCharacters(setup.course)
   return roster.map((c) => simulateCharacter(c.id, setup.course, setup.cond, base))
 }
 

@@ -48,6 +48,7 @@ const RATED = [...COURSES, ...PAR3_COURSES]
 const { buildLayout } = await import('../src/engine/layout.ts')
 const { oddsFor, playShot, startHole } = await import('../src/engine/resolve.ts')
 const { rngFromString } = await import('../src/engine/rng.ts')
+const { pinsAndGusts } = await import('../src/engine/daily.ts')
 
 const N = 4000 // rounds per course; deterministic seeds make this reproducible
 
@@ -93,9 +94,14 @@ const smart: Policy = (h, aggLeft) => {
   return 'normal'
 }
 
-function simRound(courseIdx: number, cond: Conditions, seed: string): number {
+function simRound(courseIdx: number, baseCond: Conditions, seed: string): number {
   const course = RATED[courseIdx]
   const rng = rngFromString(seed)
+  // Pin (every course) and gust (par-3 shorts) vary hole to hole in real
+  // play — draw them fresh each simulated round, off a sub-stream so the
+  // draw doesn't consume rolls from the shot-outcome stream above. Wind/
+  // greens/difficulty stay pinned at the course's base value (see playIndex).
+  const cond: Conditions = { ...baseCond, ...pinsAndGusts(rngFromString(`${seed}:cond`), course) }
   let toPar = 0
   let aggLeft = 8
   for (const spec of course.holes) {
@@ -118,7 +124,11 @@ function simRound(courseIdx: number, cond: Conditions, seed: string): number {
  * The play index uses each course's *base* difficulty with NO daily jitter —
  * a stable measure of the course itself. (Wind/greens likewise come from the
  * course's typical values.) Averaging over jitter would only add noise around
- * the same mean.
+ * the same mean. Pin position and, on par-3 shorts, gust DO vary per
+ * simulated round (see simRound) — they're a real risk/reward swing (up to
+ * ±35% on kickin/scramble for a tucked pin) and a real wind swing baked into
+ * the odds engine, not incidental noise, so a rating that never draws them
+ * would understate exactly the courses built to lean on them.
  */
 function playIndex(courseIdx: number): number {
   const course = RATED[courseIdx]

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { CHARACTERS, characterById } from '../engine/characters'
+import { characterById, playableCharacters } from '../engine/characters'
 import { courseBySlug, COURSES, PAR3_COURSES, playRatingFor } from '../engine/courses'
 import { dailySetup, forecastSetup, RESULT_LABEL, RESULT_SQUARE, shareText, SITE_URL, toParLabel, type DailySetup } from '../engine/daily'
 import { gradeCopy, type RoundGrade } from '../engine/grade'
@@ -243,11 +243,8 @@ function Par3Intro() {
           <b>The wind swirls.</b> Gusts change hole to hole out here — check before you pick a line.
         </li>
         <li>
-          <b>Deuces are the badge.</b> Twos get counted on your recap.
-        </li>
-        <li>
-          <b>Aces are earned, never owed.</b> Out here a hole-in-one is pure odds — no guaranteed
-          moment, and these rounds don't move your countdown on the big courses.
+          <b>Every hole is real.</b> Lengths off the club's own scorecard, hazards mapped from
+          satellite imagery — not made up.
         </li>
       </ul>
       <button
@@ -482,10 +479,10 @@ export function CharacterPickScreen(props: {
         <PlayRatingChip slug={course.slug} />
       </div>
       <div className="char-cards">
-        {/* the Fairway Finder's whole edge is the driver, and a par-3 short
-         * course never lets him unsheathe it — a zero-edge pick would be a
-         * trap, so he sits these out. */}
-        {CHARACTERS.filter((c) => !(course.par3Course && c.id === 'fairway')).map((c) => (
+        {/* playableCharacters benches the Fairway Finder on par-3 courses —
+         * his edge is the driver, and a zero-edge pick would be a trap.
+         * Shared with the clubhouse cast (cast.ts) so the two rosters can't drift. */}
+        {playableCharacters(course).map((c) => (
           <button key={c.id} className={`char-card ${c.id}`} onClick={() => props.onPick(c.id)}>
             <CharacterAvatar id={c.id} size={84} />
             <b>{c.name}</b>

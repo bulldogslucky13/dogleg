@@ -68,7 +68,7 @@ export function stageName(stage: Stage, par: number, lie?: string): string {
 }
 
 function riskTag(h: HoleInPlay, choice: Choice, summary: OddsSummary): { tone: 'good' | 'warn' | 'bad'; text: string } {
-  const m = pressure(h.layout.spec.strokeIndex, h.layout.spec.par, h.cond)
+  const m = pressure(h.layout.spec.strokeIndex, h.layout.spec.par, h.cond, h.layout.gust ?? 0)
   const tier = m < 0.34 ? 0 : m < 0.6 ? 1 : 2
   if (h.stage === 'putt') {
     if (choice === 'safe') return { tone: 'good', text: 'Lag it close' }
@@ -174,7 +174,7 @@ export function StatusBanner(props: { hole: HoleInPlay }) {
 
 export function TierBanner(props: { hole: HoleInPlay }) {
   const spec = props.hole.layout.spec
-  const m = pressure(spec.strokeIndex, spec.par, props.hole.cond)
+  const m = pressure(spec.strokeIndex, spec.par, props.hole.cond, props.hole.layout.gust ?? 0)
   const tier =
     m < 0.34
       ? { cls: 'good', text: 'Gettable — green light' }

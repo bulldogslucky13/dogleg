@@ -5,6 +5,15 @@ import { fnv1a, mulberry32 } from '../engine/rng'
 const W = 360
 const H = 520
 
+/**
+ * How far off green-center today's pin sits, as a fraction of the green's
+ * radius — shared by the top-down map (pinPt, aim ring, flag) and GreenView
+ * (holeX), so a tucked pin reads as more hidden than a middle or open one in
+ * BOTH views, and there's exactly one place to retune the offsets. `center`
+ * pins use frac 0 (sign is 0 too, so it's moot) — kept for completeness.
+ */
+const PIN_OFFSET_FRAC: Record<PinPosition['tier'], number> = { open: 0.28, middle: 0.45, tucked: 0.62 }
+
 export interface MapSize {
   w: number
   h: number
@@ -336,9 +345,10 @@ export function HoleMap(props: {
   // where the flag actually stands on the green (par-3 pin side) — shared by
   // the flag sprite, the approach preview's aim point, and the on-green ball
   const pinPt: Pt = (() => {
+    const pin = layout.pin
     const pn = normalAt(L - 1)
-    const pinSign = layout.pin?.side === 'left' ? 1 : layout.pin?.side === 'right' ? -1 : 0
-    const off = pinSign * greenRx * 0.45
+    const pinSign = pin?.side === 'left' ? 1 : pin?.side === 'right' ? -1 : 0
+    const off = pinSign * PIN_OFFSET_FRAC[pin?.tier ?? 'middle'] * greenRx
     return { x: greenPt.x + pn.x * off, y: greenPt.y + pn.y * off }
   })()
 
@@ -721,8 +731,12 @@ export function GreenView(props: {
   // ball, so pin-left is screen-left; a tucked flag hides near the edge, an
   // open one sits fat. No pin (par 4s/5s, pre-pin saves) = classic center cup.
   const greenRx = Math.max(230 * k, w * 0.68)
+  // GreenView faces the green head-on (always north-up), unlike the top-down
+  // map's geometry-normal orientation — so "left" here is screen-left
+  // directly, opposite sign from HoleMap's pinPt. Tier magnitude comes from
+  // the SAME table as the map, so a tucked pin reads equally hidden in both.
   const pinSign = pin?.side === 'left' ? -1 : pin?.side === 'right' ? 1 : 0
-  const pinFrac = pin ? (pin.tier === 'tucked' ? 0.62 : pin.tier === 'open' ? 0.28 : 0.45) : 0
+  const pinFrac = pin ? PIN_OFFSET_FRAC[pin.tier] : 0
   const holeX = cx + pinSign * pinFrac * greenRx * 0.72
   // the ball rests where it truly is: a short putt hugs the flag's side of
   // the green, a long lag drifts back toward the fat middle (every aim

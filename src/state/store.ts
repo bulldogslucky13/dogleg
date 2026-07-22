@@ -4,7 +4,7 @@ import { startHole, playShot, type HoleInPlay } from '../engine/resolve'
 import { rngFromString, skip, type Rng } from '../engine/rng'
 import type { CharacterId, Choice, Conditions, HoleResult, HoleScore, Stage } from '../engine/types'
 import { courseBySlug } from '../engine/courses'
-import { EMPTY_FORTUNE, encodeFortune, splitFortune, type FortuneState } from '../engine/fortune'
+import { EMPTY_FORTUNE, encodeFortune, fortuneEligible, splitFortune, type FortuneState } from '../engine/fortune'
 import { gradeRound } from '../engine/grade'
 import { AGGRESSIVE_BUDGET, decisionsFromScores, destinyPlan, fortuneOddsFor, setupFromSeed } from '../engine/replay'
 import { track } from '../lib/analytics'
@@ -827,7 +827,8 @@ function updateFortuneAfterRound(state: RoundState): void {
   // par-3 short courses sit outside fortune: their rounds neither advance the
   // drought counters (grinding 9-hole quickies toward destiny) nor spend them
   // (an odds-won ace there shouldn't reset your march on the big courses)
-  if (courseBySlug(state.courseSlug)?.par3Course) return
+  const course = courseBySlug(state.courseSlug)
+  if (course && !fortuneEligible(course)) return
   try {
     // a round counts once, however many times the result screen re-records it
     if (localStorage.getItem(FORTUNE_LAST_KEY) === state.seed) return

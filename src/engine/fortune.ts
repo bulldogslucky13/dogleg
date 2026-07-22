@@ -22,6 +22,16 @@
  * at ~1-in-70 (aggressive, 18 holes) through ~1-in-380 (safe, 9 holes),
  * rare enough to stay special, common enough to actually happen.
  */
+import type { CourseSpec } from './types'
+
+/** Is this course inside fortune at all? Par-3 short courses are excluded
+ * entirely (see the module doc above) — single predicate so destinyPlan/
+ * fortuneOddsFor (replay.ts) and updateFortuneAfterRound (store.ts) can
+ * never independently drift on which courses the exclusion covers. */
+export function fortuneEligible(course: Pick<CourseSpec, 'par3Course'>): boolean {
+  return !course.par3Course
+}
+
 export const FORTUNE_CONFIG = {
   practice: {
     /** expected rounds per event at k = 0, then +step per event, capped */

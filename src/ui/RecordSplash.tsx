@@ -52,7 +52,7 @@ export function RecordSplash(props: {
       })
       const outcome = await shareMomentCard(blob, {
         filename: 'dogleg-course-record.png',
-        text: `Reclaimed the course record on ${props.courseName} (${toParLabel(props.toPar)}) — DogLeg`,
+        text: `${props.takenFrom ? 'Reclaimed' : 'Set'} the course record on ${props.courseName} (${toParLabel(props.toPar)}) — DogLeg`,
         url: `https://${SITE_URL}`,
       })
       if (outcome === 'cancelled') return

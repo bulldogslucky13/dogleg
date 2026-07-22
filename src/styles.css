@@ -1682,20 +1682,41 @@ button {
   color: #9c3f33;
 }
 
-/* the pre-round stakes strip: quick, names the chase, never delays the tee */
+/* the pre-round tale of the tape: holder, score, and their actual card —
+   quick to read, never delays the tee shot */
 .ghost-stakes {
   border: 1.5px dashed var(--line);
   border-radius: 12px;
-  padding: 9px 12px;
-  font-size: 0.85rem;
-  font-weight: 700;
-  text-align: center;
-  color: rgba(29, 43, 32, 0.75);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: rgba(29, 43, 32, 0.8);
 }
 
 .ghost-stakes.cr {
   border-color: rgba(201, 162, 39, 0.6);
   background: rgba(201, 162, 39, 0.08);
+}
+
+.ghost-stakes-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 0.85rem;
+}
+
+.ghost-stakes-score {
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.ghost-stakes .ghost-grid {
+  align-self: center;
+  font-size: 0.8rem;
+  line-height: 1.25;
+  letter-spacing: 1px;
 }
 
 .ghost-close {

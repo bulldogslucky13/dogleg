@@ -1,11 +1,13 @@
 import { courseBySlug } from '../engine/courses'
 import { replayFrames, replayRound, type ReplayFrame } from '../engine/replay'
-import type { BallState, CharacterId } from '../engine/types'
+import type { BallState, CharacterId, Choice, HoleResult } from '../engine/types'
+import { fetchRecordReplay, loadPlayer } from '../lib/leaderboard'
 import { chasing } from '../lib/records'
 import { loadArchive, type ArchivedRound } from './store'
 
 /**
- * The ghost — a record round played back alongside a live unlimited round.
+ * The ghost — the course-record round played back alongside a live unlimited
+ * round.
  *
  * This is a PACE race, not a shot-for-shot overlay. Rounds are deliberately
  * not deterministic across players or attempts: the ghost faced its own
@@ -14,64 +16,83 @@ import { loadArchive, type ArchivedRound } from './store'
  * the ghost ball on the map is atmosphere. Nothing here touches the live
  * round's rng, odds, or scoring.
  *
- * Replay availability is local-only (course_records stores holder + score,
- * never the round), so the ghost is the best round THIS device can replay:
- * the true course-record round when this player set it, otherwise their own
- * best on the course. A true-record ghost of another player's round needs
- * server-side replay storage — separate track.
+ * Where the ghost comes from, in order:
+ *  1. The TRUE record round — the referee keeps the seed + decisions of every
+ *     record it confirms (course_records.seed/decisions), so challengers race
+ *     the actual holder. Loaded on demand at attempt start, never preloaded.
+ *  2. Records set before the round was kept (or offline): the player's own
+ *     best replayable round on the course — clearly labeled as such.
  */
 
-export interface GhostTarget {
-  /** the round being chased */
+export interface Ghost {
+  /** 'record' = the standing course record; 'personal' = your own best here */
+  kind: 'record' | 'personal'
+  /** the record holder's clubhouse name; null when the ghost is your own round */
+  holder: string | null
   seed: string
   character?: CharacterId
   toPar: number
-  /** true when this replay IS the standing course record (set here, not since stolen) */
-  isCourseRecord: boolean
-}
-
-export interface Ghost extends GhostTarget {
+  /** the ghost round's per-hole results — the stakes card's color blocks */
+  results: HoleResult[]
   /** cumulative to-par through hole 1..18 — paceToPar[i] is after hole i+1 */
   paceToPar: number[]
   frames: ReplayFrame[]
 }
 
-/** The cheap preview for the pre-round stakes strip — no replay computed. */
-export function ghostTarget(courseSlug: string, excludeSeed?: string): GhostTarget | null {
+/**
+ * Load the ghost for an unlimited round on this course: the true record
+ * round when the server has it, the player's own best otherwise, null when
+ * there's nothing to race — normal round, no ghost.
+ */
+export async function loadGhost(courseSlug: string, excludeSeed?: string): Promise<Ghost | null> {
+  const rec = await fetchRecordReplay(courseSlug)
+  if (rec?.seed && rec.decisions && rec.seed !== excludeSeed) {
+    const myName = loadPlayer()?.name ?? null
+    const mine = !!myName && rec.player_name.toLowerCase() === myName.toLowerCase()
+    const ghost = buildGhost(rec.seed, rec.character ?? undefined, rec.decisions, {
+      kind: 'record',
+      holder: mine ? null : rec.player_name,
+    })
+    if (ghost) return ghost
+    // a stored round that doesn't replay (never expected — the referee
+    // verified it) falls through to the local ghost rather than no ghost
+  }
   const best = bestReplayable(courseSlug, excludeSeed)
   if (!best) return null
-  return {
-    seed: best.seed,
-    character: best.character,
-    toPar: best.toPar,
-    // courseRecord marks the round that TOOK the record; if that record has
-    // since been stolen (the ledger knows), this replay is no longer the wall
-    isCourseRecord: !!best.courseRecord && !chasing(courseSlug),
-  }
+  return buildGhost(best.seed, best.character, best.decisions, {
+    // your own archived round can itself be the standing record (set before
+    // the server kept rounds); the steal ledger knows if it has since fallen
+    kind: best.courseRecord && !chasing(courseSlug) ? 'record' : 'personal',
+    holder: null,
+  })
 }
 
-/**
- * The full ghost, loaded on demand when an attempt starts: one replay pass
- * for the exact per-hole scoreline, one for the frame-by-frame ball states.
- * Null when the course has nothing replayable — normal round, no ghost.
- */
-export function loadGhost(courseSlug: string, excludeSeed?: string): Ghost | null {
-  const target = ghostTarget(courseSlug, excludeSeed)
-  if (!target) return null
-  const best = loadArchive().find((r) => r.seed === target.seed)
-  if (!best) return null
-  const outcome = replayRound(best.seed, best.character, best.decisions)
+function buildGhost(
+  seed: string,
+  character: CharacterId | undefined,
+  decisions: Choice[][],
+  identity: Pick<Ghost, 'kind' | 'holder'>,
+): Ghost | null {
+  const outcome = replayRound(seed, character, decisions)
   if (!outcome.ok) return null
-  const frames = replayFrames(best.seed, best.character, best.decisions)
+  const frames = replayFrames(seed, character, decisions)
   if (!frames) return null
-  const pars = courseBySlug(courseSlug)?.holes.map((h) => h.par) ?? Array(18).fill(4)
+  const pars = courseBySlug(outcome.info.course.slug)?.holes.map((h) => h.par) ?? Array(18).fill(4)
   const paceToPar: number[] = []
   let run = 0
   outcome.scores.forEach((s, i) => {
     run += s.strokes - pars[i]
     paceToPar.push(run)
   })
-  return { ...target, paceToPar, frames }
+  return {
+    ...identity,
+    seed,
+    character,
+    toPar: outcome.toPar,
+    results: outcome.results,
+    paceToPar,
+    frames,
+  }
 }
 
 function bestReplayable(courseSlug: string, excludeSeed?: string): ArchivedRound | null {
@@ -126,8 +147,13 @@ export function paceVs(ghost: Ghost, playerScores: Array<{ strokes: number } | n
   return { diff, holesCompared: done, state: diff < 0 ? 'ahead' : diff > 0 ? 'behind' : 'even' }
 }
 
-/** "−1 vs pace" / "+2 vs pace" / "even with the record" */
-export function paceLabel(pace: Pace): string {
-  if (pace.state === 'even') return 'even vs pace'
-  return `${pace.diff > 0 ? '+' : '−'}${Math.abs(pace.diff)} vs pace`
+/** what the chip calls the thing being raced — short, honest */
+export function ghostNoun(ghost: Ghost): string {
+  return ghost.kind === 'record' ? 'the record' : 'your best'
+}
+
+/** "−1 vs the record" / "+2 vs your best" / "even with the record" */
+export function paceLabel(pace: Pace, ghost: Ghost): string {
+  if (pace.state === 'even') return `even with ${ghostNoun(ghost)}`
+  return `${pace.diff > 0 ? '+' : '−'}${Math.abs(pace.diff)} vs ${ghostNoun(ghost)}`
 }

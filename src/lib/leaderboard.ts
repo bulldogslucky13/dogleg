@@ -1,5 +1,5 @@
 import { decisionsFromScores } from '../engine/replay'
-import type { CharacterId, HoleResult } from '../engine/types'
+import type { CharacterId, Choice, HoleResult } from '../engine/types'
 import type { HistoryEntry, RoundState } from '../state/store'
 import { SUPABASE_ANON_KEY, SUPABASE_URL, backendEnabled } from './backend'
 
@@ -109,6 +109,31 @@ export interface CourseRecord {
   player_name: string
   character: CharacterId | null
   to_par: number
+}
+
+/** A course record WITH its stored round — enough to replay it as a ghost.
+ * seed/decisions are null for records set before the round was kept. */
+export interface RecordReplay extends CourseRecord {
+  seed: string | null
+  decisions: Choice[][] | null
+}
+
+/** The one course's record round, loaded on demand when an attempt starts —
+ * never preloaded (the decision list is small, but 49 of them isn't). */
+export async function fetchRecordReplay(courseSlug: string): Promise<RecordReplay | null> {
+  if (!backendEnabled) return null
+  try {
+    const url =
+      `${SUPABASE_URL}/rest/v1/course_records` +
+      `?course_slug=eq.${encodeURIComponent(courseSlug)}` +
+      `&select=course_slug,player_name,character,to_par,seed,decisions`
+    const res = await fetch(url, { headers: REST_HEADERS })
+    if (!res.ok) return null
+    const rows = (await res.json()) as RecordReplay[]
+    return rows[0] ?? null
+  } catch {
+    return null
+  }
 }
 
 export async function fetchCourseRecords(): Promise<Map<string, CourseRecord> | null> {

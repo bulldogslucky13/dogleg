@@ -97,12 +97,16 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
       .find((b): b is HTMLButtonElement => b !== null)!
     fireEvent.click(courseButton)
 
-    // the stakes strip names the chase before the tee shot
-    expect(screen.getByText(/The ghost is your best here/)).toBeTruthy()
+    // the ghost loads async (record fetch → local fallback) — flush it
+    await act(async () => {})
+    // the tale of the tape names the chase before the tee shot, card included
+    expect(screen.getByText(/The ghost: your best round here/)).toBeTruthy()
+    expect(document.querySelector('.ghost-grid')).not.toBeNull()
     fireEvent.click(screen.getByText(CHARACTERS[0].name))
+    await act(async () => {})
 
     // pace chip is up from the first tee (chasing state before any hole closes)
-    expect(screen.getByText(new RegExp(`chasing`))).toBeTruthy()
+    expect(screen.getByText(/chasing your best/)).toBeTruthy()
 
     // play hole 1 to completion — the chip flips to a live pace comparison
     for (let g = 0; g < 30; g++) {
@@ -122,7 +126,7 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
         vi.advanceTimersByTime(1500)
       })
     }
-    expect(screen.getByText(/vs pace/)).toBeTruthy()
+    expect(screen.getByText(/vs your best|even with your best/)).toBeTruthy()
     void target // (the exact diff depends on live dice — presence is the contract)
   })
 
@@ -182,7 +186,9 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
       .map((el) => el.closest('button'))
       .find((b): b is HTMLButtonElement => b !== null)!
     fireEvent.click(courseButton)
+    await act(async () => {})
     fireEvent.click(screen.getByText(CHARACTERS[0].name))
+    await act(async () => {})
 
     // the pace tracker (the feature) stays; the ghost ball (theater) is gone
     expect(screen.getByText(/chasing/)).toBeTruthy()

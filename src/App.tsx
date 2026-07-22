@@ -29,7 +29,7 @@ import {
   type UiMode,
 } from './state/store'
 import { absorbHistory, logRound } from './state/stats'
-import { ghostBallAt, ghostTarget, loadGhost, paceLabel, paceVs } from './state/ghost'
+import { ghostBallAt, ghostNoun, loadGhost, paceLabel, paceVs, type Ghost } from './state/ghost'
 import { chasing } from './lib/records'
 import { identifyPlayer, track } from './lib/analytics'
 import { clubhouseLine, fetchHoleChoices, groupChoices, type TallyRow } from './lib/decisionStats'
@@ -186,14 +186,26 @@ export default function App() {
 
   const hole = useMemo(() => (round && !round.complete && round.hole ? holeInPlay(round) : null), [round])
 
-  // The ghost: loaded once per unlimited round (on demand — two replay passes
-  // of the target round, milliseconds), kept through the result screen so the
-  // final margin can be told. Purely derived; never touches the live rng.
-  const ghost = useMemo(
-    () => (round?.mode === 'practice' ? loadGhost(round.courseSlug, round.seed) : null),
+  // The ghost: loaded once per unlimited round — one fetch for the true
+  // record round (the referee keeps what it verified), falling back to the
+  // player's own best; then two replay passes, milliseconds. Kept through
+  // the result screen so the final margin can be told. Purely derived;
+  // never touches the live rng.
+  const [ghost, setGhost] = useState<Ghost | null>(null)
+  useEffect(() => {
+    if (round?.mode !== 'practice') {
+      setGhost(null)
+      return
+    }
+    let live = true
+    void loadGhost(round.courseSlug, round.seed).then((g) => {
+      if (live) setGhost(g)
+    })
+    return () => {
+      live = false
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [round?.seed],
-  )
+  }, [round?.seed])
   // reduced motion drops the ghost ball (theater) but keeps the pace tracker
   // (the feature); jsdom has no matchMedia, hence the guard
   const reducedMotion = useMemo(
@@ -363,7 +375,6 @@ export default function App() {
       <CharacterPickScreen
         setup={start.setup}
         practice={start.mode === 'practice'}
-        ghost={start.mode === 'practice' ? ghostTarget(start.setup.course.slug) : null}
         onPick={(character: CharacterId) => {
           const r = newRound(start.setup, start.mode, character, loadIdentity()?.id)
           track('round_started', { mode: start.mode, course: r.courseSlug, puzzle_number: r.puzzleNumber, character })
@@ -412,7 +423,7 @@ export default function App() {
         boardRound={recapSource}
         ghostClose={
           isPractice && round && ghost
-            ? { margin: roundToPar(round) - ghost.toPar, isCourseRecord: ghost.isCourseRecord }
+            ? { margin: roundToPar(round) - ghost.toPar, kind: ghost.kind, holder: ghost.holder }
             : null
         }
         character={isPractice && round ? round.character : entry?.character}
@@ -587,7 +598,10 @@ export default function App() {
               const pace = paceVs(ghost, round.scores, round.courseSlug)
               return (
                 <div className={`pace-chip ${pace.state}`}>
-                  👻 {pace.holesCompared === 0 ? `chasing ${toParLabel(ghost.toPar)}` : paceLabel(pace)}
+                  👻{' '}
+                  {pace.holesCompared === 0
+                    ? `chasing ${ghostNoun(ghost)} · ${toParLabel(ghost.toPar)}`
+                    : paceLabel(pace, ghost)}
                 </div>
               )
             })()

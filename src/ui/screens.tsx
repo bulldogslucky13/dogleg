@@ -9,7 +9,7 @@ import { track } from '../lib/analytics'
 import { backendEnabled } from '../lib/backend'
 import { fetchCourseRecords, loadPlayer, type CourseRecord } from '../lib/leaderboard'
 import { dismissSteals, pendingSteals, syncLedger, type StolenRecord } from '../lib/records'
-import type { GhostTarget } from '../state/ghost'
+import { loadGhost, type Ghost } from '../state/ghost'
 import { currentHandicap, formatHandicap } from '../state/stats'
 import { characterRecords, computeStreaks, loadArchive, type HistoryEntry, type RoundRecap, type RoundState } from '../state/store'
 import { AccountPanel } from './AccountPanel'
@@ -246,6 +246,63 @@ function StealCard(props: {
   )
 }
 
+/** what the result screen's quiet close calls the thing that was raced */
+function ghostCloseNoun(close: { kind: 'record' | 'personal'; holder: string | null }): string {
+  if (close.kind !== 'record') return 'your best'
+  return close.holder ? `${close.holder}'s record` : 'your own record'
+}
+
+/**
+ * The pre-round tale of the tape: who holds the wall, their score, and their
+ * actual card hole by hole — so the challenger knows exactly what they're
+ * getting into. Self-loading (one fetch + one engine replay) and quick; it
+ * renders when ready and never delays the tee shot.
+ */
+function GhostStakes(props: { courseSlug: string }) {
+  const [ghost, setGhost] = useState<Ghost | null>(null)
+  useEffect(() => {
+    let live = true
+    void loadGhost(props.courseSlug).then((g) => {
+      if (live) setGhost(g)
+    })
+    return () => {
+      live = false
+    }
+  }, [props.courseSlug])
+  if (!ghost) return null
+  const char = characterById(ghost.character)
+  const headline =
+    ghost.kind === 'record'
+      ? ghost.holder
+        ? `The record: ${ghost.holder}`
+        : 'The record is yours — defend it'
+      : 'The ghost: your best round here'
+  return (
+    <div className={`ghost-stakes${ghost.kind === 'record' ? ' cr' : ''}`}>
+      <div className="ghost-stakes-head">
+        <b>👻 {headline}</b>
+        <span className="ghost-stakes-score">
+          {char ? `${char.emoji} ` : ''}
+          {toParLabel(ghost.toPar)}
+        </span>
+      </div>
+      <div className="emoji-grid ghost-grid">
+        <div>
+          {ghost.results.slice(0, 9).map((r, i) => (
+            <span key={i}>{RESULT_SQUARE[r]}</span>
+          ))}
+        </div>
+        <div>
+          {ghost.results.slice(9).map((r, i) => (
+            <span key={i}>{RESULT_SQUARE[r]}</span>
+          ))}
+        </div>
+      </div>
+      <span className="fine">Their card, their luck — you race the pace on your own dice.</span>
+    </div>
+  )
+}
+
 /** The fortune disclosure, wherever the current streak is shown. Flavor
  * only, by design: the mechanic is disclosed, the math stays under the
  * hood — never print the multiplier or the ramp. */
@@ -276,8 +333,6 @@ function HandicapChip(props: { onTap: () => void }) {
 export function CharacterPickScreen(props: {
   setup: DailySetup
   practice: boolean
-  /** the round being chased in unlimited play, when one is replayable */
-  ghost?: GhostTarget | null
   onPick: (c: CharacterId) => void
   onBack: () => void
 }) {
@@ -294,14 +349,7 @@ export function CharacterPickScreen(props: {
         <h2 className="pick-title">Pick your player</h2>
         <p className="tagline">One edge, all 18 holes. Choose for the course in front of you:</p>
       </header>
-      {props.ghost && (
-        <div className={`ghost-stakes${props.ghost.isCourseRecord ? ' cr' : ''}`}>
-          👻{' '}
-          {props.ghost.isCourseRecord
-            ? `The ghost is your course record — ${toParLabel(props.ghost.toPar)}. Defend the pace.`
-            : `The ghost is your best here — ${toParLabel(props.ghost.toPar)}. Race it.`}
-        </div>
-      )}
+      {props.practice && <GhostStakes courseSlug={course.slug} />}
       <div className="chips center">
         <span className="chip">{course.holes.reduce((s, h) => s + h.yards, 0).toLocaleString()} yards</span>
         <span className="chip">Wind {cond.wind} mph</span>
@@ -335,7 +383,7 @@ export function ResultScreen(props: {
   /** the finished round, when it's still in storage — enables board submission */
   boardRound: RoundState | null
   /** the ghost race's quiet close: final margin vs the chased round */
-  ghostClose?: { margin: number; isCourseRecord: boolean } | null
+  ghostClose?: { margin: number; kind: 'record' | 'personal'; holder: string | null } | null
   history: HistoryEntry[]
   onHome: () => void
   onPracticeAgain: () => void
@@ -427,14 +475,13 @@ export function ResultScreen(props: {
       </p>
       {props.ghostClose && props.ghostClose.margin > 0 && (
         <p className="fine ghost-close">
-          👻 {props.ghostClose.margin} off {props.ghostClose.isCourseRecord ? 'the record' : 'your best'} — so
-          close, again. The ghost will be waiting.
+          👻 {props.ghostClose.margin} off {ghostCloseNoun(props.ghostClose)} — so close, again. The ghost will be
+          waiting.
         </p>
       )}
       {props.ghostClose && props.ghostClose.margin === 0 && (
         <p className="fine ghost-close">
-          👻 Matched {props.ghostClose.isCourseRecord ? 'the record' : 'your best'} to the stroke — ties don't take
-          it. One better.
+          👻 Matched {ghostCloseNoun(props.ghostClose)} to the stroke — ties don't take it. One better.
         </p>
       )}
       <div className="emoji-grid">

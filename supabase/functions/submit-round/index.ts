@@ -276,6 +276,12 @@ Deno.serve(async (req) => {
       character: character ?? null,
       to_par: replay.toPar,
       set_at: new Date().toISOString(),
+      // the record ROUND rides along — the referee just replayed and verified
+      // this exact seed + decision list, so keeping it costs nothing and lets
+      // every challenger race the true record as a ghost. Public by design:
+      // it's the same payload a replay share link carries.
+      seed,
+      decisions,
     })
     if (error) return json(500, { error: 'could not save record' })
 

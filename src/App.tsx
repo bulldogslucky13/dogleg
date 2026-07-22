@@ -198,6 +198,10 @@ export default function App() {
       return
     }
     let live = true
+    // drop the previous attempt's ghost before the new one loads — otherwise
+    // a slow or null-returning fetch lets the old course's pace chip, ball,
+    // and early-hole comparisons render against the new round
+    setGhost(null)
     void loadGhost(round.courseSlug, round.seed).then((g) => {
       if (live) setGhost(g)
     })

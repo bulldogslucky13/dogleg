@@ -299,6 +299,31 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
     }
   })
 
+  it('odds-driving chips (water, pin, wind) survive the three-chip cap; flavor yields', async () => {
+    // a stacked par-3 short hole produces four chip candidates: SI flavor,
+    // live water, today's pin, and the gust wind (the ONLY wind display on
+    // phones). Only three fit — the odds-driving trio must be the survivors.
+    const { HazardChips } = await import('./ui/panels')
+    const { buildLayout } = await import('./engine/layout')
+    const { startHole } = await import('./engine/resolve')
+    const spec = { number: 1, par: 3 as const, yards: 150, strokeIndex: 1, dogleg: 'S' as const, hazard: 'water' as const }
+    const cond = {
+      wind: 10,
+      greens: 'Medium' as const,
+      difficulty: 5,
+      pins: { 1: { tier: 'tucked' as const, side: 'left' as const } },
+      gusts: { 1: 5 },
+    }
+    const hole = startHole(buildLayout('chip-cap-smoke', spec, cond), cond)
+    render(<HazardChips hole={hole} />)
+    expect(screen.getByText(/mph/)).toBeTruthy()
+    expect(screen.getByText(/Sucker pin/)).toBeTruthy()
+    expect(screen.getByText(/Water|water/)).toBeTruthy()
+    expect(screen.queryByText(/Signature test/)).toBeNull()
+    // three chips max, always
+    expect(document.querySelectorAll('.chips .chip').length).toBeLessThanOrEqual(3)
+  })
+
   it("the tier banner's risk read includes the hole's gust, matching the real odds bar", async () => {
     // par-3 short courses carry a per-hole gust (layout.gust) that the odds
     // engine's pressure() factors in on every quoted percentage — the banner

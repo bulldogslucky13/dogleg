@@ -2489,6 +2489,13 @@ button {
   padding: 3px 9px;
 }
 
+/* two-class selector so this wins over .rating-chip's own font-size
+   regardless of stylesheet order — the Play Rating chip stays as compact
+   as its forecast-chip siblings here, even though it's bigger elsewhere */
+.rating-chip.forecast-chip {
+  font-size: 0.72rem;
+}
+
 /* ---------- first-run tutorial ---------- */
 
 .tut-backdrop {

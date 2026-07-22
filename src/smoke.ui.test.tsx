@@ -13,6 +13,7 @@ import { act, cleanup, fireEvent, render, screen, within } from '@testing-librar
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
 import { CHARACTERS } from './engine/characters'
+import { playRatingFor } from './engine/courses'
 import { forecastSetup, localDateKey } from './engine/daily'
 import { setupFromSeed } from './engine/replay'
 import { loadIdentity, loadPlayer } from './lib/leaderboard'
@@ -65,6 +66,22 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
     const forecast = forecastSetup()
     expect(screen.getByText(/Tomorrow's forecast/)).toBeTruthy()
     expect(screen.getAllByText(new RegExp(forecast.course.name)).length).toBeGreaterThan(0)
+
+    // the forecast's Play Rating chip carries a personalized outlook emoji —
+    // comparing tomorrow's rating to today's — appended right on the button
+    const tomorrowRating = playRatingFor(forecast.course.slug)
+    const ratingButtons = screen.getAllByRole('button', { name: new RegExp(`Play Rating ${tomorrowRating}/10`) })
+    expect(ratingButtons.length).toBeGreaterThan(0)
+    const ratingDelta = tomorrowRating - playRatingFor(entry.courseSlug)
+    const forecastButton = ratingButtons.find((b) => b.closest('.forecast'))!
+    expect(forecastButton).toBeTruthy()
+    if (ratingDelta >= 2) {
+      expect(forecastButton.textContent).toMatch(/😬|😩/)
+    } else if (ratingDelta <= -2) {
+      expect(forecastButton.textContent).toMatch(/😅|😮/)
+    } else {
+      expect(forecastButton.textContent).not.toMatch(/😬|😩|😅|😮/)
+    }
   })
 
   it('the Play Rating badge opens and closes its methodology explainer', () => {

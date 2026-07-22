@@ -152,7 +152,7 @@ export function HomeScreen(props: {
         </button>
       )}
 
-      {props.playedToday && <ForecastCard />}
+      {props.playedToday && <ForecastCard today={props.playedToday} />}
 
       <button className="cta ghost" onClick={() => setShowCourses((v) => !v)}>
         Play unlimited · Browse courses
@@ -194,7 +194,7 @@ export function HomeScreen(props: {
  * the home screen once today's round is in the books, so it reads as "you're
  * done — here's what's on the tee tomorrow".
  */
-export function ForecastCard() {
+export function ForecastCard(props: { today: HistoryEntry }) {
   const forecast = forecastSetup()
   const windTone =
     forecast.cond.wind >= 18
@@ -204,21 +204,30 @@ export function ForecastCard() {
         : `${forecast.cond.wind} mph wind`
   const windMood = forecast.cond.wind >= 18 ? '💨' : forecast.cond.wind >= 12 ? '🍃' : '☀️'
   const greensHot = forecast.cond.greens === 'Fast'
+
+  // how tomorrow's Play Rating compares to today's — only call it out when the
+  // swing is real (±2), so the tease isn't noise on an ordinary rotation day.
+  // today's score nudges which emoji lands: a rough day sharpens the harder
+  // read into dread, a hot one softens the easier read into relief.
+  const ratingDelta = playRatingFor(forecast.course.slug) - playRatingFor(props.today.courseSlug)
+  const roughToday = props.today.toPar >= 3
+  const hotToday = props.today.toPar <= -2
+  const outlookEmoji =
+    ratingDelta >= 2 ? (roughToday ? '😩' : '😬') : ratingDelta <= -2 ? (hotToday ? '😮‍💨' : '😅') : undefined
+
   return (
     <div className="forecast">
       <div className="kicker">Tomorrow's forecast</div>
-      <p className="forecast-line">
+      <div className="forecast-line">
         <b>{forecast.course.name}</b>
         <span className="chips slim">
           <span className="chip forecast-chip">
-            {windMood} {windTone}
-          </span>
-          <span className="chip forecast-chip">
-            {greensHot ? '⚡ ' : ''}
+            {windMood} {windTone} · {greensHot ? '⚡ ' : ''}
             {forecast.cond.greens.toLowerCase()} greens
           </span>
+          <PlayRatingChip slug={forecast.course.slug} className="forecast-chip" suffix={outlookEmoji} />
         </span>
-      </p>
+      </div>
     </div>
   )
 }

@@ -56,6 +56,17 @@ function missingGhostColumns(error: { code?: string; message?: string }): boolea
   return msg.includes('seed') || msg.includes('decisions')
 }
 
+/**
+ * True when a write failed only because the season_records table itself isn't
+ * there yet (pre-delta database — the schema update is manual, the function
+ * deploy is automatic). PostgREST reports an unknown table as PGRST205;
+ * Postgres proper uses 42P01. Anything else is a real failure.
+ */
+function missingSeasonTable(error: { code?: string; message?: string }): boolean {
+  if (error.code !== 'PGRST205' && error.code !== '42P01') return false
+  return (error.message ?? '').includes('season_records')
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS })
   if (req.method !== 'POST') return json(405, { error: 'POST only' })
@@ -291,29 +302,83 @@ Deno.serve(async (req) => {
   // HERE, from the ET calendar, at submission time: that single fact makes
   // rollover reliable with nobody online, because a season's rows simply
   // stop changing when submissions start carrying the next key.
+  // The claim is written as two atomic statements rather than a read-then-
+  // write: an insert that only wins when no row exists yet, then an update
+  // the DATABASE gates on `to_par > ours` — so two concurrent submissions
+  // can both race here and the better round holds the row either way.
   const season = seasonForDate(new Date())
-  const { data: seasonExisting } = await supabase
+  const seasonRow = {
+    scope: 'global',
+    season_key: season.key,
+    course_slug: info.course.slug,
+    player_id: player.id,
+    player_name: player.name,
+    character: character ?? null,
+    to_par: replay.toPar,
+    set_at: new Date().toISOString(),
+    seed,
+    decisions,
+  }
+  // null → the database predates season_records (the schema update is manual,
+  // the function deploy automatic). Practice submissions must keep working
+  // through that window: season bookkeeping degrades away and the response
+  // simply omits seasonRecord. Self-heals once the table exists.
+  let seasonRecord: {
+    broken: boolean
+    toPar: number
+    holder: string
+    character: string | null
+    seasonKey: string
+  } | null = null
+  const { data: seasonClaimed, error: seasonClaimError } = await supabase
     .from('season_records')
-    .select('to_par, player_id, player_name, character')
-    .eq('scope', 'global')
-    .eq('season_key', season.key)
-    .eq('course_slug', info.course.slug)
-    .maybeSingle()
-  const isSeasonRecord = !seasonExisting || replay.toPar < seasonExisting.to_par
-  if (isSeasonRecord) {
-    const { error: seasonError } = await supabase.from('season_records').upsert({
-      scope: 'global',
-      season_key: season.key,
-      course_slug: info.course.slug,
-      player_id: player.id,
-      player_name: player.name,
-      character: character ?? null,
-      to_par: replay.toPar,
-      set_at: new Date().toISOString(),
-      seed,
-      decisions,
-    })
-    if (seasonError) return json(500, { error: 'could not save season record' })
+    .upsert(seasonRow, { onConflict: 'scope,season_key,course_slug', ignoreDuplicates: true })
+    .select('to_par')
+  if (seasonClaimError && !missingSeasonTable(seasonClaimError)) {
+    return json(500, { error: 'could not save season record' })
+  }
+  if (!seasonClaimError) {
+    let seasonBroken = (seasonClaimed?.length ?? 0) > 0
+    if (!seasonBroken) {
+      // a row exists — replace it only when this round is strictly better,
+      // decided by the database in one statement (ties keep the holder)
+      const { data: seasonTaken, error: seasonTakeError } = await supabase
+        .from('season_records')
+        .update(seasonRow)
+        .eq('scope', 'global')
+        .eq('season_key', season.key)
+        .eq('course_slug', info.course.slug)
+        .gt('to_par', replay.toPar)
+        .select('to_par')
+      if (seasonTakeError) return json(500, { error: 'could not save season record' })
+      seasonBroken = (seasonTaken?.length ?? 0) > 0
+    }
+    if (seasonBroken) {
+      seasonRecord = {
+        broken: true,
+        toPar: replay.toPar,
+        holder: player.name,
+        character: character ?? null,
+        seasonKey: season.key,
+      }
+    } else {
+      const { data: seasonHolder } = await supabase
+        .from('season_records')
+        .select('to_par, player_name, character')
+        .eq('scope', 'global')
+        .eq('season_key', season.key)
+        .eq('course_slug', info.course.slug)
+        .maybeSingle()
+      if (seasonHolder) {
+        seasonRecord = {
+          broken: false,
+          toPar: seasonHolder.to_par,
+          holder: seasonHolder.player_name,
+          character: seasonHolder.character ?? null,
+          seasonKey: season.key,
+        }
+      }
+    }
   }
 
   // practice: ALL-TIME course records (never reset)
@@ -406,15 +471,7 @@ Deno.serve(async (req) => {
     record: isRecord
       ? { broken: true, toPar: replay.toPar, holder: player.name, character: character ?? null }
       : { broken: false, toPar: existing!.to_par, holder: existing!.player_name, character: existing!.character ?? null },
-    seasonRecord: isSeasonRecord
-      ? { broken: true, toPar: replay.toPar, holder: player.name, character: character ?? null, seasonKey: season.key }
-      : {
-          broken: false,
-          toPar: seasonExisting!.to_par,
-          holder: seasonExisting!.player_name,
-          character: seasonExisting!.character ?? null,
-          seasonKey: season.key,
-        },
+    ...(seasonRecord ? { seasonRecord } : {}),
     player: { id: player.id, name: player.name, ...(player.secret ? { secret: player.secret } : {}) },
   })
 })

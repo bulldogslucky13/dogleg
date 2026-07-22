@@ -1,11 +1,21 @@
 // @vitest-environment jsdom
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { seasonForDate } from '../engine/season'
-import { ackSeason, needsSeasonSplash, pastSeasons, podium, roundsInSeason } from './seasonStore'
+import type { CourseRecord, Player } from '../lib/leaderboard'
+import { ackSeason, needsSeasonSplash, pastSeasons, podium, roundsInSeason, seasonAwards } from './seasonStore'
 import type { LoggedRound } from './stats'
+
+const mockPlayer: { current: Player | null } = { current: null }
+const mockBoard: { current: Map<string, CourseRecord> | null } = { current: null }
+vi.mock('../lib/leaderboard', () => ({
+  loadPlayer: () => mockPlayer.current,
+  fetchSeasonRecords: async () => mockBoard.current,
+}))
 
 beforeEach(() => {
   localStorage.clear()
+  mockPlayer.current = null
+  mockBoard.current = null
 })
 
 describe('the season splash shows once per rollover', () => {
@@ -66,5 +76,27 @@ describe('rounds are assigned to seasons by when they were played', () => {
     const log = [mk(summer.startsAt - 1), mk(summer.startsAt), mk(summer.endsAt - 1), mk(summer.endsAt)]
     const inSummer = roundsInSeason(summer, log)
     expect(inSummer.map((r) => r.playedAt)).toEqual([summer.startsAt, summer.endsAt - 1])
+  })
+})
+
+describe('the awards shelf is scoped to the player who earned it', () => {
+  it("drops a cached shelf when the device's identity changes", async () => {
+    // Fall 2026: exactly one finished season (Summer, the launch season)
+    const august = new Date('2026-08-05T12:00:00Z')
+    mockBoard.current = new Map([
+      ['pebble-beach', { course_slug: 'pebble-beach', player_name: 'Hank', character: null, to_par: -4 }],
+    ])
+    mockPlayer.current = { id: 'p1', secret: 's1', name: 'Hank' }
+    const hanks = await seasonAwards(august)
+    expect(hanks).toHaveLength(1)
+    expect(hanks[0].seasonKey).toBe('2026-q2-summer')
+    expect(hanks[0].place).toBe(1)
+    // same device adopts a different synced identity: Marge must not inherit
+    // Hank's shelf, and the summer board holds nothing of hers
+    mockPlayer.current = { id: 'p2', secret: 's2', name: 'Marge' }
+    expect(await seasonAwards(august)).toHaveLength(0)
+    // an unnamed device shows no shelf at all
+    mockPlayer.current = null
+    expect(await seasonAwards(august)).toHaveLength(0)
   })
 })

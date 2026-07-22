@@ -101,22 +101,32 @@ export interface SeasonAward {
 
 interface AwardCache {
   v: 1
+  /** the clubhouse name (lowercased) these awards were folded for — a device
+   * that adopts a different synced identity must not inherit them */
+  player: string | null
   /** last PAST season folded into the cache */
   through: string | null
   awards: SeasonAward[]
 }
 
-function readAwards(): AwardCache {
+function emptyAwards(player: string | null): AwardCache {
+  return { v: 1, player, through: null, awards: [] }
+}
+
+function readAwards(me: string): AwardCache {
   try {
     const raw = localStorage.getItem(AWARDS_KEY)
     if (raw) {
       const j = JSON.parse(raw) as AwardCache
-      if (j?.v === 1) return j
+      // a cache built for another player (or a pre-scoping cache with no
+      // player at all) is discarded — refetching past seasons is cheap and
+      // the immutable rows make the rebuild identical every time
+      if (j?.v === 1 && j.player === me) return j
     }
   } catch {
     /* fall through */
   }
-  return { v: 1, through: null, awards: [] }
+  return emptyAwards(me)
 }
 
 /**
@@ -126,9 +136,10 @@ function readAwards(): AwardCache {
  * take a past award away.
  */
 export async function seasonAwards(now: Date = new Date()): Promise<SeasonAward[]> {
-  const cache = readAwards()
   const me = loadPlayer()?.name?.toLowerCase() ?? null
-  if (!me) return cache.awards
+  // no clubhouse name → no awards are attributable to this device
+  if (!me) return []
+  const cache = readAwards(me)
   const past = pastSeasons(seasonForDate(now))
   const pending = past.filter((s) => cache.through === null || s.key > cache.through)
   for (const season of pending) {

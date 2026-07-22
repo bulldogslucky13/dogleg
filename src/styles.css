@@ -2460,7 +2460,7 @@ button {
   color: rgba(29, 43, 32, 0.85);
 }
 
-/* end-of-round retention hook: a playful teaser for tomorrow's daily */
+/* home-screen retention hook, shown once today's round is played: a playful teaser for tomorrow's daily */
 .forecast {
   background: var(--cream);
   border: 1.5px solid rgba(201, 162, 39, 0.45);

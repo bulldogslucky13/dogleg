@@ -152,6 +152,8 @@ export function HomeScreen(props: {
         </button>
       )}
 
+      {props.playedToday && <ForecastCard />}
+
       <button className="cta ghost" onClick={() => setShowCourses((v) => !v)}>
         Play unlimited · Browse courses
       </button>
@@ -182,6 +184,41 @@ export function HomeScreen(props: {
       )}
       <HandicapChip onTap={props.onStats} />
       <AccountPanel onHistorySynced={props.onHistorySynced} />
+    </div>
+  )
+}
+
+/**
+ * Tomorrow's daily, teased in golf-forecast tone — course + conditions only,
+ * never the seed/dateKey/puzzle number or anything outcome-derived. Shown on
+ * the home screen once today's round is in the books, so it reads as "you're
+ * done — here's what's on the tee tomorrow".
+ */
+export function ForecastCard() {
+  const forecast = forecastSetup()
+  const windTone =
+    forecast.cond.wind >= 18
+      ? `${forecast.cond.wind} mph gusts`
+      : forecast.cond.wind >= 12
+        ? `${forecast.cond.wind} mph breeze`
+        : `${forecast.cond.wind} mph wind`
+  const windMood = forecast.cond.wind >= 18 ? '💨' : forecast.cond.wind >= 12 ? '🍃' : '☀️'
+  const greensHot = forecast.cond.greens === 'Fast'
+  return (
+    <div className="forecast">
+      <div className="kicker">Tomorrow's forecast</div>
+      <p className="forecast-line">
+        <b>{forecast.course.name}</b>
+        <span className="chips slim">
+          <span className="chip forecast-chip">
+            {windMood} {windTone}
+          </span>
+          <span className="chip forecast-chip">
+            {greensHot ? '⚡ ' : ''}
+            {forecast.cond.greens.toLowerCase()} greens
+          </span>
+        </span>
+      </p>
     </div>
   )
 }
@@ -350,17 +387,6 @@ export function ResultScreen(props: {
     })
     return `https://${SITE_URL}/#watch=${code}`
   })()
-  // tomorrow's daily, teased in golf-forecast tone — course + conditions only,
-  // never the seed/dateKey/puzzle number or anything outcome-derived
-  const forecast = forecastSetup()
-  const windTone =
-    forecast.cond.wind >= 18
-      ? `${forecast.cond.wind} mph gusts`
-      : forecast.cond.wind >= 12
-        ? `${forecast.cond.wind} mph breeze`
-        : `${forecast.cond.wind} mph wind`
-  const windMood = forecast.cond.wind >= 18 ? '💨' : forecast.cond.wind >= 12 ? '🍃' : '☀️'
-  const greensHot = forecast.cond.greens === 'Fast'
   const canNativeShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function'
   const copy = async () => {
     let ok = true
@@ -549,21 +575,6 @@ export function ResultScreen(props: {
           {copiedReplay ? 'Replay link copied ✓' : '🎬 Copy replay link — let them watch it'}
         </button>
       )}
-      <div className="forecast">
-        <div className="kicker">Tomorrow's forecast</div>
-        <p className="forecast-line">
-          <b>{forecast.course.name}</b>
-          <span className="chips slim">
-            <span className="chip forecast-chip">
-              {windMood} {windTone}
-            </span>
-            <span className="chip forecast-chip">
-              {greensHot ? '⚡ ' : ''}
-              {forecast.cond.greens.toLowerCase()} greens
-            </span>
-          </span>
-        </p>
-      </div>
       {props.practice && (
         <button className="cta" onClick={props.onPracticeAgain}>
           Play another practice round

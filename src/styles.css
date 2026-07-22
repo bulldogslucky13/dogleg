@@ -2660,6 +2660,22 @@ button {
   opacity: 1;
 }
 
+/* The modal is DOM-nested inside whatever card holds the chip (e.g. the dark
+   .today-card), so pin its text colors to the light card explicitly — otherwise
+   the host card's cream text leaks in and washes out the prose. */
+.rating-card {
+  color: var(--ink);
+}
+
+.rating-card .kicker {
+  color: rgba(29, 43, 32, 0.5);
+}
+
+.rating-card .tut-body.rating-body,
+.rating-card .tut-body.rating-body p {
+  color: rgba(29, 43, 32, 0.85);
+}
+
 .rating-card .tut-body.rating-body {
   min-height: 0;
   display: flex;

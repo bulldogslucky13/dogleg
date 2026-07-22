@@ -381,37 +381,66 @@ Deno.serve(async (req) => {
     }
   }
 
-  // practice: ALL-TIME course records (never reset)
+  // practice: ALL-TIME course records (never reset). Same race-safe shape as
+  // the season write above: claim-if-absent, then a database-gated replace,
+  // so two concurrent submissions can't leave a worse round on the row. The
+  // pre-write read is NOT part of that decision — it only identifies the
+  // previous holder for the steal email.
   const { data: existing } = await supabase
     .from('course_records')
     .select('to_par, player_id, player_name, character')
     .eq('course_slug', info.course.slug)
     .maybeSingle()
-  const isRecord = !existing || replay.toPar < existing.to_par
+  const record = {
+    course_slug: info.course.slug,
+    player_id: player.id,
+    player_name: player.name,
+    character: character ?? null,
+    to_par: replay.toPar,
+    set_at: new Date().toISOString(),
+  }
+  // the record ROUND rides along — the referee just replayed and verified
+  // this exact seed + decision list, so keeping it costs nothing and lets
+  // every challenger race the true record as a ghost. Public by design:
+  // it's the same payload a replay share link carries.
+  //
+  // pre-delta database: the seed/decisions columns don't exist yet (the
+  // migration is manual, the function deploy is automatic). Both writes
+  // retry without the ghost round; the client falls back to the
+  // challenger's own best. Self-heals once the delta runs.
+  let { data: recordClaimed, error: recordClaimError } = await supabase
+    .from('course_records')
+    .upsert({ ...record, seed, decisions }, { onConflict: 'course_slug', ignoreDuplicates: true })
+    .select('to_par')
+  if (recordClaimError && missingGhostColumns(recordClaimError)) {
+    ;({ data: recordClaimed, error: recordClaimError } = await supabase
+      .from('course_records')
+      .upsert(record, { onConflict: 'course_slug', ignoreDuplicates: true })
+      .select('to_par'))
+  }
+  if (recordClaimError) return json(500, { error: 'could not save record' })
+  let isRecord = (recordClaimed?.length ?? 0) > 0
+  if (!isRecord) {
+    // a record exists — replace it only when this round is strictly better,
+    // decided by the database in one statement (ties keep the holder)
+    let { data: recordTaken, error: recordTakeError } = await supabase
+      .from('course_records')
+      .update({ ...record, seed, decisions })
+      .eq('course_slug', info.course.slug)
+      .gt('to_par', replay.toPar)
+      .select('to_par')
+    if (recordTakeError && missingGhostColumns(recordTakeError)) {
+      ;({ data: recordTaken, error: recordTakeError } = await supabase
+        .from('course_records')
+        .update(record)
+        .eq('course_slug', info.course.slug)
+        .gt('to_par', replay.toPar)
+        .select('to_par'))
+    }
+    if (recordTakeError) return json(500, { error: 'could not save record' })
+    isRecord = (recordTaken?.length ?? 0) > 0
+  }
   if (isRecord) {
-    const record = {
-      course_slug: info.course.slug,
-      player_id: player.id,
-      player_name: player.name,
-      character: character ?? null,
-      to_par: replay.toPar,
-      set_at: new Date().toISOString(),
-    }
-    // the record ROUND rides along — the referee just replayed and verified
-    // this exact seed + decision list, so keeping it costs nothing and lets
-    // every challenger race the true record as a ghost. Public by design:
-    // it's the same payload a replay share link carries.
-    let { error } = await supabase.from('course_records').upsert({ ...record, seed, decisions })
-    // pre-delta database: the seed/decisions columns don't exist yet (the
-    // migration is manual, the function deploy is automatic — this closes the
-    // window between them). Keep the record without the ghost round; the
-    // client falls back to the challenger's own best. Self-heals once the
-    // delta runs and the next break stores its round.
-    if (error && missingGhostColumns(error)) {
-      ;({ error } = await supabase.from('course_records').upsert(record))
-    }
-    if (error) return json(500, { error: 'could not save record' })
-
     // ---- tell the previous holder their record was stolen ----
     // Best effort, entirely behind env config (no RESEND_API_KEY → no-op),
     // and never allowed to affect the submission response: the record is
@@ -464,13 +493,30 @@ Deno.serve(async (req) => {
       else await notify
     }
   }
+  // re-read rather than trust the pre-write snapshot: when our claim lost a
+  // race (existing was null but the insert conflicted), the snapshot has no
+  // holder to show — the row itself always does
+  let recordHolder = existing
+  if (!isRecord && !recordHolder) {
+    const { data: raced } = await supabase
+      .from('course_records')
+      .select('to_par, player_id, player_name, character')
+      .eq('course_slug', info.course.slug)
+      .maybeSingle()
+    recordHolder = raced
+  }
   return json(200, {
     mode: 'practice',
     toPar: replay.toPar,
     strokes: replay.strokes,
     record: isRecord
       ? { broken: true, toPar: replay.toPar, holder: player.name, character: character ?? null }
-      : { broken: false, toPar: existing!.to_par, holder: existing!.player_name, character: existing!.character ?? null },
+      : {
+          broken: false,
+          toPar: recordHolder?.to_par ?? replay.toPar,
+          holder: recordHolder?.player_name ?? player.name,
+          character: recordHolder?.character ?? null,
+        },
     ...(seasonRecord ? { seasonRecord } : {}),
     player: { id: player.id, name: player.name, ...(player.secret ? { secret: player.secret } : {}) },
   })

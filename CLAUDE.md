@@ -28,6 +28,16 @@ variable, and fails loudly if either is missing. To deploy by hand:
 `pnpm build:validator && supabase functions deploy submit-round --project-ref
 <ref> --no-verify-jwt --use-api`.
 
+**Conditions are versioned.** Replay links, archived rounds, and course-record
+ghosts persist only a seed + decisions; conditions re-derive from the seed on
+every replay. So anything that changes what a seed reconstructs (new
+conditions fields, new per-hole draws) MUST be gated so historical seeds keep
+reconstructing exactly what they were dealt: dailies gate on a cutover
+dateKey, practice seeds gate on the seed prefix (`practice:` → `practice2:` →
+…). The pattern, current cutovers, and how to add the next version live in
+the conditions-versioning note in `src/engine/daily.ts`. An ungated change
+here silently rewrites every historical record and replay.
+
 Per-function settings (`verify_jwt`) live in `supabase/config.toml` — that is
 the source of truth for local `supabase serve` as well as deploys. Auth
 settings are *not* in that file: site_url and the redirect allow-list are

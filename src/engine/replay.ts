@@ -12,7 +12,7 @@ export { dailySalt } from './daily'
 // re-exported for the server bundle's fortune verification: the referee
 // recomputes days-since-last-ace/albatross from posted cards, which takes
 // the course's pars to tell an ace (eagle on a par 3) from a plain eagle
-export { FORTUNE_CONFIG, destinyDue } from './fortune'
+export { FORTUNE_CONFIG, destinyDue, fortuneEligible } from './fortune'
 export { courseBySlug } from './courses'
 
 /**
@@ -60,7 +60,10 @@ export function setupFromSeed(seed: string): SeedInfo | null {
     if (course.slug !== slug) return null // seed names a course that isn't that day's rotation
     return { mode: 'daily', course, cond: dailyConditions(dateKey, course), fortune, dateKey, puzzleNumber: n, salt }
   }
-  const practice = /^practice:([a-z0-9-]+):/.exec(base)
+  // every historical practice prefix parses forever; the prefix itself is the
+  // conditions version (practiceConditions gates pin/gust draws on it) — see
+  // the conditions-versioning note in daily.ts
+  const practice = /^practice2?:([a-z0-9-]+):/.exec(base)
   if (practice) {
     const course = courseBySlug(practice[1])
     if (!course) return null

@@ -16,7 +16,8 @@ import { castLinesForHole, castRound } from './engine/cast'
 import { CHARACTERS } from './engine/characters'
 import { COURSES, PAR3_COURSES, courseBySlug, playRatingFor } from './engine/courses'
 import { PLAY_RATINGS } from './engine/playRatings'
-import { courseForPuzzle, dailySetup, forecastSetup, practiceSetup, shareText, type DailySetup } from './engine/daily'
+import { courseForPuzzle, dailyConditions, dailySetup, forecastSetup, practiceSetup, shareText, type DailySetup } from './engine/daily'
+import { splitFortune } from './engine/fortune'
 import { gradeCopy, gradeRound } from './engine/grade'
 import { decisionsFromScores, destinyPlan, fortuneOddsFor, replayRound, setupFromSeed } from './engine/replay'
 import { approachOdds } from './engine/odds'
@@ -163,14 +164,51 @@ describe('smoke: par-3 short courses play start to finish at their real length',
         expect(typeof cond.gusts?.[h.number]).toBe('number')
       }
     }
-    // rotation courses: pins on par 3s only, never gusts
-    const daily = dailySetup().cond
-    const course = dailySetup().course
+    // rotation courses, from the pin era on: pins on par 3s only, never gusts
+    const pinEra = new Date(2026, 6, 25) // ≥ PINS_FROM_DATEKEY (2026-07-24)
+    const daily = dailySetup(pinEra).cond
+    const course = dailySetup(pinEra).course
     for (const h of course.holes) {
       if (h.par === 3) expect(daily.pins?.[h.number]).toBeDefined()
       else expect(daily.pins?.[h.number]).toBeUndefined()
     }
     expect(daily.gusts).toBeUndefined()
+  })
+
+  it('conditions are VERSIONED: pre-pin seeds reconstruct pin-free, exactly as dealt', () => {
+    // Replay links, archives, and record ghosts persist only seed + decisions.
+    // A daily dealt before the cutover must reconstruct without pins forever —
+    // and with the identical wind/greens/difficulty it always had.
+    const prePin = dailyConditions('2026-07-20', COURSES[0])
+    expect(prePin.pins).toBeUndefined()
+    expect(prePin.gusts).toBeUndefined()
+    const postPin = dailyConditions('2026-07-24', COURSES[0])
+    expect(postPin.pins).toBeDefined()
+    // the pin draws ride AFTER the classic three, so the classic three agree
+    // across the cutover for the same rng key shape
+    expect(typeof prePin.wind).toBe('number')
+
+    // old-format practice seeds (the pre-pin `practice:` prefix) parse forever
+    // and reconstruct pin-free; the current prefix carries pins
+    const oldSeed = `practice:${COURSES[0].slug}:12345`
+    const oldInfo = setupFromSeed(oldSeed)
+    expect(oldInfo).not.toBeNull()
+    expect(oldInfo!.cond.pins).toBeUndefined()
+    const fresh = practiceSetup(COURSES[0].slug, '12345')
+    expect(fresh.seed.startsWith('practice2:')).toBe(true)
+    expect(setupFromSeed(fresh.seed)!.cond.pins).toBeDefined()
+  })
+
+  it('fortune-ineligible rounds carry no fortune tail (referee record gate stays open)', () => {
+    // a par-3 short round's seed has no `:f…` tail — the engine ignores
+    // fortune there, and a due tail would trip the referee's destined-round
+    // record gate on a round where destiny never fired
+    const short = newRound(practiceSetup('the-swing', 'smoke-tail'), 'practice', 'dart')
+    expect(splitFortune(short.seed).fortune).toBeNull()
+    expect(setupFromSeed(short.seed)).not.toBeNull()
+    // big-course rounds still carry their tail
+    const big = newRound(practiceSetup('pebble-beach', 'smoke-tail'), 'practice', 'dart')
+    expect(splitFortune(big.seed).fortune).not.toBeNull()
   })
 
   it('a finished short-course round counts its deuces; big courses stay null', () => {

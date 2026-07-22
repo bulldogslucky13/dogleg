@@ -130,8 +130,12 @@ export function newRound(
   // A setup seed is a base seed, but be idempotent if handed one that already
   // carries a fortune tail (e.g. a round seed fed back in) — strip it before
   // re-appending, or the seed grows a second `:f…` tail that won't parse.
+  // Fortune-ineligible courses (the par-3 shorts) carry NO tail at all: the
+  // engine ignores it there, and a due-destiny tail would trip the referee's
+  // "destined rounds don't contend for course records" gate on rounds where
+  // destiny never actually fired.
   const baseSeed = splitFortune(setup.seed).base
-  const fortuneTail = `:${encodeFortune(fortuneFor(mode))}`
+  const fortuneTail = fortuneEligible(course) ? `:${encodeFortune(fortuneFor(mode))}` : ''
   return {
     mode,
     seed: (salt ? `${baseSeed}:${salt}` : baseSeed) + fortuneTail,

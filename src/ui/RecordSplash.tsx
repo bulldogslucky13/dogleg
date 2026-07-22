@@ -6,11 +6,12 @@ import { track } from '../lib/analytics'
 import { momentCardBlob, shareMomentCard } from './momentCard'
 
 /**
- * The reclaim celebration — the fortune splash's little sibling. Same gold
- * confetti energy, scaled down: a card over the result screen instead of a
- * full-screen takeover, dismissible immediately (no advance lock — the
+ * The course-record celebration — the fortune splash's little sibling. Same
+ * gold confetti energy, scaled down: a card over the result screen instead
+ * of a full-screen takeover, dismissible immediately (no advance lock — the
  * result screen underneath is not skippable content). Shares through the
- * same branded card pipeline as the fortune moments.
+ * same branded card pipeline as the fortune moments. With `takenFrom` it's
+ * a reclaim; without, a fresh record.
  */
 export function RecordSplash(props: {
   courseName: string
@@ -61,7 +62,7 @@ export function RecordSplash(props: {
         filename: 'dogleg-course-record.png',
         text: props.season
           ? `${props.season.name} record on ${props.courseName} (${toParLabel(props.toPar)}) — DogLeg`
-          : `Reclaimed the course record on ${props.courseName} (${toParLabel(props.toPar)}) — DogLeg`,
+          : `${props.takenFrom ? 'Reclaimed' : 'Set'} the course record on ${props.courseName} (${toParLabel(props.toPar)}) — DogLeg`,
         url: `https://${SITE_URL}`,
       })
       if (outcome === 'cancelled') return
@@ -76,7 +77,7 @@ export function RecordSplash(props: {
   }
 
   return (
-    <div className="record-splash-backdrop" role="dialog" aria-label="Record reclaimed" onClick={props.onClose}>
+    <div className="record-splash-backdrop" role="dialog" aria-label="Course record" onClick={props.onClose}>
       {confetti.map((_c, i) => (
         <span key={i} className="moment-confetti" style={confettiStyle(i)} aria-hidden />
       ))}

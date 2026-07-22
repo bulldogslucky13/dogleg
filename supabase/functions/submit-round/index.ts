@@ -35,6 +35,18 @@ function utcDateKey(offsetDays: number): string {
   return `${d.getUTCFullYear()}-${`${d.getUTCMonth() + 1}`.padStart(2, '0')}-${`${d.getUTCDate()}`.padStart(2, '0')}`
 }
 
+/**
+ * True when an upsert failed only because the course_records.seed/decisions
+ * columns aren't there yet (pre-delta database). PostgREST reports an unknown
+ * column as PGRST204 with the missing name in the message; Postgres proper
+ * uses 42703. Anything else is a real failure we must not swallow.
+ */
+function missingGhostColumns(error: { code?: string; message?: string }): boolean {
+  if (error.code !== 'PGRST204' && error.code !== '42703') return false
+  const msg = error.message ?? ''
+  return msg.includes('seed') || msg.includes('decisions')
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS })
   if (req.method !== 'POST') return json(405, { error: 'POST only' })
@@ -299,14 +311,27 @@ Deno.serve(async (req) => {
     .maybeSingle()
   const isRecord = !existing || replay.toPar < existing.to_par
   if (isRecord) {
-    const { error } = await supabase.from('course_records').upsert({
+    const record = {
       course_slug: info.course.slug,
       player_id: player.id,
       player_name: player.name,
       character: character ?? null,
       to_par: replay.toPar,
       set_at: new Date().toISOString(),
-    })
+    }
+    // the record ROUND rides along — the referee just replayed and verified
+    // this exact seed + decision list, so keeping it costs nothing and lets
+    // every challenger race the true record as a ghost. Public by design:
+    // it's the same payload a replay share link carries.
+    let { error } = await supabase.from('course_records').upsert({ ...record, seed, decisions })
+    // pre-delta database: the seed/decisions columns don't exist yet (the
+    // migration is manual, the function deploy is automatic — this closes the
+    // window between them). Keep the record without the ghost round; the
+    // client falls back to the challenger's own best. Self-heals once the
+    // delta runs and the next break stores its round.
+    if (error && missingGhostColumns(error)) {
+      ;({ error } = await supabase.from('course_records').upsert(record))
+    }
     if (error) return json(500, { error: 'could not save record' })
 
     // ---- tell the previous holder their record was stolen ----

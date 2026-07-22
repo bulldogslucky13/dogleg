@@ -65,6 +65,16 @@ create table if not exists course_records (
   set_at timestamptz not null default now()
 );
 
+-- The record ROUND itself (seed + decision list), kept from the very replay
+-- the referee verified when the record was confirmed. Lets challengers race
+-- the true record as a ghost. Nullable: records set before this column
+-- existed have no stored round (the ghost falls back to the challenger's own
+-- best until the record is next broken). Public read is deliberate — this is
+-- the same payload a replay share link carries, and record rounds are
+-- bragging material by design.
+alter table course_records add column if not exists seed text;
+alter table course_records add column if not exists decisions jsonb;
+
 -- SEASON course records: one holder per (scope, season, course). Seasons
 -- follow the fixed ET calendar in src/engine/season.ts; the referee stamps
 -- season_key at submission time, which is what makes rollover need no cron

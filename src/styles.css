@@ -1697,6 +1697,82 @@ button {
   white-space: nowrap;
 }
 
+/* ghost pace — the ahead/behind state is the emotional core: color + sign,
+   legible at a glance, one chip, no crowding */
+.pace-chip {
+  margin-top: 5px;
+  display: inline-block;
+  border-radius: 999px;
+  padding: 3px 10px;
+  font-size: 0.68rem;
+  font-weight: 800;
+  white-space: nowrap;
+  border: 1px solid var(--line);
+  background: var(--cream-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.pace-chip.ahead {
+  background: #dcecd4;
+  border-color: rgba(78, 138, 72, 0.5);
+  color: #2e6329;
+}
+
+.pace-chip.behind {
+  background: rgba(192, 91, 77, 0.12);
+  border-color: rgba(192, 91, 77, 0.45);
+  color: #9c3f33;
+}
+
+/* the pre-round tale of the tape: holder, score, and their actual card —
+   quick to read, never delays the tee shot */
+.ghost-stakes {
+  border: 1.5px dashed var(--line);
+  border-radius: 12px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: rgba(29, 43, 32, 0.8);
+}
+
+.ghost-stakes.cr {
+  border-color: rgba(201, 162, 39, 0.6);
+  background: rgba(201, 162, 39, 0.08);
+}
+
+.ghost-stakes-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 0.85rem;
+}
+
+.ghost-stakes-score {
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.ghost-stakes .ghost-grid {
+  align-self: center;
+  font-size: 0.8rem;
+  line-height: 1.25;
+  letter-spacing: 1px;
+}
+
+.ghost-close {
+  font-weight: 700;
+}
+
+/* the ghost ball is atmosphere — reduced motion drops it entirely (the pace
+   chip stays: that's the feature) */
+@media (prefers-reduced-motion: reduce) {
+  .ghost-ball {
+    display: none;
+  }
+}
+
 /* record reclaimed: the fortune splash's little sibling */
 .record-splash-backdrop {
   position: fixed;

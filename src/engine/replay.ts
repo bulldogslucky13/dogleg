@@ -14,6 +14,9 @@ export { dailySalt } from './daily'
 // the course's pars to tell an ace (eagle on a par 3) from a plain eagle
 export { FORTUNE_CONFIG, destinyDue } from './fortune'
 export { courseBySlug } from './courses'
+// the referee stamps every submission's season from the SAME calendar the
+// client displays — one implementation, bundled into engine.mjs
+export { seasonForDate, type Season } from './season'
 
 /**
  * Deterministic round replay — the backbone of leaderboard score validation.

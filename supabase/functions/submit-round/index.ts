@@ -9,7 +9,7 @@
 //
 // deno-lint-ignore-file no-explicit-any
 import { createClient } from 'npm:@supabase/supabase-js@2'
-import { FORTUNE_CONFIG, choiceRowsFromReplay, courseBySlug, dailySalt, destinyDue, replayRound } from './engine.mjs'
+import { FORTUNE_CONFIG, choiceRowsFromReplay, courseBySlug, dailySalt, destinyDue, replayRound, seasonForDate } from './engine.mjs'
 import { buildStealEmail, sendViaResend } from './email.ts'
 
 const CORS = {
@@ -261,7 +261,37 @@ Deno.serve(async (req) => {
     })
   }
 
-  // practice: course records
+  // ---- practice: SEASON course record first (scope 'global' today —
+  // leagues later filter this same table by scope). The season is stamped
+  // HERE, from the ET calendar, at submission time: that single fact makes
+  // rollover reliable with nobody online, because a season's rows simply
+  // stop changing when submissions start carrying the next key.
+  const season = seasonForDate(new Date())
+  const { data: seasonExisting } = await supabase
+    .from('season_records')
+    .select('to_par, player_id, player_name, character')
+    .eq('scope', 'global')
+    .eq('season_key', season.key)
+    .eq('course_slug', info.course.slug)
+    .maybeSingle()
+  const isSeasonRecord = !seasonExisting || replay.toPar < seasonExisting.to_par
+  if (isSeasonRecord) {
+    const { error: seasonError } = await supabase.from('season_records').upsert({
+      scope: 'global',
+      season_key: season.key,
+      course_slug: info.course.slug,
+      player_id: player.id,
+      player_name: player.name,
+      character: character ?? null,
+      to_par: replay.toPar,
+      set_at: new Date().toISOString(),
+      seed,
+      decisions,
+    })
+    if (seasonError) return json(500, { error: 'could not save season record' })
+  }
+
+  // practice: ALL-TIME course records (never reset)
   const { data: existing } = await supabase
     .from('course_records')
     .select('to_par, player_id, player_name, character')
@@ -338,6 +368,15 @@ Deno.serve(async (req) => {
     record: isRecord
       ? { broken: true, toPar: replay.toPar, holder: player.name, character: character ?? null }
       : { broken: false, toPar: existing!.to_par, holder: existing!.player_name, character: existing!.character ?? null },
+    seasonRecord: isSeasonRecord
+      ? { broken: true, toPar: replay.toPar, holder: player.name, character: character ?? null, seasonKey: season.key }
+      : {
+          broken: false,
+          toPar: seasonExisting!.to_par,
+          holder: seasonExisting!.player_name,
+          character: seasonExisting!.character ?? null,
+          seasonKey: season.key,
+        },
     player: { id: player.id, name: player.name, ...(player.secret ? { secret: player.secret } : {}) },
   })
 })

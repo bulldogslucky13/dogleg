@@ -282,6 +282,26 @@ button {
   color: rgba(29, 43, 32, 0.6);
 }
 
+/* the season race: legible pressure, not intrusion */
+.season-countdown {
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-align: center;
+  color: rgba(29, 43, 32, 0.65);
+  border: 1.5px dashed var(--line);
+  border-radius: 10px;
+  padding: 7px 10px;
+}
+
+.course-cr.open {
+  color: var(--good);
+  font-weight: 700;
+}
+
+.course-cr.alltime {
+  opacity: 0.75;
+}
+
 .fine {
   font-size: 0.78rem;
   color: rgba(29, 43, 32, 0.55);
@@ -1257,6 +1277,19 @@ button {
   background: radial-gradient(90% 90% at 50% 45%, #7c56b8 0%, #4c3378 45%, #150d24 100%);
 }
 
+/* the all-time record: clubhouse greens burnished with gold */
+.moment-backdrop.alltime {
+  background: radial-gradient(90% 90% at 50% 45%, #3f7a44 0%, #26512d 45%, #0e2415 100%);
+}
+
+.moment-backdrop.alltime .moment-confetti:nth-child(3n) {
+  background: #ffd968;
+}
+
+.moment-backdrop.alltime .moment-confetti:nth-child(3n + 1) {
+  background: #c9a227;
+}
+
 .moment-rays {
   position: absolute;
   inset: -60%;
@@ -1803,6 +1836,98 @@ button {
   display: flex;
   align-items: center;
   justify-content: space-between;
+}
+
+/* the permanent season awards shelf — earned once, never removed */
+.season-awards {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.season-award {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  border: 1.5px solid var(--line);
+  border-radius: 10px;
+  padding: 7px 12px;
+  font-size: 0.82rem;
+}
+
+.season-award.podium {
+  border-color: rgba(201, 162, 39, 0.55);
+  background: rgba(201, 162, 39, 0.08);
+}
+
+.season-award span {
+  color: rgba(29, 43, 32, 0.6);
+  font-size: 0.74rem;
+  text-align: right;
+}
+
+/* the season-launch splash: podium + holder list inside the tutorial card */
+.season-splash {
+  max-height: calc(100dvh - 60px);
+  overflow-y: auto;
+}
+
+.season-recap-kicker {
+  margin-top: 6px;
+}
+
+.season-podium {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.podium-spot {
+  border: 1.5px solid var(--line);
+  border-radius: 12px;
+  padding: 10px 6px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 0.8rem;
+}
+
+.podium-spot.place-1 {
+  border-color: rgba(201, 162, 39, 0.7);
+  background: rgba(201, 162, 39, 0.1);
+}
+
+.podium-spot .podium-medal {
+  font-size: 1.2rem;
+}
+
+.podium-spot span {
+  font-size: 0.68rem;
+  color: rgba(29, 43, 32, 0.6);
+}
+
+.season-holders {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  max-height: 180px;
+  overflow-y: auto;
+}
+
+.season-holder-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 0.78rem;
+  padding: 3px 2px;
+  border-bottom: 1px solid var(--line);
+}
+
+.round-row.season-held {
+  border-color: rgba(201, 162, 39, 0.55);
+  background: rgba(201, 162, 39, 0.06);
 }
 
 /* account sync CTA — slim, persistent, never in the way */

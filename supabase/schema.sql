@@ -65,6 +65,32 @@ create table if not exists course_records (
   set_at timestamptz not null default now()
 );
 
+-- SEASON course records: one holder per (scope, season, course). Seasons
+-- follow the fixed ET calendar in src/engine/season.ts; the referee stamps
+-- season_key at submission time, which is what makes rollover need no cron
+-- and no finalize step — a season's rows simply stop changing when
+-- submissions start carrying the next key, and past seasons ARE the archive
+-- (podium, awards, and holder lists all derive from these immutable rows).
+-- `scope` is 'global' today; a future League feature filters this same table
+-- by scope ('league:<id>') rather than rebuilding it.
+create table if not exists season_records (
+  scope text not null default 'global',
+  season_key text not null,
+  course_slug text not null,
+  player_id uuid not null references players (id),
+  player_name text not null,
+  to_par int not null,
+  character text,
+  seed text,
+  decisions jsonb,
+  set_at timestamptz not null default now(),
+  primary key (scope, season_key, course_slug)
+);
+
+alter table season_records enable row level security;
+drop policy if exists "anyone can read season records" on season_records;
+create policy "anyone can read season records" on season_records for select using (true);
+
 -- One row per record-steal email actually attempted, keyed by day. The row is
 -- inserted BEFORE the send, so a duplicate key means "already emailed today"
 -- and the send is skipped. At-most-once beats at-least-once here: a lost

@@ -44,6 +44,8 @@ import { ReplayScreen } from './ui/ReplayScreen'
 import { RoundsScreen } from './ui/RoundsScreen'
 import { CharacterPickScreen, HomeScreen, ResultScreen } from './ui/screens'
 import { Tutorial, hasSeenTutorial } from './ui/Tutorial'
+import { SeasonSplash } from './ui/SeasonSplash'
+import { ackSeason, needsSeasonSplash } from './state/seasonStore'
 
 type View = 'home' | 'pick' | 'play' | 'result' | 'watch' | 'rounds'
 
@@ -77,6 +79,8 @@ export default function App() {
   const [uiMode, setUiMode] = useState<UiMode>(loadUiMode)
   const [pending, setPending] = useState<PendingStart | null>(null)
   const [showTutorial, setShowTutorial] = useState(() => !hasSeenTutorial())
+  /** once per rollover: the new-season announcement + last season's recap */
+  const [showSeason, setShowSeason] = useState(() => needsSeasonSplash())
   /** which result the result view shows — the daily card or a finished practice round */
   const [resultFor, setResultFor] = useState<'daily' | 'practice'>('daily')
   const [animating, setAnimating] = useState(false)
@@ -250,6 +254,14 @@ export default function App() {
   if (view === 'home') {
     return (
       <>
+        {!showTutorial && showSeason && (
+          <SeasonSplash
+            onClose={() => {
+              ackSeason()
+              setShowSeason(false)
+            }}
+          />
+        )}
         {showTutorial && (
           <Tutorial
             onClose={() => setShowTutorial(false)}

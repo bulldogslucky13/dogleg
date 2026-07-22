@@ -14,6 +14,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
 import { CHARACTERS } from './engine/characters'
 import { forecastSetup } from './engine/daily'
+import { seasonForDate } from './engine/season'
 import { setupFromSeed } from './engine/replay'
 import { loadIdentity, loadPlayer } from './lib/leaderboard'
 
@@ -29,6 +30,8 @@ beforeEach(() => {
   localStorage.clear()
   // skip the first-run tutorial overlay so the home screen is interactive
   localStorage.setItem('dogleg:tutorial:v1', 'done')
+  // ...and pre-ack the season splash (its own tests clear this)
+  localStorage.setItem('dogleg:season-ack:v1', seasonForDate().key)
 })
 
 afterEach(() => {
@@ -78,6 +81,56 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
     // (AccountPanel itself renders null in tests — backend is off in CI)
     fireEvent.click(screen.getByText(/Playing on more than one device/))
     expect(screen.getByText('Clubhouse')).toBeTruthy()
+  })
+
+  it('the season splash shows once after a rollover, explains the goal, then never again', () => {
+    localStorage.removeItem('dogleg:season-ack:v1')
+    const first = render(<App />)
+    const season = seasonForDate()
+    expect(screen.getByText(new RegExp(`${season.name} has begun`))).toBeTruthy()
+    expect(screen.getByText(/up for grabs/)).toBeTruthy()
+    fireEvent.click(screen.getByText('To the first tee'))
+    expect(screen.queryByText(/has begun/)).toBeNull()
+    first.unmount()
+    // acked: a second open stays quiet until the next rollover
+    render(<App />)
+    expect(screen.queryByText(/has begun/)).toBeNull()
+  })
+
+  it('the unlimited browser shows the season countdown and both boards per course', () => {
+    render(<App />)
+    fireEvent.click(screen.getByText(/Play unlimited/))
+    const season = seasonForDate()
+    expect(screen.getByText(new RegExp(`${season.name} ends in`))).toBeTruthy()
+    // backend is off in tests → the season board never loads and course rows
+    // simply omit record lines (no fabricated empty states offline)
+    expect(screen.queryByText(/Season record open/)).toBeNull()
+  })
+
+  it('the Clubhouse has a Seasons tab with the in-progress season and archive framing', async () => {
+    const { newRound, applyChoice, advanceHole, archiveRound } = await import('./state/store')
+    const { logRound } = await import('./state/stats')
+    const { practiceSetup } = await import('./engine/daily')
+    let s = newRound(practiceSetup('pebble-beach', 'smokeseason'), 'practice', 'dart')
+    let guard = 0
+    while (!s.complete && guard++ < 500) {
+      if (s.hole?.stage === 'done') {
+        s = advanceHole(s)
+        continue
+      }
+      const next = applyChoice(s, 'normal')
+      s = next === s ? applyChoice(s, 'safe') : next
+    }
+    archiveRound(s)
+    logRound(s)
+
+    render(<App />)
+    fireEvent.click(screen.getByText(/Clubhouse · my rounds/))
+    fireEvent.click(screen.getByText('Seasons'))
+    expect(screen.getByText(/in progress — ends in/)).toBeTruthy()
+    expect(screen.getByText(/1 round this season/)).toBeTruthy()
+    // launch season: nothing archived yet, framed as coming — not missing
+    expect(screen.getByText(/first season in the books-to-be/)).toBeTruthy()
   })
 
   it('the streak display carries the fortune disclosure note', () => {

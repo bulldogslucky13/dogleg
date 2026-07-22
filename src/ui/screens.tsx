@@ -7,7 +7,8 @@ import { decisionsFromScores, encodeReplay } from '../engine/replay'
 import type { CharacterId, HoleResult } from '../engine/types'
 import { track } from '../lib/analytics'
 import { backendEnabled } from '../lib/backend'
-import { fetchCourseRecords, loadPlayer, type CourseRecord } from '../lib/leaderboard'
+import { fetchCourseRecords, fetchSeasonRecords, loadPlayer, type CourseRecord } from '../lib/leaderboard'
+import { seasonCountdown, seasonForDate } from '../engine/season'
 import { dismissSteals, pendingSteals, syncLedger, type StolenRecord } from '../lib/records'
 import { currentHandicap, formatHandicap } from '../state/stats'
 import { characterRecords, computeStreaks, loadArchive, type HistoryEntry, type RoundRecap, type RoundState } from '../state/store'
@@ -35,13 +36,20 @@ export function HomeScreen(props: {
   const records = characterRecords(props.history)
   const [showCourses, setShowCourses] = useState(false)
   const [courseRecs, setCourseRecs] = useState<Map<string, CourseRecord> | null>(null)
+  const [seasonRecs, setSeasonRecs] = useState<Map<string, CourseRecord> | null>(null)
   const [steals, setSteals] = useState(() => pendingSteals())
+  const season = seasonForDate()
 
-  // course records load once when the browser opens — free-play bragging rights
+  // both record boards load once when the browser opens — the season board is
+  // the live race, the all-time board is the wall of legends
   useEffect(() => {
     if (showCourses && backendEnabled && courseRecs === null) {
       void fetchCourseRecords().then((r) => setCourseRecs(r ?? new Map()))
+      // a FAILED season fetch stays null (no lines) — an empty season board is
+      // "open, be the first"; an unreachable one must not pretend to know
+      void fetchSeasonRecords(season.key).then((r) => setSeasonRecs(r))
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showCourses, courseRecs])
 
   // the record-stolen check: compare the records this device holds against
@@ -157,21 +165,36 @@ export function HomeScreen(props: {
       </button>
       {showCourses && (
         <div className="course-list">
-          {COURSES.map((c) => (
-            <button key={c.slug} className="course-row" onClick={() => props.onPractice(c.slug)}>
-              <b>{c.name}</b>
-              <span>
-                {c.location} · Play Rating {playRatingFor(c.slug)}/10
-              </span>
-              {courseRecs?.get(c.slug) && (
-                <em className="course-cr">
-                  CR {toParLabel(courseRecs.get(c.slug)!.to_par)} ·{' '}
-                  {characterById(courseRecs.get(c.slug)!.character ?? undefined)?.emoji ?? ''}{' '}
-                  {courseRecs.get(c.slug)!.player_name}
-                </em>
-              )}
-            </button>
-          ))}
+          <p className="season-countdown">
+            ⏳ {season.name} ends in {seasonCountdown(season)} — season records are up for grabs
+          </p>
+          {COURSES.map((c) => {
+            const sr = seasonRecs?.get(c.slug)
+            const at = courseRecs?.get(c.slug)
+            return (
+              <button key={c.slug} className="course-row" onClick={() => props.onPractice(c.slug)}>
+                <b>{c.name}</b>
+                <span>
+                  {c.location} · Play Rating {playRatingFor(c.slug)}/10
+                </span>
+                {seasonRecs &&
+                  (sr ? (
+                    <em className="course-cr">
+                      Season {toParLabel(sr.to_par)} · {characterById(sr.character ?? undefined)?.emoji ?? ''}{' '}
+                      {sr.player_name}
+                    </em>
+                  ) : (
+                    <em className="course-cr open">Season record open — be the first</em>
+                  ))}
+                {at && (
+                  <em className="course-cr alltime">
+                    All-time {toParLabel(at.to_par)} · {characterById(at.character ?? undefined)?.emoji ?? ''}{' '}
+                    {at.player_name}
+                  </em>
+                )}
+              </button>
+            )
+          })}
           <p className="fine">Practice rounds don't touch your streak.</p>
         </div>
       )}

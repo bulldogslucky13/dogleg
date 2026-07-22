@@ -12,10 +12,12 @@ import {
   type CourseRecord,
   type SubmitResult,
 } from '../lib/leaderboard'
-import { recordWon, type StolenRecord } from '../lib/records'
+import { seasonForDate } from '../engine/season'
+import { recordWon } from '../lib/records'
 import { markArchiveRecord, roundToPar, type RoundState } from '../state/store'
 import { courseBySlug } from '../engine/courses'
 import { identifyPlayer, track } from '../lib/analytics'
+import { AllTimeSplash } from './AllTimeSplash'
 import { RecordSplash } from './RecordSplash'
 import { SyncCta } from './RoundsScreen'
 
@@ -32,8 +34,10 @@ export function ScoreBoard(props: { round: RoundState }) {
   const [result, setResult] = useState<SubmitResult | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [board, setBoard] = useState<BoardRow[] | null>(null)
-  /** set when this round took BACK a record that had been stolen from us */
-  const [reclaim, setReclaim] = useState<StolenRecord | null>(null)
+  /** set when this round took the course record — reclaim or fresh break */
+  const [celebrate, setCelebrate] = useState<
+    { tier: 'alltime'; previousHolder: string | null } | { tier: 'season'; takenFrom: string | null } | null
+  >(null)
   /** the standing record, fetched for unnamed players so beating it can
    * become the claim-a-name moment */
   const [standing, setStanding] = useState<CourseRecord | null>(null)
@@ -67,13 +71,15 @@ export function ScoreBoard(props: { round: RoundState }) {
     let reclaimed = false
     if (r.record?.broken) {
       markArchiveRecord(round.seed) // pin it in the locker forever
-      // ledger: this record is ours now — and if it had been stolen from
-      // us, that's a RECLAIM, which deserves its own moment
+      // ledger bookkeeping runs for every all-time break; the CELEBRATION is
+      // tiered — an all-time record outranks (and absorbs) the season one, so
+      // exactly one full-screen moment ever shows
       const stolen = recordWon(round.courseSlug, r.record.toPar)
-      if (stolen) {
-        setReclaim(stolen)
-        reclaimed = true
-      }
+      reclaimed = !!stolen
+      setCelebrate({ tier: 'alltime', previousHolder: standing?.player_name ?? stolen?.by ?? null })
+    } else if (r.seasonRecord?.broken) {
+      // season title only: the record-reclaim treatment with season copy
+      setCelebrate({ tier: 'season', takenFrom: null })
     }
     // the untracked conversion: a round actually WRITTEN to a board. Only
     // count real writes, so the metric isn't inflated by no-op submits:
@@ -154,15 +160,27 @@ export function ScoreBoard(props: { round: RoundState }) {
     const beatsStanding = !player && !result && (!standing || roundToPar(round) < standing.to_par)
     return (
       <div className="board-block">
-        {reclaim && (
+        {celebrate?.tier === 'alltime' && (
+          <AllTimeSplash
+            courseName={courseBySlug(round.courseSlug)?.name ?? round.courseSlug}
+            courseSlug={round.courseSlug}
+            dateKey={round.dateKey}
+            toPar={roundToPar(round)}
+            character={round.character}
+            season={seasonForDate()}
+            previousHolder={celebrate.previousHolder ?? undefined}
+            onClose={() => setCelebrate(null)}
+          />
+        )}
+        {celebrate?.tier === 'season' && (
           <RecordSplash
             courseName={courseBySlug(round.courseSlug)?.name ?? round.courseSlug}
             courseSlug={round.courseSlug}
             dateKey={round.dateKey}
             toPar={roundToPar(round)}
             character={round.character}
-            takenFrom={reclaim.by}
-            onClose={() => setReclaim(null)}
+            season={seasonForDate()}
+            onClose={() => setCelebrate(null)}
           />
         )}
         {rec?.broken && (
@@ -171,9 +189,16 @@ export function ScoreBoard(props: { round: RoundState }) {
             {round.character ? ` ${characterById(round.character)?.emoji ?? ''}` : ''}
           </div>
         )}
+        {result?.seasonRecord && !result.seasonRecord.broken && (
+          <p className="fine">
+            {seasonForDate().name} record: {toParLabel(result.seasonRecord.toPar)} ·{' '}
+            {result.seasonRecord.character ? `${characterById(result.seasonRecord.character)?.emoji ?? ''} ` : ''}
+            {result.seasonRecord.holder}
+          </p>
+        )}
         {rec && !rec.broken && (
           <p className="fine">
-            Course record: {toParLabel(rec.toPar)} ·{' '}
+            All-time record: {toParLabel(rec.toPar)} ·{' '}
             {rec.character ? `${characterById(rec.character)?.emoji ?? ''} ` : ''}
             {rec.holder}
           </p>

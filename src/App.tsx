@@ -593,7 +593,7 @@ export default function App() {
         <div className="hole-right">
           <div className={`topar ${toPar < 0 ? 'good' : toPar > 0 ? 'bad' : ''}`}>{toParLabel(toPar)} to par</div>
           <div className="yards">{hole.layout.length} yards</div>
-          {ghost ? (
+          {ghost &&
             (() => {
               const pace = paceVs(ghost, round.scores, round.courseSlug)
               return (
@@ -604,10 +604,13 @@ export default function App() {
                     : paceLabel(pace, ghost)}
                 </div>
               )
-            })()
-          ) : chase ? (
+            })()}
+          {/* the stolen record stays on the wall unless the ghost IS that record —
+              a personal-best fallback ghost races "your best", so the real target
+              (holder + score) must stay visible for a "win it back" attempt */}
+          {chase && (!ghost || ghost.kind === 'personal') && (
             <div className="chase-chip">🎯 Record {toParLabel(chase.theirToPar)} · {chase.by}</div>
-          ) : null}
+          )}
         </div>
       </header>
 

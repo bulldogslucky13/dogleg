@@ -4,7 +4,7 @@ import { startHole, playShot, type HoleInPlay } from '../engine/resolve'
 import { rngFromString, skip, type Rng } from '../engine/rng'
 import type { CharacterId, Choice, Conditions, HoleResult, HoleScore, Stage } from '../engine/types'
 import { courseBySlug } from '../engine/courses'
-import { EMPTY_FORTUNE, encodeFortune, splitFortune, type FortuneState } from '../engine/fortune'
+import { EMPTY_FORTUNE, encodeFortune, fortuneEligible, splitFortune, type FortuneState } from '../engine/fortune'
 import { gradeRound } from '../engine/grade'
 import { AGGRESSIVE_BUDGET, decisionsFromScores, destinyPlan, fortuneOddsFor, setupFromSeed } from '../engine/replay'
 import { track } from '../lib/analytics'
@@ -110,7 +110,7 @@ export function newRound(
   playerId?: string,
 ): RoundState {
   const course = setup.course
-  const layout = buildLayout(course.slug, course.holes[0])
+  const layout = buildLayout(course.slug, course.holes[0], setup.cond)
   const hole = startHole(layout, setup.cond, character)
   // Daily seeds get a per-player salt: same course, same conditions for
   // everyone, but your OWN dice — so watching someone's replay can't be
@@ -130,8 +130,12 @@ export function newRound(
   // A setup seed is a base seed, but be idempotent if handed one that already
   // carries a fortune tail (e.g. a round seed fed back in) — strip it before
   // re-appending, or the seed grows a second `:f…` tail that won't parse.
+  // Fortune-ineligible courses (the par-3 shorts) carry NO tail at all: the
+  // engine ignores it there, and a due-destiny tail would trip the referee's
+  // "destined rounds don't contend for course records" gate on rounds where
+  // destiny never actually fired.
   const baseSeed = splitFortune(setup.seed).base
-  const fortuneTail = `:${encodeFortune(fortuneFor(mode))}`
+  const fortuneTail = fortuneEligible(course) ? `:${encodeFortune(fortuneFor(mode))}` : ''
   return {
     mode,
     seed: (salt ? `${baseSeed}:${salt}` : baseSeed) + fortuneTail,
@@ -141,7 +145,7 @@ export function newRound(
     puzzleNumber: setup.puzzleNumber,
     dateKey: setup.dateKey,
     currentHole: 0,
-    scores: Array(18).fill(null),
+    scores: Array(course.holes.length).fill(null),
     aggressiveLeft: AGGRESSIVE_BUDGET,
     rolls: 0,
     complete: false,
@@ -169,7 +173,7 @@ function serializeHole(h: HoleInPlay): SerializedHole {
 export function holeInPlay(state: RoundState): HoleInPlay {
   const course = courseBySlug(state.courseSlug)!
   const spec = course.holes[state.currentHole]
-  const layout = buildLayout(course.slug, spec)
+  const layout = buildLayout(course.slug, spec, state.cond)
   const info = setupFromSeed(state.seed)
   const fOdds = info ? fortuneOddsFor(info) : undefined
   const s = state.hole ?? serializeHole(startHole(layout, state.cond, state.character, fOdds))
@@ -243,12 +247,12 @@ function trackHoleCompleted(state: RoundState): void {
 export function advanceHole(state: RoundState): RoundState {
   if (!state.hole?.score) return state
   trackHoleCompleted(state)
-  if (state.currentHole >= 17) {
+  const course = courseBySlug(state.courseSlug)!
+  if (state.currentHole >= course.holes.length - 1) {
     return { ...state, complete: true }
   }
-  const course = courseBySlug(state.courseSlug)!
   const idx = state.currentHole + 1
-  const layout = buildLayout(course.slug, course.holes[idx])
+  const layout = buildLayout(course.slug, course.holes[idx], state.cond)
   const info = setupFromSeed(state.seed)
   const hole = startHole(layout, state.cond, state.character, info ? fortuneOddsFor(info) : undefined)
   return { ...state, currentHole: idx, hole: serializeHole(hole) }
@@ -434,6 +438,8 @@ export interface RoundRecap {
   penalties: number
   /** longest one-putt in feet, if any */
   longestMake: number | null
+  /** par-3 short courses only: holes played in 2 (the deuce count); null elsewhere */
+  deuces: number | null
 }
 
 /** The story of a finished round, computed from its shot records. */
@@ -466,7 +472,10 @@ export function buildRecap(state: RoundState): RoundRecap | null {
       }
     })
   })
-  return { best, worst, aggressiveUsed: AGGRESSIVE_BUDGET - state.aggressiveLeft, penalties, longestMake }
+  const deuces = course.par3Course
+    ? state.scores.filter((s) => s?.strokes === 2).length
+    : null
+  return { best, worst, aggressiveUsed: AGGRESSIVE_BUDGET - state.aggressiveLeft, penalties, longestMake, deuces }
 }
 
 export interface Streaks {
@@ -819,6 +828,11 @@ function updateFortuneAfterRound(state: RoundState): void {
   // daily counters are DERIVED from posted dailies, never accumulated
   // locally — see postedDailyCounters
   if (state.mode !== 'practice') return
+  // par-3 short courses sit outside fortune: their rounds neither advance the
+  // drought counters (grinding 9-hole quickies toward destiny) nor spend them
+  // (an odds-won ace there shouldn't reset your march on the big courses)
+  const course = courseBySlug(state.courseSlug)
+  if (course && !fortuneEligible(course)) return
   try {
     // a round counts once, however many times the result screen re-records it
     if (localStorage.getItem(FORTUNE_LAST_KEY) === state.seed) return

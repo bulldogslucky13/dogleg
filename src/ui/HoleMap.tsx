@@ -1,9 +1,18 @@
 import { useCallback, useMemo, useRef, useState } from 'react'
-import type { ApproachOdds, BallState, Choice, HazardZone, HoleLayout } from '../engine/types'
+import type { ApproachOdds, BallState, Choice, HazardZone, HoleLayout, PinPosition } from '../engine/types'
 import { fnv1a, mulberry32 } from '../engine/rng'
 
 const W = 360
 const H = 520
+
+/**
+ * How far off green-center today's pin sits, as a fraction of the green's
+ * radius — shared by the top-down map (pinPt, aim ring, flag) and GreenView
+ * (holeX), so a tucked pin reads as more hidden than a middle or open one in
+ * BOTH views, and there's exactly one place to retune the offsets. `center`
+ * pins use frac 0 (sign is 0 too, so it's moot) — kept for completeness.
+ */
+const PIN_OFFSET_FRAC: Record<PinPosition['tier'], number> = { open: 0.28, middle: 0.45, tucked: 0.62 }
 
 export interface MapSize {
   w: number
@@ -209,6 +218,9 @@ function Tree({ x, y, s, tone = 0 }: { x: number; y: number; s: number; tone?: n
 /** clamp a yard-based size into a readable on-screen range */
 const clampPx = (px: number, min: number, max: number) => Math.max(min, Math.min(max, px))
 
+/** flank water at least this long is a lake shoreline, not a pond ellipse */
+const LAKE_SPAN_YD = 60
+
 /**
  * Compute drawable placement + ball anchor for every zone. Single source for
  * map & ball. All placements are at the zone's true yardage; lateral offsets
@@ -232,8 +244,9 @@ function placeZones(layout: HoleLayout, geo: Geo): Map<string, ZonePlace> {
     // corridor half-width at this yardage: green footprint near the pin, fairway otherwise
     const corridorYd = mid > greenFrom ? greenRxYd : 15
 
-    if (z.kind === 'ocean' || (z.kind === 'water' && z.side === 'cross')) {
-      // drawn specially (flank / band); anchor for a dropped ball is never needed here
+    if (z.kind === 'ocean' || (z.kind === 'water' && (z.side === 'cross' || z.to - z.from >= LAKE_SPAN_YD))) {
+      // drawn specially (flank / band / lake shoreline); anchor for a dropped
+      // ball is never needed here
       out.set(z.id, { anchor: { x: p.x + n.x * sideSign * 40 * u, y: p.y + n.y * sideSign * 40 * u }, ellipses: [], kind: z.kind })
       continue
     }
@@ -329,10 +342,38 @@ export function HoleMap(props: {
     return groves
   }, [layout])
 
+  // where the flag actually stands on the green (par-3 pin side) — shared by
+  // the flag sprite, the approach preview's aim point, and the on-green ball
+  const pinPt: Pt = (() => {
+    const pin = layout.pin
+    const pn = normalAt(L - 1)
+    const pinSign = pin?.side === 'left' ? 1 : pin?.side === 'right' ? -1 : 0
+    const off = pinSign * PIN_OFFSET_FRAC[pin?.tier ?? 'middle'] * greenRx
+    return { x: greenPt.x + pn.x * off, y: greenPt.y + pn.y * off }
+  })()
+
   // ---- ball position (truth-anchored) — shared by the live ball and the
   // record-round ghost, so both sit on the same geometry ----
   const placeBall = (b: BallState): Pt => {
-    if (b.lie === 'green') return greenPt
+    if (b.lie === 'green') {
+      // on the green the truth is puttFeet-from-the-CUP: rest the ball that
+      // far from the pin, biased toward the fat middle (where every aim
+      // shades) — a kick-in hugs the flag, a lag sits out toward center
+      const feet = b.puttFeet ?? 0
+      if (feet <= 0) return pinPt
+      const d = (feet / 3) * uPerYd
+      const dx = greenPt.x - pinPt.x
+      const dy = greenPt.y - pinPt.y
+      const dl = Math.hypot(dx, dy)
+      if (dl < 1) {
+        // center pin: the miss is short of the hole, toward the front edge
+        return { x: pinPt.x, y: pinPt.y + Math.min(d, greenRy * 0.85) }
+      }
+      // cap at 1.7× the pin→center distance so a monster lag can pass the
+      // middle but never rolls off the far edge of the drawing
+      const reach = Math.min(d, dl * 1.7)
+      return { x: pinPt.x + (dx / dl) * reach, y: pinPt.y + (dy / dl) * reach }
+    }
     const anchored = b.zoneId ? places.get(b.zoneId) : null
     if (anchored) return { x: anchored.anchor.x, y: anchored.anchor.y - 2 }
     if (b.pos > L) {
@@ -370,6 +411,37 @@ export function HoleMap(props: {
           fill="url(#water)"
           stroke="#3a6d86"
           strokeWidth={1.5}
+          opacity={0.95}
+        />
+      )
+    }
+    if (z.kind === 'water' && z.to - z.from >= LAKE_SPAN_YD) {
+      // a lake running the flank: draw the shoreline at its true yardage — a
+      // capped pond ellipse would shrink 150 yards of water into a puddle
+      // (Palm Beach's Intracoastal lakes). Lens-shaped: pinched at the ends,
+      // widest mid-zone, hugging just outside the corridor.
+      const STEPS = 22
+      const inner: string[] = []
+      const outer: string[] = []
+      for (let i = 0; i <= STEPS; i++) {
+        const t = i / STEPS
+        const yy = z.from + (z.to - z.from) * t
+        const pp = at(Math.min(yy, L + 20))
+        const nn = normalAt(Math.min(yy, L - 1))
+        const pinch = Math.min(1, 4 * t * (1 - t) + 0.3)
+        const iOff = 16 * uPerYd
+        const oOff = (16 + 30 * pinch) * uPerYd
+        inner.push(`${(pp.x + nn.x * sideSign * iOff).toFixed(1)},${(pp.y + nn.y * sideSign * iOff).toFixed(1)}`)
+        outer.push(`${(pp.x + nn.x * sideSign * oOff).toFixed(1)},${(pp.y + nn.y * sideSign * oOff).toFixed(1)}`)
+      }
+      return (
+        <path
+          key={z.id}
+          d={`M${inner.join(' L')} L${outer.reverse().join(' L')} Z`}
+          fill="url(#water)"
+          stroke="#3a6d86"
+          strokeWidth={1.5}
+          strokeLinejoin="round"
           opacity={0.95}
         />
       )
@@ -480,6 +552,13 @@ export function HoleMap(props: {
     const feet = (o.kickin * 2 + o.makeable * makeFeet + o.lag * lagFeet) / Math.max(0.0001, onGreen)
     const innerR = Math.min(greenRy * 0.95, Math.max(6, (feet / 3) * 1.15 * uPerYd))
 
+    // The inner ring is the AIM: safe plays the fat middle, aggressive fires
+    // straight at the flag, normal splits the difference. The outer (miss)
+    // ring stays centered on the green — a miss sprays off the whole target.
+    const aimT = ch === 'aggressive' ? 1 : ch === 'normal' ? 0.5 : 0
+    const aimX = greenPt.x + (pinPt.x - greenPt.x) * aimT
+    const aimY = greenPt.y + (pinPt.y - greenPt.y) * aimT
+
     return (
       <g>
         <ellipse
@@ -494,8 +573,8 @@ export function HoleMap(props: {
           strokeWidth={1.4}
         />
         <ellipse
-          cx={greenPt.x}
-          cy={greenPt.y}
+          cx={aimX}
+          cy={aimY}
           rx={innerR}
           ry={innerR * 0.8}
           fill={color}
@@ -569,8 +648,8 @@ export function HoleMap(props: {
         opacity={0.85}
       />
 
-      {/* flag */}
-      <g transform={`translate(${greenPt.x}, ${greenPt.y - 2})`}>
+      {/* flag — standing at today's pin (par-3 side offset, see pinPt) */}
+      <g transform={`translate(${pinPt.x}, ${pinPt.y - 2})`}>
         <line x1="0" y1="0" x2="0" y2="-30" stroke="#26301f" strokeWidth={2.4} />
         <path d="M0,-30 L18,-24 L0,-18 Z" fill="#c05b4d" />
         <ellipse cx="0" cy="1.5" rx="4.5" ry="2" fill="#1d2b20" opacity={0.7} />
@@ -631,17 +710,39 @@ export function HoleMap(props: {
 }
 
 /** Putting surface view. */
-export function GreenView(props: { feet: number; holeNumber: number; greens: string; size?: MapSize | null }) {
-  const { feet } = props
+export function GreenView(props: {
+  feet: number
+  holeNumber: number
+  greens: string
+  /** today's pin (par 3s): shifts the cup toward its real side of the green */
+  pin?: PinPosition
+  size?: MapSize | null
+}) {
+  const { feet, pin } = props
   const { w, h, cx } = cameraFrame(props.size ?? null)
   // green fills the panel height; putt length scales with it
   const k = h / H
   const bend = props.holeNumber % 2 === 0 ? 1 : -1
   const dist = Math.min(215, 46 + feet * 3.4) * k
-  const bx = cx + bend * Math.min(40, feet * 0.9) * k
   // floor keeps the flag (44 units tall) clear of the floating status pill
   const holeY = Math.max(108 * k, 92)
   const ballY = holeY + dist
+  // the cup sits where the pin actually is: golfer faces the green from the
+  // ball, so pin-left is screen-left; a tucked flag hides near the edge, an
+  // open one sits fat. No pin (par 4s/5s, pre-pin saves) = classic center cup.
+  const greenRx = Math.max(230 * k, w * 0.68)
+  // GreenView faces the green head-on (always north-up), unlike the top-down
+  // map's geometry-normal orientation — so "left" here is screen-left
+  // directly, opposite sign from HoleMap's pinPt. Tier magnitude comes from
+  // the SAME table as the map, so a tucked pin reads equally hidden in both.
+  const pinSign = pin?.side === 'left' ? -1 : pin?.side === 'right' ? 1 : 0
+  const pinFrac = pin ? PIN_OFFSET_FRAC[pin.tier] : 0
+  const holeX = cx + pinSign * pinFrac * greenRx * 0.72
+  // the ball rests where it truly is: a short putt hugs the flag's side of
+  // the green, a long lag drifts back toward the fat middle (every aim
+  // shades that way) — so the drawn gap always tracks puttFeet
+  const ballX = holeX + (cx - holeX) * Math.min(1, feet / 40)
+  const bx = (ballX + holeX) / 2 + bend * Math.min(40, feet * 0.9) * k
   return (
     <svg className="holemap" viewBox={`0 0 ${w} ${h}`} role="img" aria-label={`${feet} foot putt`}>
       <defs>
@@ -651,11 +752,11 @@ export function GreenView(props: { feet: number; holeNumber: number; greens: str
         </radialGradient>
       </defs>
       <rect width={w} height={h} fill="#22402c" />
-      <ellipse cx={cx} cy={250 * k} rx={Math.max(230 * k, w * 0.68)} ry={228 * k} fill="url(#gsurf)" />
+      <ellipse cx={cx} cy={250 * k} rx={greenRx} ry={228 * k} fill="url(#gsurf)" />
       <ellipse cx={cx} cy={250 * k} rx={150 * k} ry={148 * k} fill="none" stroke="#f4efe3" strokeWidth={1} opacity={0.18} />
       <ellipse cx={cx} cy={250 * k} rx={82 * k} ry={80 * k} fill="none" stroke="#f4efe3" strokeWidth={1} opacity={0.18} />
       <path
-        d={`M${cx},${ballY} Q${bx},${(ballY + holeY) / 2} ${cx},${holeY + 10}`}
+        d={`M${ballX},${ballY} Q${bx},${(ballY + holeY) / 2} ${holeX},${holeY + 10}`}
         fill="none"
         stroke="#f4efe3"
         strokeWidth={3}
@@ -663,12 +764,12 @@ export function GreenView(props: { feet: number; holeNumber: number; greens: str
         strokeLinecap="round"
         opacity={0.9}
       />
-      <ellipse cx={cx} cy={holeY} rx={7} ry={4.5} fill="#1d2b20" />
-      <g transform={`translate(${cx}, ${holeY})`}>
+      <ellipse cx={holeX} cy={holeY} rx={7} ry={4.5} fill="#1d2b20" />
+      <g transform={`translate(${holeX}, ${holeY})`}>
         <line x1="0" y1="0" x2="0" y2="-44" stroke="#26301f" strokeWidth={2.6} />
         <path d="M0,-44 L22,-36 L0,-29 Z" fill="#c05b4d" />
       </g>
-      <circle cx={cx} cy={ballY} r={7} fill="#f7f5ee" stroke="#26301f" strokeWidth={1.6} />
+      <circle cx={ballX} cy={ballY} r={7} fill="#f7f5ee" stroke="#26301f" strokeWidth={1.6} />
     </svg>
   )
 }

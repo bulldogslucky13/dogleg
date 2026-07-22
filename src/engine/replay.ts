@@ -1,6 +1,6 @@
 import { courseBySlug } from './courses'
 import { dailyConditions, courseForPuzzle, practiceConditions, puzzleNumberForDateKey } from './daily'
-import { destinyDue, fortuneShotOdds, splitFortune, type FortuneState, type MomentKind } from './fortune'
+import { destinyDue, fortuneEligible, fortuneShotOdds, splitFortune, type FortuneState, type MomentKind } from './fortune'
 import { buildLayout } from './layout'
 import { playShot, startHole, type HoleInPlay } from './resolve'
 import { rngFromString } from './rng'
@@ -12,7 +12,7 @@ export { dailySalt } from './daily'
 // re-exported for the server bundle's fortune verification: the referee
 // recomputes days-since-last-ace/albatross from posted cards, which takes
 // the course's pars to tell an ace (eagle on a par 3) from a plain eagle
-export { FORTUNE_CONFIG, destinyDue } from './fortune'
+export { FORTUNE_CONFIG, destinyDue, fortuneEligible } from './fortune'
 export { courseBySlug } from './courses'
 
 /**
@@ -60,7 +60,10 @@ export function setupFromSeed(seed: string): SeedInfo | null {
     if (course.slug !== slug) return null // seed names a course that isn't that day's rotation
     return { mode: 'daily', course, cond: dailyConditions(dateKey, course), fortune, dateKey, puzzleNumber: n, salt }
   }
-  const practice = /^practice:([a-z0-9-]+):/.exec(base)
+  // every historical practice prefix parses forever; the prefix itself is the
+  // conditions version (practiceConditions gates pin/gust draws on it) — see
+  // the conditions-versioning note in daily.ts
+  const practice = /^practice2?:([a-z0-9-]+):/.exec(base)
   if (practice) {
     const course = courseBySlug(practice[1])
     if (!course) return null
@@ -80,14 +83,17 @@ export interface DestinyPlan {
 }
 
 export function destinyPlan(info: SeedInfo): DestinyPlan {
-  if (!info.fortune) return { ace: false, albatross: false }
+  // Par-3 short courses sit outside fortune entirely: eighteen ace chances a
+  // round would let a due destiny be cashed on the cheapest tee in the game.
+  // Aces there are pure odds — see the par-3 paragraph in fortune.ts.
+  if (!info.fortune || !fortuneEligible(info.course)) return { ace: false, albatross: false }
   const due = destinyDue(info.mode, info.fortune)
   return { ace: due.ace, albatross: due.albatross }
 }
 
 /** The per-shot probability boosts that DO flow through the honest odds. */
 export function fortuneOddsFor(info: SeedInfo): { acePerShot: number; albPerShot: number } | undefined {
-  if (!info.fortune) return undefined
+  if (!info.fortune || !fortuneEligible(info.course)) return undefined
   return fortuneShotOdds(info.mode, info.fortune)
 }
 
@@ -100,7 +106,10 @@ export type ReplayOutcome =
 export function replayRound(seed: string, character: CharacterId | undefined, decisions: Choice[][]): ReplayOutcome {
   const info = setupFromSeed(seed)
   if (!info) return { ok: false, error: 'invalid seed' }
-  if (!Array.isArray(decisions) || decisions.length !== 18) return { ok: false, error: 'need 18 holes of decisions' }
+  const holeCount = info.course.holes.length
+  if (!Array.isArray(decisions) || decisions.length !== holeCount) {
+    return { ok: false, error: `need ${holeCount} holes of decisions` }
+  }
 
   // dice ignore the fortune tail — see roundRng in the store for why
   const rng = rngFromString(splitFortune(seed).base)
@@ -109,9 +118,9 @@ export function replayRound(seed: string, character: CharacterId | undefined, de
   const plan = destinyPlan(info)
   const fOdds = fortuneOddsFor(info)
 
-  for (let i = 0; i < 18; i++) {
+  for (let i = 0; i < holeCount; i++) {
     const spec = info.course.holes[i]
-    const layout = buildLayout(info.course.slug, spec)
+    const layout = buildLayout(info.course.slug, spec, info.cond)
     const h = startHole(layout, info.cond, character, fOdds)
     const holeChoices = decisions[i]
     if (!Array.isArray(holeChoices) || holeChoices.length === 0 || holeChoices.length > 20) {
@@ -154,7 +163,7 @@ export function replayRound(seed: string, character: CharacterId | undefined, de
 /** The submission payload a finished client round produces: choices per hole,
  * in the exact order they were played. */
 export function decisionsFromScores(scores: (HoleScore | null)[]): Choice[][] | null {
-  if (scores.length !== 18 || scores.some((s) => !s)) return null
+  if (scores.length === 0 || scores.some((s) => !s)) return null
   return scores.map((s) => s!.shots.map((shot) => shot.choice))
 }
 
@@ -222,9 +231,9 @@ export function replayFrames(seed: string, character: CharacterId | undefined, d
   const fOdds = fortuneOddsFor(info)
   const frames: ReplayFrame[] = []
   let runToPar = 0
-  for (let i = 0; i < 18; i++) {
+  for (let i = 0; i < info.course.holes.length; i++) {
     const spec = info.course.holes[i]
-    const layout = buildLayout(info.course.slug, spec)
+    const layout = buildLayout(info.course.slug, spec, info.cond)
     const h = startHole(layout, info.cond, character, fOdds)
     frames.push({ holeIndex: i, shotIndex: 0, hole: snapshot(h), runningToPar: runToPar })
     decisions[i].forEach((choice, j) => {
@@ -271,7 +280,8 @@ export function decodeReplay(code: string): ReplayPayload | null {
     const j = JSON.parse(raw) as { v: number; s: string; c: string; d: string; n?: string }
     if (j.v !== 1 || typeof j.s !== 'string' || typeof j.d !== 'string') return null
     const decisions = j.d.split('-').map((hole) => hole.split('').map((ch) => CHAR_CHOICE[ch]))
-    if (decisions.length !== 18 || decisions.some((h) => h.some((c) => !c))) return null
+    // hole count varies by course (par-3 shorts run 9/10); replayRound checks the exact length
+    if (decisions.length < 1 || decisions.length > 18 || decisions.some((h) => h.some((c) => !c))) return null
     const character = j.c === 'fairway' || j.c === 'dart' || j.c === 'greens' ? j.c : undefined
     return { seed: j.s, character, decisions, name: j.n || undefined }
   } catch {

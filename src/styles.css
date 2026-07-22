@@ -282,6 +282,52 @@ button {
   color: rgba(29, 43, 32, 0.6);
 }
 
+.course-tabs {
+  display: flex;
+  gap: 6px;
+  padding: 3px;
+  border: 1.5px solid var(--line);
+  border-radius: 12px;
+}
+
+.course-tab {
+  flex: 1;
+  padding: 8px 10px;
+  border-radius: 9px;
+  border: none;
+  background: transparent;
+  color: var(--ink);
+  font-weight: 600;
+  font-size: 0.88rem;
+}
+
+.course-tab.active {
+  background: var(--ink);
+  color: var(--paper, #f4efe2);
+}
+
+.par3-intro {
+  border: 1.5px solid var(--line);
+  border-radius: 12px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 0.88rem;
+}
+
+.par3-intro p {
+  margin: 0;
+}
+
+.par3-intro ul {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
 .fine {
   font-size: 0.78rem;
   color: rgba(29, 43, 32, 0.55);
@@ -2823,15 +2869,26 @@ button {
   margin: 4px 0 2px;
 }
 
+/* flex, not grid: a par-3 course fields only two players, and they should
+ * sit centered at normal card size rather than leaving a phantom third slot */
 .char-cards {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  display: flex;
+  justify-content: center;
   gap: 10px;
+}
+
+.char-cards .char-card {
+  flex: 1 1 0;
+  max-width: calc((100% - 20px) / 3);
 }
 
 @media (max-width: 480px) {
   .char-cards {
-    grid-template-columns: 1fr;
+    flex-direction: column;
+  }
+
+  .char-cards .char-card {
+    max-width: none;
   }
 }
 

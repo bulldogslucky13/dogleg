@@ -364,4 +364,358 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
       { id: 'z8', kind: 'bunker', from: 412, to: 423, side: 'right' },
     ],
   },
+
+  // ---------------------------------------------------------------------
+  // Par-3 short courses. Zones imported from OSM (see COURSE_GEO in
+  // scripts/import-osm.ts), then SCALED so each hole's length equals the
+  // club's published scorecard yardage — the card is the source of truth
+  // for distance, OSM for geography. fairwayFrom/To are 0 by the par-3
+  // convention (no fairway corridor on a one-shotter).
+  // ---------------------------------------------------------------------
+  // hole 1 — scorecard 167 yd (OSM centreline 164 yd, zones scaled to card)
+  'palm-beach-par-3:1': {
+    length: 167,
+    fairwayFrom: 0,
+    fairwayTo: 0,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'water', from: 0, to: 167, side: 'right' },
+      { id: 'z2', kind: 'bunker', from: 49, to: 67, side: 'left' },
+      { id: 'z3', kind: 'bunker', from: 134, to: 147, side: 'right' },
+      { id: 'z4', kind: 'bunker', from: 161, to: 167, side: 'left' },
+    ],
+  },
+  // hole 2 — scorecard 126 yd (OSM centreline 121 yd, zones scaled to card)
+  'palm-beach-par-3:2': {
+    length: 126,
+    fairwayFrom: 0,
+    fairwayTo: 0,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'water', from: 0, to: 96, side: 'left' },
+      { id: 'z2', kind: 'bunker', from: 8, to: 123, side: 'left' },
+    ],
+  },
+  // hole 3 — scorecard 196 yd (OSM centreline 187 yd, zones scaled to card)
+  'palm-beach-par-3:3': {
+    length: 196,
+    fairwayFrom: 0,
+    fairwayTo: 0,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 17, to: 55, side: 'left' },
+      { id: 'z2', kind: 'bunker', from: 73, to: 92, side: 'left' },
+      { id: 'z3', kind: 'water', from: 82, to: 196, side: 'right' },
+      { id: 'z4', kind: 'bunker', from: 105, to: 196, side: 'left' },
+    ],
+  },
+  // hole 4 — scorecard 211 yd (OSM centreline 209 yd, zones scaled to card)
+  'palm-beach-par-3:4': {
+    length: 211,
+    fairwayFrom: 0,
+    fairwayTo: 0,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'ocean', from: 0, to: 211, side: 'left' },
+      { id: 'z2', kind: 'bunker', from: 0, to: 6, side: 'cross' },
+      { id: 'z3', kind: 'water', from: 2, to: 160, side: 'cross' },
+      { id: 'z4', kind: 'bunker', from: 6, to: 113, side: 'left' },
+    ],
+  },
+  // hole 5 — scorecard 176 yd (OSM centreline 169 yd, zones scaled to card)
+  'palm-beach-par-3:5': {
+    length: 176,
+    fairwayFrom: 0,
+    fairwayTo: 0,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'ocean', from: 0, to: 176, side: 'left' },
+      { id: 'z2', kind: 'bunker', from: 42, to: 65, side: 'right' },
+    ],
+  },
+  // hole 6 — scorecard 128 yd (OSM centreline 121 yd, zones scaled to card)
+  'palm-beach-par-3:6': {
+    length: 128,
+    fairwayFrom: 0,
+    fairwayTo: 0,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'ocean', from: 0, to: 128, side: 'left' },
+      { id: 'z2', kind: 'bunker', from: 0, to: 19, side: 'left' },
+      { id: 'z3', kind: 'bunker', from: 23, to: 66, side: 'right' },
+      { id: 'z4', kind: 'bunker', from: 66, to: 85, side: 'cross' },
+      { id: 'z5', kind: 'bunker', from: 85, to: 128, side: 'left' },
+    ],
+  },
+  // hole 7 — scorecard 108 yd (OSM centreline 103 yd, zones scaled to card)
+  'palm-beach-par-3:7': {
+    length: 108,
+    fairwayFrom: 0,
+    fairwayTo: 0,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'ocean', from: 0, to: 108, side: 'right' },
+      { id: 'z2', kind: 'bunker', from: 0, to: 13, side: 'left' },
+      { id: 'z3', kind: 'bunker', from: 13, to: 48, side: 'cross' },
+    ],
+  },
+  // hole 8 — scorecard 133 yd (OSM centreline 125 yd, zones scaled to card)
+  'palm-beach-par-3:8': {
+    length: 133,
+    fairwayFrom: 0,
+    fairwayTo: 0,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'ocean', from: 0, to: 133, side: 'right' },
+      { id: 'z2', kind: 'bunker', from: 0, to: 30, side: 'left' },
+      { id: 'z3', kind: 'bunker', from: 30, to: 64, side: 'right' },
+    ],
+  },
+  // hole 9 — scorecard 81 yd (OSM centreline 74 yd, zones scaled to card)
+  'palm-beach-par-3:9': {
+    length: 81,
+    fairwayFrom: 0,
+    fairwayTo: 0,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 55, to: 63, side: 'right' },
+    ],
+  },
+  // hole 10 — scorecard 112 yd (OSM centreline 107 yd, zones scaled to card)
+  'palm-beach-par-3:10': {
+    length: 112,
+    fairwayFrom: 0,
+    fairwayTo: 0,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 0, to: 10, side: 'right' },
+      { id: 'z2', kind: 'bunker', from: 75, to: 112, side: 'right' },
+    ],
+  },
+  // hole 11 — scorecard 108 yd (OSM centreline 100 yd, zones scaled to card)
+  'palm-beach-par-3:11': {
+    length: 108,
+    fairwayFrom: 0,
+    fairwayTo: 0,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 0, to: 91, side: 'right' },
+      { id: 'z2', kind: 'bunker', from: 86, to: 97, side: 'cross' },
+    ],
+  },
+  // hole 12 — scorecard 126 yd (OSM centreline 117 yd, zones scaled to card)
+  'palm-beach-par-3:12': {
+    length: 126,
+    fairwayFrom: 0,
+    fairwayTo: 0,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 0, to: 24, side: 'cross' },
+      { id: 'z2', kind: 'bunker', from: 24, to: 126, side: 'right' },
+    ],
+  },
+  // hole 13 — scorecard 171 yd (OSM centreline 118 yd, zones scaled to card)
+  'palm-beach-par-3:13': {
+    length: 171,
+    fairwayFrom: 0,
+    fairwayTo: 0,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 0, to: 6, side: 'right' },
+    ],
+  },
+  // hole 14 — scorecard 129 yd (OSM centreline 126 yd, zones scaled to card)
+  'palm-beach-par-3:14': {
+    length: 129,
+    fairwayFrom: 0,
+    fairwayTo: 0,
+    greenDepth: 20,
+    zones: [
+    ],
+  },
+  // hole 15 — scorecard 156 yd (OSM centreline 147 yd, zones scaled to card)
+  'palm-beach-par-3:15': {
+    length: 156,
+    fairwayFrom: 0,
+    fairwayTo: 0,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'water', from: 53, to: 68, side: 'left' },
+      { id: 'z2', kind: 'water', from: 68, to: 108, side: 'cross' },
+      { id: 'z3', kind: 'water', from: 108, to: 156, side: 'left' },
+    ],
+  },
+  // hole 16 — scorecard 117 yd (OSM centreline 112 yd, zones scaled to card)
+  'palm-beach-par-3:16': {
+    length: 117,
+    fairwayFrom: 0,
+    fairwayTo: 0,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'water', from: 61, to: 117, side: 'left' },
+    ],
+  },
+  // hole 17 — scorecard 148 yd (OSM centreline 144 yd, zones scaled to card)
+  'palm-beach-par-3:17': {
+    length: 148,
+    fairwayFrom: 0,
+    fairwayTo: 0,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'water', from: 0, to: 105, side: 'right' },
+      { id: 'z2', kind: 'bunker', from: 0, to: 29, side: 'left' },
+      { id: 'z3', kind: 'bunker', from: 45, to: 72, side: 'cross' },
+      { id: 'z4', kind: 'bunker', from: 72, to: 109, side: 'right' },
+    ],
+  },
+  // hole 18 — scorecard 179 yd (OSM centreline 158 yd, zones scaled to card)
+  'palm-beach-par-3:18': {
+    length: 179,
+    fairwayFrom: 0,
+    fairwayTo: 0,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'water', from: 68, to: 127, side: 'right' },
+    ],
+  },
+  // hole 1 — scorecard 176 yd (OSM centreline 159 yd, zones scaled to card)
+  'cobblestone-creek:1': {
+    length: 176,
+    fairwayFrom: 0,
+    fairwayTo: 0,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 122, to: 133, side: 'left' },
+      { id: 'z2', kind: 'bunker', from: 151, to: 157, side: 'right' },
+    ],
+  },
+  // hole 2 — scorecard 150 yd (OSM centreline 154 yd, zones scaled to card)
+  'cobblestone-creek:2': {
+    length: 150,
+    fairwayFrom: 0,
+    fairwayTo: 0,
+    greenDepth: 22,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 144, to: 150, side: 'right' },
+    ],
+  },
+  // hole 3 — scorecard 168 yd (OSM centreline 171 yd, zones scaled to card)
+  'cobblestone-creek:3': {
+    length: 168,
+    fairwayFrom: 0,
+    fairwayTo: 0,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 151, to: 168, side: 'left' },
+    ],
+  },
+  // hole 4 — scorecard 225 yd (OSM centreline 228 yd, zones scaled to card)
+  'cobblestone-creek:4': {
+    length: 225,
+    fairwayFrom: 0,
+    fairwayTo: 0,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'water', from: 132, to: 138, side: 'left' },
+      { id: 'z2', kind: 'water', from: 138, to: 156, side: 'cross' },
+      { id: 'z3', kind: 'water', from: 156, to: 172, side: 'left' },
+      { id: 'z4', kind: 'bunker', from: 199, to: 211, side: 'left' },
+    ],
+  },
+  // hole 5 — scorecard 108 yd (OSM centreline 159 yd, zones scaled to card)
+  'cobblestone-creek:5': {
+    length: 108,
+    fairwayFrom: 0,
+    fairwayTo: 0,
+    greenDepth: 20,
+    zones: [
+    ],
+  },
+  // hole 6 — scorecard 150 yd (OSM centreline 154 yd, zones scaled to card)
+  'cobblestone-creek:6': {
+    length: 150,
+    fairwayFrom: 0,
+    fairwayTo: 0,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'water', from: 19, to: 43, side: 'left' },
+      { id: 'z2', kind: 'water', from: 43, to: 103, side: 'cross' },
+      { id: 'z3', kind: 'water', from: 103, to: 150, side: 'left' },
+      { id: 'z4', kind: 'bunker', from: 105, to: 111, side: 'right' },
+      { id: 'z5', kind: 'bunker', from: 115, to: 140, side: 'left' },
+    ],
+  },
+  // hole 7 — scorecard 185 yd (OSM centreline 184 yd, zones scaled to card)
+  'cobblestone-creek:7': {
+    length: 185,
+    fairwayFrom: 0,
+    fairwayTo: 0,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 157, to: 161, side: 'right' },
+      { id: 'z2', kind: 'bunker', from: 177, to: 183, side: 'right' },
+    ],
+  },
+  // hole 8 — scorecard 92 yd (OSM centreline 95 yd, zones scaled to card)
+  'cobblestone-creek:8': {
+    length: 92,
+    fairwayFrom: 0,
+    fairwayTo: 0,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 72, to: 77, side: 'left' },
+    ],
+  },
+  // hole 9 — scorecard 225 yd (OSM centreline 229 yd, zones scaled to card)
+  'cobblestone-creek:9': {
+    length: 225,
+    fairwayFrom: 0,
+    fairwayTo: 0,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 153, to: 163, side: 'right' },
+      { id: 'z2', kind: 'bunker', from: 198, to: 212, side: 'left' },
+    ],
+  },
+  // ---------------------------------------------------------------------
+  // PGA Frisco — The Swing. HAND-AUTHORED: OSM maps Fields Ranch East/West
+  // but not the 10-hole Swing short course, so these are drawn from the
+  // published scorecard lengths + aerial imagery of the heavily-bunkered
+  // layout. Replace with a real import if OSM ever grows the course.
+  // ---------------------------------------------------------------------
+  'the-swing:1': { length: 75, fairwayFrom: 0, fairwayTo: 0, greenDepth: 24, zones: [
+    { id: 'z1', kind: 'bunker', from: 55, to: 68, side: 'cross' },
+    { id: 'z2', kind: 'bunker', from: 62, to: 75, side: 'left' },
+  ] },
+  'the-swing:2': { length: 77, fairwayFrom: 0, fairwayTo: 0, greenDepth: 24, zones: [
+    { id: 'z1', kind: 'bunker', from: 60, to: 72, side: 'right' },
+    { id: 'z2', kind: 'bunker', from: 66, to: 77, side: 'left' },
+  ] },
+  'the-swing:3': { length: 88, fairwayFrom: 0, fairwayTo: 0, greenDepth: 26, zones: [
+    { id: 'z1', kind: 'bunker', from: 64, to: 76, side: 'cross' },
+    { id: 'z2', kind: 'bunker', from: 74, to: 88, side: 'right' },
+  ] },
+  'the-swing:4': { length: 70, fairwayFrom: 0, fairwayTo: 0, greenDepth: 22, zones: [
+    { id: 'z1', kind: 'bunker', from: 52, to: 64, side: 'left' },
+    { id: 'z2', kind: 'bunker', from: 58, to: 70, side: 'right' },
+  ] },
+  'the-swing:5': { length: 103, fairwayFrom: 0, fairwayTo: 0, greenDepth: 26, zones: [
+    { id: 'z1', kind: 'bunker', from: 72, to: 86, side: 'cross' },
+    { id: 'z2', kind: 'bunker', from: 84, to: 98, side: 'left' },
+    { id: 'z3', kind: 'bunker', from: 90, to: 103, side: 'right' },
+  ] },
+  'the-swing:6': { length: 77, fairwayFrom: 0, fairwayTo: 0, greenDepth: 24, zones: [] },
+  'the-swing:7': { length: 69, fairwayFrom: 0, fairwayTo: 0, greenDepth: 22, zones: [
+    { id: 'z1', kind: 'bunker', from: 50, to: 62, side: 'right' },
+    { id: 'z2', kind: 'bunker', from: 58, to: 69, side: 'left' },
+  ] },
+  'the-swing:8': { length: 71, fairwayFrom: 0, fairwayTo: 0, greenDepth: 22, zones: [
+    { id: 'z1', kind: 'bunker', from: 54, to: 66, side: 'cross' },
+    { id: 'z2', kind: 'bunker', from: 62, to: 71, side: 'right' },
+  ] },
+  'the-swing:9': { length: 64, fairwayFrom: 0, fairwayTo: 0, greenDepth: 22, zones: [] },
+  'the-swing:10': { length: 76, fairwayFrom: 0, fairwayTo: 0, greenDepth: 24, zones: [
+    { id: 'z1', kind: 'bunker', from: 58, to: 70, side: 'left' },
+    { id: 'z2', kind: 'bunker', from: 64, to: 76, side: 'right' },
+  ] },
 }

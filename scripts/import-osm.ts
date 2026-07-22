@@ -63,12 +63,19 @@ type CourseGeo = {
   osmName: string
   osmHolePrefix?: string
   engineSlug: string
+  /** holes packed tighter than ~40yd apart (par-3 shorts): assign BUNKERS
+   * strictly to the nearest hole line, or a neighbour's sand bleeds into the
+   * corridor. Water keeps the looser rule — shared lakes genuinely border
+   * several holes at once. */
+  packed?: boolean
 }
 
 const COURSE_GEO: Record<string, CourseGeo> = {
   sawgrass: { name: 'TPC Sawgrass — Stadium', center: [30.1985, -81.396], radius: 1400, osmName: 'Stadium Course', osmHolePrefix: 'Stadium', engineSlug: 'tpc-sawgrass' },
   augusta: { name: 'Augusta National', center: [33.5021, -82.0233], radius: 1600, osmName: 'Augusta National', engineSlug: 'augusta-national' },
   pebble: { name: 'Pebble Beach Links', center: [36.5686, -121.9497], radius: 2500, osmName: 'Pebble Beach Golf', engineSlug: 'pebble-beach' },
+  palmbeach: { name: 'Palm Beach Par 3', center: [26.6321, -80.0385], radius: 1200, osmName: 'Palm Beach Par 3', engineSlug: 'palm-beach-par-3', packed: true },
+  cobblestone: { name: 'Cobblestone Creek', center: [35.1638, -97.4215], radius: 900, osmName: 'Cobblestone Creek', engineSlug: 'cobblestone-creek', packed: true },
 }
 
 // ---------- Overpass ----------
@@ -593,7 +600,7 @@ async function main() {
   // long shared hazard (Rae's Creek fronting Augusta 12) has a far-off centroid
   // but runs right under our line, so it's ours; a neighbour's bunker never
   // comes close to our line at all.
-  const ownsHazard = (ring: Vec[]) => {
+  const ownsHazard = (ring: Vec[], kind: ZoneKind) => {
     let dT = Infinity
     let dOther = Infinity
     for (const v of ring) {
@@ -603,10 +610,15 @@ async function main() {
         else dOther = Math.min(dOther, d)
       }
     }
+    // Packed short courses: a bunker belongs to whichever hole line it's
+    // nearest, full stop — the 42yd hug clause below spans a whole corridor
+    // gap there and adopts the neighbour's sand (Palm Beach hole 1 grew
+    // phantom left bunkers from holes 2/18 without this).
+    if (geo.packed && kind === 'bunker') return dT <= dOther + toMeters(5)
     // hugging our line ⇒ ours; only cull ones clearly closer to a neighbour
     return dT <= toMeters(42) || dT <= dOther + toMeters(20)
   }
-  const ownedRings = rings.filter((r) => r.kind === 'green' || ownsHazard(r.ring))
+  const ownedRings = rings.filter((r) => r.kind === 'green' || ownsHazard(r.ring, r.kind))
 
   // travel direction at along a, averaged over ±25 yd → a normal that a single
   // coarse-centreline kink can't flip (a real dogleg bend still turns it)

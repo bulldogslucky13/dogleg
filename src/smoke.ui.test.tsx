@@ -126,6 +126,49 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
     expect(screen.getByText(/golf gods reward the faithful/)).toBeTruthy()
   })
 
+  it('the Par 3 tab shows its one-time intro, lists the shorts, and tees one up', async () => {
+    render(<App />)
+    fireEvent.click(screen.getByText(/Play unlimited/))
+    // default tab is the championship rotation — the shorts stay out of sight
+    expect(screen.queryByText('Cobblestone Creek')).toBeNull()
+
+    fireEvent.click(screen.getByText('Par 3 Courses'))
+    // first visit: the how-the-shorts-play explainer, dismissed once, gone for good
+    expect(screen.getByText(/Nothing but one-shotters/)).toBeTruthy()
+    fireEvent.click(screen.getByText(/Got it/))
+    expect(screen.queryByText(/Nothing but one-shotters/)).toBeNull()
+
+    // all three shorts, with their real hole counts on the row
+    expect(screen.getByText('Cobblestone Creek')).toBeTruthy()
+    expect(screen.getByText('PGA Frisco — The Swing')).toBeTruthy()
+    expect(screen.getByText('Palm Beach Par 3')).toBeTruthy()
+    expect(screen.getByText(/9 holes/)).toBeTruthy()
+    expect(screen.getByText(/10 holes/)).toBeTruthy()
+
+    // flipping back and forth doesn't resurrect the intro
+    fireEvent.click(screen.getByText('Courses'))
+    expect(screen.getByText('Pebble Beach Links')).toBeTruthy()
+    fireEvent.click(screen.getByText('Par 3 Courses'))
+    expect(screen.queryByText(/Nothing but one-shotters/)).toBeNull()
+
+    // tee up a short course: pick screen → first tee of hole 1
+    const courseButton = screen
+      .getAllByText('Palm Beach Par 3')
+      .map((el) => el.closest('button'))
+      .find((b): b is HTMLButtonElement => b !== null)!
+    fireEvent.click(courseButton)
+    await act(async () => {})
+    // the Fairway Finder sits out the shorts (his edge is the driver) —
+    // only the Dart Thrower and Greens Keeper are pickable
+    expect(screen.queryByText('Fairway Finder')).toBeNull()
+    expect(screen.getByText('Dart Thrower')).toBeTruthy()
+    expect(screen.getByText('Greens Keeper')).toBeTruthy()
+    fireEvent.click(screen.getByText(CHARACTERS[1].name))
+    await act(async () => {})
+    // a par-3 course round is live: the map header shows the practice tag
+    expect(screen.getAllByText(/Palm Beach Par 3/).length).toBeGreaterThan(0)
+  })
+
   it('a replayable round raises a ghost: stakes on the pick, pace chip through the round', async () => {
     vi.useFakeTimers()
     // archive a real store-played round on Pebble Beach — the ghost target
@@ -214,6 +257,90 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
       />,
     )
     expect(document.querySelector('circle.ghost-ball')).toBeNull()
+  })
+
+  it('GreenView places the cup at the real pin — every tier/side combo, no crash, no NaN geometry', async () => {
+    const { GreenView } = await import('./ui/HoleMap')
+    const sides = ['left', 'center', 'right'] as const
+    const tiers = ['open', 'middle', 'tucked'] as const
+    const cupOffset = (feet: number, pin?: { tier: (typeof tiers)[number]; side: (typeof sides)[number] }) => {
+      const { container, unmount } = render(<GreenView feet={feet} holeNumber={1} greens="Fast" pin={pin} />)
+      const green = container.querySelector('ellipse[fill="url(#gsurf)"]')!
+      const cup = container.querySelector('ellipse[rx="7"]')!
+      const centerX = Number(green.getAttribute('cx'))
+      const greenRx = Number(green.getAttribute('rx'))
+      const cupX = Number(cup.getAttribute('cx'))
+      const svg = container.querySelector('svg.holemap')!
+      unmount()
+      return { cupX, centerX, greenRx, ariaLabel: svg.getAttribute('aria-label') }
+    }
+
+    // par 4/5 putts (and pre-pin saves) carry no pin at all — no crash, no NaN
+    for (const feet of [4, 20, 45]) {
+      const { cupX } = cupOffset(feet)
+      expect(Number.isFinite(cupX)).toBe(true)
+    }
+
+    // every par-3 pin combo: the cup always lands inside the drawn green —
+    // never off in NaN-land — and a tucked pin hides further from center
+    // than an open one on the same side (PIN_OFFSET_FRAC, shared with the map)
+    for (const tier of tiers) {
+      for (const side of sides) {
+        const r = cupOffset(22, { tier, side })
+        expect(r.ariaLabel).toBe('22 foot putt')
+        expect(Number.isFinite(r.cupX)).toBe(true)
+        expect(Math.abs(r.cupX - r.centerX)).toBeLessThanOrEqual(r.greenRx)
+      }
+    }
+    for (const side of ['left', 'right'] as const) {
+      const tucked = cupOffset(22, { tier: 'tucked', side })
+      const open = cupOffset(22, { tier: 'open', side })
+      expect(Math.abs(tucked.cupX - tucked.centerX)).toBeGreaterThan(Math.abs(open.cupX - open.centerX))
+    }
+  })
+
+  it('odds-driving chips (water, pin, wind) survive the three-chip cap; flavor yields', async () => {
+    // a stacked par-3 short hole produces four chip candidates: SI flavor,
+    // live water, today's pin, and the gust wind (the ONLY wind display on
+    // phones). Only three fit — the odds-driving trio must be the survivors.
+    const { HazardChips } = await import('./ui/panels')
+    const { buildLayout } = await import('./engine/layout')
+    const { startHole } = await import('./engine/resolve')
+    const spec = { number: 1, par: 3 as const, yards: 150, strokeIndex: 1, dogleg: 'S' as const, hazard: 'water' as const }
+    const cond = {
+      wind: 10,
+      greens: 'Medium' as const,
+      difficulty: 5,
+      pins: { 1: { tier: 'tucked' as const, side: 'left' as const } },
+      gusts: { 1: 5 },
+    }
+    const hole = startHole(buildLayout('chip-cap-smoke', spec, cond), cond)
+    render(<HazardChips hole={hole} />)
+    expect(screen.getByText(/mph/)).toBeTruthy()
+    expect(screen.getByText(/Sucker pin/)).toBeTruthy()
+    expect(screen.getByText(/Water|water/)).toBeTruthy()
+    expect(screen.queryByText(/Signature test/)).toBeNull()
+    // three chips max, always
+    expect(document.querySelectorAll('.chips .chip').length).toBeLessThanOrEqual(3)
+  })
+
+  it("the tier banner's risk read includes the hole's gust, matching the real odds bar", async () => {
+    // par-3 short courses carry a per-hole gust (layout.gust) that the odds
+    // engine's pressure() factors in on every quoted percentage — the banner
+    // and risk tags must read the same pressure, or the UI tells the player
+    // one thing while the odds bar it's standing next to tells another.
+    const { TierBanner } = await import('./ui/panels')
+    const { buildLayout } = await import('./engine/layout')
+    const { startHole } = await import('./engine/resolve')
+    const spec = { number: 1, par: 3 as const, yards: 150, strokeIndex: 1, dogleg: 'S' as const, hazard: 'none' as const }
+    const baseCond = { wind: 10, greens: 'Medium' as const, difficulty: 2 }
+    const calm = startHole(buildLayout('gust-smoke', spec, { ...baseCond, gusts: { 1: 0 } }), baseCond)
+    const gusty = startHole(buildLayout('gust-smoke', spec, { ...baseCond, gusts: { 1: 7 } }), baseCond)
+    render(<TierBanner hole={calm} />)
+    expect(screen.getByText('Gettable — green light')).toBeTruthy()
+    cleanup()
+    render(<TierBanner hole={gusty} />)
+    expect(screen.getByText('Pick your moment')).toBeTruthy()
   })
 
   it('reduced motion drops the ghost ball but keeps the pace tracker', async () => {

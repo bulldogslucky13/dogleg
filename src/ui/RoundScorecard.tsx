@@ -80,7 +80,7 @@ export function RoundScorecard(props: { round: LoggedRound; onReplay?: () => voi
         </div>
         <div className="sc-nines">
           {nine(0)}
-          {nine(9)}
+          {round.results.length > 9 && nine(9)}
         </div>
         <div className="sc-actions">
           {props.onReplay && (

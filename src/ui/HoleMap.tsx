@@ -613,7 +613,7 @@ export function HoleMap(props: {
   const ghostVisible = ghostPt && Math.hypot(ghostPt.x - ballPt.x, ghostPt.y - ballPt.y) > 8
 
   // ---- zones ----
-  const zoneEls = layout.zones.map((z) => {
+  const renderZone = (z: HazardZone) => {
     const place = places.get(z.id)!
     const span = Math.max(10, z.to - z.from)
     const sideSign = z.side === 'left' ? 1 : -1
@@ -746,7 +746,22 @@ export function HoleMap(props: {
         )}
       </g>
     )
-  })
+  }
+
+  // A `cross` bunker is sand you thread, not a wall. Draw the bunkers, then lay
+  // a slim strip of fairway back down the middle of the corridor, then draw
+  // water/trees on top. So crossing sand keeps a visible fairway lane through it
+  // and a fairway-lie ball reads as grass — while water, which really does block
+  // the line, still covers the lane.
+  const sandEls = layout.zones.filter((z) => z.kind === 'bunker' || z.kind === 'deeprough').map(renderZone)
+  const overEls = layout.zones.filter((z) => z.kind === 'water' || z.kind === 'ocean' || z.kind === 'trees').map(renderZone)
+  const fairwayLane =
+    par3 ? null : (
+      <path
+        d={ribbonPath(geo, Math.max(Math.max(30, layout.fairwayFrom - 40), vFrom - 10), layout.fairwayTo, () => 9)}
+        fill="#4f7d45"
+      />
+    )
 
   const previewColor = (c: Choice) => (c === 'safe' ? '#7fb56b' : c === 'normal' ? '#d9c15c' : '#d07a5a')
 
@@ -860,7 +875,9 @@ export function HoleMap(props: {
         return <Tree key={i} x={p.x + n.x * g.lat * uPerYd} y={p.y + n.y * g.lat * uPerYd} s={treeSize(g.size)} tone={g.tone} />
       })}
 
-      {zoneEls}
+      {sandEls}
+      {fairwayLane}
+      {overEls}
 
       {/* landmark beside the green (Harbour Town lighthouse) — on the land side
           (right; water is left), base near the green's height so it reads as

@@ -1,5 +1,4 @@
 import { decisionsFromScores } from '../engine/replay'
-import { ENGINE_VERSION } from '../engine/version'
 import type { CharacterId, Choice, HoleResult } from '../engine/types'
 import type { HistoryEntry, RoundState } from '../state/store'
 import { SUPABASE_ANON_KEY, SUPABASE_URL, backendEnabled } from './backend'
@@ -255,7 +254,12 @@ export async function submitRound(round: RoundState, name?: string): Promise<Sub
         seed: round.seed,
         character: round.character,
         decisions,
-        engineVersion: ENGINE_VERSION,
+        // the version stamped when the round STARTED, never the current
+        // bundle's — a round finished in an old tab and resubmitted after a
+        // refresh must still fail the handshake, not launder itself through
+        // the new bundle. Pre-handshake saves carry no stamp and omit the
+        // field, taking the legacy replay-and-see path.
+        ...(round.engineVersion !== undefined ? { engineVersion: round.engineVersion } : {}),
         ...(player ? { playerId: player.id, playerSecret: player.secret } : {}),
         ...(name && !player?.name ? { name } : {}),
       }),

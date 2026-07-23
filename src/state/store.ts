@@ -7,6 +7,7 @@ import { courseBySlug } from '../engine/courses'
 import { EMPTY_FORTUNE, encodeFortune, fortuneEligible, splitFortune, type FortuneState } from '../engine/fortune'
 import { gradeRound } from '../engine/grade'
 import { AGGRESSIVE_BUDGET, decisionsFromScores, destinyPlan, fortuneOddsFor, setupFromSeed } from '../engine/replay'
+import { ENGINE_VERSION } from '../engine/version'
 import { track } from '../lib/analytics'
 
 export { AGGRESSIVE_BUDGET }
@@ -26,6 +27,12 @@ export interface RoundState {
   rolls: number
   complete: boolean
   hole: SerializedHole | null
+  /** the ENGINE_VERSION this round's dice actually rolled under, stamped at
+   * creation. Submission sends THIS, not the current bundle's constant — a
+   * round played, saved, and resubmitted after a refresh must not launder
+   * itself through the new bundle's version and dodge the referee's
+   * stale-client check. Absent on pre-handshake saves. */
+  engineVersion?: number
 }
 
 interface SerializedHole {
@@ -150,6 +157,7 @@ export function newRound(
     rolls: 0,
     complete: false,
     hole: serializeHole(hole),
+    engineVersion: ENGINE_VERSION,
   }
 }
 

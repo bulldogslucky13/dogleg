@@ -51,6 +51,26 @@ export const OSM_BEND: Record<string, number[]> = {
   'harbour-town:15': [0, -6, -12, -18, -24, -30, -35, -40, -44, -46, -43, -29, 0],
   'harbour-town:16': [0, -10, -20, -29, -39, -49, -58, -64, -67, -66, -53, -27, 0],
   'harbour-town:18': [0, -4, -8, -13, -17, -21, -23, -25, -25, -22, -16, -8, 0],
+
+  // Carnoustie — Championship — real centreline curvature. Signs contradict
+  // the tuple's dogleg flag on more holes than they confirm: 2 bends LEFT
+  // (tuple said R), 4 bends LEFT 42 yd (tuple said S), 5 bends LEFT (tuple
+  // said R), 7 bends RIGHT (tuple said S), 9 bends LEFT right at the 8-yd
+  // persistence threshold (tuple said R), 11 bends LEFT (tuple said S), 15
+  // bends RIGHT (tuple said S), 18 bends RIGHT (tuple said S). Only 3 (L),
+  // 6 (L), 12 (L), and 14 (R) agree with their flag.
+  'carnoustie:2': [0, 5, 10, 14, 19, 22, 24, 24, 21, 18, 12, 6, 0],
+  'carnoustie:3': [0, 7, 12, 18, 23, 27, 29, 30, 28, 23, 15, 8, 0],
+  'carnoustie:4': [0, 9, 18, 27, 34, 40, 42, 41, 37, 30, 20, 10, 0],
+  'carnoustie:5': [0, 8, 17, 25, 33, 39, 43, 44, 43, 38, 27, 14, 0],
+  'carnoustie:6': [0, 2, 2, 3, 4, 4, 5, 7, 10, 15, 19, 16, 0],
+  'carnoustie:7': [0, -2, -4, -6, -9, -10, -11, -11, -10, -8, -5, -3, 0],
+  'carnoustie:9': [0, 6, 8, 8, 8, 7, 6, 5, 4, 3, 2, 1, 0],
+  'carnoustie:11': [0, 5, 10, 14, 18, 21, 22, 23, 22, 20, 14, 7, 0],
+  'carnoustie:12': [0, 4, 8, 8, 6, 7, 11, 16, 15, 9, 4, 1, 0],
+  'carnoustie:14': [0, -7, -14, -22, -29, -34, -38, -38, -36, -31, -20, -10, 0],
+  'carnoustie:15': [0, -6, -13, -19, -26, -30, -33, -33, -30, -25, -17, -8, 0],
+  'carnoustie:18': [0, -2, -3, -5, -6, -7, -8, -8, -7, -6, -4, -2, 0],
 }
 
 export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
@@ -1027,4 +1047,336 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
     { id: 'z1', kind: 'bunker', from: 58, to: 70, side: 'left' },
     { id: 'z2', kind: 'bunker', from: 64, to: 76, side: 'right' },
   ] },
+
+  // ---------------------------------------------------------------------
+  // Carnoustie — Championship. Imported from OSM (see COURSE_GEO in
+  // scripts/import-osm.ts). White-tee scorecard verified against courses.ts
+  // (par/HCP/yardage all match) before import; QA'd hole-by-hole against
+  // ProVisualizer satellite imagery.
+  //
+  // The burns are hand-laid: the importer only ingests `natural=water`
+  // polygons and coastline, but Carnoustie's burns are OSM `waterway=stream`
+  // LINESTRINGS, invisible to it. Their zones below were computed by
+  // intersecting the tagged Barry Burn / Jockie's Burn ways with each hole's
+  // centreline (same arc-length yardstick as the importer, scaled to the
+  // card where the hole is), then verified against imagery. Crossings a few
+  // dozen yards off the tee that no real swing faces (holes 1, 2, 6, 11,
+  // 18's tee-front) are deliberately omitted — the tpc-sawgrass:2 precedent.
+  // ---------------------------------------------------------------------
+  // hole 1 — Cup — scorecard 401 yd (OSM centreline 379 yd, zones scaled to card)
+  'carnoustie:1': {
+    length: 401,
+    fairwayFrom: 141,
+    fairwayTo: 388,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 265, to: 275, side: 'right' },
+      { id: 'z2', kind: 'bunker', from: 347, to: 360, side: 'right' },
+      { id: 'z3', kind: 'bunker', from: 385, to: 394, side: 'right' },
+    ],
+  },
+  // hole 2 — Gulley — scorecard 435 yd (OSM centreline 405 yd, zones scaled to card)
+  'carnoustie:2': {
+    length: 435,
+    fairwayFrom: 153,
+    fairwayTo: 418,
+    greenDepth: 28,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 165, to: 174, side: 'left' },
+      { id: 'z2', kind: 'bunker', from: 217, to: 221, side: 'right' },
+      { id: 'z3', kind: 'bunker', from: 221, to: 228, side: 'cross' },
+      { id: 'z4', kind: 'bunker', from: 228, to: 232, side: 'left' },
+      { id: 'z5', kind: 'bunker', from: 361, to: 380, side: 'right' },
+      { id: 'z6', kind: 'bunker', from: 391, to: 397, side: 'left' },
+      { id: 'z7', kind: 'bunker', from: 404, to: 410, side: 'right' },
+      { id: 'z8', kind: 'bunker', from: 427, to: 434, side: 'left' },
+    ],
+  },
+  // hole 3 — Jockie's Burn — bunkers down the left; z4 + z5 are hand fixes:
+  // the greenside sand the raster dropped (visible short-left of the green
+  // in imagery; card flags 'sand'), and the hole's namesake burn hugging the
+  // green front (waterway crossing computed at 317 yd — the pitch must carry
+  // it, exactly the shot the hole is famous for)
+  'carnoustie:3': {
+    length: 344,
+    fairwayFrom: 120,
+    fairwayTo: 330,
+    greenDepth: 24,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 46, to: 60, side: 'left' },
+      { id: 'z2', kind: 'bunker', from: 210, to: 214, side: 'left' },
+      { id: 'z3', kind: 'bunker', from: 234, to: 248, side: 'left' },
+      { id: 'z4', kind: 'bunker', from: 302, to: 314, side: 'left' },
+      { id: 'z5', kind: 'water', from: 314, to: 321, side: 'cross' },
+    ],
+  },
+  // hole 4 — Hillocks — scorecard 375 yd (OSM centreline 405 yd, zones scaled
+  // to card); z3 is a hand fix: the burn/ditch left of the driving zone
+  // (visible as open water in imagery, and the card's 'water' flag) runs as a
+  // `waterway` linestring the importer can't see — laid from its OSM way,
+  // scaled 164–275 raw → 152–255
+  'carnoustie:4': {
+    length: 375,
+    fairwayFrom: 131,
+    fairwayTo: 364,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 6, to: 9, side: 'left' },
+      { id: 'z2', kind: 'bunker', from: 30, to: 39, side: 'right' },
+      { id: 'z3', kind: 'water', from: 152, to: 255, side: 'left' },
+      { id: 'z4', kind: 'bunker', from: 176, to: 181, side: 'right' },
+      { id: 'z5', kind: 'bunker', from: 211, to: 219, side: 'right' },
+      { id: 'z6', kind: 'bunker', from: 244, to: 248, side: 'left' },
+      { id: 'z7', kind: 'bunker', from: 304, to: 309, side: 'right' },
+      { id: 'z8', kind: 'bunker', from: 343, to: 348, side: 'right' },
+      { id: 'z9', kind: 'bunker', from: 361, to: 365, side: 'right' },
+    ],
+  },
+  // hole 5 — Brae — bunkers flank the corridor, greenside sand left; z4 is a
+  // hand fix: Jockie's Burn cuts across the approach (waterway crossing
+  // computed at 272 yd, the dark band visible mid-approach in imagery) —
+  // going for it in two brings the burn into play
+  'carnoustie:5': {
+    length: 379,
+    fairwayFrom: 133,
+    fairwayTo: 367,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 90, to: 96, side: 'right' },
+      { id: 'z2', kind: 'bunker', from: 206, to: 220, side: 'left' },
+      { id: 'z3', kind: 'bunker', from: 224, to: 232, side: 'right' },
+      { id: 'z4', kind: 'water', from: 269, to: 276, side: 'cross' },
+      { id: 'z5', kind: 'bunker', from: 318, to: 326, side: 'right' },
+      { id: 'z6', kind: 'bunker', from: 350, to: 356, side: 'left' },
+      { id: 'z7', kind: 'bunker', from: 368, to: 379, side: 'left' },
+    ],
+  },
+  // hole 6 — Hogan's Alley — scorecard 520 yd (OSM centreline 573 yd, zones scaled to card)
+  'carnoustie:6': {
+    length: 520,
+    fairwayFrom: 182,
+    fairwayTo: 509,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 20, to: 33, side: 'right' },
+      { id: 'z2', kind: 'bunker', from: 82, to: 85, side: 'right' },
+      { id: 'z3', kind: 'bunker', from: 223, to: 245, side: 'right' },
+      { id: 'z4', kind: 'bunker', from: 269, to: 281, side: 'right' },
+      { id: 'z5', kind: 'bunker', from: 495, to: 499, side: 'left' },
+      { id: 'z6', kind: 'bunker', from: 514, to: 519, side: 'right' },
+    ],
+  },
+  // hole 7 — Plantation — bunkers both sides, greenside sand right
+  'carnoustie:7': {
+    length: 400,
+    fairwayFrom: 140,
+    fairwayTo: 388,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 2, to: 6, side: 'right' },
+      { id: 'z2', kind: 'bunker', from: 32, to: 50, side: 'right' },
+      { id: 'z3', kind: 'bunker', from: 202, to: 210, side: 'left' },
+      { id: 'z4', kind: 'bunker', from: 254, to: 264, side: 'right' },
+      { id: 'z5', kind: 'bunker', from: 360, to: 368, side: 'left' },
+      { id: 'z6', kind: 'bunker', from: 382, to: 386, side: 'right' },
+    ],
+  },
+  // hole 8 — Short — scorecard 167 yd (OSM centreline 155 yd, zones scaled to card)
+  'carnoustie:8': {
+    length: 167,
+    fairwayFrom: 58,
+    fairwayTo: 154,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 151, to: 162, side: 'right' },
+      { id: 'z2', kind: 'bunker', from: 162, to: 166, side: 'left' },
+    ],
+  },
+  // hole 9 — Railway — scorecard 416 yd (OSM centreline 465 yd, zones scaled to card)
+  'carnoustie:9': {
+    length: 416,
+    fairwayFrom: 146,
+    fairwayTo: 404,
+    greenDepth: 22,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 7, to: 16, side: 'left' },
+      { id: 'z2', kind: 'bunker', from: 227, to: 233, side: 'right' },
+      { id: 'z3', kind: 'bunker', from: 378, to: 383, side: 'left' },
+      { id: 'z4', kind: 'bunker', from: 394, to: 399, side: 'right' },
+      { id: 'z5', kind: 'bunker', from: 408, to: 415, side: 'left' },
+    ],
+  },
+  // hole 10 — South America — bunkers right and left through the corridor;
+  // z4 is a hand fix: the Barry Burn crosses just short of the green
+  // (waterway crossing computed at 385 yd) — the long approach must carry it
+  'carnoustie:10': {
+    length: 443,
+    fairwayFrom: 155,
+    fairwayTo: 431,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 206, to: 230, side: 'right' },
+      { id: 'z2', kind: 'bunker', from: 252, to: 262, side: 'right' },
+      { id: 'z3', kind: 'bunker', from: 274, to: 284, side: 'left' },
+      { id: 'z4', kind: 'water', from: 382, to: 390, side: 'cross' },
+      { id: 'z5', kind: 'bunker', from: 420, to: 426, side: 'left' },
+    ],
+  },
+  // hole 11 — John Philp — z4 + z5 are hand fixes: the greenside pair the
+  // raster dropped (sand visible flanking the green front in imagery; card
+  // flags 'sand'). The import also painted a right-side bunker at 226–236
+  // that sits 35 yd off the centreline in OSM — outwith the corridor a
+  // pushed shot actually samples (its neighbours kept below are 14–15 yd
+  // off) — removed as over-painting; with it, safe layups read dishonestly
+  // sandy. z4 is the gorse bank flanking the long-left of the drive, plainly
+  // visible in imagery but absent from OSM (no natural=scrub polygons here
+  // at all — same source gap as harbour-town:18's trees): bombing driver
+  // flirts with the whins, the shorter safe line stays out of them. The
+  // Barry Burn's crossing here is a 59-yd tee-front carry no real swing
+  // faces — omitted per the block note above
+  'carnoustie:11': {
+    length: 368,
+    fairwayFrom: 129,
+    fairwayTo: 356,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 52, to: 56, side: 'right' },
+      { id: 'z2', kind: 'bunker', from: 218, to: 222, side: 'left' },
+      { id: 'z3', kind: 'bunker', from: 248, to: 260, side: 'left' },
+      { id: 'z4', kind: 'deeprough', from: 265, to: 330, side: 'left' },
+      { id: 'z5', kind: 'bunker', from: 338, to: 350, side: 'left' },
+      { id: 'z6', kind: 'bunker', from: 342, to: 354, side: 'right' },
+    ],
+  },
+  // hole 12 — Southward Ho — bunkers off the tee and at the turn; z1 is a
+  // hand fix: the burn channel runs tight down the right of the tee shot
+  // (waterway parallel ~10 yd off the line for the first 199 yd, revetted
+  // walls visible in imagery — the card's 'water' flag)
+  'carnoustie:12': {
+    length: 489,
+    fairwayFrom: 171,
+    fairwayTo: 477,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'water', from: 40, to: 198, side: 'right' },
+      { id: 'z2', kind: 'bunker', from: 40, to: 52, side: 'left' },
+      { id: 'z3', kind: 'bunker', from: 62, to: 78, side: 'left' },
+      { id: 'z4', kind: 'bunker', from: 114, to: 122, side: 'right' },
+      { id: 'z5', kind: 'bunker', from: 160, to: 164, side: 'right' },
+      { id: 'z6', kind: 'bunker', from: 270, to: 284, side: 'right' },
+      { id: 'z7', kind: 'bunker', from: 442, to: 452, side: 'right' },
+      { id: 'z8', kind: 'bunker', from: 456, to: 464, side: 'left' },
+    ],
+  },
+  // hole 13 — Whins — scorecard 161 yd (OSM centreline 148 yd, zones scaled to card)
+  'carnoustie:13': {
+    length: 161,
+    fairwayFrom: 57,
+    fairwayTo: 148,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 4, to: 11, side: 'right' },
+      { id: 'z2', kind: 'bunker', from: 126, to: 135, side: 'cross' },
+      { id: 'z3', kind: 'bunker', from: 157, to: 161, side: 'cross' },
+    ],
+  },
+  // hole 14 — Spectacles — scorecard 476 yd (OSM centreline 509 yd, zones
+  // scaled to card); QA: 10 zones, the most of any hole here — worth a
+  // closer look against imagery
+  'carnoustie:14': {
+    length: 476,
+    fairwayFrom: 166,
+    fairwayTo: 464,
+    greenDepth: 22,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 2, to: 7, side: 'right' },
+      { id: 'z2', kind: 'bunker', from: 56, to: 64, side: 'right' },
+      { id: 'z3', kind: 'bunker', from: 75, to: 84, side: 'right' },
+      { id: 'z4', kind: 'bunker', from: 232, to: 247, side: 'left' },
+      { id: 'z5', kind: 'bunker', from: 251, to: 256, side: 'right' },
+      { id: 'z6', kind: 'bunker', from: 271, to: 281, side: 'left' },
+      { id: 'z7', kind: 'bunker', from: 395, to: 400, side: 'left' },
+      { id: 'z8', kind: 'bunker', from: 402, to: 410, side: 'right' },
+      { id: 'z9', kind: 'bunker', from: 438, to: 441, side: 'left' },
+      { id: 'z10', kind: 'bunker', from: 449, to: 456, side: 'right' },
+    ],
+  },
+  // hole 15 — Lucky Slap — bunkers right through the middle, one greenside left
+  'carnoustie:15': {
+    length: 459,
+    fairwayFrom: 161,
+    fairwayTo: 447,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 78, to: 86, side: 'right' },
+      { id: 'z2', kind: 'bunker', from: 228, to: 234, side: 'right' },
+      { id: 'z3', kind: 'bunker', from: 262, to: 268, side: 'right' },
+      { id: 'z4', kind: 'bunker', from: 404, to: 414, side: 'right' },
+      { id: 'z5', kind: 'bunker', from: 428, to: 434, side: 'left' },
+    ],
+  },
+  // hole 16 — Barry Burn — QA: only 3 bunkers came through for a hole the
+  // card calls heavily bunkered, and (per the block note above) the burn
+  // that gives the hole its name never shows up as a hazard at all
+  'carnoustie:16': {
+    length: 235,
+    fairwayFrom: 82,
+    fairwayTo: 221,
+    greenDepth: 24,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 190, to: 194, side: 'right' },
+      { id: 'z2', kind: 'bunker', from: 204, to: 208, side: 'left' },
+      { id: 'z3', kind: 'bunker', from: 210, to: 216, side: 'right' },
+    ],
+  },
+  // hole 17 — Island — scorecard 433 yd (OSM centreline 456 yd, zones scaled
+  // to card). The Barry Burn's double loop is hand-laid from its waterway
+  // (crossings computed at 96/135/165/259 yd): z3/z4 are the near loop whose
+  // second arm guards the island fairway — so fairwayFrom moves 152 → 170,
+  // the fairway genuinely starts past the burn, keeping the carry honest —
+  // z6 is the far arm drives can run into, and z5 is the burn wrapping the
+  // island's right edge. The 96-yd tee-front crossing is omitted per the
+  // block note above. z1/z2 looked like the README's phantom-cross artifact
+  // but imagery confirms the sandy waste really does spread across the line
+  // short of the burn — kept as imported.
+  'carnoustie:17': {
+    length: 433,
+    fairwayFrom: 170,
+    fairwayTo: 422,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 47, to: 78, side: 'right' },
+      { id: 'z2', kind: 'bunker', from: 78, to: 84, side: 'cross' },
+      { id: 'z3', kind: 'water', from: 131, to: 139, side: 'cross' },
+      { id: 'z4', kind: 'water', from: 161, to: 169, side: 'cross' },
+      { id: 'z5', kind: 'water', from: 213, to: 343, side: 'right' },
+      { id: 'z6', kind: 'water', from: 255, to: 263, side: 'cross' },
+      { id: 'z7', kind: 'bunker', from: 273, to: 281, side: 'left' },
+      { id: 'z8', kind: 'bunker', from: 380, to: 387, side: 'left' },
+      { id: 'z9', kind: 'bunker', from: 393, to: 405, side: 'right' },
+      { id: 'z10', kind: 'bunker', from: 414, to: 420, side: 'right' },
+    ],
+  },
+  // hole 18 — Home — scorecard 444 yd (OSM centreline 486 yd, zones scaled
+  // to card). The Barry Burn is hand-laid from its waterway (crossings
+  // computed at 19/171/407 yd): z1 is the burn hugging the right of the
+  // tee-shot corridor, z2 the mid-fairway crossing — fairwayFrom moves
+  // 155 → 176 so the fairway starts past it and the carry stays honest —
+  // and z4 the famous green-front crossing (~13 yd short of the putting
+  // surface) where Opens slip away. The 19-yd tee-front crossing is omitted
+  // per the block note above.
+  'carnoustie:18': {
+    length: 444,
+    fairwayFrom: 176,
+    fairwayTo: 431,
+    greenDepth: 24,
+    zones: [
+      { id: 'z1', kind: 'water', from: 30, to: 243, side: 'right' },
+      { id: 'z2', kind: 'water', from: 166, to: 176, side: 'cross' },
+      { id: 'z3', kind: 'bunker', from: 265, to: 301, side: 'right' },
+      { id: 'z4', kind: 'water', from: 403, to: 411, side: 'cross' },
+      { id: 'z5', kind: 'bunker', from: 424, to: 428, side: 'left' },
+      { id: 'z6', kind: 'bunker', from: 429, to: 444, side: 'right' },
+    ],
+  },
 }

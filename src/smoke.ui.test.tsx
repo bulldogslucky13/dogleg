@@ -13,7 +13,9 @@ import { act, cleanup, fireEvent, render, screen, within } from '@testing-librar
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
 import { CHARACTERS } from './engine/characters'
-import { playRatingFor } from './engine/courses'
+import { COURSES, playRatingFor } from './engine/courses'
+import { buildLayout } from './engine/layout'
+import { HoleMap } from './ui/HoleMap'
 import { forecastSetup, localDateKey, practiceSetup } from './engine/daily'
 import { seasonForDate } from './engine/season'
 import { setupFromSeed } from './engine/replay'
@@ -1161,6 +1163,26 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
     fireEvent.click(screen.getByText(/Modern view/))
     expect(screen.getByText(/Classic view/)).toBeTruthy()
     expect(localStorage.getItem('dogleg:uimode')).toBe('classic')
+  })
+})
+
+describe('smoke: landmark holes render', () => {
+  it('every hole carrying a landmark draws its map (lighthouse, footbridge, …)', () => {
+    // landmarks are pure map flavor gated on the hole tuple — a broken sprite
+    // only crashes when that course's hole is on screen, which the happy-path
+    // walkthrough above never reaches. Render each landmark hole directly.
+    const landmarked = COURSES.flatMap((c) =>
+      c.holes.filter((h) => h.landmark).map((h) => ({ course: c, hole: h })),
+    )
+    expect(landmarked.length).toBeGreaterThanOrEqual(2) // harbour-town 18, carnoustie 18
+    for (const { course, hole } of landmarked) {
+      const layout = buildLayout(course.slug, hole)
+      const { container, unmount } = render(
+        <HoleMap layout={layout} ball={{ pos: 0, lie: 'tee', side: 'center' }} previewWindow={null} previewApproach={null} previewChoice={null} />,
+      )
+      expect(container.querySelector('svg'), `${course.slug}:${hole.number}`).toBeTruthy()
+      unmount()
+    }
   })
 })
 

@@ -193,7 +193,7 @@ export const COURSES: CourseSpec[] = [
       [4, 459, 7, 'S', 'sand'],
       [3, 245, 13, 'S', 'sand'],
       [4, 433, 5, 'L', 'water', 'The Island — the Barry Burn snakes across again and again'],
-      [4, 444, 11, 'S', 'water', 'Home over the Barry Burn — where Opens slip away'],
+      [4, 444, 11, 'S', 'water', 'Home over the Barry Burn — where Opens slip away', undefined, 'bridge'],
     ]),
   },
   {

@@ -908,6 +908,43 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
     expect(screen.getByText(/St Andrews/)).toBeTruthy()
   })
 
+  it('a record held from another device never badges a worse local round as CR', () => {
+    // stale flag set true, as it always is on a round that once took a record
+    localStorage.setItem(
+      'dogleg:archive:v1',
+      JSON.stringify([
+        {
+          seed: 's-oak-1',
+          mode: 'practice',
+          courseSlug: 'oakmont',
+          dateKey: '2026-07-21',
+          toPar: 1,
+          strokes: 74,
+          results: [],
+          decisions: [],
+          courseRecord: true,
+          playedAt: 1,
+        },
+      ]),
+    )
+    // we DO hold Oakmont's record — but at -6, set on another device. Our best
+    // local round is only +1 and must not be dressed up as that record.
+    localStorage.setItem(
+      'dogleg:records:v1',
+      JSON.stringify({ v: 1, held: { oakmont: { toPar: -6, since: 1 } }, stolen: {} }),
+    )
+
+    render(<App />)
+    fireEvent.click(screen.getByText(/Clubhouse · my rounds/))
+    fireEvent.click(screen.getByText(/Records · 1/))
+
+    // the +1 local round doesn't match the -6 held score → no CR, stays a PR
+    expect(screen.queryByText('CR')).toBeNull()
+    expect(screen.queryByText(/Course records you hold/)).toBeNull()
+    expect(screen.getByText('Personal bests')).toBeTruthy()
+    expect(screen.getAllByText(/Oakmont/)).toHaveLength(1)
+  })
+
   it('the stats view computes the handicap countdown and opens the lowest round scorecard', async () => {
     const { newRound, applyChoice, advanceHole, archiveRound } = await import('./state/store')
     const { logRound } = await import('./state/stats')

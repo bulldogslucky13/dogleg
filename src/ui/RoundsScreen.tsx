@@ -171,8 +171,14 @@ export function RoundsScreen(props: {
     if (!best || r.toPar < best.toPar) bestByCourse.set(r.courseSlug, r)
   }
   const bestByPar = [...bestByCourse.values()].sort((a, b) => a.toPar - b.toPar)
-  const records = bestByPar.filter((r) => held[r.courseSlug] !== undefined)
-  const prs = bestByPar.filter((r) => held[r.courseSlug] === undefined)
+  // A round earns the CR badge only when we still hold the record AND this
+  // archived round IS that record — its score matches the held ledger score.
+  // A record held under our name but set on another device (adopted by
+  // syncLedger) won't match any local round, so we never dress an unrelated,
+  // worse local best up as the record; it stays an honest personal best.
+  const holdsRecord = (r: ArchivedRound) => held[r.courseSlug]?.toPar === r.toPar
+  const records = bestByPar.filter(holdsRecord)
+  const prs = bestByPar.filter((r) => !holdsRecord(r))
   const recent = [...rounds].sort((a, b) => b.playedAt - a.playedAt).slice(0, 10)
 
   const scorecard = card && (

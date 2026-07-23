@@ -23,4 +23,4 @@
  * sides pick up the new number together; only clients holding a stale bundle
  * see the handshake fail, which is exactly the point.
  */
-export const ENGINE_VERSION = 1
+export const ENGINE_VERSION = 2

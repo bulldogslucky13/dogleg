@@ -112,7 +112,9 @@ describe('destiny in the engine', () => {
     expect(layup.scores.some((s, i) => course.holes[i].par === 5 && s.strokes === 2)).toBe(false)
   })
 
-  it('a penalty-tainted go attempt neither fires nor spends the albatross destiny', () => {
+  // ~1.2s alone, but the whole-course seed hunt can starve past vitest's 5s
+  // default when CI runs it beside the Monte Carlo calibration workers
+  it('a penalty-tainted go attempt neither fires nor spends the albatross destiny', { timeout: 30_000 }, () => {
     // Hunt any course/seed where the FIRST par 5's tee shot takes a penalty
     // (aggressive tee, courting the trouble) while the next par 5's tee
     // stays clean — the destined albatross must SKIP the for-3 recovery on

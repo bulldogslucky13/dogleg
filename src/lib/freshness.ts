@@ -31,6 +31,14 @@ export const FRESH_TTL_MS = 5 * 60_000
 let verdict: { at: number; stale: boolean } | null = null
 let inflight: Promise<boolean> | null = null
 
+/** The last verdict, synchronously — for round-START gates that can't await
+ * (a click handler about to roll dice). False until a check has completed;
+ * pair call sites with an async bundleIsStale() somewhere upstream (screen
+ * mount, interval) so the verdict is warm by the time the click lands. */
+export function bundleKnownStale(): boolean {
+  return verdict?.stale ?? false
+}
+
 export async function bundleIsStale(): Promise<boolean> {
   if (!backendEnabled) return false
   if (verdict && (verdict.stale || Date.now() - verdict.at < FRESH_TTL_MS)) return verdict.stale

@@ -50,6 +50,11 @@ interface Frame {
   yBottom: number
 }
 
+// height of the "CADDY'S READ" label row + its gap to the chip row below it —
+// CaddyThoughts adds this row above the chips on every hole that has any, so
+// it's reserved unconditionally, not just for the signature-pill case
+const CADDY_LABEL_ROW = 20
+
 /**
  * Screen anchors for the camera window: view start / view end along the
  * centerline. Margins keep the flag clear of the floating top banner and the
@@ -60,9 +65,9 @@ function cameraFrame(size: MapSize | null, bottomInset = 0): Frame {
   const h = size?.h ?? H
   const yTop = Math.min(84, Math.max(58, h * 0.16))
   // bottomInset reserves extra room for a taller bottom overlay (e.g. the
-  // signature pill adds a second row above the hazard chips), so the tee ball
+  // signature pill adds a second row above the caddy's read), so the tee ball
   // isn't parked behind it
-  const yBottom = h - Math.min(64, Math.max(42, h * 0.11)) - bottomInset
+  const yBottom = h - Math.min(64, Math.max(42, h * 0.11)) - CADDY_LABEL_ROW - bottomInset
   return { w, h, cx: w / 2, yTop, yBottom }
 }
 
@@ -92,6 +97,20 @@ function viewWindow(layout: HoleLayout, ball: BallState): [number, number] {
   return [Math.max(0, Math.min(ball.pos - 15, L - 90)), L + past]
 }
 
+/** Catmull-Rom interpolation of an evenly-spaced sample array at t∈[0,1] —
+ * smooths the OSM bend profile's 13 samples into a continuous curve. */
+function catmull(a: number[], t: number): number {
+  const n = a.length - 1
+  const x = Math.max(0, Math.min(1, t)) * n
+  const i = Math.min(n - 1, Math.floor(x))
+  const f = x - i
+  const p0 = a[Math.max(0, i - 1)]
+  const p1 = a[i]
+  const p2 = a[i + 1]
+  const p3 = a[Math.min(n, i + 2)]
+  return 0.5 * (2 * p1 + (-p0 + p2) * f + (2 * p0 - 5 * p1 + 4 * p2 - p3) * f * f + (-p0 + 3 * p1 - 3 * p2 + p3) * f * f * f)
+}
+
 /**
  * Sampled centerline with arc-length parametrization plus a similarity
  * transform that maps the camera window onto the screen. Everything downstream
@@ -100,22 +119,40 @@ function viewWindow(layout: HoleLayout, ball: BallState): [number, number] {
  */
 function useGeometry(layout: HoleLayout, view: [number, number], fr: Frame) {
   return useMemo(() => {
-    const { dogleg } = layout.spec
     const L = layout.length
-    const bendDir = dogleg === 'L' ? -1 : dogleg === 'R' ? 1 : 0
-    const tee: Pt = { x: 180 - bendDir * 26, y: 474 }
-    const green: Pt = { x: 180 + bendDir * 30, y: 92 }
-    const mid: Pt = { x: (tee.x + green.x) / 2, y: (tee.y + green.y) / 2 }
-    const ctrl: Pt = { x: mid.x + bendDir * 78, y: mid.y + 20 }
     const pts: Pt[] = []
     const N = 72
-    for (let i = 0; i <= N; i++) {
-      const t = i / N
-      const a = 1 - t
-      pts.push({
-        x: a * a * tee.x + 2 * a * t * ctrl.x + t * t * green.x,
-        y: a * a * tee.y + 2 * a * t * ctrl.y + t * t * green.y,
-      })
+    // Chord anchors: tee low, pin high, both on the vertical axis.
+    const CHORD_TOP = 92
+    const CHORD_BOT = 474
+    const bend = layout.bend
+    if (bend && bend.length >= 3) {
+      // Real OSM centreline: the straight tee→pin chord plus the hole's sampled
+      // lateral deviation, so the fairway turns where it actually turns. Bend is
+      // yards, golfer-left positive; screen-left is −x, so subtract.
+      const chordLen = CHORD_BOT - CHORD_TOP
+      const wpy = chordLen / L
+      for (let i = 0; i <= N; i++) {
+        const t = i / N
+        pts.push({ x: 180 - catmull(bend, t) * wpy, y: CHORD_BOT - chordLen * t })
+      }
+    } else {
+      // No profile (procedural courses, straight holes): fall back to the crude
+      // symmetric bow from the hand-set dogleg flag.
+      const { dogleg } = layout.spec
+      const bendDir = dogleg === 'L' ? -1 : dogleg === 'R' ? 1 : 0
+      const tee: Pt = { x: 180 - bendDir * 26, y: 474 }
+      const green: Pt = { x: 180 + bendDir * 30, y: 92 }
+      const mid: Pt = { x: (tee.x + green.x) / 2, y: (tee.y + green.y) / 2 }
+      const ctrl: Pt = { x: mid.x + bendDir * 78, y: mid.y + 20 }
+      for (let i = 0; i <= N; i++) {
+        const t = i / N
+        const a = 1 - t
+        pts.push({
+          x: a * a * tee.x + 2 * a * t * ctrl.x + t * t * green.x,
+          y: a * a * tee.y + 2 * a * t * ctrl.y + t * t * green.y,
+        })
+      }
     }
     const cum = [0]
     for (let i = 1; i <= N; i++) {
@@ -197,6 +234,120 @@ function ribbonPath(geo: Geo, from: number, to: number, widthYd: (t: number) => 
     rightPts.unshift(`${(p.x - n.x * w).toFixed(1)},${(p.y - n.y * w).toFixed(1)}`)
   }
   return `M${leftPts.join(' L')} L${rightPts.join(' L')} Z`
+}
+
+// Hazard kinds whose importer-split zones we stitch back into one drawn shape.
+// Ocean (a seaward half-plane) and trees/deeprough (scattered sprites) are not
+// footprint hazards, so they keep their own rendering.
+const MERGE_KINDS = new Set<HazardZone['kind']>(['bunker', 'water'])
+
+/** Signed lateral band [lo, hi] (yards from centreline, golfer-left positive)
+ * that a single zone covers at a given yardage. `cor` is the corridor
+ * half-width in yards there. Water carries more visual body than sand and sits
+ * a touch further off the corridor edge, matching the old lake/pond look. */
+function zoneBand(z: HazardZone, cor: number): [number, number] {
+  const span = Math.max(10, z.to - z.from)
+  const water = z.kind === 'water'
+  const w = water ? Math.min(34, 12 + span * 0.22) : Math.min(12, 5 + span * 0.18)
+  const edge = water ? cor + 1 : cor // water laps just past the short grass
+  const cross = water ? cor + 4 : cor + 2
+  if (z.side === 'left') return [edge, edge + w]
+  if (z.side === 'right') return [-(edge + w), -edge]
+  return [-cross, cross] // cross / green: strung across the corridor
+}
+
+/** Two zones belong to the same physical hazard when they're the same kind,
+ * abut in yardage, AND their lateral footprints overlap — exactly what the OSM
+ * importer splits one diagonal bunker or one body of water into (left → cross →
+ * right as the centreline curves past it). Opposite-side flanking hazards (a
+ * left and a right bunker with no cross between) never overlap, so they stay
+ * separate shapes. */
+export function zonesAdjacent(a: HazardZone, b: HazardZone): boolean {
+  if (a.kind !== b.kind) return false
+  const gap = Math.max(a.from, b.from) - Math.min(a.to, b.to)
+  if (gap > 6) return false
+  // relative overlap only — a fixed corridor width is fine for the test
+  const [aLo, aHi] = zoneBand(a, 15)
+  const [bLo, bHi] = zoneBand(b, 15)
+  return Math.min(aHi, bHi) >= Math.max(aLo, bLo)
+}
+
+/** Group a hole's mergeable zones into runs of physically-continuous same-kind
+ * zones (the connected components of the adjacency relation), preserving array
+ * order for stable z-indexing. A run of length ≥2 is drawn as one merged shape;
+ * singletons render on their existing path. */
+export function hazardRuns(zones: HazardZone[]): HazardZone[][] {
+  const mergeable = zones.filter((z) => MERGE_KINDS.has(z.kind))
+  const byYard = [...mergeable].sort((p, q) => p.from - q.from)
+  const runs: HazardZone[][] = []
+  for (const z of byYard) {
+    // A zone can bridge SEVERAL existing runs at once — e.g. a `cross` bunker
+    // touching a `right` run below it and a `left` run above it (Harbour Town
+    // 17's green-wrapping bunker). Coalesce every run it joins, not just the
+    // first, or the connected component renders as separate shapes.
+    const bridged = runs.filter((r) => r.some((m) => zonesAdjacent(m, z)))
+    if (bridged.length === 0) {
+      runs.push([z])
+      continue
+    }
+    bridged[0].push(z)
+    for (let k = 1; k < bridged.length; k++) {
+      bridged[0].push(...bridged[k])
+      runs.splice(runs.indexOf(bridged[k]), 1)
+    }
+  }
+  return runs
+}
+
+/** Continuous outline hugging the union footprint of a merged run — one organic
+ * waste-bunker or water shape instead of a chain of separate blobs. Water runs
+ * taper at their ends so a lake reads as a body, not a slab. */
+function hazardBandPath(
+  geo: Geo,
+  run: HazardZone[],
+  greenFrom: number,
+  greenRxYd: number,
+  L: number,
+): string {
+  const from = Math.min(...run.map((z) => z.from))
+  const to = Math.max(...run.map((z) => z.to))
+  const water = run[0].kind === 'water'
+  const STEPS = Math.max(10, Math.round((to - from) / 5))
+  const hiPts: string[] = []
+  const loPts: string[] = []
+  let prev: [number, number] | null = null
+  for (let i = 0; i <= STEPS; i++) {
+    const t = i / STEPS
+    const y = from + (to - from) * t
+    const cor = y > greenFrom ? greenRxYd : 15
+    let lo = Infinity
+    let hi = -Infinity
+    for (const z of run) {
+      if (y < z.from - 2 || y > z.to + 2) continue
+      const [zLo, zHi] = zoneBand(z, cor)
+      lo = Math.min(lo, zLo)
+      hi = Math.max(hi, zHi)
+    }
+    // a rounding-gap yard with no active zone: carry the previous band so the
+    // outline stays continuous rather than collapsing to the centreline
+    if (lo === Infinity) {
+      if (!prev) continue
+      ;[lo, hi] = prev
+    }
+    prev = [lo, hi]
+    // taper water toward the extreme ends so a lake pinches to a point
+    const taper = water ? Math.min(1, 6 * t * (1 - t) + 0.25) : 1
+    const wob = Math.sin(y * 0.7) * 0.6 // gentle edge waviness (yards)
+    const p = geo.at(Math.min(y, L - 1))
+    const n = geo.normalAt(Math.min(y, L - 1))
+    const u = geo.uPerYd
+    const mid = (lo + hi) / 2
+    const hiO = mid + (hi - mid) * taper + wob
+    const loO = mid + (lo - mid) * taper + wob
+    hiPts.push(`${(p.x + n.x * hiO * u).toFixed(1)},${(p.y + n.y * hiO * u).toFixed(1)}`)
+    loPts.unshift(`${(p.x + n.x * loO * u).toFixed(1)},${(p.y + n.y * loO * u).toFixed(1)}`)
+  }
+  return `M${hiPts.join(' L')} L${loPts.join(' L')} Z`
 }
 
 /** One canopy: layered crowns + soft shadow. */
@@ -370,6 +521,25 @@ export function HoleMap(props: {
   const places = useMemo(() => placeZones(layout, geo), [layout, geo])
   const treeSize = (base: number) => clampPx(base * uPerYd, 7, 22)
 
+  // Merge the zones the OSM importer split from one physical hazard (a waste
+  // bunker or a body of water read as left → cross → right as the centreline
+  // curves past it) back into a single drawn shape. `mergedFirst` maps a run's
+  // leading zone id to the whole run; `mergedRest` are the follower ids to skip
+  // while rendering (the run is drawn once, at its first member).
+  const { mergedFirst, mergedRest } = useMemo(() => {
+    const first = new Map<string, HazardZone[]>()
+    const rest = new Set<string>()
+    for (const run of hazardRuns(layout.zones)) {
+      if (run.length < 2) continue
+      const inOrder = layout.zones.filter((z) => run.includes(z))
+      first.set(inOrder[0].id, inOrder)
+      for (const z of inOrder.slice(1)) rest.add(z.id)
+    }
+    return { mergedFirst: first, mergedRest: rest }
+  }, [layout])
+  const greenFromYd = L - layout.greenDepth / 2 - 2
+  const greenRxYd = greenRx / uPerYd
+
   // decorative groves flanking the corridor, anchored in world yards so they
   // track the camera; sizes clamp so zoomed views don't grow monster trees
   const deco = useMemo(() => {
@@ -447,6 +617,22 @@ export function HoleMap(props: {
     const place = places.get(z.id)!
     const span = Math.max(10, z.to - z.from)
     const sideSign = z.side === 'left' ? 1 : -1
+
+    // Importer-split hazard stitched back together: draw the whole run once, at
+    // its first member, as one continuous shape (skips the per-side paths below).
+    if (mergedRest.has(z.id)) return null // already drawn as part of its run
+    const run = mergedFirst.get(z.id)
+    if (run) {
+      const d = hazardBandPath(geo, run, greenFromYd, greenRxYd, L)
+      return z.kind === 'water' ? (
+        <path key={z.id} d={d} fill="url(#water)" stroke="#3a6d86" strokeWidth={1.5} strokeLinejoin="round" opacity={0.95} />
+      ) : (
+        <g key={z.id}>
+          <path d={d} fill="#a8916a" opacity={0.7} transform="translate(0 1.5)" />
+          <path d={d} fill="#e2d2a8" stroke="#b49b6c" strokeWidth={1.3} strokeLinejoin="round" />
+        </g>
+      )
+    }
 
     if (z.kind === 'water' && z.side === 'cross') {
       return (
@@ -545,7 +731,7 @@ export function HoleMap(props: {
         </g>
       )
     }
-    // bunkers & side/greenside water: pre-placed ellipses
+    // singleton bunkers & side/greenside water: pre-placed ellipses
     return (
       <g key={z.id}>
         {place.ellipses.map((e, i) =>
@@ -773,13 +959,15 @@ export function GreenView(props: {
   size?: MapSize | null
 }) {
   const { feet, pin } = props
-  const { w, h, cx } = cameraFrame(props.size ?? null)
+  const { w, h, cx, yBottom } = cameraFrame(props.size ?? null)
   // green fills the panel height; putt length scales with it
   const k = h / H
   const bend = props.holeNumber % 2 === 0 ? 1 : -1
-  const dist = Math.min(215, 46 + feet * 3.4) * k
   // floor keeps the flag (44 units tall) clear of the floating status pill
   const holeY = Math.max(108 * k, 92)
+  // capped at yBottom so a long lag putt's ball never sits behind the
+  // caddy's-read overlay at the bottom of the panel
+  const dist = Math.min(Math.min(215, 46 + feet * 3.4) * k, Math.max(0, yBottom - holeY))
   const ballY = holeY + dist
   // the cup sits where the pin actually is: golfer faces the green from the
   // ball, so pin-left is screen-left; a tucked flag hides near the edge, an

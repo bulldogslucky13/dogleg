@@ -20,6 +20,39 @@ export interface OsmHoleGeometry {
   greenDepth: number
 }
 
+/**
+ * Cosmetic dogleg profiles, keyed by `${courseSlug}:${holeNumber}` — the signed
+ * lateral deviation (yards, >0 = golfer-left) of the real OSM centreline from
+ * the straight tee→pin chord, sampled at 13 evenly-spaced fractions (endpoints
+ * ~0). The SVG map bends the hole to this so it turns where it really turns, and
+ * the "Dogleg left/right" chip reads its direction — both OVERRIDING the
+ * hand-set `HoleSpec.dogleg` flag, which shipped backwards on several holes.
+ *
+ * Map-only: the odds engine is 1-D and never reads this, so adding/removing a
+ * profile is NOT odds- or replay-affecting (no ENGINE_VERSION bump). Generated
+ * by `pnpm import:osm <course> <hole>` (see scripts/README.md, freeze process)
+ * — only holes that actually bend (|max| ≥ 8 yд) are persisted; the rest render
+ * straight. © OpenStreetMap contributors, ODbL.
+ */
+export const OSM_BEND: Record<string, number[]> = {
+  // Harbour Town Golf Links — real centreline curvature. Note how the signs
+  // correct the tuple flags: 5/8/15 bend LEFT (tuple said R), 6 bends RIGHT
+  // (tuple said L), 2 is a right dogleg the "straight" flag missed.
+  'harbour-town:2': [0, 6, 12, 18, 24, 28, 31, 32, 31, 27, 23, 15, 0],
+  'harbour-town:3': [0, -3, -7, -10, -13, -17, -19, -20, -20, -19, -14, -7, 0],
+  'harbour-town:5': [0, -14, -29, -43, -55, -63, -65, -58, -43, -30, -18, -9, 0],
+  'harbour-town:6': [0, 6, 12, 17, 23, 29, 33, 36, 36, 34, 25, 12, 0],
+  'harbour-town:8': [0, -9, -18, -27, -37, -44, -49, -51, -49, -43, -29, -14, 0],
+  'harbour-town:9': [0, -1, -3, -4, -5, -6, -7, -8, -9, -9, -8, -4, 0],
+  'harbour-town:10': [0, -6, -12, -18, -23, -29, -33, -35, -35, -32, -23, -12, 0],
+  'harbour-town:11': [0, -3, -6, -9, -12, -14, -16, -18, -18, -17, -13, -6, 0],
+  'harbour-town:12': [0, 5, 11, 16, 22, 27, 31, 34, 34, 31, 24, 12, 0],
+  'harbour-town:13': [0, -3, -6, -9, -13, -16, -18, -20, -20, -19, -15, -8, 0],
+  'harbour-town:15': [0, -6, -12, -18, -24, -30, -35, -40, -44, -46, -43, -29, 0],
+  'harbour-town:16': [0, -10, -20, -29, -39, -49, -58, -64, -67, -66, -53, -27, 0],
+  'harbour-town:18': [0, -4, -8, -13, -17, -21, -23, -25, -25, -22, -16, -8, 0],
+}
+
 export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   // hole 1 — opener
   'tpc-sawgrass:1': {

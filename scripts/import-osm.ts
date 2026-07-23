@@ -21,9 +21,15 @@
  * Add an entry per course you want to import.
  *
  * Known gaps (prototype):
- *  - Ocean holes (Pebble 7/8, Portrush) — the sea is natural=coastline, a LINE
- *    not a polygon, so it isn't captured yet. Needs coastline handling.
- *  - OSM coverage varies; obscure courses may lack golf=hole centerlines.
+ *  - OSM coverage varies; obscure courses may lack golf=hole centerlines, and
+ *    many resorts have no natural=wood polygons even where trees define the
+ *    course (Sea Pines) — hand-author `trees` zones when identity demands it
+ *    (see harbour-town:18 in engine/geometry.ts).
+ *  - Ocean IS handled (natural=coastline rasterised as a seaward half-plane,
+ *    see OCEAN_REACH_YD below) — but tidal marsh is often mapped as
+ *    natural=water/wetland polygons instead, so sound-side holes may come
+ *    through as `water`; relabel to `ocean` by hand where the flavor fits
+ *    (pebble 7/8, harbour-town 18).
  *
  * This is a build-time tool. Output is meant to be reviewed and committed as
  * static data — nothing here runs in the app or touches the network at runtime.
@@ -41,7 +47,7 @@
  * courses.ts — extending the Landmark union in engine/types.ts and adding a
  * sprite in ui/HoleMap.tsx if it's a new kind. Cosmetic only, never in the
  * odds or replay, so it's always versioning-safe. See scripts/README.md
- * step 4 of the freeze process.
+ * step 5 of the freeze process.
  */
 
 // Let --compare import the engine's extensionless TS modules (./rng etc.) —
@@ -255,6 +261,30 @@ function pointAtArc(pts: Vec[], cum: number[], a: number): { p: Vec; dir: Vec } 
   const t = (a - cum[i]) / segLen
   const dir: Vec = [seg[0] / segLen, seg[1] / segLen]
   return { p: [pts[i][0] + seg[0] * t, pts[i][1] + seg[1] * t], dir }
+}
+
+/**
+ * Cosmetic dogleg profile: signed lateral deviation (yards, >0 = golfer-left)
+ * of the smoothed centreline from the straight tee→green chord, sampled at
+ * BEND_SAMPLES+1 evenly-spaced fractions. Endpoints are ~0 by construction; the
+ * max-magnitude sample marks where — and how hard — the hole actually turns.
+ * Map-only: the odds engine works in 1-D and never sees this, so it is not
+ * odds- or replay-affecting.
+ */
+const BEND_SAMPLES = 12
+function bendProfile(center: Vec[], cum: number[]): number[] {
+  const total = cum[cum.length - 1]
+  const tee = center[0]
+  const end = center[center.length - 1]
+  const chord = sub(end, tee)
+  const chordLen = len(chord) || 1
+  const dir: Vec = [chord[0] / chordLen, chord[1] / chordLen]
+  const out: number[] = []
+  for (let i = 0; i <= BEND_SAMPLES; i++) {
+    const { p } = pointAtArc(center, cum, (i / BEND_SAMPLES) * total)
+    out.push(Math.round(toYards(cross(dir, sub(p, tee)))))
+  }
+  return out
 }
 
 /**
@@ -684,6 +714,9 @@ async function main() {
     .filter((r) => r.to - r.from >= 4)
   const zones = merged.map((r, i) => ({ id: `z${i + 1}`, kind: r.kind, from: r.from, to: Math.min(length, r.to), side: r.side }))
 
+  const bend = bendProfile(center, cum)
+  const bendMax = bend.reduce((m, v) => (Math.abs(v) > Math.abs(m) ? v : m), 0)
+
   const layout = {
     slug,
     holeRef: holeNo,
@@ -693,6 +726,9 @@ async function main() {
     fairwayFrom: Math.round(length * 0.35),
     fairwayTo: length - Math.round(greenDepth / 2) - 2,
     greenDepth: Math.round(greenDepth),
+    // only worth persisting when the hole actually bends (a few yards of wander
+    // is projection noise on a "straight" hole — leave it off and it renders straight)
+    ...(Math.abs(bendMax) >= 8 ? { bend } : {}),
   }
 
   if (flags.includes('--json')) {
@@ -709,6 +745,14 @@ async function main() {
   console.log(`length: ${length} yd   greenDepth: ${layout.greenDepth} yd   fairway: ${layout.fairwayFrom}–${layout.fairwayTo} yd`)
   console.log(`zones (${zones.length}):`)
   console.log(fmtZones(zones))
+  if (Math.abs(bendMax) >= 8) {
+    const cornerFrac = bend.indexOf(bendMax) / BEND_SAMPLES
+    console.log(
+      `bend: max ${bendMax > 0 ? '+' : ''}${bendMax} yd ${bendMax > 0 ? '(left)' : '(right)'} near ${Math.round(cornerFrac * length)} yd — [${bend.join(', ')}]`,
+    )
+  } else {
+    console.log(`bend: straight (max ${bendMax} yd, not persisted)`)
+  }
 
   // side-by-side with the current procedural layout the game ships today
   if (flags.includes('--compare')) {

@@ -14,10 +14,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
 import { CHARACTERS } from './engine/characters'
 import { playRatingFor } from './engine/courses'
-import { forecastSetup, localDateKey } from './engine/daily'
+import { forecastSetup, localDateKey, practiceSetup } from './engine/daily'
 import { seasonForDate } from './engine/season'
 import { setupFromSeed } from './engine/replay'
 import { loadIdentity, loadPlayer } from './lib/leaderboard'
+import { applyChoice, holeInPlay, newRound, saveRound } from './state/store'
 import type { HistoryEntry } from './state/store'
 
 // jsdom has no ResizeObserver; the map measures itself with one
@@ -352,10 +353,10 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
     }
   })
 
-  it('odds-driving chips (water, pin, wind) survive the three-chip cap; flavor yields', async () => {
-    // a stacked par-3 short hole produces four chip candidates: SI flavor,
-    // live water, today's pin, and the gust wind (the ONLY wind display on
-    // phones). Only three fit — the odds-driving trio must be the survivors.
+  it("the caddy's read shows the full list — no cap, flavor included", async () => {
+    // a stacked par-3 short hole produces four chips: SI flavor, live water,
+    // today's pin, and the gust wind. The row scrolls, so every one shows —
+    // including the SI flavor chip the old three-chip cap used to drop.
     const { HazardChips } = await import('./ui/panels')
     const { buildLayout } = await import('./engine/layout')
     const { startHole } = await import('./engine/resolve')
@@ -372,9 +373,39 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
     expect(screen.getByText(/mph/)).toBeTruthy()
     expect(screen.getByText(/Sucker pin/)).toBeTruthy()
     expect(screen.getByText(/Water|water/)).toBeTruthy()
-    expect(screen.queryByText(/Signature test/)).toBeNull()
-    // three chips max, always
-    expect(document.querySelectorAll('.chips .chip').length).toBeLessThanOrEqual(3)
+    // the SI flavor chip now rides along instead of yielding its slot
+    expect(screen.getByText(/Signature test/)).toBeTruthy()
+    expect(document.querySelectorAll('.chips .chip').length).toBe(4)
+  })
+
+  it("the putt green's Caddy's read renders end to end through a live round", () => {
+    // the putt-stage caddy's read is wired up separately from HazardChips
+    // (App.tsx builds its own chip list — putt look, green speed, today's
+    // pin — and calls CaddyThoughts directly), so it needs its own coverage:
+    // HazardChips-level tests never reach this code path.
+    //
+    // Driven through the store API directly (same one newRound/applyChoice
+    // the UI itself calls — see CLAUDE.md) with a fixed practice seed, rather
+    // than clicking the real daily's "Tee off": the daily's outcome is
+    // seeded off the calendar date, and an approach can hole out and skip
+    // the putt stage entirely — that would make this test's pass/fail
+    // depend on which day it runs, not on the caddy's-read component. This
+    // seed is verified (see the loop below) to reach the green in 2 shots.
+    let state = newRound(practiceSetup('harbour-town', 'putt-smoke-fixed-seed-0'), 'practice', 'fairway')
+    for (let guard = 0; holeInPlay(state).stage !== 'putt' && holeInPlay(state).stage !== 'done' && guard < 10; guard++) {
+      state = applyChoice(state, 'safe')
+    }
+    expect(holeInPlay(state).stage).toBe('putt')
+    saveRound(state)
+
+    // a fresh mount lands straight on the saved hole, mid-round, at the putt
+    // stage — same as "resumes an in-progress round from storage" above
+    render(<App />)
+    expect(screen.getByText('Lag')).toBeTruthy()
+    expect(screen.getByText(/Caddy.?s read/i)).toBeTruthy()
+    const read = within(document.querySelector('.caddy-track')!)
+    expect(read.getByText(/~\d+ ft$/)).toBeTruthy()
+    expect(read.getByText(/greens?$/)).toBeTruthy()
   })
 
   it("the tier banner's risk read includes the hole's gust, matching the real odds bar", async () => {
@@ -861,6 +892,125 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
 
     fireEvent.click(screen.getAllByText('▶ Replay')[0])
     expect(screen.getByText('‹ Exit replay')).toBeTruthy()
+  })
+
+  it('"Course records you hold" follows the ledger: one row per course, and only records still held', () => {
+    // Three archived rounds all once flagged courseRecord:true — the stale flag
+    // that used to drive this list directly. Oakmont has TWO such rounds (the
+    // record moved from +2 to -3); St Andrews' record has since been beaten.
+    const round = (over: Partial<Record<string, unknown>>) => ({
+      seed: `s-${over.slug}-${over.toPar}`,
+      mode: 'practice',
+      courseSlug: over.slug,
+      dateKey: '2026-07-21',
+      toPar: over.toPar,
+      strokes: 70,
+      results: [],
+      decisions: [],
+      courseRecord: true,
+      playedAt: over.playedAt ?? 1,
+    })
+    localStorage.setItem(
+      'dogleg:archive:v1',
+      JSON.stringify([
+        round({ slug: 'oakmont', toPar: 2, playedAt: 1 }),
+        round({ slug: 'oakmont', toPar: -3, playedAt: 2 }),
+        round({ slug: 'st-andrews-old', toPar: 7, playedAt: 3 }),
+      ]),
+    )
+    // the reconciled ledger: we still hold Oakmont; St Andrews is gone
+    localStorage.setItem(
+      'dogleg:records:v1',
+      JSON.stringify({ v: 1, held: { oakmont: { toPar: -3, since: 1 } }, stolen: {} }),
+    )
+
+    render(<App />)
+    fireEvent.click(screen.getByText(/Clubhouse · my rounds/))
+    // two distinct courses, one row each — never one CR per record-ever
+    fireEvent.click(screen.getByText(/Records · 2/))
+
+    expect(screen.getByText(/Course records you hold/)).toBeTruthy()
+    // exactly one CR badge (Oakmont), not two — the +2 round is deduped away,
+    // and the beaten St Andrews record is not here at all
+    expect(screen.getAllByText('CR')).toHaveLength(1)
+    expect(screen.getAllByText(/Oakmont/)).toHaveLength(1)
+    // the lost record drops to Personal bests instead of vanishing
+    expect(screen.getByText('Personal bests')).toBeTruthy()
+    expect(screen.getByText(/St Andrews/)).toBeTruthy()
+  })
+
+  it('a record held from another device never badges a worse local round as CR', () => {
+    // stale flag set true, as it always is on a round that once took a record
+    localStorage.setItem(
+      'dogleg:archive:v1',
+      JSON.stringify([
+        {
+          seed: 's-oak-1',
+          mode: 'practice',
+          courseSlug: 'oakmont',
+          dateKey: '2026-07-21',
+          toPar: 1,
+          strokes: 74,
+          results: [],
+          decisions: [],
+          courseRecord: true,
+          playedAt: 1,
+        },
+      ]),
+    )
+    // we DO hold Oakmont's record — but at -6, set on another device. Our best
+    // local round is only +1 and must not be dressed up as that record.
+    localStorage.setItem(
+      'dogleg:records:v1',
+      JSON.stringify({ v: 1, held: { oakmont: { toPar: -6, since: 1 } }, stolen: {} }),
+    )
+
+    render(<App />)
+    fireEvent.click(screen.getByText(/Clubhouse · my rounds/))
+    fireEvent.click(screen.getByText(/Records · 1/))
+
+    // the +1 local round doesn't match the -6 held score → no CR, stays a PR
+    expect(screen.queryByText('CR')).toBeNull()
+    expect(screen.queryByText(/Course records you hold/)).toBeNull()
+    expect(screen.getByText('Personal bests')).toBeTruthy()
+    expect(screen.getAllByText(/Oakmont/)).toHaveLength(1)
+  })
+
+  it('a still-held record keeps its CR row when a better local round has not posted', () => {
+    const round = (toPar: number, flag: boolean, playedAt: number) => ({
+      seed: `s-oak-${toPar}`,
+      mode: 'practice',
+      courseSlug: 'oakmont',
+      dateKey: '2026-07-21',
+      toPar,
+      strokes: 70,
+      results: [],
+      decisions: [],
+      courseRecord: flag,
+      playedAt,
+    })
+    // -3 is the confirmed, still-held record; -5 was played later but never
+    // posted (offline / submit error), so it hasn't taken the record yet.
+    localStorage.setItem(
+      'dogleg:archive:v1',
+      JSON.stringify([round(-5, false, 2), round(-3, true, 1)]),
+    )
+    localStorage.setItem(
+      'dogleg:records:v1',
+      JSON.stringify({ v: 1, held: { oakmont: { toPar: -3, since: 1 } }, stolen: {} }),
+    )
+
+    render(<App />)
+    fireEvent.click(screen.getByText(/Clubhouse · my rounds/))
+    fireEvent.click(screen.getByText(/Records · 1/))
+
+    // the held record survives — one CR row at -3, the unconfirmed -5 doesn't
+    // evict it (nor add a second row for the same course)
+    expect(screen.getByText(/Course records you hold/)).toBeTruthy()
+    expect(screen.getAllByText('CR')).toHaveLength(1)
+    expect(screen.getAllByText(/Oakmont/)).toHaveLength(1)
+    expect(screen.getByText('-3')).toBeTruthy()
+    expect(screen.queryByText('-5')).toBeNull()
   })
 
   it('the stats view computes the handicap countdown and opens the lowest round scorecard', async () => {

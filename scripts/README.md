@@ -59,6 +59,16 @@ polygon name, and the engine slug (for `--compare`).
 3. That's it. `courses.ts` **auto-reconciles** each hole's `yards` to the
    imported `length` at load, so the header, scorecard, course total, and map
    all read one source. No hand-editing of the yardage tuples.
+4. **Landmark pass.** While QA-ing against satellite/aerial imagery, ask: does
+   any hole have a *classic, instantly-recognizable structure* a golfer would
+   expect to see on the map? (Harbour Town 18's candy-striped lighthouse is
+   the archetype; think windmills, famous clubhouses, bridges like the Swilcan.)
+   If so, set `landmark` on that hole's tuple in `courses.ts` and — when it's a
+   new kind — extend the `Landmark` union in `src/engine/types.ts` and add a
+   sprite next to `Lighthouse` in `src/ui/HoleMap.tsx`. Landmarks are **pure
+   map flavor**: cosmetic only, never in the odds, geometry, or seed replay,
+   so adding one is always versioning-safe. One per course is plenty — save
+   them for the shot everyone remembers.
 
 Data © OpenStreetMap contributors, [ODbL](https://opendatacommons.org/licenses/odbl/).
 Attribution required if this geometry ships.

@@ -5,7 +5,8 @@ import { toParLabel } from '../engine/daily'
 import type { ReplayPayload } from '../engine/replay'
 import { seasonCountdown, seasonForDate } from '../engine/season'
 import { currentEmail } from '../lib/auth'
-import { loadPlayer } from '../lib/leaderboard'
+import { backendEnabled } from '../lib/backend'
+import { fetchCourseRecords, loadPlayer } from '../lib/leaderboard'
 import {
   currentHandicap,
   formatAverage,
@@ -17,7 +18,7 @@ import {
 } from '../state/stats'
 import { lifetimeRounds, loadArchive, type ArchivedRound, type HistoryEntry } from '../state/store'
 import { pastSeasons, roundsInSeason, seasonAwards, type SeasonAward } from '../state/seasonStore'
-import { loadLedger } from '../lib/records'
+import { loadLedger, syncLedger } from '../lib/records'
 import { AccountPanel } from './AccountPanel'
 import { RoundScorecard } from './RoundScorecard'
 import { track } from '../lib/analytics'
@@ -78,6 +79,29 @@ export function RoundsScreen(props: {
     currentEmail()
       .then((e) => live && setEmail(e))
       .catch(() => {})
+    return () => {
+      live = false
+    }
+  }, [])
+
+  // The "records you hold" list is derived from the ledger, so it must be
+  // reconciled the same way the home screen reconciles it (screens.tsx) — we
+  // can't assume that async check finished before the player navigated in
+  // here, and once HomeScreen unmounts its localStorage write has no path into
+  // this component. Reconcile on mount and hold the result in state so a stolen
+  // record can't linger as "held" (or an adopted one stay missing) until the
+  // player leaves and comes back. Backend off in tests → the local ledger stands.
+  const [ledger, setLedger] = useState(() => loadLedger())
+  useEffect(() => {
+    if (!backendEnabled) return
+    const myName = loadPlayer()?.name ?? null
+    if (!myName) return
+    let live = true
+    void fetchCourseRecords().then((recs) => {
+      if (!live || !recs) return
+      syncLedger(recs, myName)
+      setLedger(loadLedger())
+    })
     return () => {
       live = false
     }
@@ -164,7 +188,7 @@ export function RoundsScreen(props: {
   // "CR"s on one course). Keying off `held` fixes both: one row per course
   // (best round wins), and only records that are still ours right now. A course
   // whose record we've lost falls back to the personal-bests list.
-  const held = loadLedger().held
+  const held = ledger.held
   const bestByCourse = new Map<string, ArchivedRound>()
   for (const r of rounds) {
     const best = bestByCourse.get(r.courseSlug)

@@ -450,3 +450,31 @@ describe('buildRecap', () => {
     expect(buildRecap({ ...roundWith(scores), complete: false })).toBeNull()
   })
 })
+
+describe('engine-version stamp on rounds', () => {
+  afterEach(() => vi.unstubAllGlobals())
+
+  it('newRound stamps the bundle ENGINE_VERSION, and the stamp survives save/load', async () => {
+    const map = new Map<string, string>()
+    vi.stubGlobal('localStorage', {
+      getItem: (k: string) => map.get(k) ?? null,
+      setItem: (k: string, v: string) => void map.set(k, v),
+      removeItem: (k: string) => void map.delete(k),
+      key: (i: number) => [...map.keys()][i] ?? null,
+      clear: () => map.clear(),
+      get length() {
+        return map.size
+      },
+    } as Storage)
+    const { newRound, saveRound, loadRound: load } = await import('./store')
+    const { practiceSetup } = await import('../engine/daily')
+    const { ENGINE_VERSION } = await import('../engine/version')
+    const round = newRound(practiceSetup(COURSES[0].slug, 'stamp:test'), 'practice', 'fairway')
+    expect(round.engineVersion).toBe(ENGINE_VERSION)
+    // the round in localStorage after a refresh must still carry the version
+    // its dice rolled under — that stamp (not the new bundle's constant) is
+    // what submission sends, so a stale round can't dodge the referee's check
+    saveRound(round)
+    expect(load()?.engineVersion).toBe(ENGINE_VERSION)
+  })
+})

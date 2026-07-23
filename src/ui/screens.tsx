@@ -7,6 +7,7 @@ import { decisionsFromScores, encodeReplay } from '../engine/replay'
 import type { CharacterId, HoleResult } from '../engine/types'
 import { track } from '../lib/analytics'
 import { backendEnabled } from '../lib/backend'
+import { bundleIsStale, FRESH_TTL_MS } from '../lib/freshness'
 import { fetchCourseRecords, fetchSeasonRecords, loadPlayer, type CourseRecord } from '../lib/leaderboard'
 import { seasonCountdown, seasonForDate } from '../engine/season'
 import { dismissSteals, pendingSteals, syncLedger, type StolenRecord } from '../lib/records'
@@ -44,7 +45,33 @@ export function HomeScreen(props: {
    * holders under the new season's name */
   const [seasonRecsKey, setSeasonRecsKey] = useState<string | null>(null)
   const [steals, setSteals] = useState(() => pendingSteals())
+  /** an engine-changing deploy landed after this tab loaded its bundle — a
+   * round played now couldn't post, so say "reload" before the first stroke */
+  const [stale, setStale] = useState(false)
   const season = seasonForDate()
+
+  // checked on mount, then again whenever the tab comes back into view and on
+  // a slow interval — a home screen left open through a deploy must notice it
+  // BEFORE the player tees off, not at submit time. (bundleIsStale itself
+  // caches, so the extra calls are only fetches when its TTL has lapsed.)
+  useEffect(() => {
+    let cancelled = false
+    const check = () =>
+      void bundleIsStale().then((s) => {
+        if (!cancelled && s) setStale(true)
+      })
+    check()
+    const onVisible = () => {
+      if (!document.hidden) check()
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    const timer = setInterval(check, FRESH_TTL_MS)
+    return () => {
+      cancelled = true
+      clearInterval(timer)
+      document.removeEventListener('visibilitychange', onVisible)
+    }
+  }, [])
 
   // the all-time board loads once when the browser opens — the wall of legends
   useEffect(() => {
@@ -78,6 +105,10 @@ export function HomeScreen(props: {
     })
   }, [])
   const avgLabel = (avg: number) => (avg > 0 ? `+${avg.toFixed(1)}` : avg.toFixed(1))
+  // a stale bundle must not START any round — the referee refuses its score,
+  // daily or practice alike. Every start path funnels into the remedy: the
+  // page reloads onto the current bundle and the player tees off from there.
+  const startPractice = stale ? () => window.location.reload() : props.onPractice
   return (
     <div className="screen home">
       <header className="masthead">
@@ -93,6 +124,13 @@ export function HomeScreen(props: {
         <p className="tagline">One round. 18 holes. ~2 minutes.</p>
       </header>
 
+      {stale && (
+        <div className="stale-banner" role="status">
+          <span>A new version of DogLeg is live — refresh so your score can post.</span>
+          <button onClick={() => window.location.reload()}>Refresh</button>
+        </div>
+      )}
+
       {steals.length > 0 && (
         <StealCard
           steals={steals}
@@ -100,7 +138,7 @@ export function HomeScreen(props: {
             dismissSteals()
             setSteals([])
           }}
-          onWinItBack={props.onPractice}
+          onWinItBack={startPractice}
         />
       )}
 
@@ -162,6 +200,12 @@ export function HomeScreen(props: {
         <button className="cta" onClick={props.onResume}>
           Resume today's round
         </button>
+      ) : stale ? (
+        // a stale bundle would play a round the referee refuses to post —
+        // the primary CTA becomes the fix instead of the trap
+        <button className="cta" onClick={() => window.location.reload()}>
+          Refresh to play
+        </button>
       ) : (
         <button className="cta" onClick={props.onTeeOff}>
           Tee off
@@ -171,6 +215,16 @@ export function HomeScreen(props: {
         <button className="cta ghost" onClick={props.onResume}>
           Resume practice round · {props.activeRound.courseName}
         </button>
+      )}
+      {stale && props.activeRound && !props.playedToday && (
+        // an in-progress round already carries its creation-time engine stamp,
+        // so its score is unpostable no matter when the tab refreshes.
+        // Discarding a half-played daily for the player would be worse than
+        // telling the truth: finish it if you like, the board won't take it.
+        <p className="fine">
+          Your round in progress started on an old version of DogLeg, so its score won't post to the board — your
+          next round will.
+        </p>
       )}
 
       {props.playedToday && <ForecastCard today={props.playedToday} />}
@@ -212,7 +266,7 @@ export function HomeScreen(props: {
               const sr = seasonRecs?.get(c.slug)
               const at = courseRecs?.get(c.slug)
               return (
-                <button key={c.slug} className="course-row" onClick={() => props.onPractice(c.slug)}>
+                <button key={c.slug} className="course-row" onClick={() => startPractice(c.slug)}>
                   <b>{c.name}</b>
                   <span>
                     {c.location} · Play Rating {playRatingFor(c.slug)}/10
@@ -240,7 +294,7 @@ export function HomeScreen(props: {
               const sr = seasonRecs?.get(c.slug)
               const at = courseRecs?.get(c.slug)
               return (
-                <button key={c.slug} className="course-row" onClick={() => props.onPractice(c.slug)}>
+                <button key={c.slug} className="course-row" onClick={() => startPractice(c.slug)}>
                   <b>{c.name}</b>
                   <span>
                     {c.location} · {c.holes.length} holes · Play Rating {playRatingFor(c.slug)}/10

@@ -56,7 +56,15 @@ export function ScoreBoard(props: { round: RoundState }) {
     const r = await submitRound(round, pickedName)
     setBusy(false)
     if (!r.ok) {
-      setError(r.error ?? 'something went sideways')
+      // stale_client: the round was played under an engine the referee no
+      // longer runs, and its version stamp rides with it forever — so this
+      // score can never post, refresh or not. Be honest about that; the
+      // refresh is for the NEXT round, not this one.
+      setError(
+        r.code === 'stale_client'
+          ? 'This round was played on an old version of DogLeg, so its score can’t post. Refresh the page — your next round will count.'
+          : (r.error ?? 'something went sideways'),
+      )
       return
     }
     setResult(r)

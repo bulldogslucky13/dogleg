@@ -44,6 +44,7 @@ import { decodeReplay, type ReplayPayload } from './engine/replay'
 import { ReplayScreen } from './ui/ReplayScreen'
 import { RoundsScreen } from './ui/RoundsScreen'
 import { CharacterPickScreen, HomeScreen, ResultScreen } from './ui/screens'
+import { bundleIsStale, bundleKnownStale } from './lib/freshness'
 import { Tutorial, hasSeenTutorial } from './ui/Tutorial'
 import { SeasonSplash } from './ui/SeasonSplash'
 import { ackSeason, needsSeasonSplash } from './state/seasonStore'
@@ -176,6 +177,15 @@ export default function App() {
     track('screen_viewed', props)
     // fire on view change only — round/course ride along as context
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view])
+
+  // Warm the staleness verdict on the screens that lead into a round start
+  // (pick is every round's doorway; result hosts "play another practice
+  // round"), so the SYNC gate in onPick has a fresh answer by the time the
+  // player commits. HomeScreen runs its own banner-driven checks; this covers
+  // the start paths that never pass back through home.
+  useEffect(() => {
+    if (view === 'pick' || view === 'result') void bundleIsStale()
   }, [view])
 
   // the tutorial auto-opens on a first visit — that impression is the top of
@@ -392,6 +402,14 @@ export default function App() {
         setup={start.setup}
         practice={start.mode === 'practice'}
         onPick={(character: CharacterId) => {
+          // the one doorway every round starts through — daily, practice,
+          // and result-screen rematches all land here. A stale bundle would
+          // stamp the old engine version onto a round the referee is already
+          // guaranteed to refuse; reload onto the current bundle instead.
+          if (bundleKnownStale()) {
+            window.location.reload()
+            return
+          }
           const r = newRound(start.setup, start.mode, character, loadIdentity()?.id)
           track('round_started', { mode: start.mode, course: r.courseSlug, puzzle_number: r.puzzleNumber, character })
           setRound(r)

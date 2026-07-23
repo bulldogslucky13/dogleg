@@ -10,6 +10,7 @@
 // deno-lint-ignore-file no-explicit-any
 import { createClient } from 'npm:@supabase/supabase-js@2'
 import {
+  ENGINE_VERSION,
   FORTUNE_CONFIG,
   choiceRowsFromReplay,
   courseBySlug,
@@ -83,6 +84,21 @@ Deno.serve(async (req) => {
   if (typeof seed !== 'string' || seed.length > 120) return json(400, { error: 'bad seed' })
   if (character !== undefined && !['fairway', 'dart', 'greens'].includes(character)) {
     return json(400, { error: 'bad character' })
+  }
+
+  // ---- engine-generation handshake, BEFORE any replay ----
+  // A round played on a different engine generation than this bundle would
+  // replay with different dice — the replay "failure" that produces is not
+  // the player's fault and its error text is gibberish to them ("hole 11:
+  // round left unfinished"). Reject the mismatch up front with a
+  // machine-readable code so the client can say "refresh". A payload with NO
+  // version is a pre-handshake client: let it replay as before — its round
+  // either validates or it doesn't, same as always.
+  if (body?.engineVersion !== undefined && body.engineVersion !== ENGINE_VERSION) {
+    return json(409, {
+      error: 'A new version of DogLeg is live — refresh to post your score.',
+      code: 'stale_client',
+    })
   }
 
   // ---- the referee: recompute the score from seed + decisions ----

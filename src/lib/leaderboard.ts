@@ -209,6 +209,9 @@ export async function fetchMyHistory(): Promise<HistoryEntry[] | null> {
 export interface SubmitResult {
   ok: boolean
   error?: string
+  /** machine-readable rejection reason — 'stale_client' when the bundle's
+   * engine generation no longer matches the referee's (refresh to fix) */
+  code?: string
   mode?: 'daily' | 'practice'
   toPar?: number
   rank?: number
@@ -251,12 +254,24 @@ export async function submitRound(round: RoundState, name?: string): Promise<Sub
         seed: round.seed,
         character: round.character,
         decisions,
+        // the version stamped when the round STARTED, never the current
+        // bundle's — a round finished in an old tab and resubmitted after a
+        // refresh must still fail the handshake, not launder itself through
+        // the new bundle. Pre-handshake saves carry no stamp and omit the
+        // field, taking the legacy replay-and-see path.
+        ...(round.engineVersion !== undefined ? { engineVersion: round.engineVersion } : {}),
         ...(player ? { playerId: player.id, playerSecret: player.secret } : {}),
         ...(name && !player?.name ? { name } : {}),
       }),
     })
     const body = (await res.json()) as SubmitResult & { player?: Player & { secret?: string } }
-    if (!res.ok) return { ok: false, error: (body as { error?: string }).error ?? `submit failed (${res.status})` }
+    if (!res.ok) {
+      return {
+        ok: false,
+        error: body.error ?? `submit failed (${res.status})`,
+        ...(body.code ? { code: body.code } : {}),
+      }
+    }
     // the server's view of the identity wins: a fresh secret on first-ever
     // submission, or the name just claimed onto an anonymous id
     const secret = body.player?.secret ?? player?.secret

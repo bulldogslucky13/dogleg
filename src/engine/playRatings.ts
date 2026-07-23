@@ -86,7 +86,7 @@ export const PLAY_INDEX: Record<string, number> = {
   'st-andrews-old': 0.661,
   'augusta-national': 1.169,
   'tpc-sawgrass': 3.122,
-  'harbour-town': 1.664,
+  'harbour-town': 1.645,
   'carnoustie': 2.064,
   'copper-canyon': -0.982,
   'royal-portrush-dunluce': 2.065,

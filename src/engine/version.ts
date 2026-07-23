@@ -23,7 +23,6 @@
  * sides pick up the new number together; only clients holding a stale bundle
  * see the handshake fail, which is exactly the point.
  */
-// NOTE: this branch is off main (v1). #65 also bumps to 2 and deploys first —
-// when main (v2) merges in, reconcile this to 3 so the greenside odds change
-// gets its own generation and never reads as a downgrade.
-export const ENGINE_VERSION = 2
+// v2 = #65 (Harbour Town scorecard + geometry). v3 = this change: the greenside
+// odds weight, a fresh generation stacked on top of #65.
+export const ENGINE_VERSION = 3

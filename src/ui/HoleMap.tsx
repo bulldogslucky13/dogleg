@@ -14,6 +14,16 @@ const H = 520
  */
 const PIN_OFFSET_FRAC: Record<PinPosition['tier'], number> = { open: 0.28, middle: 0.45, tucked: 0.62 }
 
+// Lies the engine plays as fairway. A ball with one of these sits center-
+// corridor, so it can be *drawn* over a hazard band that spans the corridor at
+// that yardage — most visibly a greenside `cross` bunker (Harbour Town 5). The
+// engine's odds already resolved it as fairway (you threaded the sand); the map
+// just needs to say so. We lay a small patch of fairway turf under the ball so
+// it reads as grass, blending invisibly on real fairway and covering sand only
+// right where the ball rests. Matches `#4f7d45`, the fairway ribbon fill.
+const FAIRWAY_LIES = new Set<BallState['lie']>(['fairway', 'dialed'])
+const FAIRWAY_FILL = '#4f7d45'
+
 export interface MapSize {
   w: number
   h: number
@@ -924,6 +934,10 @@ export function HoleMap(props: {
       {/* ball */}
       {ball.lie !== 'green' && ball.pos > 0 && (
         <g className="ballwrap">
+          {FAIRWAY_LIES.has(ball.lie) && (
+            // turf under a fairway-lie ball so it never reads as sand — see FAIRWAY_LIES
+            <ellipse cx={ballPt.x} cy={ballPt.y} rx={ballR * 2.6} ry={ballR * 1.9} fill={FAIRWAY_FILL} />
+          )}
           <ellipse cx={ballPt.x + 1.5} cy={ballPt.y + 2.5} rx={ballR * 1.1} ry={ballR * 0.6} fill="#101f15" opacity={0.4} />
           <circle className="ball" cx={ballPt.x} cy={ballPt.y} r={ballR} fill="#ffffff" stroke="#26301f" strokeWidth={2} />
         </g>

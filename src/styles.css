@@ -2451,6 +2451,23 @@ button {
   color: #2e6329;
 }
 
+.stale-banner {
+  background: var(--ink);
+  color: var(--cream);
+  border-radius: 14px;
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.25);
+}
+
+.stale-banner span {
+  flex: 1;
+}
+
 .course-cr {
   font-style: normal;
   font-size: 0.7rem;

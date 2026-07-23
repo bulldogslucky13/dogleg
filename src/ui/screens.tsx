@@ -7,6 +7,7 @@ import { decisionsFromScores, encodeReplay } from '../engine/replay'
 import type { CharacterId, HoleResult } from '../engine/types'
 import { track } from '../lib/analytics'
 import { backendEnabled } from '../lib/backend'
+import { bundleIsStale } from '../lib/freshness'
 import { fetchCourseRecords, fetchSeasonRecords, loadPlayer, type CourseRecord } from '../lib/leaderboard'
 import { seasonCountdown, seasonForDate } from '../engine/season'
 import { dismissSteals, pendingSteals, syncLedger, type StolenRecord } from '../lib/records'
@@ -44,7 +45,20 @@ export function HomeScreen(props: {
    * holders under the new season's name */
   const [seasonRecsKey, setSeasonRecsKey] = useState<string | null>(null)
   const [steals, setSteals] = useState(() => pendingSteals())
+  /** an engine-changing deploy landed after this tab loaded its bundle — a
+   * round played now couldn't post, so say "reload" before the first stroke */
+  const [stale, setStale] = useState(false)
   const season = seasonForDate()
+
+  useEffect(() => {
+    let cancelled = false
+    void bundleIsStale().then((s) => {
+      if (!cancelled && s) setStale(true)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   // the all-time board loads once when the browser opens — the wall of legends
   useEffect(() => {
@@ -92,6 +106,15 @@ export function HomeScreen(props: {
         </h1>
         <p className="tagline">One round. 18 holes. ~2 minutes.</p>
       </header>
+
+      {stale && (
+        <div className="stale-banner" role="status">
+          <span>A new version of DogLeg is live — reload before you tee off so your score can post.</span>
+          <button className="cta slim" onClick={() => window.location.reload()}>
+            Reload
+          </button>
+        </div>
+      )}
 
       {steals.length > 0 && (
         <StealCard

@@ -14,10 +14,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
 import { CHARACTERS } from './engine/characters'
 import { playRatingFor } from './engine/courses'
-import { forecastSetup, localDateKey } from './engine/daily'
+import { forecastSetup, localDateKey, practiceSetup } from './engine/daily'
 import { seasonForDate } from './engine/season'
 import { setupFromSeed } from './engine/replay'
 import { loadIdentity, loadPlayer } from './lib/leaderboard'
+import { applyChoice, holeInPlay, newRound, saveRound } from './state/store'
 import type { HistoryEntry } from './state/store'
 
 // jsdom has no ResizeObserver; the map measures itself with one
@@ -382,28 +383,24 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
     // (App.tsx builds its own chip list — putt look, green speed, today's
     // pin — and calls CaddyThoughts directly), so it needs its own coverage:
     // HazardChips-level tests never reach this code path.
-    vi.useFakeTimers()
-    render(<App />)
-    fireEvent.click(screen.getByText('Tee off'))
-    fireEvent.click(screen.getByText(CHARACTERS[0].name))
-
-    for (let guard = 0; guard < 30; guard++) {
-      if (screen.queryByText('Lag')) break
-      if (screen.queryByText('Next hole') || screen.queryByText('Sign the card')) break
-      const splash = screen.queryByText('HOLE IN ONE') ?? screen.queryByText('ALBATROSS')
-      if (splash) {
-        act(() => vi.advanceTimersByTime(5100))
-        fireEvent.click(splash)
-        continue
-      }
-      const card = document.querySelector<HTMLButtonElement>('button.choice')!
-      fireEvent.click(card)
-      fireEvent.click(card)
-      act(() => vi.advanceTimersByTime(1500))
+    //
+    // Driven through the store API directly (same one newRound/applyChoice
+    // the UI itself calls — see CLAUDE.md) with a fixed practice seed, rather
+    // than clicking the real daily's "Tee off": the daily's outcome is
+    // seeded off the calendar date, and an approach can hole out and skip
+    // the putt stage entirely — that would make this test's pass/fail
+    // depend on which day it runs, not on the caddy's-read component. This
+    // seed is verified (see the loop below) to reach the green in 2 shots.
+    let state = newRound(practiceSetup('harbour-town', 'putt-smoke-fixed-seed-0'), 'practice', 'fairway')
+    for (let guard = 0; holeInPlay(state).stage !== 'putt' && holeInPlay(state).stage !== 'done' && guard < 10; guard++) {
+      state = applyChoice(state, 'safe')
     }
+    expect(holeInPlay(state).stage).toBe('putt')
+    saveRound(state)
 
-    // a holed-out approach is rare luck, not the case this test exercises —
-    // guard so the assertion below fails loudly instead of vacuously passing
+    // a fresh mount lands straight on the saved hole, mid-round, at the putt
+    // stage — same as "resumes an in-progress round from storage" above
+    render(<App />)
     expect(screen.getByText('Lag')).toBeTruthy()
     expect(screen.getByText(/Caddy.?s read/i)).toBeTruthy()
     const read = within(document.querySelector('.caddy-track')!)

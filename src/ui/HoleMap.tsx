@@ -752,23 +752,28 @@ export function HoleMap(props: {
   // of a flank lake as intended.
   const zoneEls = layout.zones.map(renderZone)
   // A `cross` bunker is sand you thread, not a wall: lay a slim strip of fairway
-  // back down the middle of the corridor, over everything, so crossing sand
-  // keeps a visible lane through it and a fairway-lie ball reads as grass.
+  // (LANE_HALF yд half-width) back down the middle of the corridor, over
+  // everything, so crossing sand keeps a visible lane through it and a
+  // fairway-lie ball reads as grass. Par 3s have no fairway corridor → no lane.
+  const LANE_HALF = 9
   const fairwayLane =
     par3 ? null : (
       <path
-        d={ribbonPath(geo, Math.max(Math.max(30, layout.fairwayFrom - 40), vFrom - 10), layout.fairwayTo, () => 9)}
+        d={ribbonPath(geo, Math.max(Math.max(30, layout.fairwayFrom - 40), vFrom - 10), layout.fairwayTo, () => LANE_HALF)}
         fill="#4f7d45"
       />
     )
-  // …but a water CARRY really does block the line, so re-lay just the crossing
-  // water over the lane (only the cross zones — flank lakes stay in authored
-  // order above, so they never bury the bunkers on their shore).
-  const crossWaterCover = layout.zones
-    .filter((z) => (z.kind === 'water' || z.kind === 'ocean') && z.side === 'cross')
-    .map((z) => (
-      <path key={`xw-${z.id}`} d={ribbonPath(geo, z.from, z.to, () => 28)} fill="url(#water)" stroke="#3a6d86" strokeWidth={1.5} opacity={0.95} />
-    ))
+  // A water carry really does block the line, so where the lane crosses one,
+  // re-lay just that lane-width strip of water back over it — only the center
+  // the lane actually covered, so later flank hazards keep their authored order.
+  // Gated to the lane case (no lane on a par 3 = nothing to repair).
+  const crossWaterCover = par3
+    ? []
+    : layout.zones
+        .filter((z) => (z.kind === 'water' || z.kind === 'ocean') && z.side === 'cross')
+        .map((z) => (
+          <path key={`xw-${z.id}`} d={ribbonPath(geo, z.from, z.to, () => LANE_HALF + 1)} fill="url(#water)" opacity={0.95} />
+        ))
 
   const previewColor = (c: Choice) => (c === 'safe' ? '#7fb56b' : c === 'normal' ? '#d9c15c' : '#d07a5a')
 

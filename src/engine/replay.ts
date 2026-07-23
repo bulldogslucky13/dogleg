@@ -17,6 +17,9 @@ export { courseBySlug } from './courses'
 // the referee stamps every submission's season from the SAME calendar the
 // client displays — one implementation, bundled into engine.mjs
 export { seasonForDate, type Season } from './season'
+// the engine-generation handshake: the client sends its copy with every
+// submission, the referee compares against this one before replaying
+export { ENGINE_VERSION } from './version'
 
 /**
  * Deterministic round replay — the backbone of leaderboard score validation.

@@ -56,7 +56,14 @@ export function ScoreBoard(props: { round: RoundState }) {
     const r = await submitRound(round, pickedName)
     setBusy(false)
     if (!r.ok) {
-      setError(r.error ?? 'something went sideways')
+      // stale_client: this bundle's engine no longer matches the referee's —
+      // the round is fine, the app is just old. Say "refresh", not the
+      // referee's replay-divergence gibberish.
+      setError(
+        r.code === 'stale_client'
+          ? 'A new version of DogLeg is live — refresh the page, then post your score.'
+          : (r.error ?? 'something went sideways'),
+      )
       return
     }
     setResult(r)

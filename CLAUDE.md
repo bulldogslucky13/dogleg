@@ -23,6 +23,15 @@ Engine changes that alter odds/resolution require the function to be
 redeployed, or old and new clients will disagree with the referee. **This is
 automated** — the `functions` job in `.github/workflows/deploy.yml` rebuilds
 `engine.mjs` and redeploys on every push to `main`, before the site goes live.
+Stale browser tabs are the remaining gap: a client that loaded its bundle
+before such a deploy would replay differently than the referee, so submissions
+carry `ENGINE_VERSION` (`src/engine/version.ts`, re-exported through
+`replay.ts` into `engine.mjs`) and the function rejects a mismatch up front
+with code `stale_client` ("refresh to post your score") instead of a cryptic
+replay error. **Bump `ENGINE_VERSION` in the same PR as any change that
+alters what a seed + decisions replay into** (odds, resolution, geometry,
+conditions); additions the replay ignores don't need a bump. Payloads without
+a version (pre-handshake clients) still replay as before.
 It needs the `SUPABASE_ACCESS_TOKEN` secret and `SUPABASE_PROJECT_REF`
 variable, and fails loudly if either is missing. To deploy by hand:
 `pnpm build:validator && supabase functions deploy submit-round --project-ref

@@ -1,4 +1,5 @@
 import { decisionsFromScores } from '../engine/replay'
+import { ENGINE_VERSION } from '../engine/version'
 import type { CharacterId, Choice, HoleResult } from '../engine/types'
 import type { HistoryEntry, RoundState } from '../state/store'
 import { SUPABASE_ANON_KEY, SUPABASE_URL, backendEnabled } from './backend'
@@ -209,6 +210,9 @@ export async function fetchMyHistory(): Promise<HistoryEntry[] | null> {
 export interface SubmitResult {
   ok: boolean
   error?: string
+  /** machine-readable rejection reason — 'stale_client' when the bundle's
+   * engine generation no longer matches the referee's (refresh to fix) */
+  code?: string
   mode?: 'daily' | 'practice'
   toPar?: number
   rank?: number
@@ -251,12 +255,19 @@ export async function submitRound(round: RoundState, name?: string): Promise<Sub
         seed: round.seed,
         character: round.character,
         decisions,
+        engineVersion: ENGINE_VERSION,
         ...(player ? { playerId: player.id, playerSecret: player.secret } : {}),
         ...(name && !player?.name ? { name } : {}),
       }),
     })
     const body = (await res.json()) as SubmitResult & { player?: Player & { secret?: string } }
-    if (!res.ok) return { ok: false, error: (body as { error?: string }).error ?? `submit failed (${res.status})` }
+    if (!res.ok) {
+      return {
+        ok: false,
+        error: body.error ?? `submit failed (${res.status})`,
+        ...(body.code ? { code: body.code } : {}),
+      }
+    }
     // the server's view of the identity wins: a fresh secret on first-ever
     // submission, or the name just claimed onto an anonymous id
     const secret = body.player?.secret ?? player?.secret

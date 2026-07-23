@@ -277,3 +277,17 @@ describe('choiceRowsFromReplay: the clubhouse decision stats feed (Layer 2)', ()
     expect(rows.some((r) => r.hole === 1)).toBe(true)
   })
 })
+
+describe('engine-version handshake', () => {
+  it('replay re-exports ENGINE_VERSION so engine.mjs carries the referee copy', async () => {
+    // the client sends src/engine/version.ts's constant; the edge function
+    // imports ENGINE_VERSION from engine.mjs (bundled from THIS module). If
+    // the re-export disappears, the deployed referee crashes on import — so
+    // its presence here is the whole handshake's load-bearing wall.
+    const replayModule = await import('./replay')
+    const { ENGINE_VERSION } = await import('./version')
+    expect(replayModule.ENGINE_VERSION).toBe(ENGINE_VERSION)
+    expect(Number.isInteger(ENGINE_VERSION)).toBe(true)
+    expect(ENGINE_VERSION).toBeGreaterThan(0)
+  })
+})

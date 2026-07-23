@@ -97,6 +97,20 @@ function viewWindow(layout: HoleLayout, ball: BallState): [number, number] {
   return [Math.max(0, Math.min(ball.pos - 15, L - 90)), L + past]
 }
 
+/** Catmull-Rom interpolation of an evenly-spaced sample array at t∈[0,1] —
+ * smooths the OSM bend profile's 13 samples into a continuous curve. */
+function catmull(a: number[], t: number): number {
+  const n = a.length - 1
+  const x = Math.max(0, Math.min(1, t)) * n
+  const i = Math.min(n - 1, Math.floor(x))
+  const f = x - i
+  const p0 = a[Math.max(0, i - 1)]
+  const p1 = a[i]
+  const p2 = a[i + 1]
+  const p3 = a[Math.min(n, i + 2)]
+  return 0.5 * (2 * p1 + (-p0 + p2) * f + (2 * p0 - 5 * p1 + 4 * p2 - p3) * f * f + (-p0 + 3 * p1 - 3 * p2 + p3) * f * f * f)
+}
+
 /**
  * Sampled centerline with arc-length parametrization plus a similarity
  * transform that maps the camera window onto the screen. Everything downstream
@@ -105,22 +119,40 @@ function viewWindow(layout: HoleLayout, ball: BallState): [number, number] {
  */
 function useGeometry(layout: HoleLayout, view: [number, number], fr: Frame) {
   return useMemo(() => {
-    const { dogleg } = layout.spec
     const L = layout.length
-    const bendDir = dogleg === 'L' ? -1 : dogleg === 'R' ? 1 : 0
-    const tee: Pt = { x: 180 - bendDir * 26, y: 474 }
-    const green: Pt = { x: 180 + bendDir * 30, y: 92 }
-    const mid: Pt = { x: (tee.x + green.x) / 2, y: (tee.y + green.y) / 2 }
-    const ctrl: Pt = { x: mid.x + bendDir * 78, y: mid.y + 20 }
     const pts: Pt[] = []
     const N = 72
-    for (let i = 0; i <= N; i++) {
-      const t = i / N
-      const a = 1 - t
-      pts.push({
-        x: a * a * tee.x + 2 * a * t * ctrl.x + t * t * green.x,
-        y: a * a * tee.y + 2 * a * t * ctrl.y + t * t * green.y,
-      })
+    // Chord anchors: tee low, pin high, both on the vertical axis.
+    const CHORD_TOP = 92
+    const CHORD_BOT = 474
+    const bend = layout.bend
+    if (bend && bend.length >= 3) {
+      // Real OSM centreline: the straight tee→pin chord plus the hole's sampled
+      // lateral deviation, so the fairway turns where it actually turns. Bend is
+      // yards, golfer-left positive; screen-left is −x, so subtract.
+      const chordLen = CHORD_BOT - CHORD_TOP
+      const wpy = chordLen / L
+      for (let i = 0; i <= N; i++) {
+        const t = i / N
+        pts.push({ x: 180 - catmull(bend, t) * wpy, y: CHORD_BOT - chordLen * t })
+      }
+    } else {
+      // No profile (procedural courses, straight holes): fall back to the crude
+      // symmetric bow from the hand-set dogleg flag.
+      const { dogleg } = layout.spec
+      const bendDir = dogleg === 'L' ? -1 : dogleg === 'R' ? 1 : 0
+      const tee: Pt = { x: 180 - bendDir * 26, y: 474 }
+      const green: Pt = { x: 180 + bendDir * 30, y: 92 }
+      const mid: Pt = { x: (tee.x + green.x) / 2, y: (tee.y + green.y) / 2 }
+      const ctrl: Pt = { x: mid.x + bendDir * 78, y: mid.y + 20 }
+      for (let i = 0; i <= N; i++) {
+        const t = i / N
+        const a = 1 - t
+        pts.push({
+          x: a * a * tee.x + 2 * a * t * ctrl.x + t * t * green.x,
+          y: a * a * tee.y + 2 * a * t * ctrl.y + t * t * green.y,
+        })
+      }
     }
     const cum = [0]
     for (let i = 1; i <= N; i++) {

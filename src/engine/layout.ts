@@ -1,6 +1,6 @@
 import type { Conditions, HazardZone, HoleLayout, HoleSpec } from './types'
 import { rngFromString } from './rng'
-import { OSM_GEOMETRY } from './geometry'
+import { OSM_GEOMETRY, OSM_BEND } from './geometry'
 
 /**
  * Generate the geometric layout for a hole. Deterministic per course+hole.
@@ -26,6 +26,7 @@ export function buildLayout(courseSlug: string, spec: HoleSpec, cond?: Condition
       fairwayFrom: real.fairwayFrom,
       fairwayTo: real.fairwayTo,
       greenDepth: real.greenDepth,
+      bend: OSM_BEND[`${courseSlug}:${spec.number}`],
       pin,
       gust,
     }

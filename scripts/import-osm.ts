@@ -264,6 +264,30 @@ function pointAtArc(pts: Vec[], cum: number[], a: number): { p: Vec; dir: Vec } 
 }
 
 /**
+ * Cosmetic dogleg profile: signed lateral deviation (yards, >0 = golfer-left)
+ * of the smoothed centreline from the straight tee→green chord, sampled at
+ * BEND_SAMPLES+1 evenly-spaced fractions. Endpoints are ~0 by construction; the
+ * max-magnitude sample marks where — and how hard — the hole actually turns.
+ * Map-only: the odds engine works in 1-D and never sees this, so it is not
+ * odds- or replay-affecting.
+ */
+const BEND_SAMPLES = 12
+function bendProfile(center: Vec[], cum: number[]): number[] {
+  const total = cum[cum.length - 1]
+  const tee = center[0]
+  const end = center[center.length - 1]
+  const chord = sub(end, tee)
+  const chordLen = len(chord) || 1
+  const dir: Vec = [chord[0] / chordLen, chord[1] / chordLen]
+  const out: number[] = []
+  for (let i = 0; i <= BEND_SAMPLES; i++) {
+    const { p } = pointAtArc(center, cum, (i / BEND_SAMPLES) * total)
+    out.push(Math.round(toYards(cross(dir, sub(p, tee)))))
+  }
+  return out
+}
+
+/**
  * Nearest coastline test. OSM draws coastline with the SEA on the right of the
  * way direction (land on the left), so the signed side of the closest segment
  * tells us whether `q` is over water. Returns null if no coastline is near.
@@ -690,6 +714,9 @@ async function main() {
     .filter((r) => r.to - r.from >= 4)
   const zones = merged.map((r, i) => ({ id: `z${i + 1}`, kind: r.kind, from: r.from, to: Math.min(length, r.to), side: r.side }))
 
+  const bend = bendProfile(center, cum)
+  const bendMax = bend.reduce((m, v) => (Math.abs(v) > Math.abs(m) ? v : m), 0)
+
   const layout = {
     slug,
     holeRef: holeNo,
@@ -699,6 +726,9 @@ async function main() {
     fairwayFrom: Math.round(length * 0.35),
     fairwayTo: length - Math.round(greenDepth / 2) - 2,
     greenDepth: Math.round(greenDepth),
+    // only worth persisting when the hole actually bends (a few yards of wander
+    // is projection noise on a "straight" hole — leave it off and it renders straight)
+    ...(Math.abs(bendMax) >= 8 ? { bend } : {}),
   }
 
   if (flags.includes('--json')) {
@@ -715,6 +745,14 @@ async function main() {
   console.log(`length: ${length} yd   greenDepth: ${layout.greenDepth} yd   fairway: ${layout.fairwayFrom}–${layout.fairwayTo} yd`)
   console.log(`zones (${zones.length}):`)
   console.log(fmtZones(zones))
+  if (Math.abs(bendMax) >= 8) {
+    const cornerFrac = bend.indexOf(bendMax) / BEND_SAMPLES
+    console.log(
+      `bend: max ${bendMax > 0 ? '+' : ''}${bendMax} yd ${bendMax > 0 ? '(left)' : '(right)'} near ${Math.round(cornerFrac * length)} yd — [${bend.join(', ')}]`,
+    )
+  } else {
+    console.log(`bend: straight (max ${bendMax} yd, not persisted)`)
+  }
 
   // side-by-side with the current procedural layout the game ships today
   if (flags.includes('--compare')) {

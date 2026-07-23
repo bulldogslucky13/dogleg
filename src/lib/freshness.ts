@@ -22,15 +22,22 @@ export function staleFromManifest(body: unknown): boolean {
   return typeof v === 'number' && v !== ENGINE_VERSION
 }
 
+let check: Promise<boolean> | null = null
+
 export async function bundleIsStale(): Promise<boolean> {
   if (!backendEnabled) return false
-  try {
-    // relative to the page URL so it works on any host/sub-path (base './'),
-    // and no-store so a CDN or the browser can't hand back the stale answer
-    const res = await fetch('./version.json', { cache: 'no-store' })
-    if (!res.ok) return false
-    return staleFromManifest(await res.json())
-  } catch {
-    return false
-  }
+  // one fetch per page load — the answer can't change until the tab reloads
+  // (and reloading IS the remedy), so home-screen remounts share it
+  check ??= (async () => {
+    try {
+      // relative to the page URL so it works on any host/sub-path (base './'),
+      // and no-store so a CDN or the browser can't hand back the stale answer
+      const res = await fetch('./version.json', { cache: 'no-store' })
+      if (!res.ok) return false
+      return staleFromManifest(await res.json())
+    } catch {
+      return false
+    }
+  })()
+  return check
 }

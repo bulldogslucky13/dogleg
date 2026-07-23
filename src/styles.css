@@ -2452,20 +2452,53 @@ button {
 }
 
 .stale-banner {
+  position: fixed;
+  right: 16px;
+  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  z-index: 90; /* over everything except the tutorial backdrop (100) */
+  max-width: min(340px, calc(100vw - 32px));
   background: var(--ink);
   color: var(--cream);
   border-radius: 14px;
-  padding: 14px 16px;
+  padding: 12px 14px;
   display: flex;
   align-items: center;
   gap: 12px;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   font-weight: 600;
-  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.25);
+  line-height: 1.35;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  animation: stale-in 0.25s ease both;
 }
 
 .stale-banner span {
   flex: 1;
+}
+
+.stale-banner button {
+  flex-shrink: 0;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  background: transparent;
+  color: var(--cream);
+  border-radius: 10px;
+  padding: 8px 14px;
+  font: inherit;
+  font-weight: 800;
+  font-size: 0.8rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.stale-banner button:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+@keyframes stale-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
 }
 
 .course-cr {

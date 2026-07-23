@@ -109,10 +109,8 @@ export function HomeScreen(props: {
 
       {stale && (
         <div className="stale-banner" role="status">
-          <span>A new version of DogLeg is live — reload before you tee off so your score can post.</span>
-          <button className="cta slim" onClick={() => window.location.reload()}>
-            Reload
-          </button>
+          <span>A new version of DogLeg is live — refresh so your score can post.</span>
+          <button onClick={() => window.location.reload()}>Refresh</button>
         </div>
       )}
 
@@ -184,6 +182,12 @@ export function HomeScreen(props: {
       ) : props.activeRound?.mode === 'daily' ? (
         <button className="cta" onClick={props.onResume}>
           Resume today's round
+        </button>
+      ) : stale ? (
+        // a stale bundle would play a round the referee refuses to post —
+        // the primary CTA becomes the fix instead of the trap
+        <button className="cta" onClick={() => window.location.reload()}>
+          Refresh to play
         </button>
       ) : (
         <button className="cta" onClick={props.onTeeOff}>

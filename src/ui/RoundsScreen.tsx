@@ -227,7 +227,7 @@ export function RoundsScreen(props: {
               <b>–</b>
               <span>Handicap: Not yet established</span>
               <span className="fine">
-                Play {hcap.roundsToGo} more round{hcap.roundsToGo === 1 ? '' : 's'} to establish your handicap
+                Play {hcap.holesToGo} more hole{hcap.holesToGo === 1 ? '' : 's'} to establish your handicap
               </span>
             </>
           )}

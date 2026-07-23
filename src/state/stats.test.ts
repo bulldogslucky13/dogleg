@@ -164,9 +164,9 @@ describe('current handicap — best 10 of the last 30', () => {
     return logged({ results, playedAt })
   }
 
-  it('is not established under 10 rounds, with a countdown', () => {
+  it('is not established under 10 rounds of holes, with a countdown in holes', () => {
     const h = currentHandicap([withToPar(1, 1), withToPar(2, 2)])
-    expect(h).toEqual({ established: false, roundsToGo: 8 })
+    expect(h).toEqual({ established: false, holesToGo: 144 })
   })
 
   it('between 10 and 30 rounds it takes the best 10 of what exists', () => {
@@ -218,9 +218,9 @@ describe('current handicap — best 10 of the last 30', () => {
   }
 
   it('a 9-hole card is half a round toward establishment — two nines make an 18', () => {
-    // ten 9-hole rounds are only 90 holes: five full rounds' worth
+    // ten 9-hole rounds are only 90 holes: halfway to the 180-hole threshold
     const log = Array.from({ length: 10 }, (_, i) => shortRound(COBBLESTONE, 0, i))
-    expect(currentHandicap(log)).toEqual({ established: false, roundsToGo: 5 })
+    expect(currentHandicap(log)).toEqual({ established: false, holesToGo: 90 })
   })
 
   it('a 9-hole score scales to 18 via the expected score, never competing raw', () => {
@@ -244,7 +244,7 @@ describe('current handicap — best 10 of the last 30', () => {
 
     // ten Swing rounds establish nothing…
     const swingOnly = Array.from({ length: 10 }, (_, i) => shortRound(SWING, -3, i))
-    expect(currentHandicap(swingOnly)).toEqual({ established: false, roundsToGo: 10 })
+    expect(currentHandicap(swingOnly)).toEqual({ established: false, holesToGo: 180 })
 
     // …and five fresh Swing masterpieces can't budge an established handicap
     const base = Array.from({ length: 30 }, (_, i) => withToPar(8, i))

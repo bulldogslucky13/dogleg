@@ -302,7 +302,7 @@ const EXPECTED_PER_NINE_SLOPE = 0.52
 const EXPECTED_PER_NINE_BASE = 1.2
 
 export type Handicap =
-  | { established: false; roundsToGo: number }
+  | { established: false; holesToGo: number }
   | { established: true; value: number }
 
 /** Whether a round's score is acceptable for the handicap: at least nine
@@ -342,9 +342,11 @@ function differential18(round: LoggedRound, index: number): number {
  */
 export function currentHandicap(log = loadRoundLog()): Handicap {
   const acceptable = log.filter(handicapEligible)
-  const equivalents = acceptable.reduce((s, r) => s + r.results.length / 18, 0)
-  if (equivalents < HANDICAP_MIN_ROUNDS) {
-    return { established: false, roundsToGo: Math.ceil(HANDICAP_MIN_ROUNDS - equivalents) }
+  // the countdown speaks in holes, not rounds: "5 rounds to go" would read as
+  // five more cards, but a player on a 9-hole course needs ten
+  const holesPlayed = acceptable.reduce((s, r) => s + r.results.length, 0)
+  if (holesPlayed < HANDICAP_MIN_ROUNDS * 18) {
+    return { established: false, holesToGo: HANDICAP_MIN_ROUNDS * 18 - holesPlayed }
   }
   const window = [...acceptable].sort((a, b) => b.playedAt - a.playedAt).slice(0, HANDICAP_WINDOW)
   let value = 0

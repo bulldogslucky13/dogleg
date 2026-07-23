@@ -17,6 +17,7 @@ import {
 } from '../state/stats'
 import { lifetimeRounds, loadArchive, type ArchivedRound, type HistoryEntry } from '../state/store'
 import { pastSeasons, roundsInSeason, seasonAwards, type SeasonAward } from '../state/seasonStore'
+import { loadLedger } from '../lib/records'
 import { AccountPanel } from './AccountPanel'
 import { RoundScorecard } from './RoundScorecard'
 import { track } from '../lib/analytics'
@@ -155,15 +156,23 @@ export function RoundsScreen(props: {
   )
 
   const rounds = archive
-  const records = rounds.filter((r) => r.courseRecord)
+  // "Course records you hold" reflects the reconciled ledger — the same `held`
+  // set the home screen syncs against the server (src/lib/records.ts) — NOT the
+  // per-round `courseRecord` flag. That flag is written when a round *takes* a
+  // record and never cleared, so on its own it keeps listing records that have
+  // since been beaten, and lists every round that was *ever* a record (two
+  // "CR"s on one course). Keying off `held` fixes both: one row per course
+  // (best round wins), and only records that are still ours right now. A course
+  // whose record we've lost falls back to the personal-bests list.
+  const held = loadLedger().held
   const bestByCourse = new Map<string, ArchivedRound>()
   for (const r of rounds) {
     const best = bestByCourse.get(r.courseSlug)
     if (!best || r.toPar < best.toPar) bestByCourse.set(r.courseSlug, r)
   }
-  const prs = [...bestByCourse.values()]
-    .filter((r) => !r.courseRecord)
-    .sort((a, b) => a.toPar - b.toPar)
+  const bestByPar = [...bestByCourse.values()].sort((a, b) => a.toPar - b.toPar)
+  const records = bestByPar.filter((r) => held[r.courseSlug] !== undefined)
+  const prs = bestByPar.filter((r) => held[r.courseSlug] === undefined)
   const recent = [...rounds].sort((a, b) => b.playedAt - a.playedAt).slice(0, 10)
 
   const scorecard = card && (

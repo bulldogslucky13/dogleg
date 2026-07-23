@@ -863,6 +863,51 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
     expect(screen.getByText('‹ Exit replay')).toBeTruthy()
   })
 
+  it('"Course records you hold" follows the ledger: one row per course, and only records still held', () => {
+    // Three archived rounds all once flagged courseRecord:true — the stale flag
+    // that used to drive this list directly. Oakmont has TWO such rounds (the
+    // record moved from +2 to -3); St Andrews' record has since been beaten.
+    const round = (over: Partial<Record<string, unknown>>) => ({
+      seed: `s-${over.slug}-${over.toPar}`,
+      mode: 'practice',
+      courseSlug: over.slug,
+      dateKey: '2026-07-21',
+      toPar: over.toPar,
+      strokes: 70,
+      results: [],
+      decisions: [],
+      courseRecord: true,
+      playedAt: over.playedAt ?? 1,
+    })
+    localStorage.setItem(
+      'dogleg:archive:v1',
+      JSON.stringify([
+        round({ slug: 'oakmont', toPar: 2, playedAt: 1 }),
+        round({ slug: 'oakmont', toPar: -3, playedAt: 2 }),
+        round({ slug: 'st-andrews-old', toPar: 7, playedAt: 3 }),
+      ]),
+    )
+    // the reconciled ledger: we still hold Oakmont; St Andrews is gone
+    localStorage.setItem(
+      'dogleg:records:v1',
+      JSON.stringify({ v: 1, held: { oakmont: { toPar: -3, since: 1 } }, stolen: {} }),
+    )
+
+    render(<App />)
+    fireEvent.click(screen.getByText(/Clubhouse · my rounds/))
+    // two distinct courses, one row each — never one CR per record-ever
+    fireEvent.click(screen.getByText(/Records · 2/))
+
+    expect(screen.getByText(/Course records you hold/)).toBeTruthy()
+    // exactly one CR badge (Oakmont), not two — the +2 round is deduped away,
+    // and the beaten St Andrews record is not here at all
+    expect(screen.getAllByText('CR')).toHaveLength(1)
+    expect(screen.getAllByText(/Oakmont/)).toHaveLength(1)
+    // the lost record drops to Personal bests instead of vanishing
+    expect(screen.getByText('Personal bests')).toBeTruthy()
+    expect(screen.getByText(/St Andrews/)).toBeTruthy()
+  })
+
   it('the stats view computes the handicap countdown and opens the lowest round scorecard', async () => {
     const { newRound, applyChoice, advanceHole, archiveRound } = await import('./state/store')
     const { logRound } = await import('./state/stats')

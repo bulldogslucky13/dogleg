@@ -225,7 +225,7 @@ function zoneBand(z: HazardZone, cor: number): [number, number] {
  * right as the centreline curves past it). Opposite-side flanking hazards (a
  * left and a right bunker with no cross between) never overlap, so they stay
  * separate shapes. */
-function zonesAdjacent(a: HazardZone, b: HazardZone): boolean {
+export function zonesAdjacent(a: HazardZone, b: HazardZone): boolean {
   if (a.kind !== b.kind) return false
   const gap = Math.max(a.from, b.from) - Math.min(a.to, b.to)
   if (gap > 6) return false
@@ -236,16 +236,28 @@ function zonesAdjacent(a: HazardZone, b: HazardZone): boolean {
 }
 
 /** Group a hole's mergeable zones into runs of physically-continuous same-kind
- * zones, preserving array order for stable z-indexing. A run of length ≥2 is
- * drawn as one merged shape; singletons render on their existing path. */
-function hazardRuns(zones: HazardZone[]): HazardZone[][] {
+ * zones (the connected components of the adjacency relation), preserving array
+ * order for stable z-indexing. A run of length ≥2 is drawn as one merged shape;
+ * singletons render on their existing path. */
+export function hazardRuns(zones: HazardZone[]): HazardZone[][] {
   const mergeable = zones.filter((z) => MERGE_KINDS.has(z.kind))
   const byYard = [...mergeable].sort((p, q) => p.from - q.from)
   const runs: HazardZone[][] = []
   for (const z of byYard) {
-    const run = runs.find((r) => r.some((m) => zonesAdjacent(m, z)))
-    if (run) run.push(z)
-    else runs.push([z])
+    // A zone can bridge SEVERAL existing runs at once — e.g. a `cross` bunker
+    // touching a `right` run below it and a `left` run above it (Harbour Town
+    // 17's green-wrapping bunker). Coalesce every run it joins, not just the
+    // first, or the connected component renders as separate shapes.
+    const bridged = runs.filter((r) => r.some((m) => zonesAdjacent(m, z)))
+    if (bridged.length === 0) {
+      runs.push([z])
+      continue
+    }
+    bridged[0].push(z)
+    for (let k = 1; k < bridged.length; k++) {
+      bridged[0].push(...bridged[k])
+      runs.splice(runs.indexOf(bridged[k]), 1)
+    }
   }
   return runs
 }

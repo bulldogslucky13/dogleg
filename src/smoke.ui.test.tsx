@@ -945,6 +945,43 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
     expect(screen.getAllByText(/Oakmont/)).toHaveLength(1)
   })
 
+  it('a still-held record keeps its CR row when a better local round has not posted', () => {
+    const round = (toPar: number, flag: boolean, playedAt: number) => ({
+      seed: `s-oak-${toPar}`,
+      mode: 'practice',
+      courseSlug: 'oakmont',
+      dateKey: '2026-07-21',
+      toPar,
+      strokes: 70,
+      results: [],
+      decisions: [],
+      courseRecord: flag,
+      playedAt,
+    })
+    // -3 is the confirmed, still-held record; -5 was played later but never
+    // posted (offline / submit error), so it hasn't taken the record yet.
+    localStorage.setItem(
+      'dogleg:archive:v1',
+      JSON.stringify([round(-5, false, 2), round(-3, true, 1)]),
+    )
+    localStorage.setItem(
+      'dogleg:records:v1',
+      JSON.stringify({ v: 1, held: { oakmont: { toPar: -3, since: 1 } }, stolen: {} }),
+    )
+
+    render(<App />)
+    fireEvent.click(screen.getByText(/Clubhouse · my rounds/))
+    fireEvent.click(screen.getByText(/Records · 1/))
+
+    // the held record survives — one CR row at -3, the unconfirmed -5 doesn't
+    // evict it (nor add a second row for the same course)
+    expect(screen.getByText(/Course records you hold/)).toBeTruthy()
+    expect(screen.getAllByText('CR')).toHaveLength(1)
+    expect(screen.getAllByText(/Oakmont/)).toHaveLength(1)
+    expect(screen.getByText('-3')).toBeTruthy()
+    expect(screen.queryByText('-5')).toBeNull()
+  })
+
   it('the stats view computes the handicap countdown and opens the lowest round scorecard', async () => {
     const { newRound, applyChoice, advanceHole, archiveRound } = await import('./state/store')
     const { logRound } = await import('./state/stats')

@@ -185,24 +185,35 @@ export function RoundsScreen(props: {
   // per-round `courseRecord` flag. That flag is written when a round *takes* a
   // record and never cleared, so on its own it keeps listing records that have
   // since been beaten, and lists every round that was *ever* a record (two
-  // "CR"s on one course). Keying off `held` fixes both: one row per course
-  // (best round wins), and only records that are still ours right now. A course
-  // whose record we've lost falls back to the personal-bests list.
+  // "CR"s on one course). Keying off `held` fixes both: one row per course,
+  // and only records that are still ours right now. A course whose record we've
+  // lost falls back to the personal-bests list.
   const held = ledger.held
   const bestByCourse = new Map<string, ArchivedRound>()
+  // The archived round that IS each held record: the one whose score matches
+  // the ledger's held score. Looked up independently of bestByCourse (not off
+  // the single best-per-course round) for two reasons. A record held under our
+  // name but set on another device won't match any local round, so we never
+  // dress an unrelated, worse local best up as the record. And a still-held
+  // record keeps its row even when a *better but unconfirmed* round now tops
+  // the course locally (played offline, or a failed submit) — that round hasn't
+  // taken the record yet, so it must not evict it. First match wins; archive is
+  // newest-first, so that's the most recent round at the record score.
+  const recordByCourse = new Map<string, ArchivedRound>()
   for (const r of rounds) {
     const best = bestByCourse.get(r.courseSlug)
     if (!best || r.toPar < best.toPar) bestByCourse.set(r.courseSlug, r)
+    if (held[r.courseSlug]?.toPar === r.toPar && !recordByCourse.has(r.courseSlug)) {
+      recordByCourse.set(r.courseSlug, r)
+    }
   }
-  const bestByPar = [...bestByCourse.values()].sort((a, b) => a.toPar - b.toPar)
-  // A round earns the CR badge only when we still hold the record AND this
-  // archived round IS that record — its score matches the held ledger score.
-  // A record held under our name but set on another device (adopted by
-  // syncLedger) won't match any local round, so we never dress an unrelated,
-  // worse local best up as the record; it stays an honest personal best.
-  const holdsRecord = (r: ArchivedRound) => held[r.courseSlug]?.toPar === r.toPar
-  const records = bestByPar.filter(holdsRecord)
-  const prs = bestByPar.filter((r) => !holdsRecord(r))
+  const records = [...recordByCourse.values()].sort((a, b) => a.toPar - b.toPar)
+  // Personal bests are the best round on every course we don't hold a record
+  // row for — so a course never shows both a CR and a PR row (the old
+  // per-round flag listed both, which is the duplication this fixes).
+  const prs = [...bestByCourse.values()]
+    .filter((r) => !recordByCourse.has(r.courseSlug))
+    .sort((a, b) => a.toPar - b.toPar)
   const recent = [...rounds].sort((a, b) => b.playedAt - a.playedAt).slice(0, 10)
 
   const scorecard = card && (

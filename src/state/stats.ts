@@ -278,30 +278,87 @@ export function lifetimeStats(log = loadRoundLog()): LifetimeStats {
   }
 }
 
+/** 18-hole-equivalent rounds needed to establish (a 9-hole card is half a
+ * round — WHS establishes by holes played, so two nines make an eighteen) */
 export const HANDICAP_MIN_ROUNDS = 10
 export const HANDICAP_WINDOW = 30
 export const HANDICAP_BEST_OF = 10
+
+/** WHS 2024 minimum rateable length, prorated: 750 yards per 9 holes. A
+ * course shorter than this can't hold a Course Rating, so its scores are
+ * never acceptable for handicap purposes. Of the par-3 library that rules
+ * out only The Swing (770 yards over TEN holes — under the bar); Cobblestone
+ * Creek (1479/9) and Palm Beach (2572/18) both rate, and their scores count
+ * like any other — USGA dropped the old 1,500/3,000-yard minimums in 2024
+ * precisely so par-3 courses feed handicaps. */
+const MIN_RATED_YARDS_PER_NINE = 750
+
+/** WHS 2024 expected score: a 9-hole card no longer waits to be paired with
+ * a second nine — it becomes an 18-hole differential immediately by adding
+ * the player's *expected* differential for the unplayed nine, which the USGA
+ * models as 0.52 × index + 1.2 (an average nine is a touch worse than half
+ * the potential-based index). Prorated per unplayed hole for 10–17s. */
+const EXPECTED_PER_NINE_SLOPE = 0.52
+const EXPECTED_PER_NINE_BASE = 1.2
 
 export type Handicap =
   | { established: false; roundsToGo: number }
   | { established: true; value: number }
 
+/** Whether a round's score is acceptable for the handicap: at least nine
+ * holes played, on a course long enough to be rated (see the yardage floor
+ * above). Ineligible rounds still live in the log and every other stat —
+ * they just never touch the handicap window or the establishment count. */
+export function handicapEligible(round: Pick<LoggedRound, 'courseSlug' | 'results'>): boolean {
+  if (round.results.length < 9) return false
+  const course = courseBySlug(round.courseSlug)
+  if (!course) return true
+  const yards = course.holes.reduce((s, h) => s + h.yards, 0)
+  return yards >= (course.holes.length / 9) * MIN_RATED_YARDS_PER_NINE
+}
+
+/** A round's 18-hole-equivalent score vs par: full rounds count raw; short
+ * rounds (9–17 holes) get the expected score for the holes not played,
+ * scaled off the player's index — the WHS 2024 treatment. */
+function differential18(round: LoggedRound, index: number): number {
+  const holes = round.results.length
+  if (holes >= 18) return round.toPar
+  const unplayed = 18 - holes
+  return round.toPar + (unplayed / 9) * (EXPECTED_PER_NINE_SLOPE * index + EXPECTED_PER_NINE_BASE)
+}
+
 /**
- * Best-10-of-last-30, WHS-flavored: the 30 most recent completed rounds,
- * the 10 best of those by score vs par, averaged. Reflects potential, not
- * lifetime history — one great round visibly improves it. Established at 10
- * completed rounds; between 10 and 30 the best 10 come from what exists.
+ * Best-10-of-last-30, WHS-flavored: the 30 most recent acceptable rounds,
+ * the 10 best of those by 18-hole-equivalent score vs par, averaged.
+ * Reflects potential, not lifetime history — one great round visibly
+ * improves it. Established at 10 full rounds' worth of holes; between 10
+ * and 30 the best 10 come from what exists.
+ *
+ * Short rounds follow the WHS 2024 rules: they convert to 18-hole
+ * differentials via the expected score (no waiting to pair two nines — that
+ * rule died Jan 2024), and the expected score depends on the very index this
+ * window defines, so the computation runs to a fixed point. It converges
+ * fast: each short round feeds back at most 0.52 of the index.
  */
 export function currentHandicap(log = loadRoundLog()): Handicap {
-  if (log.length < HANDICAP_MIN_ROUNDS) {
-    return { established: false, roundsToGo: HANDICAP_MIN_ROUNDS - log.length }
+  const acceptable = log.filter(handicapEligible)
+  const equivalents = acceptable.reduce((s, r) => s + r.results.length / 18, 0)
+  if (equivalents < HANDICAP_MIN_ROUNDS) {
+    return { established: false, roundsToGo: Math.ceil(HANDICAP_MIN_ROUNDS - equivalents) }
   }
-  const window = [...log].sort((a, b) => b.playedAt - a.playedAt).slice(0, HANDICAP_WINDOW)
-  const bestTen = window
-    .map((r) => r.toPar)
-    .sort((a, b) => a - b)
-    .slice(0, HANDICAP_BEST_OF)
-  return { established: true, value: bestTen.reduce((s, v) => s + v, 0) / bestTen.length }
+  const window = [...acceptable].sort((a, b) => b.playedAt - a.playedAt).slice(0, HANDICAP_WINDOW)
+  let value = 0
+  for (let i = 0; i < 30; i++) {
+    const bestTen = window
+      .map((r) => differential18(r, value))
+      .sort((a, b) => a - b)
+      .slice(0, HANDICAP_BEST_OF)
+    const next = bestTen.reduce((s, v) => s + v, 0) / bestTen.length
+    const settled = Math.abs(next - value) < 0.001
+    value = next
+    if (settled) break
+  }
+  return { established: true, value }
 }
 
 /** Golf convention: a better-than-scratch (under par) handicap reads as a

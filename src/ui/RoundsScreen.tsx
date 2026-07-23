@@ -220,7 +220,7 @@ export function RoundsScreen(props: {
             <>
               <b>{formatHandicap(hcap.value)}</b>
               <span>Current handicap</span>
-              <span className="fine">Best 10 of your last 30 rounds, vs par</span>
+              <span className="fine">Best 10 of your last 30 rounds, vs par · 9-hole cards scale to 18, USGA-style</span>
             </>
           ) : (
             <>

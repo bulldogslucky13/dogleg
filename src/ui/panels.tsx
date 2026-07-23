@@ -212,8 +212,17 @@ export function HazardChips(props: { hole: HoleInPlay }) {
   } else if (layout.zones.some((z) => z.kind === 'water' || z.kind === 'ocean')) {
     chips.push({ text: 'Water behind you — out of play' })
   } else if (ahead.some((z) => z.kind === 'bunker')) chips.push({ text: 'Bunkers guard it' })
-  if (spec.dogleg === 'L') chips.push({ text: 'Dogleg left' })
-  if (spec.dogleg === 'R') chips.push({ text: 'Dogleg right' })
+  // Dogleg chip: prefer the real OSM bend (authoritative direction) over the
+  // hand-set flag, which shipped backwards on several holes. Only call it a
+  // dogleg when the turn is pronounced (≥20 yd off the direct line).
+  const doglegDir = layout.bend
+    ? (() => {
+        const m = layout.bend.reduce((a, v) => (Math.abs(v) > Math.abs(a) ? v : a), 0)
+        return Math.abs(m) >= 20 ? (m < 0 ? 'L' : 'R') : null
+      })()
+    : spec.dogleg
+  if (doglegDir === 'L') chips.push({ text: 'Dogleg left' })
+  if (doglegDir === 'R') chips.push({ text: 'Dogleg right' })
   // today's flag on a par 3, framed against the greenside trouble — the
   // tucked ones are the decision ("Sucker pin left · short-sided")
   if (atTee) {

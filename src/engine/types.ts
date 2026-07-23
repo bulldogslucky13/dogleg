@@ -20,6 +20,15 @@ export interface HoleSpec {
   yards: number
   /** 1 = hardest hole on the course, 18 = easiest */
   strokeIndex: number
+  /**
+   * @deprecated Hand-set and unreliable (several Harbour Town flags shipped
+   * backwards). For OSM-imported holes the real centreline bend (`OSM_BEND` in
+   * geometry.ts, surfaced as `HoleLayout.bend`) is authoritative and overrides
+   * this for both the map and the "Dogleg left/right" chip. This field remains
+   * ONLY because procedurally-generated courses still derive their challenge
+   * side (and thus hazard placement, which feeds the odds) from it. Prefer the
+   * OSM bend wherever a hole has one.
+   */
   dogleg: Dogleg
   hazard: HazardStyle
   signature?: string
@@ -94,6 +103,14 @@ export interface HoleLayout {
   fairwayTo: number
   /** green depth in yards (front edge = length - greenDepth/2) */
   greenDepth: number
+  /**
+   * Cosmetic dogleg profile for OSM-imported holes: signed lateral deviation
+   * (yards, >0 = golfer-left) of the real centreline from the straight tee→pin
+   * chord, at evenly-spaced fractions (endpoints ~0). The map follows this to
+   * bend the hole where it truly turns; the chip reads its direction. Map-only
+   * — the odds work in 1-D and never see it, so it's not replay-affecting.
+   */
+  bend?: number[]
   /** today's flag on a par 3, when the round's conditions carry one */
   pin?: PinPosition
   /** this hole's wind delta (mph) on a par-3 short course, from Conditions.gusts */

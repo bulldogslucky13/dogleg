@@ -102,6 +102,14 @@ find the polygon name for a new course, query Overpass for
    `courses.ts` **auto-reconciles** each hole's `yards` to the imported
    `length` at load, so the header, scorecard, course total, and map all read
    one source. No hand-editing of the yardage tuples.
+   - **Dogleg profile.** If the report prints a `bend:` line (max ≥ 8 yд), paste
+     that array into the `OSM_BEND` map (same key, `${slug}:${hole}`). The map
+     bends the hole to the real centreline where it actually turns, and the
+     "Dogleg left/right" chip reads its direction — both **overriding** the
+     hand-set `HoleSpec.dogleg` flag, which shipped backwards on several holes.
+     `bend` is cosmetic (the odds are 1-D and never read it), so it's not
+     replay-affecting and needs no `ENGINE_VERSION` bump. Straight holes print
+     `bend: straight` and get no entry — they render on the flag fallback.
 4. **QA pass against satellite/aerial imagery** — walk every hole and compare
    the zone report (kind / side / yardage) to what's actually on the ground.
    ProVisualizer's 2D planner (`provisualizer.com/courses/<slug>.php`,

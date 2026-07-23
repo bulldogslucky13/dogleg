@@ -1,13 +1,14 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it } from 'vitest'
-import { COURSES } from '../engine/courses'
-import type { HoleResult } from '../engine/types'
+import { COURSES, PAR3_COURSES } from '../engine/courses'
+import type { CourseSpec, HoleResult } from '../engine/types'
 import {
   aceHoles,
   currentHandicap,
   formatAverage,
   formatHandicap,
   fortuneRounds,
+  handicapEligible,
   holeStrokes,
   lifetimeStats,
   loadRoundLog,
@@ -163,9 +164,9 @@ describe('current handicap — best 10 of the last 30', () => {
     return logged({ results, playedAt })
   }
 
-  it('is not established under 10 rounds, with a countdown', () => {
+  it('is not established under 10 rounds of holes, with a countdown in holes', () => {
     const h = currentHandicap([withToPar(1, 1), withToPar(2, 2)])
-    expect(h).toEqual({ established: false, roundsToGo: 8 })
+    expect(h).toEqual({ established: false, holesToGo: 144 })
   })
 
   it('between 10 and 30 rounds it takes the best 10 of what exists', () => {
@@ -194,6 +195,71 @@ describe('current handicap — best 10 of the last 30', () => {
     } else {
       throw new Error('handicap should be established')
     }
+  })
+
+  // the par-3 library, by WHS 2024 eligibility: Cobblestone (9 holes, 1479
+  // yards) and Palm Beach (18, 2572) clear the 750-per-nine rating floor;
+  // The Swing (10 holes, 770 yards) does not and never touches the handicap
+  const COBBLESTONE = PAR3_COURSES.find((c) => c.slug === 'cobblestone-creek')!
+  const SWING = PAR3_COURSES.find((c) => c.slug === 'the-swing')!
+
+  const shortRound = (course: CourseSpec, toPar: number, playedAt: number): LoggedRound => {
+    const results = course.holes.map((_, i) =>
+      i < Math.abs(toPar) ? (toPar > 0 ? 'bogey' : 'birdie') : 'par',
+    ) as HoleResult[]
+    return logged({
+      seed: `p3:${course.slug}:${playedAt}`,
+      courseSlug: course.slug,
+      results,
+      toPar,
+      strokes: course.holes.reduce((s, h) => s + h.par, 0) + toPar,
+      playedAt,
+    })
+  }
+
+  it('a 9-hole card is half a round toward establishment — two nines make an 18', () => {
+    // ten 9-hole rounds are only 90 holes: halfway to the 180-hole threshold
+    const log = Array.from({ length: 10 }, (_, i) => shortRound(COBBLESTONE, 0, i))
+    expect(currentHandicap(log)).toEqual({ established: false, holesToGo: 90 })
+  })
+
+  it('a 9-hole score scales to 18 via the expected score, never competing raw', () => {
+    // fifteen 18-hole rounds at +6, one even-par nine at Cobblestone. The
+    // nine's differential is 0 + (0.52·index + 1.2), the index solves the
+    // fixed point index = (9·6 + 0.52·index + 1.2)/10 → 5.52/0.948 ≈ 5.823 —
+    // a good nine helps, but nothing like the raw 0 would have (that would
+    // have dragged the average to 5.4 and, with more nines, toward zero).
+    const log = [
+      ...Array.from({ length: 15 }, (_, i) => withToPar(6, i)),
+      shortRound(COBBLESTONE, 0, 99),
+    ]
+    const h = currentHandicap(log)
+    expect(h.established).toBe(true)
+    if (h.established) expect(h.value).toBeCloseTo(5.823, 2)
+  })
+
+  it('rounds on a course too short to rate never touch the handicap', () => {
+    expect(handicapEligible(shortRound(SWING, 0, 1))).toBe(false)
+    expect(handicapEligible(shortRound(COBBLESTONE, 0, 1))).toBe(true)
+
+    // ten Swing rounds establish nothing…
+    const swingOnly = Array.from({ length: 10 }, (_, i) => shortRound(SWING, -3, i))
+    expect(currentHandicap(swingOnly)).toEqual({ established: false, holesToGo: 180 })
+
+    // …and five fresh Swing masterpieces can't budge an established handicap
+    const base = Array.from({ length: 30 }, (_, i) => withToPar(8, i))
+    const h = currentHandicap([...base, ...Array.from({ length: 5 }, (_, i) => shortRound(SWING, -5, 100 + i))])
+    expect(h.established).toBe(true)
+    if (h.established) expect(h.value).toBeCloseTo(8)
+  })
+
+  it('an all-nines player still establishes, at the expected-score fixed point', () => {
+    // twenty even-par nines = ten full rounds of holes. Every differential is
+    // 0.52·index + 1.2, so the index settles where index = 0.52·index + 1.2
+    const log = Array.from({ length: 20 }, (_, i) => shortRound(COBBLESTONE, 0, i))
+    const h = currentHandicap(log)
+    expect(h.established).toBe(true)
+    if (h.established) expect(h.value).toBeCloseTo(1.2 / (1 - 0.52), 2)
   })
 
   it('formats per golf convention: plus handicaps for under-par averages', () => {

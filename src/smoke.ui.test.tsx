@@ -833,7 +833,7 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
 
     // one round in the book: no handicap yet, countdown says how far to go
     expect(screen.getByText('Handicap: Not yet established')).toBeTruthy()
-    expect(screen.getByText(/Play 9 more rounds to establish your handicap/)).toBeTruthy()
+    expect(screen.getByText(/Play 162 more holes to establish your handicap/)).toBeTruthy()
     // the score distribution renders from the log
     expect(screen.getByText('Pars')).toBeTruthy()
     expect(screen.getByText('Birdies')).toBeTruthy()

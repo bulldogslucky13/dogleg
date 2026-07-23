@@ -22,22 +22,33 @@ export function staleFromManifest(body: unknown): boolean {
   return typeof v === 'number' && v !== ENGINE_VERSION
 }
 
-let check: Promise<boolean> | null = null
+/** A STALE verdict is terminal — only a reload can change it, so never
+ * refetch past one. A fresh verdict is only trusted for this long: a deploy
+ * can land while the tab sits open, and the next home-screen visit after the
+ * TTL should notice it rather than trusting a page-load-time answer forever. */
+const FRESH_TTL_MS = 5 * 60_000
+
+let verdict: { at: number; stale: boolean } | null = null
+let inflight: Promise<boolean> | null = null
 
 export async function bundleIsStale(): Promise<boolean> {
   if (!backendEnabled) return false
-  // one fetch per page load — the answer can't change until the tab reloads
-  // (and reloading IS the remedy), so home-screen remounts share it
-  check ??= (async () => {
+  if (verdict && (verdict.stale || Date.now() - verdict.at < FRESH_TTL_MS)) return verdict.stale
+  inflight ??= (async () => {
     try {
       // relative to the page URL so it works on any host/sub-path (base './'),
       // and no-store so a CDN or the browser can't hand back the stale answer
       const res = await fetch('./version.json', { cache: 'no-store' })
-      if (!res.ok) return false
-      return staleFromManifest(await res.json())
+      const stale = res.ok ? staleFromManifest(await res.json()) : false
+      verdict = { at: Date.now(), stale }
+      return stale
     } catch {
+      // fail open, but remember when we tried — offline shouldn't hammer
+      verdict = { at: Date.now(), stale: false }
       return false
+    } finally {
+      inflight = null
     }
   })()
-  return check
+  return inflight
 }

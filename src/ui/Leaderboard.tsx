@@ -56,12 +56,13 @@ export function ScoreBoard(props: { round: RoundState }) {
     const r = await submitRound(round, pickedName)
     setBusy(false)
     if (!r.ok) {
-      // stale_client: this bundle's engine no longer matches the referee's —
-      // the round is fine, the app is just old. Say "refresh", not the
-      // referee's replay-divergence gibberish.
+      // stale_client: the round was played under an engine the referee no
+      // longer runs, and its version stamp rides with it forever — so this
+      // score can never post, refresh or not. Be honest about that; the
+      // refresh is for the NEXT round, not this one.
       setError(
         r.code === 'stale_client'
-          ? 'A new version of DogLeg is live — refresh the page, then post your score.'
+          ? 'This round was played on an old version of DogLeg, so its score can’t post. Refresh the page — your next round will count.'
           : (r.error ?? 'something went sideways'),
       )
       return

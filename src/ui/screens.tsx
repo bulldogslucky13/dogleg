@@ -92,6 +92,10 @@ export function HomeScreen(props: {
     })
   }, [])
   const avgLabel = (avg: number) => (avg > 0 ? `+${avg.toFixed(1)}` : avg.toFixed(1))
+  // a stale bundle must not START any round — the referee refuses its score,
+  // daily or practice alike. Every start path funnels into the remedy: the
+  // page reloads onto the current bundle and the player tees off from there.
+  const startPractice = stale ? () => window.location.reload() : props.onPractice
   return (
     <div className="screen home">
       <header className="masthead">
@@ -121,7 +125,7 @@ export function HomeScreen(props: {
             dismissSteals()
             setSteals([])
           }}
-          onWinItBack={props.onPractice}
+          onWinItBack={startPractice}
         />
       )}
 
@@ -239,7 +243,7 @@ export function HomeScreen(props: {
               const sr = seasonRecs?.get(c.slug)
               const at = courseRecs?.get(c.slug)
               return (
-                <button key={c.slug} className="course-row" onClick={() => props.onPractice(c.slug)}>
+                <button key={c.slug} className="course-row" onClick={() => startPractice(c.slug)}>
                   <b>{c.name}</b>
                   <span>
                     {c.location} · Play Rating {playRatingFor(c.slug)}/10
@@ -267,7 +271,7 @@ export function HomeScreen(props: {
               const sr = seasonRecs?.get(c.slug)
               const at = courseRecs?.get(c.slug)
               return (
-                <button key={c.slug} className="course-row" onClick={() => props.onPractice(c.slug)}>
+                <button key={c.slug} className="course-row" onClick={() => startPractice(c.slug)}>
                   <b>{c.name}</b>
                   <span>
                     {c.location} · {c.holes.length} holes · Play Rating {playRatingFor(c.slug)}/10

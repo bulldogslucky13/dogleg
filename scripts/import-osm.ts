@@ -21,15 +21,9 @@
  * Add an entry per course you want to import.
  *
  * Known gaps (prototype):
- *  - OSM coverage varies; obscure courses may lack golf=hole centerlines, and
- *    many resorts have no natural=wood polygons even where trees define the
- *    course (Sea Pines) — hand-author `trees` zones when identity demands it
- *    (see harbour-town:18 in engine/geometry.ts).
- *  - Ocean IS handled (natural=coastline rasterised as a seaward half-plane,
- *    see OCEAN_REACH_YD below) — but tidal marsh is often mapped as
- *    natural=water/wetland polygons instead, so sound-side holes may come
- *    through as `water`; relabel to `ocean` by hand where the flavor fits
- *    (pebble 7/8, harbour-town 18).
+ *  - Ocean holes (Pebble 7/8, Portrush) — the sea is natural=coastline, a LINE
+ *    not a polygon, so it isn't captured yet. Needs coastline handling.
+ *  - OSM coverage varies; obscure courses may lack golf=hole centerlines.
  *
  * This is a build-time tool. Output is meant to be reviewed and committed as
  * static data — nothing here runs in the app or touches the network at runtime.

@@ -37,7 +37,8 @@ import { ensureIdentity, loadIdentity, loadPlayer } from './lib/leaderboard'
 import { CharacterAvatar } from './ui/Avatars'
 import { GreenView, HoleMap, useMapSize } from './ui/HoleMap'
 import { SideMap } from './ui/SideMap'
-import { ChoiceCards, ClassicScorecard, HazardChips, HoleComplete, Scorecard, StatusBanner, TierBanner } from './ui/panels'
+import { CaddyThoughts, ChoiceCards, ClassicScorecard, HazardChips, HoleComplete, Scorecard, StatusBanner, TierBanner } from './ui/panels'
+import { prefersReducedMotion } from './ui/motion'
 import type { MomentKind } from './engine/fortune'
 import { MomentSplash } from './ui/MomentSplash'
 import { decodeReplay, type ReplayPayload } from './engine/replay'
@@ -225,11 +226,8 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [round?.seed])
   // reduced motion drops the ghost ball (theater) but keeps the pace tracker
-  // (the feature); jsdom has no matchMedia, hence the guard
-  const reducedMotion = useMemo(
-    () => typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches,
-    [],
-  )
+  // (the feature)
+  const reducedMotion = useMemo(() => prefersReducedMotion(), [])
 
   // Clubhouse cast (Layer 1): a deterministic sim of the game's regular
   // characters playing today's course, surfaced choices-only in the post-hole
@@ -690,16 +688,18 @@ export default function App() {
         {!holeDone && (
           <div className="map-overlay bottom">
             {hole.stage === 'putt' ? (
-              <div className="chips slim center">
-                <span className="chip">
-                  {LOOK_LABEL[madePuttLook(hole.strokes, spec.par)].chip} · ~{hole.ball.puttFeet} ft
-                </span>
-                <span className="chip">{round.cond.greens} green</span>
-                {(() => {
-                  const pin = pinChip(hole.layout)
-                  return pin && <span className="chip">{pin}</span>
-                })()}
-              </div>
+              (() => {
+                const pin = pinChip(hole.layout)
+                return (
+                  <CaddyThoughts
+                    chips={[
+                      `${LOOK_LABEL[madePuttLook(hole.strokes, spec.par)].chip} · ~${hole.ball.puttFeet} ft`,
+                      `${round.cond.greens} green`,
+                      ...(pin ? [pin] : []),
+                    ]}
+                  />
+                )
+              })()
             ) : (
               // wind/greens/hazards live on the map at every stage — the hole
               // head no longer carries condition chips on small screens

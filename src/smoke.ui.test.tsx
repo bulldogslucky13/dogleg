@@ -14,10 +14,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
 import { CHARACTERS } from './engine/characters'
 import { playRatingFor } from './engine/courses'
-import { forecastSetup, localDateKey } from './engine/daily'
+import { forecastSetup, localDateKey, practiceSetup } from './engine/daily'
 import { seasonForDate } from './engine/season'
 import { setupFromSeed } from './engine/replay'
 import { loadIdentity, loadPlayer } from './lib/leaderboard'
+import { applyChoice, holeInPlay, newRound, saveRound } from './state/store'
 import type { HistoryEntry } from './state/store'
 
 // jsdom has no ResizeObserver; the map measures itself with one
@@ -352,10 +353,10 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
     }
   })
 
-  it('odds-driving chips (water, pin, wind) survive the three-chip cap; flavor yields', async () => {
-    // a stacked par-3 short hole produces four chip candidates: SI flavor,
-    // live water, today's pin, and the gust wind (the ONLY wind display on
-    // phones). Only three fit — the odds-driving trio must be the survivors.
+  it("the caddy's read shows the full list — no cap, flavor included", async () => {
+    // a stacked par-3 short hole produces four chips: SI flavor, live water,
+    // today's pin, and the gust wind. The row scrolls, so every one shows —
+    // including the SI flavor chip the old three-chip cap used to drop.
     const { HazardChips } = await import('./ui/panels')
     const { buildLayout } = await import('./engine/layout')
     const { startHole } = await import('./engine/resolve')
@@ -372,9 +373,39 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
     expect(screen.getByText(/mph/)).toBeTruthy()
     expect(screen.getByText(/Sucker pin/)).toBeTruthy()
     expect(screen.getByText(/Water|water/)).toBeTruthy()
-    expect(screen.queryByText(/Signature test/)).toBeNull()
-    // three chips max, always
-    expect(document.querySelectorAll('.chips .chip').length).toBeLessThanOrEqual(3)
+    // the SI flavor chip now rides along instead of yielding its slot
+    expect(screen.getByText(/Signature test/)).toBeTruthy()
+    expect(document.querySelectorAll('.chips .chip').length).toBe(4)
+  })
+
+  it("the putt green's Caddy's read renders end to end through a live round", () => {
+    // the putt-stage caddy's read is wired up separately from HazardChips
+    // (App.tsx builds its own chip list — putt look, green speed, today's
+    // pin — and calls CaddyThoughts directly), so it needs its own coverage:
+    // HazardChips-level tests never reach this code path.
+    //
+    // Driven through the store API directly (same one newRound/applyChoice
+    // the UI itself calls — see CLAUDE.md) with a fixed practice seed, rather
+    // than clicking the real daily's "Tee off": the daily's outcome is
+    // seeded off the calendar date, and an approach can hole out and skip
+    // the putt stage entirely — that would make this test's pass/fail
+    // depend on which day it runs, not on the caddy's-read component. This
+    // seed is verified (see the loop below) to reach the green in 2 shots.
+    let state = newRound(practiceSetup('harbour-town', 'putt-smoke-fixed-seed-0'), 'practice', 'fairway')
+    for (let guard = 0; holeInPlay(state).stage !== 'putt' && holeInPlay(state).stage !== 'done' && guard < 10; guard++) {
+      state = applyChoice(state, 'safe')
+    }
+    expect(holeInPlay(state).stage).toBe('putt')
+    saveRound(state)
+
+    // a fresh mount lands straight on the saved hole, mid-round, at the putt
+    // stage — same as "resumes an in-progress round from storage" above
+    render(<App />)
+    expect(screen.getByText('Lag')).toBeTruthy()
+    expect(screen.getByText(/Caddy.?s read/i)).toBeTruthy()
+    const read = within(document.querySelector('.caddy-track')!)
+    expect(read.getByText(/~\d+ ft$/)).toBeTruthy()
+    expect(read.getByText(/greens?$/)).toBeTruthy()
   })
 
   it("the tier banner's risk read includes the hole's gust, matching the real odds bar", async () => {

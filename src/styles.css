@@ -521,6 +521,71 @@ button {
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
 }
 
+/* Caddy's read: a pinned label + a chip row that drifts back and forth to
+   reveal the full, untruncated text on a narrow map overlay (see CaddyThoughts) */
+.caddy-read {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 5px;
+  width: 100%;
+  pointer-events: none;
+}
+
+.caddy-read-tag {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding-left: 2px;
+  font-size: 0.6rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--cream);
+  text-shadow: 0 1px 5px rgba(0, 0, 0, 0.6);
+  white-space: nowrap;
+}
+
+.caddy-read-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--gold);
+  box-shadow: 0 0 0 3px rgba(201, 162, 39, 0.28);
+}
+
+.caddy-track {
+  width: 100%;
+  flex-wrap: nowrap;
+  justify-content: flex-start;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  /* the map overlay is pointer-events:none (it sits over a non-interactive
+     map), but this row is a real scroll container — re-enable it here so a
+     swipe can reveal chips the auto-drift hasn't reached yet, and so the read
+     stays reachable at all under prefers-reduced-motion (the drift is skipped
+     entirely there — see CaddyThoughts) */
+  pointer-events: auto;
+  touch-action: pan-x;
+  /* edge fades driven by scroll position (--fade-l / --fade-r, set by
+     CaddyThoughts): each collapses to 0 at its end, so a fully-shown read
+     never looks clipped and mid-drift the hidden side melts away */
+  -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 var(--fade-l, 0px), #000 calc(100% - var(--fade-r, 0px)), transparent 100%);
+  mask-image: linear-gradient(90deg, transparent 0, #000 var(--fade-l, 0px), #000 calc(100% - var(--fade-r, 0px)), transparent 100%);
+}
+
+.caddy-track::-webkit-scrollbar {
+  display: none;
+}
+
+/* chips keep their natural width in the scroll track instead of shrinking to
+   fit — the row overflows (and scrolls) rather than squeezing text down */
+.caddy-track .chip {
+  flex: 0 0 auto;
+}
+
 .holemap {
   display: block;
   width: 100%;
@@ -1159,11 +1224,17 @@ button {
   }
 
   .map-overlay.bottom .chip {
+    font-size: 0.72rem;
+    padding: 3px 9px;
+  }
+
+  /* the caddy's read shows the full, untruncated text (it scrolls instead —
+     see .caddy-track), so it's excluded at the source instead of truncating
+     it here and then overriding that back off downstream */
+  .map-overlay.bottom .chips:not(.caddy-track) .chip {
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
-    font-size: 0.72rem;
-    padding: 3px 9px;
   }
 
   .scorecard .sc-line {

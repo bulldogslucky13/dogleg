@@ -50,6 +50,11 @@ interface Frame {
   yBottom: number
 }
 
+// height of the "CADDY'S READ" label row + its gap to the chip row below it —
+// CaddyThoughts adds this row above the chips on every hole that has any, so
+// it's reserved unconditionally, not just for the signature-pill case
+const CADDY_LABEL_ROW = 20
+
 /**
  * Screen anchors for the camera window: view start / view end along the
  * centerline. Margins keep the flag clear of the floating top banner and the
@@ -60,9 +65,9 @@ function cameraFrame(size: MapSize | null, bottomInset = 0): Frame {
   const h = size?.h ?? H
   const yTop = Math.min(84, Math.max(58, h * 0.16))
   // bottomInset reserves extra room for a taller bottom overlay (e.g. the
-  // signature pill adds a second row above the hazard chips), so the tee ball
+  // signature pill adds a second row above the caddy's read), so the tee ball
   // isn't parked behind it
-  const yBottom = h - Math.min(64, Math.max(42, h * 0.11)) - bottomInset
+  const yBottom = h - Math.min(64, Math.max(42, h * 0.11)) - CADDY_LABEL_ROW - bottomInset
   return { w, h, cx: w / 2, yTop, yBottom }
 }
 
@@ -805,13 +810,15 @@ export function GreenView(props: {
   size?: MapSize | null
 }) {
   const { feet, pin } = props
-  const { w, h, cx } = cameraFrame(props.size ?? null)
+  const { w, h, cx, yBottom } = cameraFrame(props.size ?? null)
   // green fills the panel height; putt length scales with it
   const k = h / H
   const bend = props.holeNumber % 2 === 0 ? 1 : -1
-  const dist = Math.min(215, 46 + feet * 3.4) * k
   // floor keeps the flag (44 units tall) clear of the floating status pill
   const holeY = Math.max(108 * k, 92)
+  // capped at yBottom so a long lag putt's ball never sits behind the
+  // caddy's-read overlay at the bottom of the panel
+  const dist = Math.min(Math.min(215, 46 + feet * 3.4) * k, Math.max(0, yBottom - holeY))
   const ballY = holeY + dist
   // the cup sits where the pin actually is: golfer faces the green from the
   // ball, so pin-left is screen-left; a tucked flag hides near the edge, an

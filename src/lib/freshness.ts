@@ -26,7 +26,7 @@ export function staleFromManifest(body: unknown): boolean {
  * refetch past one. A fresh verdict is only trusted for this long: a deploy
  * can land while the tab sits open, and the next home-screen visit after the
  * TTL should notice it rather than trusting a page-load-time answer forever. */
-const FRESH_TTL_MS = 5 * 60_000
+export const FRESH_TTL_MS = 5 * 60_000
 
 let verdict: { at: number; stale: boolean } | null = null
 let inflight: Promise<boolean> | null = null

@@ -7,7 +7,7 @@ import { decisionsFromScores, encodeReplay } from '../engine/replay'
 import type { CharacterId, HoleResult } from '../engine/types'
 import { track } from '../lib/analytics'
 import { backendEnabled } from '../lib/backend'
-import { bundleIsStale } from '../lib/freshness'
+import { bundleIsStale, FRESH_TTL_MS } from '../lib/freshness'
 import { fetchCourseRecords, fetchSeasonRecords, loadPlayer, type CourseRecord } from '../lib/leaderboard'
 import { seasonCountdown, seasonForDate } from '../engine/season'
 import { dismissSteals, pendingSteals, syncLedger, type StolenRecord } from '../lib/records'
@@ -50,13 +50,26 @@ export function HomeScreen(props: {
   const [stale, setStale] = useState(false)
   const season = seasonForDate()
 
+  // checked on mount, then again whenever the tab comes back into view and on
+  // a slow interval — a home screen left open through a deploy must notice it
+  // BEFORE the player tees off, not at submit time. (bundleIsStale itself
+  // caches, so the extra calls are only fetches when its TTL has lapsed.)
   useEffect(() => {
     let cancelled = false
-    void bundleIsStale().then((s) => {
-      if (!cancelled && s) setStale(true)
-    })
+    const check = () =>
+      void bundleIsStale().then((s) => {
+        if (!cancelled && s) setStale(true)
+      })
+    check()
+    const onVisible = () => {
+      if (!document.hidden) check()
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    const timer = setInterval(check, FRESH_TTL_MS)
     return () => {
       cancelled = true
+      clearInterval(timer)
+      document.removeEventListener('visibilitychange', onVisible)
     }
   }, [])
 
@@ -202,6 +215,16 @@ export function HomeScreen(props: {
         <button className="cta ghost" onClick={props.onResume}>
           Resume practice round · {props.activeRound.courseName}
         </button>
+      )}
+      {stale && props.activeRound && !props.playedToday && (
+        // an in-progress round already carries its creation-time engine stamp,
+        // so its score is unpostable no matter when the tab refreshes.
+        // Discarding a half-played daily for the player would be worse than
+        // telling the truth: finish it if you like, the board won't take it.
+        <p className="fine">
+          Your round in progress started on an old version of DogLeg, so its score won't post to the board — your
+          next round will.
+        </p>
       )}
 
       {props.playedToday && <ForecastCard today={props.playedToday} />}

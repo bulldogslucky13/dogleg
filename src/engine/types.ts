@@ -10,6 +10,10 @@ export type HazardStyle = 'none' | 'sand' | 'water' | 'ocean'
 
 export type Greens = 'Slow' | 'Medium' | 'Firm' | 'Fast'
 
+/** A recognizable structure drawn behind the green as pure map flavor —
+ * cosmetic only, never touches odds/geometry/seed replay. */
+export type Landmark = 'lighthouse'
+
 export interface HoleSpec {
   number: number
   par: 3 | 4 | 5
@@ -22,6 +26,8 @@ export interface HoleSpec {
   /** true = green fully ringed by water (island). Drives layout geometry
    * explicitly, so signature prose can stay pure flavor. */
   island?: boolean
+  /** decorative structure behind the green (e.g. Harbour Town's lighthouse) */
+  landmark?: Landmark
 }
 
 export interface CourseSpec {

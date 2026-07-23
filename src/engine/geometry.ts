@@ -678,6 +678,282 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
     ],
   },
   // ---------------------------------------------------------------------
+  // Harbour Town Golf Links — imported from OSM (see COURSE_GEO), QA'd
+  // hole-by-hole against satellite imagery (ProVisualizer 2D planner).
+  // Hand edits: hole 4's greenside bunkers (OSM rings collapse behind the
+  // green, so the rasterizer drops them) and hole 18's marsh relabelled
+  // water → ocean (Calibogue Sound, matching the course tuple's hazard).
+  // ---------------------------------------------------------------------
+  // hole 1 — opener — pond crossing in front of the tee, greenside bunker left
+  'harbour-town:1': {
+    length: 407,
+    fairwayFrom: 142,
+    fairwayTo: 395,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'water', from: 14, to: 36, side: 'left' },
+      { id: 'z2', kind: 'water', from: 36, to: 52, side: 'cross' },
+      { id: 'z3', kind: 'water', from: 52, to: 60, side: 'right' },
+      { id: 'z4', kind: 'bunker', from: 374, to: 404, side: 'left' },
+    ],
+  },
+  // hole 2 — par 5 — waste sand up the right at the green
+  'harbour-town:2': {
+    length: 501,
+    fairwayFrom: 175,
+    fairwayTo: 489,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'water', from: 188, to: 200, side: 'right' },
+      { id: 'z2', kind: 'bunker', from: 232, to: 274, side: 'left' },
+      { id: 'z3', kind: 'water', from: 346, to: 370, side: 'left' },
+      { id: 'z4', kind: 'bunker', from: 386, to: 500, side: 'right' },
+    ],
+  },
+  // hole 3 — big bunker short-left of the green, pond right at the putting surface
+  'harbour-town:3': {
+    length: 436,
+    fairwayFrom: 153,
+    fairwayTo: 424,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 32, to: 40, side: 'left' },
+      { id: 'z2', kind: 'bunker', from: 60, to: 74, side: 'left' },
+      { id: 'z3', kind: 'bunker', from: 210, to: 360, side: 'right' },
+      { id: 'z4', kind: 'bunker', from: 388, to: 424, side: 'left' },
+      { id: 'z5', kind: 'water', from: 422, to: 436, side: 'right' },
+      { id: 'z6', kind: 'bunker', from: 430, to: 436, side: 'right' },
+    ],
+  },
+  // hole 4 — par 3 over the lagoon left
+  'harbour-town:4': {
+    length: 192,
+    fairwayFrom: 67,
+    fairwayTo: 180,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'water', from: 30, to: 70, side: 'right' },
+      { id: 'z2', kind: 'water', from: 70, to: 76, side: 'cross' },
+      { id: 'z3', kind: 'water', from: 76, to: 110, side: 'left' },
+      { id: 'z4', kind: 'water', from: 110, to: 152, side: 'cross' },
+      { id: 'z5', kind: 'water', from: 152, to: 192, side: 'left' },
+      { id: 'z6', kind: 'water', from: 170, to: 178, side: 'cross' },
+      { id: 'z7', kind: 'bunker', from: 176, to: 192, side: 'right' },
+    ],
+  },
+  // hole 5 — par 5 — lagoon down the left, sand everywhere at the green
+  'harbour-town:5': {
+    length: 538,
+    fairwayFrom: 188,
+    fairwayTo: 526,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'water', from: 202, to: 486, side: 'left' },
+      { id: 'z2', kind: 'bunker', from: 220, to: 238, side: 'right' },
+      { id: 'z3', kind: 'bunker', from: 250, to: 314, side: 'left' },
+      { id: 'z4', kind: 'bunker', from: 262, to: 270, side: 'cross' },
+      { id: 'z5', kind: 'bunker', from: 336, to: 358, side: 'right' },
+      { id: 'z6', kind: 'bunker', from: 368, to: 400, side: 'left' },
+      { id: 'z7', kind: 'bunker', from: 424, to: 436, side: 'left' },
+      { id: 'z8', kind: 'bunker', from: 436, to: 518, side: 'cross' },
+      { id: 'z9', kind: 'bunker', from: 518, to: 538, side: 'left' },
+    ],
+  },
+  // hole 6 — pond right of the landing zone, waste crossing the layup
+  'harbour-town:6': {
+    length: 412,
+    fairwayFrom: 144,
+    fairwayTo: 400,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 32, to: 70, side: 'left' },
+      { id: 'z2', kind: 'bunker', from: 162, to: 236, side: 'left' },
+      { id: 'z3', kind: 'water', from: 182, to: 234, side: 'right' },
+      { id: 'z4', kind: 'bunker', from: 236, to: 290, side: 'cross' },
+      { id: 'z5', kind: 'bunker', from: 290, to: 320, side: 'left' },
+      { id: 'z6', kind: 'bunker', from: 376, to: 390, side: 'left' },
+      { id: 'z7', kind: 'bunker', from: 402, to: 412, side: 'left' },
+    ],
+  },
+  // hole 7 — par 3 — water then the famous sand ring around the green
+  'harbour-town:7': {
+    length: 196,
+    fairwayFrom: 69,
+    fairwayTo: 184,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'water', from: 18, to: 126, side: 'right' },
+      { id: 'z2', kind: 'water', from: 126, to: 142, side: 'cross' },
+      { id: 'z3', kind: 'water', from: 142, to: 196, side: 'left' },
+      { id: 'z4', kind: 'bunker', from: 142, to: 154, side: 'right' },
+      { id: 'z5', kind: 'bunker', from: 154, to: 196, side: 'cross' },
+      { id: 'z6', kind: 'bunker', from: 174, to: 188, side: 'right' },
+    ],
+  },
+  // hole 8 — dogleg left — ponds left, greenside sand both sides
+  'harbour-town:8': {
+    length: 467,
+    fairwayFrom: 163,
+    fairwayTo: 455,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 8, to: 28, side: 'right' },
+      { id: 'z2', kind: 'water', from: 246, to: 288, side: 'left' },
+      { id: 'z3', kind: 'bunker', from: 318, to: 374, side: 'right' },
+      { id: 'z4', kind: 'bunker', from: 376, to: 384, side: 'left' },
+      { id: 'z5', kind: 'water', from: 380, to: 467, side: 'left' },
+      { id: 'z6', kind: 'bunker', from: 438, to: 460, side: 'left' },
+    ],
+  },
+  // hole 9 — short par 4 — the light-bulb pot bunker fronting the green
+  'harbour-town:9': {
+    length: 326,
+    fairwayFrom: 114,
+    fairwayTo: 314,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 312, to: 322, side: 'cross' },
+    ],
+  },
+  // hole 10 — the lake down the entire left of the corridor
+  'harbour-town:10': {
+    length: 447,
+    fairwayFrom: 156,
+    fairwayTo: 435,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 90, to: 100, side: 'left' },
+      { id: 'z2', kind: 'water', from: 106, to: 376, side: 'left' },
+      { id: 'z3', kind: 'bunker', from: 430, to: 436, side: 'right' },
+    ],
+  },
+  // hole 11 — long waste bunker left through the approach
+  'harbour-town:11': {
+    length: 434,
+    fairwayFrom: 152,
+    fairwayTo: 422,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'water', from: 90, to: 114, side: 'right' },
+      { id: 'z2', kind: 'water', from: 192, to: 224, side: 'left' },
+      { id: 'z3', kind: 'bunker', from: 260, to: 382, side: 'left' },
+      { id: 'z4', kind: 'bunker', from: 412, to: 432, side: 'left' },
+      { id: 'z5', kind: 'bunker', from: 432, to: 434, side: 'cross' },
+    ],
+  },
+  // hole 12 — lagoon left off the tee, waste bunker left beyond it
+  'harbour-town:12': {
+    length: 425,
+    fairwayFrom: 149,
+    fairwayTo: 413,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'water', from: 128, to: 168, side: 'left' },
+      { id: 'z2', kind: 'bunker', from: 178, to: 290, side: 'left' },
+      { id: 'z3', kind: 'bunker', from: 404, to: 412, side: 'right' },
+      { id: 'z4', kind: 'bunker', from: 412, to: 420, side: 'cross' },
+    ],
+  },
+  // hole 13 — the horseshoe bunker wrapping the green
+  'harbour-town:13': {
+    length: 370,
+    fairwayFrom: 130,
+    fairwayTo: 358,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 214, to: 266, side: 'left' },
+      { id: 'z2', kind: 'bunker', from: 266, to: 280, side: 'cross' },
+      { id: 'z3', kind: 'bunker', from: 280, to: 312, side: 'left' },
+      { id: 'z4', kind: 'bunker', from: 330, to: 340, side: 'right' },
+      { id: 'z5', kind: 'bunker', from: 340, to: 364, side: 'cross' },
+      { id: 'z6', kind: 'bunker', from: 364, to: 370, side: 'right' },
+    ],
+  },
+  // hole 14 — par 3 — pond short and left of the green
+  'harbour-town:14': {
+    length: 188,
+    fairwayFrom: 66,
+    fairwayTo: 176,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'water', from: 0, to: 116, side: 'left' },
+      { id: 'z2', kind: 'bunker', from: 32, to: 72, side: 'right' },
+      { id: 'z3', kind: 'water', from: 116, to: 168, side: 'cross' },
+      { id: 'z4', kind: 'water', from: 168, to: 188, side: 'right' },
+    ],
+  },
+  // hole 15 — par 5 — lagoon left of the layup, waste right at the green
+  'harbour-town:15': {
+    length: 577,
+    fairwayFrom: 202,
+    fairwayTo: 565,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 222, to: 246, side: 'right' },
+      { id: 'z2', kind: 'bunker', from: 246, to: 260, side: 'cross' },
+      { id: 'z3', kind: 'bunker', from: 260, to: 270, side: 'left' },
+      { id: 'z4', kind: 'bunker', from: 270, to: 334, side: 'cross' },
+      { id: 'z5', kind: 'bunker', from: 334, to: 452, side: 'left' },
+      { id: 'z6', kind: 'water', from: 446, to: 562, side: 'left' },
+      { id: 'z7', kind: 'bunker', from: 488, to: 548, side: 'right' },
+      { id: 'z8', kind: 'bunker', from: 548, to: 577, side: 'cross' },
+    ],
+  },
+  // hole 16 — the giant waste bunker inside the dogleg left
+  'harbour-town:16': {
+    length: 409,
+    fairwayFrom: 143,
+    fairwayTo: 397,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 234, to: 280, side: 'left' },
+      { id: 'z2', kind: 'bunker', from: 280, to: 334, side: 'cross' },
+      { id: 'z3', kind: 'bunker', from: 314, to: 320, side: 'left' },
+      { id: 'z4', kind: 'bunker', from: 334, to: 348, side: 'left' },
+      { id: 'z5', kind: 'bunker', from: 348, to: 386, side: 'cross' },
+      { id: 'z6', kind: 'bunker', from: 386, to: 392, side: 'left' },
+      { id: 'z7', kind: 'bunker', from: 400, to: 409, side: 'right' },
+    ],
+  },
+  // hole 17 — par 3 — marsh left and crossing, the long bunker wrapping the green
+  'harbour-town:17': {
+    length: 214,
+    fairwayFrom: 75,
+    fairwayTo: 202,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 2, to: 22, side: 'left' },
+      { id: 'z2', kind: 'bunker', from: 44, to: 48, side: 'cross' },
+      { id: 'z3', kind: 'bunker', from: 48, to: 56, side: 'left' },
+      { id: 'z4', kind: 'water', from: 50, to: 66, side: 'left' },
+      { id: 'z5', kind: 'water', from: 66, to: 118, side: 'cross' },
+      { id: 'z6', kind: 'bunker', from: 90, to: 148, side: 'right' },
+      { id: 'z7', kind: 'water', from: 118, to: 214, side: 'left' },
+      { id: 'z8', kind: 'bunker', from: 148, to: 192, side: 'left' },
+      { id: 'z9', kind: 'bunker', from: 152, to: 160, side: 'cross' },
+      { id: 'z10', kind: 'bunker', from: 192, to: 206, side: 'cross' },
+      { id: 'z11', kind: 'bunker', from: 202, to: 214, side: 'left' },
+    ],
+  },
+  // hole 18 — the lighthouse hole. Calibogue Sound / marsh runs the ENTIRE
+  // left side tee-to-green and wraps behind the green; trees line the right,
+  // no water crosses the corridor. HAND-AUTHORED from imagery: the OSM
+  // centreline hugs the marsh edge, so the importer read the diagonal as
+  // full-width `cross` bands on both sides — wrong. Honest model is one
+  // continuous left ocean hazard, a short marsh carry off the tee, and the
+  // greenside bunker up the right.
+  'harbour-town:18': {
+    length: 470,
+    fairwayFrom: 165,
+    fairwayTo: 458,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'ocean', from: 0, to: 470, side: 'left' }, // the Sound down the entire left, wrapping behind the green
+      { id: 'z2', kind: 'trees', from: 150, to: 400, side: 'right' }, // live-oak treeline framing the right of the corridor
+      { id: 'z3', kind: 'bunker', from: 414, to: 454, side: 'right' },
+    ],
+  },
+  // ---------------------------------------------------------------------
   // PGA Frisco — The Swing. HAND-AUTHORED: OSM maps Fields Ranch East/West
   // but not the 10-hole Swing short course, so these are drawn from the
   // published scorecard lengths + aerial imagery of the heavily-bunkered

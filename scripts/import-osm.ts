@@ -76,6 +76,7 @@ const COURSE_GEO: Record<string, CourseGeo> = {
   pebble: { name: 'Pebble Beach Links', center: [36.5686, -121.9497], radius: 2500, osmName: 'Pebble Beach Golf', engineSlug: 'pebble-beach' },
   palmbeach: { name: 'Palm Beach Par 3', center: [26.6321, -80.0385], radius: 1200, osmName: 'Palm Beach Par 3', engineSlug: 'palm-beach-par-3', packed: true },
   cobblestone: { name: 'Cobblestone Creek', center: [35.1638, -97.4215], radius: 900, osmName: 'Cobblestone Creek', engineSlug: 'cobblestone-creek', packed: true },
+  harbourtown: { name: 'Harbour Town Golf Links', center: [32.1307, -80.8093], radius: 1600, osmName: 'Harbour Town Golf Links', engineSlug: 'harbour-town' },
 }
 
 // ---------- Overpass ----------
@@ -146,6 +147,10 @@ function golfQuery(geo: CourseGeo): string {
   way["natural"="water"](around:${r},${lat},${lon});
   relation["natural"="water"](around:${r},${lat},${lon});
   way["natural"="coastline"](around:${r},${lat},${lon});
+  way["natural"="wood"](area.a);
+  relation["natural"="wood"](area.a);
+  way["landuse"="forest"](area.a);
+  relation["landuse"="forest"](area.a);
 );
 out geom;`
 }

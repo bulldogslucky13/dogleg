@@ -199,6 +199,90 @@ function ribbonPath(geo: Geo, from: number, to: number, widthYd: (t: number) => 
   return `M${leftPts.join(' L')} L${rightPts.join(' L')} Z`
 }
 
+/** Signed lateral band [lo, hi] (yards from centreline, golfer-left positive)
+ * that a single bunker zone covers at a given yardage. `cor` is the corridor
+ * half-width in yards at that point. */
+function bunkerBand(z: HazardZone, cor: number): [number, number] {
+  const span = Math.max(10, z.to - z.from)
+  const w = Math.min(12, 5 + span * 0.18) // sand thickness in yards
+  if (z.side === 'left') return [cor, cor + w]
+  if (z.side === 'right') return [-(cor + w), -cor]
+  return [-(cor + 2), cor + 2] // cross / green: sand strung across the corridor
+}
+
+/** Two bunker zones belong to the same physical bunker when they abut in
+ * yardage AND their lateral footprints overlap — exactly what the OSM importer
+ * splits a single diagonal/waste bunker into (left → cross → left as the
+ * centreline curves past it). Opposite-side flanking bunkers (left vs right,
+ * no cross bridging them) never overlap, so they stay separate. */
+function bunkersAdjacent(a: HazardZone, b: HazardZone): boolean {
+  const gap = Math.max(a.from, b.from) - Math.min(a.to, b.to)
+  if (gap > 6) return false
+  // lateral overlap at the greenest corridor width they share (use 15 — the
+  // fairway default — since the check only needs relative overlap, not exact px)
+  const [aLo, aHi] = bunkerBand(a, 15)
+  const [bLo, bHi] = bunkerBand(b, 15)
+  return Math.min(aHi, bHi) >= Math.max(aLo, bLo)
+}
+
+/** Group a hole's bunker zones into runs of one-or-more physically-continuous
+ * zones, preserving the original array order for stable z-indexing. A run of
+ * length ≥2 is drawn as one merged sand shape; singletons render as before. */
+function bunkerRuns(zones: HazardZone[]): HazardZone[][] {
+  const bunkers = zones.filter((z) => z.kind === 'bunker')
+  const byYard = [...bunkers].sort((p, q) => p.from - q.from)
+  const runs: HazardZone[][] = []
+  for (const z of byYard) {
+    const run = runs.find((r) => r.some((m) => bunkersAdjacent(m, z)))
+    if (run) run.push(z)
+    else runs.push([z])
+  }
+  return runs
+}
+
+/** Continuous sand outline hugging the union footprint of a merged bunker run —
+ * a single organic waste-bunker shape instead of a chain of separate ovals. */
+function sandBandPath(
+  geo: Geo,
+  run: HazardZone[],
+  greenFrom: number,
+  greenRxYd: number,
+  L: number,
+): string {
+  const from = Math.min(...run.map((z) => z.from))
+  const to = Math.max(...run.map((z) => z.to))
+  const STEPS = Math.max(10, Math.round((to - from) / 5))
+  const hiPts: string[] = []
+  const loPts: string[] = []
+  let prev: [number, number] | null = null
+  for (let i = 0; i <= STEPS; i++) {
+    const y = from + ((to - from) * i) / STEPS
+    const cor = y > greenFrom ? greenRxYd : 15
+    let lo = Infinity
+    let hi = -Infinity
+    for (const z of run) {
+      if (y < z.from - 2 || y > z.to + 2) continue
+      const [zLo, zHi] = bunkerBand(z, cor)
+      lo = Math.min(lo, zLo)
+      hi = Math.max(hi, zHi)
+    }
+    // a rounding-gap yard with no active zone: carry the previous band so the
+    // outline stays continuous rather than collapsing to the centreline
+    if (lo === Infinity) {
+      if (!prev) continue
+      ;[lo, hi] = prev
+    }
+    prev = [lo, hi]
+    const wob = Math.sin(y * 0.7) * 0.6 // gentle edge waviness (yards)
+    const p = geo.at(Math.min(y, L - 1))
+    const n = geo.normalAt(Math.min(y, L - 1))
+    const u = geo.uPerYd
+    hiPts.push(`${(p.x + n.x * (hi + wob) * u).toFixed(1)},${(p.y + n.y * (hi + wob) * u).toFixed(1)}`)
+    loPts.unshift(`${(p.x + n.x * (lo + wob) * u).toFixed(1)},${(p.y + n.y * (lo + wob) * u).toFixed(1)}`)
+  }
+  return `M${hiPts.join(' L')} L${loPts.join(' L')} Z`
+}
+
 /** One canopy: layered crowns + soft shadow. */
 function Tree({ x, y, s, tone = 0 }: { x: number; y: number; s: number; tone?: number }) {
   const c1 = tone === 0 ? '#2b4f35' : '#274a31'
@@ -369,6 +453,24 @@ export function HoleMap(props: {
   const vFrom = view[0]
   const places = useMemo(() => placeZones(layout, geo), [layout, geo])
   const treeSize = (base: number) => clampPx(base * uPerYd, 7, 22)
+
+  // Merge the bunker zones the OSM importer split from one physical bunker
+  // (left → cross → left) back into a single drawn shape. `mergedFirst` maps a
+  // run's leading zone id to the whole run; `mergedRest` are the follower ids
+  // to skip while rendering (the run is drawn once, at its first member).
+  const { mergedFirst, mergedRest } = useMemo(() => {
+    const first = new Map<string, HazardZone[]>()
+    const rest = new Set<string>()
+    for (const run of bunkerRuns(layout.zones)) {
+      if (run.length < 2) continue
+      const inOrder = layout.zones.filter((z) => run.includes(z))
+      first.set(inOrder[0].id, inOrder)
+      for (const z of inOrder.slice(1)) rest.add(z.id)
+    }
+    return { mergedFirst: first, mergedRest: rest }
+  }, [layout])
+  const greenFromYd = L - layout.greenDepth / 2 - 2
+  const greenRxYd = greenRx / uPerYd
 
   // decorative groves flanking the corridor, anchored in world yards so they
   // track the camera; sizes clamp so zoomed views don't grow monster trees
@@ -545,7 +647,23 @@ export function HoleMap(props: {
         </g>
       )
     }
-    // bunkers & side/greenside water: pre-placed ellipses
+    // a bunker that the importer split from one physical feature: draw the
+    // whole run once, at its first member, as a single continuous sand shape
+    if (z.kind === 'bunker') {
+      if (mergedRest.has(z.id)) return null // already drawn as part of its run
+      const run = mergedFirst.get(z.id)
+      if (run) {
+        const d = sandBandPath(geo, run, greenFromYd, greenRxYd, L)
+        return (
+          <g key={z.id}>
+            <path d={d} fill="#a8916a" opacity={0.7} transform="translate(0 1.5)" />
+            <path d={d} fill="#e2d2a8" stroke="#b49b6c" strokeWidth={1.3} strokeLinejoin="round" />
+          </g>
+        )
+      }
+    }
+
+    // singleton bunkers & side/greenside water: pre-placed ellipses
     return (
       <g key={z.id}>
         {place.ellipses.map((e, i) =>

@@ -5,7 +5,8 @@ import { toParLabel } from '../engine/daily'
 import type { ReplayPayload } from '../engine/replay'
 import { seasonCountdown, seasonForDate } from '../engine/season'
 import { currentEmail } from '../lib/auth'
-import { loadPlayer } from '../lib/leaderboard'
+import { backendEnabled } from '../lib/backend'
+import { fetchCourseRecords, loadPlayer } from '../lib/leaderboard'
 import {
   currentHandicap,
   formatAverage,
@@ -17,6 +18,7 @@ import {
 } from '../state/stats'
 import { lifetimeRounds, loadArchive, type ArchivedRound, type HistoryEntry } from '../state/store'
 import { pastSeasons, roundsInSeason, seasonAwards, type SeasonAward } from '../state/seasonStore'
+import { loadLedger, syncLedger } from '../lib/records'
 import { AccountPanel } from './AccountPanel'
 import { RoundScorecard } from './RoundScorecard'
 import { track } from '../lib/analytics'
@@ -77,6 +79,29 @@ export function RoundsScreen(props: {
     currentEmail()
       .then((e) => live && setEmail(e))
       .catch(() => {})
+    return () => {
+      live = false
+    }
+  }, [])
+
+  // The "records you hold" list is derived from the ledger, so it must be
+  // reconciled the same way the home screen reconciles it (screens.tsx) — we
+  // can't assume that async check finished before the player navigated in
+  // here, and once HomeScreen unmounts its localStorage write has no path into
+  // this component. Reconcile on mount and hold the result in state so a stolen
+  // record can't linger as "held" (or an adopted one stay missing) until the
+  // player leaves and comes back. Backend off in tests → the local ledger stands.
+  const [ledger, setLedger] = useState(() => loadLedger())
+  useEffect(() => {
+    if (!backendEnabled) return
+    const myName = loadPlayer()?.name ?? null
+    if (!myName) return
+    let live = true
+    void fetchCourseRecords().then((recs) => {
+      if (!live || !recs) return
+      syncLedger(recs, myName)
+      setLedger(loadLedger())
+    })
     return () => {
       live = false
     }
@@ -155,14 +180,39 @@ export function RoundsScreen(props: {
   )
 
   const rounds = archive
-  const records = rounds.filter((r) => r.courseRecord)
+  // "Course records you hold" reflects the reconciled ledger — the same `held`
+  // set the home screen syncs against the server (src/lib/records.ts) — NOT the
+  // per-round `courseRecord` flag. That flag is written when a round *takes* a
+  // record and never cleared, so on its own it keeps listing records that have
+  // since been beaten, and lists every round that was *ever* a record (two
+  // "CR"s on one course). Keying off `held` fixes both: one row per course,
+  // and only records that are still ours right now. A course whose record we've
+  // lost falls back to the personal-bests list.
+  const held = ledger.held
   const bestByCourse = new Map<string, ArchivedRound>()
+  // The archived round that IS each held record: the one whose score matches
+  // the ledger's held score. Looked up independently of bestByCourse (not off
+  // the single best-per-course round) for two reasons. A record held under our
+  // name but set on another device won't match any local round, so we never
+  // dress an unrelated, worse local best up as the record. And a still-held
+  // record keeps its row even when a *better but unconfirmed* round now tops
+  // the course locally (played offline, or a failed submit) — that round hasn't
+  // taken the record yet, so it must not evict it. First match wins; archive is
+  // newest-first, so that's the most recent round at the record score.
+  const recordByCourse = new Map<string, ArchivedRound>()
   for (const r of rounds) {
     const best = bestByCourse.get(r.courseSlug)
     if (!best || r.toPar < best.toPar) bestByCourse.set(r.courseSlug, r)
+    if (held[r.courseSlug]?.toPar === r.toPar && !recordByCourse.has(r.courseSlug)) {
+      recordByCourse.set(r.courseSlug, r)
+    }
   }
+  const records = [...recordByCourse.values()].sort((a, b) => a.toPar - b.toPar)
+  // Personal bests are the best round on every course we don't hold a record
+  // row for — so a course never shows both a CR and a PR row (the old
+  // per-round flag listed both, which is the duplication this fixes).
   const prs = [...bestByCourse.values()]
-    .filter((r) => !r.courseRecord)
+    .filter((r) => !recordByCourse.has(r.courseSlug))
     .sort((a, b) => a.toPar - b.toPar)
   const recent = [...rounds].sort((a, b) => b.playedAt - a.playedAt).slice(0, 10)
 

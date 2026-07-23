@@ -352,10 +352,10 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
     }
   })
 
-  it('odds-driving chips (water, pin, wind) survive the three-chip cap; flavor yields', async () => {
-    // a stacked par-3 short hole produces four chip candidates: SI flavor,
-    // live water, today's pin, and the gust wind (the ONLY wind display on
-    // phones). Only three fit — the odds-driving trio must be the survivors.
+  it("the caddy's read shows the full list — no cap, flavor included", async () => {
+    // a stacked par-3 short hole produces four chips: SI flavor, live water,
+    // today's pin, and the gust wind. The row scrolls, so every one shows —
+    // including the SI flavor chip the old three-chip cap used to drop.
     const { HazardChips } = await import('./ui/panels')
     const { buildLayout } = await import('./engine/layout')
     const { startHole } = await import('./engine/resolve')
@@ -372,9 +372,43 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
     expect(screen.getByText(/mph/)).toBeTruthy()
     expect(screen.getByText(/Sucker pin/)).toBeTruthy()
     expect(screen.getByText(/Water|water/)).toBeTruthy()
-    expect(screen.queryByText(/Signature test/)).toBeNull()
-    // three chips max, always
-    expect(document.querySelectorAll('.chips .chip').length).toBeLessThanOrEqual(3)
+    // the SI flavor chip now rides along instead of yielding its slot
+    expect(screen.getByText(/Signature test/)).toBeTruthy()
+    expect(document.querySelectorAll('.chips .chip').length).toBe(4)
+  })
+
+  it("the putt green's Caddy's read renders end to end through a live round", () => {
+    // the putt-stage caddy's read is wired up separately from HazardChips
+    // (App.tsx builds its own chip list — putt look, green speed, today's
+    // pin — and calls CaddyThoughts directly), so it needs its own coverage:
+    // HazardChips-level tests never reach this code path.
+    vi.useFakeTimers()
+    render(<App />)
+    fireEvent.click(screen.getByText('Tee off'))
+    fireEvent.click(screen.getByText(CHARACTERS[0].name))
+
+    for (let guard = 0; guard < 30; guard++) {
+      if (screen.queryByText('Lag')) break
+      if (screen.queryByText('Next hole') || screen.queryByText('Sign the card')) break
+      const splash = screen.queryByText('HOLE IN ONE') ?? screen.queryByText('ALBATROSS')
+      if (splash) {
+        act(() => vi.advanceTimersByTime(5100))
+        fireEvent.click(splash)
+        continue
+      }
+      const card = document.querySelector<HTMLButtonElement>('button.choice')!
+      fireEvent.click(card)
+      fireEvent.click(card)
+      act(() => vi.advanceTimersByTime(1500))
+    }
+
+    // a holed-out approach is rare luck, not the case this test exercises —
+    // guard so the assertion below fails loudly instead of vacuously passing
+    expect(screen.getByText('Lag')).toBeTruthy()
+    expect(screen.getByText(/Caddy.?s read/i)).toBeTruthy()
+    const read = within(document.querySelector('.caddy-track')!)
+    expect(read.getByText(/~\d+ ft$/)).toBeTruthy()
+    expect(read.getByText(/greens?$/)).toBeTruthy()
   })
 
   it("the tier banner's risk read includes the hole's gust, matching the real odds bar", async () => {

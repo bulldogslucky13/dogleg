@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { Choice, CourseSpec, HoleScore, OddsSummary, Stage } from '../engine/types'
 import type { HoleInPlay } from '../engine/resolve'
 import { LOOK_LABEL, madePuttLook, oddsFor, pinChip, summarize } from '../engine/resolve'
 import { pressure } from '../engine/odds'
 import { RESULT_LABEL, toParLabel } from '../engine/daily'
+import { prefersReducedMotion } from './motion'
 
 const pct = (x: number, digits = 0) => `${(x * 100).toFixed(digits)}%`
 
@@ -189,61 +190,160 @@ export function TierBanner(props: { hole: HoleInPlay }) {
   )
 }
 
+// ---------------------------------------------------------------------------
+// Caddy's read — the hazard/condition chips, framed as the caddy walking the
+// hole with you. A pinned label plus a chip row that shows the FULL text (never
+// truncated); when the line is too long for the map it drifts to the right,
+// dwells a beat, drifts back, and loops until you play a shot. Honors the OS
+// reduce-motion switch (holds still) and does nothing when everything fits.
+// ---------------------------------------------------------------------------
+
+export function CaddyThoughts(props: { chips: string[] }) {
+  const track = useRef<HTMLDivElement>(null)
+  const key = JSON.stringify(props.chips)
+  useEffect(() => {
+    const el = track.current
+    if (!el) return
+    el.scrollLeft = 0
+
+    const FADE = 16 // px — max width of each edge fade
+    // the edge fades track the scroll: no left fade when parked at the start, no
+    // right fade at the end — each grows in only once there's content hiding
+    // under it, so the read never looks clipped when it's actually all shown
+    const fades = (max: number) => {
+      el.style.setProperty('--fade-l', `${Math.max(0, Math.min(el.scrollLeft, FADE))}px`)
+      el.style.setProperty('--fade-r', `${Math.max(0, Math.min(max - el.scrollLeft, FADE))}px`)
+    }
+    fades(el.scrollWidth - el.clientWidth)
+
+    if (prefersReducedMotion()) return
+
+    const DWELL_NEAR = 1600 // ms held at the start before drifting out
+    const DWELL_FAR = 3000 // ms held at the far end ("wait a few seconds")
+    const SPEED = 24 // px/sec — a slow, barely-there drift
+    const SETTLE_FRAMES = 6 // frames to keep checking after a false "it fits" (late web-font swap, etc.)
+    // easeInOutSine: the gentlest ease there is — velocity eases to zero at both
+    // ends, so the turnarounds never snap
+    const ease = (t: number) => 0.5 - 0.5 * Math.cos(Math.PI * t)
+
+    let raf = 0
+    let origin = 0
+    let settling = 0
+    let lastLeft = -1
+    const frame = (now: number) => {
+      const max = el.scrollWidth - el.clientWidth
+      if (max > 1) {
+        settling = 0
+        if (!origin) origin = now
+        const glide = (max / SPEED) * 1000 // ms to cross the overflow once
+        const loop = DWELL_NEAR + glide + DWELL_FAR + glide
+        let t = (now - origin) % loop
+        let target: number
+        if (t < DWELL_NEAR) target = 0
+        else if ((t -= DWELL_NEAR) < glide) target = ease(t / glide) * max
+        else if ((t -= glide) < DWELL_FAR) target = max
+        else target = (1 - ease((t - DWELL_FAR) / glide)) * max
+        // dwell phases hold a constant target for seconds at a time — skip the
+        // write (and the fade recompute) once we're already sitting there
+        if (target !== lastLeft) {
+          el.scrollLeft = target
+          lastLeft = target
+          fades(max)
+        }
+        raf = requestAnimationFrame(frame)
+      } else {
+        // content fits — settle for a few frames (in case a late font swap or
+        // layout pass still grows it), then stop polling until the content
+        // key changes again, instead of running an rAF loop forever for nothing
+        if (lastLeft !== 0) {
+          el.scrollLeft = 0
+          lastLeft = 0
+          fades(max)
+        }
+        origin = 0
+        if (settling++ < SETTLE_FRAMES) raf = requestAnimationFrame(frame)
+      }
+    }
+    raf = requestAnimationFrame(frame)
+
+    // a resize (rotation, URL-bar collapse) can flip whether the row overflows
+    // without the content key changing — restart the drift cleanly from the
+    // top instead of letting a stale `origin` produce a discontinuous jump
+    const ro = new ResizeObserver(() => {
+      cancelAnimationFrame(raf)
+      origin = 0
+      settling = 0
+      lastLeft = -1
+      raf = requestAnimationFrame(frame)
+    })
+    ro.observe(el)
+
+    return () => {
+      cancelAnimationFrame(raf)
+      ro.disconnect()
+    }
+  }, [key])
+
+  if (props.chips.length === 0) return null
+  return (
+    <div className="caddy-read">
+      <span className="caddy-read-tag">
+        <span className="caddy-read-dot" />
+        Caddy&rsquo;s read
+      </span>
+      <div className="chips caddy-track" ref={track}>
+        {props.chips.map((c, i) => (
+          <span key={i} className="chip">
+            {c}
+          </span>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 export function HazardChips(props: { hole: HoleInPlay }) {
   const { layout, cond, ball } = props.hole
   const spec = layout.spec
   // signature flavor rides only on the tee, as a one-off hole intro alongside
   // the tier banner — persisting it every shot would just be noise
   const atTee = props.hole.shots.length === 0
-  // Only three chips fit the row. Odds-DRIVING chips (today's pin, a
-  // gust-carrying hole's wind — the only wind display on phones) claim their
-  // slots first; flavor chips (SI, dogleg, greens) fill whatever's left.
-  // Display order stays as authored — priority only decides who survives.
-  const chips: { text: string; keep?: boolean }[] = []
-  if (spec.strokeIndex <= 4) chips.push({ text: `Signature test · SI ${spec.strokeIndex}` })
+  // the caddy reads out everything relevant, in authored order — the row
+  // scrolls, so there's no cap on how much fits (see CaddyThoughts)
+  const chips: string[] = []
+  if (atTee && spec.strokeIndex <= 4) chips.push(`Signature test · SI ${spec.strokeIndex}`)
 
-  // geometry-honest hazard chips: only what is actually still in front of the
-  // ball. Live water/ocean is a penalty threat — it keeps its slot too.
+  // geometry-honest hazard chips: only what is actually still in front of the ball
   const ahead = layout.zones.filter((z) => z.to > ball.pos + 2)
-  if (ahead.some((z) => z.kind === 'ocean')) chips.push({ text: 'Ocean in play', keep: true })
+  if (ahead.some((z) => z.kind === 'ocean')) chips.push('Ocean in play')
   else if (ahead.some((z) => z.kind === 'water')) {
     const cross = ahead.find((z) => z.kind === 'water' && z.side === 'cross')
-    chips.push({ text: cross ? `Water crosses at ${Math.round(cross.from - ball.pos)} yds` : 'Water in play', keep: true })
+    chips.push(cross ? `Water crosses at ${Math.round(cross.from - ball.pos)} yds` : 'Water in play')
   } else if (layout.zones.some((z) => z.kind === 'water' || z.kind === 'ocean')) {
-    chips.push({ text: 'Water behind you — out of play' })
-  } else if (ahead.some((z) => z.kind === 'bunker')) chips.push({ text: 'Bunkers guard it' })
-  if (spec.dogleg === 'L') chips.push({ text: 'Dogleg left' })
-  if (spec.dogleg === 'R') chips.push({ text: 'Dogleg right' })
+    chips.push('Water behind you — out of play')
+  } else if (ahead.some((z) => z.kind === 'bunker')) chips.push('Bunkers guard it')
+  if (spec.dogleg === 'L') chips.push('Dogleg left')
+  if (spec.dogleg === 'R') chips.push('Dogleg right')
   // today's flag on a par 3, framed against the greenside trouble — the
   // tucked ones are the decision ("Sucker pin left · short-sided")
   if (atTee) {
     const pin = pinChip(layout)
-    if (pin) chips.push({ text: pin, keep: true })
+    if (pin) chips.push(pin)
   }
   // par-3 shorts carry a per-hole gust on top of the day's wind — and show it
-  // ALWAYS there (a gust-carrying hole), because it's driving the odds every
-  // hole and it changes hole to hole. Big courses keep the ≥12mph threshold.
+  // ALWAYS there (a gust-carrying hole). Big courses keep the ≥12mph threshold.
   const wind = cond.wind + (layout.gust ?? 0)
   const gustHole = layout.gust !== undefined
-  if (wind >= 18) chips.push({ text: `Howling · ${wind} mph`, keep: gustHole })
-  else if (wind >= 12) chips.push({ text: `Breezy · ${wind} mph`, keep: gustHole })
-  else if (gustHole) chips.push({ text: `Wind · ${wind} mph`, keep: true })
-  if (cond.greens === 'Fast' || cond.greens === 'Firm') chips.push({ text: 'Slick greens' })
+  if (wind >= 18) chips.push(`Howling · ${wind} mph`)
+  else if (wind >= 12) chips.push(`Breezy · ${wind} mph`)
+  else if (gustHole) chips.push(`Wind · ${wind} mph`)
+  if (cond.greens === 'Fast' || cond.greens === 'Firm') chips.push('Slick greens')
 
-  // keep-flagged chips claim slots first, the rest fill in authored order
-  const kept = new Set(chips.filter((c) => c.keep).slice(0, 3))
-  for (const c of chips) {
-    if (kept.size >= 3) break
-    kept.add(c)
-  }
-  const shown = chips.filter((c) => kept.has(c))
   const sig = atTee ? spec.signature : undefined
   if (chips.length === 0 && !sig) return null
   return (
     // signature rides its own row above the hazard chips: it wraps freely as
-    // the hole's headline, while the hazard chips keep their single-row,
-    // ellipsized layout with the full width to themselves (they'd otherwise
-    // get squeezed to stubs on narrow screens)
+    // the hole's headline, while the caddy's read scrolls the full list below it
     <div className="hazard-stack">
       {sig && (
         <div className="sig-row">
@@ -252,15 +352,7 @@ export function HazardChips(props: { hole: HoleInPlay }) {
           </span>
         </div>
       )}
-      {shown.length > 0 && (
-        <div className="chips center">
-          {shown.map((c) => (
-            <span key={c.text} className="chip">
-              {c.text}
-            </span>
-          ))}
-        </div>
-      )}
+      {chips.length > 0 && <CaddyThoughts chips={chips} />}
     </div>
   )
 }

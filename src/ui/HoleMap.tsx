@@ -645,7 +645,7 @@ export function HoleMap(props: {
   const ghostVisible = ghostPt && Math.hypot(ghostPt.x - ballPt.x, ghostPt.y - ballPt.y) > 8
 
   // ---- zones ----
-  const zoneEls = layout.zones.map((z) => {
+  const renderZone = (z: HazardZone) => {
     const place = places.get(z.id)!
     const span = Math.max(10, z.to - z.from)
     const sideSign = z.side === 'left' ? 1 : -1
@@ -778,7 +778,34 @@ export function HoleMap(props: {
         )}
       </g>
     )
-  })
+  }
+
+  // All zones in their authored order, so a shoreline bunker still sits on top
+  // of a flank lake as intended.
+  const zoneEls = layout.zones.map(renderZone)
+  // A `cross` bunker is sand you thread, not a wall: lay a slim strip of fairway
+  // (LANE_HALF yд half-width) back down the middle of the corridor, over
+  // everything, so crossing sand keeps a visible lane through it and a
+  // fairway-lie ball reads as grass. Par 3s have no fairway corridor → no lane.
+  const LANE_HALF = 9
+  const fairwayLane =
+    par3 ? null : (
+      <path
+        d={ribbonPath(geo, Math.max(Math.max(30, layout.fairwayFrom - 40), vFrom - 10), layout.fairwayTo, () => LANE_HALF)}
+        fill="#4f7d45"
+      />
+    )
+  // A water carry really does block the line, so where the lane crosses one,
+  // re-lay just that lane-width strip of water back over it — only the center
+  // the lane actually covered, so later flank hazards keep their authored order.
+  // Gated to the lane case (no lane on a par 3 = nothing to repair).
+  const crossWaterCover = par3
+    ? []
+    : layout.zones
+        .filter((z) => (z.kind === 'water' || z.kind === 'ocean') && z.side === 'cross')
+        .map((z) => (
+          <path key={`xw-${z.id}`} d={ribbonPath(geo, z.from, z.to, () => LANE_HALF + 1)} fill="url(#water)" opacity={0.95} />
+        ))
 
   const previewColor = (c: Choice) => (c === 'safe' ? '#7fb56b' : c === 'normal' ? '#d9c15c' : '#d07a5a')
 
@@ -893,6 +920,8 @@ export function HoleMap(props: {
       })}
 
       {zoneEls}
+      {fairwayLane}
+      {crossWaterCover}
 
       {/* landmark beside the green (Harbour Town lighthouse) — on the land side
           (right; water is left), base near the green's height so it reads as

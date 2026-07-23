@@ -199,50 +199,61 @@ function ribbonPath(geo: Geo, from: number, to: number, widthYd: (t: number) => 
   return `M${leftPts.join(' L')} L${rightPts.join(' L')} Z`
 }
 
+// Hazard kinds whose importer-split zones we stitch back into one drawn shape.
+// Ocean (a seaward half-plane) and trees/deeprough (scattered sprites) are not
+// footprint hazards, so they keep their own rendering.
+const MERGE_KINDS = new Set<HazardZone['kind']>(['bunker', 'water'])
+
 /** Signed lateral band [lo, hi] (yards from centreline, golfer-left positive)
- * that a single bunker zone covers at a given yardage. `cor` is the corridor
- * half-width in yards at that point. */
-function bunkerBand(z: HazardZone, cor: number): [number, number] {
+ * that a single zone covers at a given yardage. `cor` is the corridor
+ * half-width in yards there. Water carries more visual body than sand and sits
+ * a touch further off the corridor edge, matching the old lake/pond look. */
+function zoneBand(z: HazardZone, cor: number): [number, number] {
   const span = Math.max(10, z.to - z.from)
-  const w = Math.min(12, 5 + span * 0.18) // sand thickness in yards
-  if (z.side === 'left') return [cor, cor + w]
-  if (z.side === 'right') return [-(cor + w), -cor]
-  return [-(cor + 2), cor + 2] // cross / green: sand strung across the corridor
+  const water = z.kind === 'water'
+  const w = water ? Math.min(34, 12 + span * 0.22) : Math.min(12, 5 + span * 0.18)
+  const edge = water ? cor + 1 : cor // water laps just past the short grass
+  const cross = water ? cor + 4 : cor + 2
+  if (z.side === 'left') return [edge, edge + w]
+  if (z.side === 'right') return [-(edge + w), -edge]
+  return [-cross, cross] // cross / green: strung across the corridor
 }
 
-/** Two bunker zones belong to the same physical bunker when they abut in
- * yardage AND their lateral footprints overlap — exactly what the OSM importer
- * splits a single diagonal/waste bunker into (left → cross → left as the
- * centreline curves past it). Opposite-side flanking bunkers (left vs right,
- * no cross bridging them) never overlap, so they stay separate. */
-function bunkersAdjacent(a: HazardZone, b: HazardZone): boolean {
+/** Two zones belong to the same physical hazard when they're the same kind,
+ * abut in yardage, AND their lateral footprints overlap — exactly what the OSM
+ * importer splits one diagonal bunker or one body of water into (left → cross →
+ * right as the centreline curves past it). Opposite-side flanking hazards (a
+ * left and a right bunker with no cross between) never overlap, so they stay
+ * separate shapes. */
+function zonesAdjacent(a: HazardZone, b: HazardZone): boolean {
+  if (a.kind !== b.kind) return false
   const gap = Math.max(a.from, b.from) - Math.min(a.to, b.to)
   if (gap > 6) return false
-  // lateral overlap at the greenest corridor width they share (use 15 — the
-  // fairway default — since the check only needs relative overlap, not exact px)
-  const [aLo, aHi] = bunkerBand(a, 15)
-  const [bLo, bHi] = bunkerBand(b, 15)
+  // relative overlap only — a fixed corridor width is fine for the test
+  const [aLo, aHi] = zoneBand(a, 15)
+  const [bLo, bHi] = zoneBand(b, 15)
   return Math.min(aHi, bHi) >= Math.max(aLo, bLo)
 }
 
-/** Group a hole's bunker zones into runs of one-or-more physically-continuous
- * zones, preserving the original array order for stable z-indexing. A run of
- * length ≥2 is drawn as one merged sand shape; singletons render as before. */
-function bunkerRuns(zones: HazardZone[]): HazardZone[][] {
-  const bunkers = zones.filter((z) => z.kind === 'bunker')
-  const byYard = [...bunkers].sort((p, q) => p.from - q.from)
+/** Group a hole's mergeable zones into runs of physically-continuous same-kind
+ * zones, preserving array order for stable z-indexing. A run of length ≥2 is
+ * drawn as one merged shape; singletons render on their existing path. */
+function hazardRuns(zones: HazardZone[]): HazardZone[][] {
+  const mergeable = zones.filter((z) => MERGE_KINDS.has(z.kind))
+  const byYard = [...mergeable].sort((p, q) => p.from - q.from)
   const runs: HazardZone[][] = []
   for (const z of byYard) {
-    const run = runs.find((r) => r.some((m) => bunkersAdjacent(m, z)))
+    const run = runs.find((r) => r.some((m) => zonesAdjacent(m, z)))
     if (run) run.push(z)
     else runs.push([z])
   }
   return runs
 }
 
-/** Continuous sand outline hugging the union footprint of a merged bunker run —
- * a single organic waste-bunker shape instead of a chain of separate ovals. */
-function sandBandPath(
+/** Continuous outline hugging the union footprint of a merged run — one organic
+ * waste-bunker or water shape instead of a chain of separate blobs. Water runs
+ * taper at their ends so a lake reads as a body, not a slab. */
+function hazardBandPath(
   geo: Geo,
   run: HazardZone[],
   greenFrom: number,
@@ -251,18 +262,20 @@ function sandBandPath(
 ): string {
   const from = Math.min(...run.map((z) => z.from))
   const to = Math.max(...run.map((z) => z.to))
+  const water = run[0].kind === 'water'
   const STEPS = Math.max(10, Math.round((to - from) / 5))
   const hiPts: string[] = []
   const loPts: string[] = []
   let prev: [number, number] | null = null
   for (let i = 0; i <= STEPS; i++) {
-    const y = from + ((to - from) * i) / STEPS
+    const t = i / STEPS
+    const y = from + (to - from) * t
     const cor = y > greenFrom ? greenRxYd : 15
     let lo = Infinity
     let hi = -Infinity
     for (const z of run) {
       if (y < z.from - 2 || y > z.to + 2) continue
-      const [zLo, zHi] = bunkerBand(z, cor)
+      const [zLo, zHi] = zoneBand(z, cor)
       lo = Math.min(lo, zLo)
       hi = Math.max(hi, zHi)
     }
@@ -273,12 +286,17 @@ function sandBandPath(
       ;[lo, hi] = prev
     }
     prev = [lo, hi]
+    // taper water toward the extreme ends so a lake pinches to a point
+    const taper = water ? Math.min(1, 6 * t * (1 - t) + 0.25) : 1
     const wob = Math.sin(y * 0.7) * 0.6 // gentle edge waviness (yards)
     const p = geo.at(Math.min(y, L - 1))
     const n = geo.normalAt(Math.min(y, L - 1))
     const u = geo.uPerYd
-    hiPts.push(`${(p.x + n.x * (hi + wob) * u).toFixed(1)},${(p.y + n.y * (hi + wob) * u).toFixed(1)}`)
-    loPts.unshift(`${(p.x + n.x * (lo + wob) * u).toFixed(1)},${(p.y + n.y * (lo + wob) * u).toFixed(1)}`)
+    const mid = (lo + hi) / 2
+    const hiO = mid + (hi - mid) * taper + wob
+    const loO = mid + (lo - mid) * taper + wob
+    hiPts.push(`${(p.x + n.x * hiO * u).toFixed(1)},${(p.y + n.y * hiO * u).toFixed(1)}`)
+    loPts.unshift(`${(p.x + n.x * loO * u).toFixed(1)},${(p.y + n.y * loO * u).toFixed(1)}`)
   }
   return `M${hiPts.join(' L')} L${loPts.join(' L')} Z`
 }
@@ -454,14 +472,15 @@ export function HoleMap(props: {
   const places = useMemo(() => placeZones(layout, geo), [layout, geo])
   const treeSize = (base: number) => clampPx(base * uPerYd, 7, 22)
 
-  // Merge the bunker zones the OSM importer split from one physical bunker
-  // (left → cross → left) back into a single drawn shape. `mergedFirst` maps a
-  // run's leading zone id to the whole run; `mergedRest` are the follower ids
-  // to skip while rendering (the run is drawn once, at its first member).
+  // Merge the zones the OSM importer split from one physical hazard (a waste
+  // bunker or a body of water read as left → cross → right as the centreline
+  // curves past it) back into a single drawn shape. `mergedFirst` maps a run's
+  // leading zone id to the whole run; `mergedRest` are the follower ids to skip
+  // while rendering (the run is drawn once, at its first member).
   const { mergedFirst, mergedRest } = useMemo(() => {
     const first = new Map<string, HazardZone[]>()
     const rest = new Set<string>()
-    for (const run of bunkerRuns(layout.zones)) {
+    for (const run of hazardRuns(layout.zones)) {
       if (run.length < 2) continue
       const inOrder = layout.zones.filter((z) => run.includes(z))
       first.set(inOrder[0].id, inOrder)
@@ -549,6 +568,22 @@ export function HoleMap(props: {
     const place = places.get(z.id)!
     const span = Math.max(10, z.to - z.from)
     const sideSign = z.side === 'left' ? 1 : -1
+
+    // Importer-split hazard stitched back together: draw the whole run once, at
+    // its first member, as one continuous shape (skips the per-side paths below).
+    if (mergedRest.has(z.id)) return null // already drawn as part of its run
+    const run = mergedFirst.get(z.id)
+    if (run) {
+      const d = hazardBandPath(geo, run, greenFromYd, greenRxYd, L)
+      return z.kind === 'water' ? (
+        <path key={z.id} d={d} fill="url(#water)" stroke="#3a6d86" strokeWidth={1.5} strokeLinejoin="round" opacity={0.95} />
+      ) : (
+        <g key={z.id}>
+          <path d={d} fill="#a8916a" opacity={0.7} transform="translate(0 1.5)" />
+          <path d={d} fill="#e2d2a8" stroke="#b49b6c" strokeWidth={1.3} strokeLinejoin="round" />
+        </g>
+      )
+    }
 
     if (z.kind === 'water' && z.side === 'cross') {
       return (
@@ -647,22 +682,6 @@ export function HoleMap(props: {
         </g>
       )
     }
-    // a bunker that the importer split from one physical feature: draw the
-    // whole run once, at its first member, as a single continuous sand shape
-    if (z.kind === 'bunker') {
-      if (mergedRest.has(z.id)) return null // already drawn as part of its run
-      const run = mergedFirst.get(z.id)
-      if (run) {
-        const d = sandBandPath(geo, run, greenFromYd, greenRxYd, L)
-        return (
-          <g key={z.id}>
-            <path d={d} fill="#a8916a" opacity={0.7} transform="translate(0 1.5)" />
-            <path d={d} fill="#e2d2a8" stroke="#b49b6c" strokeWidth={1.3} strokeLinejoin="round" />
-          </g>
-        )
-      }
-    }
-
     // singleton bunkers & side/greenside water: pre-placed ellipses
     return (
       <g key={z.id}>

@@ -34,6 +34,14 @@
  * procedural geometry for real geometry changes its difficulty — the whole
  * point of the pull — and the rating must be regenerated to reflect it, or the
  * badge will keep showing the old procedural number.
+ *
+ * LANDMARK PASS while QA-ing against imagery: if a hole has a classic,
+ * instantly-recognizable structure (Harbour Town 18's lighthouse, a famous
+ * clubhouse, the Swilcan Bridge), set `landmark` on the hole tuple in
+ * courses.ts — extending the Landmark union in engine/types.ts and adding a
+ * sprite in ui/HoleMap.tsx if it's a new kind. Cosmetic only, never in the
+ * odds or replay, so it's always versioning-safe. See scripts/README.md
+ * step 4 of the freeze process.
  */
 
 // Let --compare import the engine's extensionless TS modules (./rng etc.) —

@@ -36,7 +36,9 @@ export function ScoreBoard(props: { round: RoundState }) {
   const [board, setBoard] = useState<BoardRow[] | null>(null)
   /** set when this round took the course record — reclaim or fresh break */
   const [celebrate, setCelebrate] = useState<
-    { tier: 'alltime'; previousHolder: string | null } | { tier: 'season'; takenFrom: string | null } | null
+    | { tier: 'alltime'; previousHolder: string | null; tookSeason: boolean }
+    | { tier: 'season'; takenFrom: string | null }
+    | null
   >(null)
   /** the standing record, fetched for unnamed players so beating it can
    * become the claim-a-name moment */
@@ -76,7 +78,14 @@ export function ScoreBoard(props: { round: RoundState }) {
       // exactly one full-screen moment ever shows
       const stolen = recordWon(round.courseSlug, r.record.toPar)
       reclaimed = !!stolen
-      setCelebrate({ tier: 'alltime', previousHolder: standing?.player_name ?? stolen?.by ?? null })
+      // tookSeason: only claim the season title when the referee actually
+      // wrote one — during the pre-migration window seasonRecord is absent
+      // and the splash must not promise a row that doesn't exist
+      setCelebrate({
+        tier: 'alltime',
+        previousHolder: standing?.player_name ?? stolen?.by ?? null,
+        tookSeason: !!r.seasonRecord?.broken,
+      })
     } else if (r.seasonRecord?.broken) {
       // season title only: the record-reclaim treatment with season copy
       setCelebrate({ tier: 'season', takenFrom: null })
@@ -86,9 +95,11 @@ export function ScoreBoard(props: { round: RoundState }) {
     //  - daily: every non-duplicate post lands on today's board (a returning
     //    player re-opening today's card auto-submits again → duplicate: true,
     //    skip it)
-    //  - practice: the round only writes when it breaks the course record;
-    //    ordinary practice completions submit for validation but write nothing
-    const wroteToBoard = round.mode === 'daily' ? !r.duplicate : !!r.record?.broken
+    //  - practice: the round only writes when it takes a board — the all-time
+    //    record or the season record (a season-only break still lands on
+    //    season_records); ordinary practice completions submit for validation
+    //    but write nothing
+    const wroteToBoard = round.mode === 'daily' ? !r.duplicate : !!r.record?.broken || !!r.seasonRecord?.broken
     if (wroteToBoard) {
       track('board_submitted', {
         mode: round.mode,
@@ -96,6 +107,7 @@ export function ScoreBoard(props: { round: RoundState }) {
         to_par: roundToPar(round),
         named: !!(pickedName || player),
         is_record: !!r.record?.broken,
+        is_season_record: !!r.seasonRecord?.broken,
         reclaim: reclaimed,
         rank: r.rank ?? null,
       })
@@ -169,6 +181,7 @@ export function ScoreBoard(props: { round: RoundState }) {
             character={round.character}
             season={seasonForDate()}
             previousHolder={celebrate.previousHolder ?? undefined}
+            tookSeason={celebrate.tookSeason}
             onClose={() => setCelebrate(null)}
           />
         )}

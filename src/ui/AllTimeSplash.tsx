@@ -23,6 +23,9 @@ export function AllTimeSplash(props: {
   season: Season
   /** the previous all-time holder, when there was one */
   previousHolder?: string
+  /** the referee confirmed a season record rode along — absent during the
+   * pre-migration window where season_records doesn't exist yet */
+  tookSeason?: boolean
   onClose: () => void
 }) {
   const [busy, setBusy] = useState(false)
@@ -91,7 +94,7 @@ export function AllTimeSplash(props: {
               {char.name}
             </span>
           )}
-          <span>Takes the {props.season.name} record with it — obviously.</span>
+          {props.tookSeason && <span>Takes the {props.season.name} record with it — obviously.</span>}
         </div>
         <button className="cta moment-share" onClick={share} disabled={busy}>
           {busy ? 'Making your card…' : '📸 Share'}

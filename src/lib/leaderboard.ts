@@ -111,6 +111,25 @@ export interface CourseRecord {
   to_par: number
 }
 
+/** The season board for one season (scope 'global'): course → holder. A
+ * course absent from the map has no season record yet — that's the "be the
+ * first this season" state, not an error. */
+export async function fetchSeasonRecords(seasonKey: string): Promise<Map<string, CourseRecord> | null> {
+  if (!backendEnabled) return null
+  try {
+    const url =
+      `${SUPABASE_URL}/rest/v1/season_records` +
+      `?scope=eq.global&season_key=eq.${encodeURIComponent(seasonKey)}` +
+      `&select=course_slug,player_name,character,to_par`
+    const res = await fetch(url, { headers: REST_HEADERS })
+    if (!res.ok) return null
+    const rows = (await res.json()) as CourseRecord[]
+    return new Map(rows.map((r) => [r.course_slug, r]))
+  } catch {
+    return null
+  }
+}
+
 /** A course record WITH its stored round — enough to replay it as a ghost.
  * seed/decisions are null for records set before the round was kept. */
 export interface RecordReplay extends CourseRecord {
@@ -196,6 +215,7 @@ export interface SubmitResult {
   total?: number
   duplicate?: boolean
   record?: { broken: boolean; toPar: number; holder: string; character?: CharacterId | null }
+  seasonRecord?: { broken: boolean; toPar: number; holder: string; character?: CharacterId | null; seasonKey: string }
 }
 
 /** Date keys of dailies this device has successfully posted to the board.

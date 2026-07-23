@@ -12,10 +12,12 @@ import {
   type CourseRecord,
   type SubmitResult,
 } from '../lib/leaderboard'
+import { seasonForDate } from '../engine/season'
 import { recordWon } from '../lib/records'
 import { markArchiveRecord, roundToPar, type RoundState } from '../state/store'
 import { courseBySlug } from '../engine/courses'
 import { identifyPlayer, track } from '../lib/analytics'
+import { AllTimeSplash } from './AllTimeSplash'
 import { RecordSplash } from './RecordSplash'
 import { SyncCta } from './RoundsScreen'
 
@@ -33,7 +35,11 @@ export function ScoreBoard(props: { round: RoundState }) {
   const [error, setError] = useState<string | null>(null)
   const [board, setBoard] = useState<BoardRow[] | null>(null)
   /** set when this round took the course record — reclaim or fresh break */
-  const [celebrate, setCelebrate] = useState<{ takenFrom: string | null } | null>(null)
+  const [celebrate, setCelebrate] = useState<
+    | { tier: 'alltime'; previousHolder: string | null; tookSeason: boolean }
+    | { tier: 'season'; takenFrom: string | null }
+    | null
+  >(null)
   /** the standing record, fetched for unnamed players so beating it can
    * become the claim-a-name moment */
   const [standing, setStanding] = useState<CourseRecord | null>(null)
@@ -67,21 +73,33 @@ export function ScoreBoard(props: { round: RoundState }) {
     let reclaimed = false
     if (r.record?.broken) {
       markArchiveRecord(round.seed) // pin it in the locker forever
-      // ledger: this record is ours now. Every confirmed break gets the
-      // celebration — a reclaim names who it came back from, a fresh break
-      // gets the plain-glory variant.
+      // ledger bookkeeping runs for every all-time break; the CELEBRATION is
+      // tiered — an all-time record outranks (and absorbs) the season one, so
+      // exactly one full-screen moment ever shows
       const stolen = recordWon(round.courseSlug, r.record.toPar)
       reclaimed = !!stolen
-      setCelebrate({ takenFrom: stolen?.by ?? null })
+      // tookSeason: only claim the season title when the referee actually
+      // wrote one — during the pre-migration window seasonRecord is absent
+      // and the splash must not promise a row that doesn't exist
+      setCelebrate({
+        tier: 'alltime',
+        previousHolder: standing?.player_name ?? stolen?.by ?? null,
+        tookSeason: !!r.seasonRecord?.broken,
+      })
+    } else if (r.seasonRecord?.broken) {
+      // season title only: the record-reclaim treatment with season copy
+      setCelebrate({ tier: 'season', takenFrom: null })
     }
     // the untracked conversion: a round actually WRITTEN to a board. Only
     // count real writes, so the metric isn't inflated by no-op submits:
     //  - daily: every non-duplicate post lands on today's board (a returning
     //    player re-opening today's card auto-submits again → duplicate: true,
     //    skip it)
-    //  - practice: the round only writes when it breaks the course record;
-    //    ordinary practice completions submit for validation but write nothing
-    const wroteToBoard = round.mode === 'daily' ? !r.duplicate : !!r.record?.broken
+    //  - practice: the round only writes when it takes a board — the all-time
+    //    record or the season record (a season-only break still lands on
+    //    season_records); ordinary practice completions submit for validation
+    //    but write nothing
+    const wroteToBoard = round.mode === 'daily' ? !r.duplicate : !!r.record?.broken || !!r.seasonRecord?.broken
     if (wroteToBoard) {
       track('board_submitted', {
         mode: round.mode,
@@ -89,6 +107,7 @@ export function ScoreBoard(props: { round: RoundState }) {
         to_par: roundToPar(round),
         named: !!(pickedName || player),
         is_record: !!r.record?.broken,
+        is_season_record: !!r.seasonRecord?.broken,
         reclaim: reclaimed,
         rank: r.rank ?? null,
       })
@@ -153,14 +172,27 @@ export function ScoreBoard(props: { round: RoundState }) {
     const beatsStanding = !player && !result && (!standing || roundToPar(round) < standing.to_par)
     return (
       <div className="board-block">
-        {celebrate && (
+        {celebrate?.tier === 'alltime' && (
+          <AllTimeSplash
+            courseName={courseBySlug(round.courseSlug)?.name ?? round.courseSlug}
+            courseSlug={round.courseSlug}
+            dateKey={round.dateKey}
+            toPar={roundToPar(round)}
+            character={round.character}
+            season={seasonForDate()}
+            previousHolder={celebrate.previousHolder ?? undefined}
+            tookSeason={celebrate.tookSeason}
+            onClose={() => setCelebrate(null)}
+          />
+        )}
+        {celebrate?.tier === 'season' && (
           <RecordSplash
             courseName={courseBySlug(round.courseSlug)?.name ?? round.courseSlug}
             courseSlug={round.courseSlug}
             dateKey={round.dateKey}
             toPar={roundToPar(round)}
             character={round.character}
-            takenFrom={celebrate.takenFrom ?? undefined}
+            season={seasonForDate()}
             onClose={() => setCelebrate(null)}
           />
         )}
@@ -170,9 +202,16 @@ export function ScoreBoard(props: { round: RoundState }) {
             {round.character ? ` ${characterById(round.character)?.emoji ?? ''}` : ''}
           </div>
         )}
+        {result?.seasonRecord && !result.seasonRecord.broken && (
+          <p className="fine">
+            {seasonForDate().name} record: {toParLabel(result.seasonRecord.toPar)} ·{' '}
+            {result.seasonRecord.character ? `${characterById(result.seasonRecord.character)?.emoji ?? ''} ` : ''}
+            {result.seasonRecord.holder}
+          </p>
+        )}
         {rec && !rec.broken && (
           <p className="fine">
-            Course record: {toParLabel(rec.toPar)} ·{' '}
+            All-time record: {toParLabel(rec.toPar)} ·{' '}
             {rec.character ? `${characterById(rec.character)?.emoji ?? ''} ` : ''}
             {rec.holder}
           </p>

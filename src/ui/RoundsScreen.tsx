@@ -3,6 +3,7 @@ import { characterById } from '../engine/characters'
 import { courseBySlug } from '../engine/courses'
 import { toParLabel } from '../engine/daily'
 import type { ReplayPayload } from '../engine/replay'
+import { seasonCountdown, seasonForDate } from '../engine/season'
 import { currentEmail } from '../lib/auth'
 import { loadPlayer } from '../lib/leaderboard'
 import {
@@ -15,6 +16,7 @@ import {
   type LoggedRound,
 } from '../state/stats'
 import { lifetimeRounds, loadArchive, type ArchivedRound, type HistoryEntry } from '../state/store'
+import { pastSeasons, roundsInSeason, seasonAwards, type SeasonAward } from '../state/seasonStore'
 import { AccountPanel } from './AccountPanel'
 import { RoundScorecard } from './RoundScorecard'
 import { track } from '../lib/analytics'
@@ -29,6 +31,7 @@ import { track } from '../lib/analytics'
  */
 
 type LockerView = 'main' | 'stats' | 'ace' | 'albatross'
+type LockerTab = 'recent' | 'records' | 'seasons'
 
 /** an archived round already carries everything the scorecard needs */
 function toLogged(r: ArchivedRound): LoggedRound {
@@ -56,7 +59,16 @@ export function RoundsScreen(props: {
   initialAccount?: boolean
 }) {
   const [view, setView] = useState<LockerView>(props.initialView ?? 'main')
-  const [tab, setTab] = useState<'recent' | 'records'>('recent')
+  const [tab, setTab] = useState<LockerTab>('recent')
+  /** permanent shelf: past seasons where this player ended holding records */
+  const [awards, setAwards] = useState<SeasonAward[]>([])
+  useEffect(() => {
+    let live = true
+    void seasonAwards().then((a) => live && setAwards(a))
+    return () => {
+      live = false
+    }
+  }, [])
   const [card, setCard] = useState<LoggedRound | null>(null)
   const [showAccount, setShowAccount] = useState(props.initialAccount ?? false)
   const [email, setEmail] = useState<string | null>(null)
@@ -83,7 +95,9 @@ export function RoundsScreen(props: {
             ? 'clubhouse_albatrosses'
             : tab === 'records'
               ? 'clubhouse_records'
-              : 'clubhouse'
+              : tab === 'seasons'
+                ? 'clubhouse_seasons'
+                : 'clubhouse'
     track('screen_viewed', { screen })
   }, [view, tab])
 
@@ -301,6 +315,26 @@ export function RoundsScreen(props: {
         </button>
       </div>
 
+      {awards.length > 0 && (
+        <div className="season-awards">
+          {awards
+            .slice()
+            .reverse()
+            .map((a) => (
+              <div key={a.seasonKey} className={`season-award${a.place ? ` podium place-${a.place}` : ''}`}>
+                <b>
+                  {a.place ? ['🥇', '🥈', '🥉'][a.place - 1] + ' ' : '🏵️ '}
+                  {a.seasonLabel}
+                </b>
+                <span>
+                  {a.place ? `Podium · ${['1st', '2nd', '3rd'][a.place - 1]} — ` : ''}
+                  {a.courses.length} course record{a.courses.length === 1 ? '' : 's'}
+                </span>
+              </div>
+            ))}
+        </div>
+      )}
+
       {!email && !showAccount && (
         <SyncCta copy="Sync account to save player stats" onTap={() => setShowAccount(true)} trigger="locker" />
       )}
@@ -333,6 +367,14 @@ export function RoundsScreen(props: {
             >
               Records · {records.length + prs.length}
             </button>
+            <button
+              role="tab"
+              aria-selected={tab === 'seasons'}
+              className={`locker-tab${tab === 'seasons' ? ' on' : ''}`}
+              onClick={() => setTab('seasons')}
+            >
+              Seasons
+            </button>
           </div>
 
           {tab === 'recent' && (
@@ -343,6 +385,8 @@ export function RoundsScreen(props: {
               {recent.map((r) => row(toLogged(r)))}
             </section>
           )}
+
+          {tab === 'seasons' && <SeasonsTab awards={awards} />}
 
           {tab === 'records' && (
             <>
@@ -382,6 +426,75 @@ export function SyncCta(props: { copy: string; onTap: () => void; trigger: strin
       <b>{props.copy}</b>
       <em>Sync ›</em>
     </button>
+  )
+}
+
+/**
+ * The player's personal season history — the archival home once a season's
+ * live boards reset. The current season shows the race in progress; each
+ * past season shows their rounds and highlights the courses where they
+ * ENDED the season holding the record (from the immutable season rows).
+ */
+function SeasonsTab(props: { awards: SeasonAward[] }) {
+  const current = seasonForDate()
+  const log = loadRoundLog()
+  const currentRounds = roundsInSeason(current, log)
+  const past = pastSeasons(current).reverse()
+  const awardFor = (key: string) => props.awards.find((a) => a.seasonKey === key)
+  return (
+    <>
+      <section className="rounds-section">
+        <div className="kicker">
+          {current.name} · in progress — ends in {seasonCountdown(current)}
+        </div>
+        <p className="fine">
+          {currentRounds.length === 0
+            ? 'No rounds this season yet — the boards are wide open.'
+            : `${currentRounds.length} round${currentRounds.length === 1 ? '' : 's'} this season · best ${toParLabel(
+                Math.min(...currentRounds.map((r) => r.toPar)),
+              )}. Records held now only count if you hold them at the horn.`}
+        </p>
+      </section>
+      {past.length === 0 ? (
+        <p className="fine">
+          {current.label} is the first season in the books-to-be. Past seasons will archive here.
+        </p>
+      ) : (
+        past.map((season) => {
+          const mine = roundsInSeason(season, log)
+          const award = awardFor(season.key)
+          return (
+            <section key={season.key} className="rounds-section">
+              <div className="kicker">
+                {season.label}
+                {award?.place ? ` · ${['🥇', '🥈', '🥉'][award.place - 1]} podium` : ''}
+              </div>
+              {award && (
+                <div className="season-final-holdings">
+                  {award.courses.map((c) => (
+                    <div key={c.courseSlug} className="round-row season-held">
+                      <div className="round-row-text">
+                        <b>{courseBySlug(c.courseSlug)?.name ?? c.courseSlug}</b>
+                        <span>Ended the season as record holder</span>
+                      </div>
+                      <em className="round-badge cr">CR</em>
+                      <b className={`round-score${c.toPar < 0 ? ' good' : ''}`}>{toParLabel(c.toPar)}</b>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <p className="fine">
+                {mine.length === 0
+                  ? 'No rounds played that season.'
+                  : `${mine.length} round${mine.length === 1 ? '' : 's'} · best ${toParLabel(
+                      Math.min(...mine.map((r) => r.toPar)),
+                    )}`}
+              </p>
+            </section>
+          )
+        })
+      )}
+    </>
   )
 }
 

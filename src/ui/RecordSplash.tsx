@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react'
 import { SITE_URL, toParLabel } from '../engine/daily'
+import type { Season } from '../engine/season'
 import type { CharacterId } from '../engine/types'
 import { track } from '../lib/analytics'
 import { momentCardBlob, shareMomentCard } from './momentCard'
@@ -20,6 +21,9 @@ export function RecordSplash(props: {
   character?: CharacterId
   /** the name we took it back from */
   takenFrom?: string
+  /** set → this is a SEASON record celebration (the all-time splash outranks
+   * this and shows instead when both fall in one round) */
+  season?: Season
   onClose: () => void
 }) {
   const [busy, setBusy] = useState(false)
@@ -45,14 +49,20 @@ export function RecordSplash(props: {
         dateKey: props.dateKey,
         toPar: props.toPar,
         character: props.character,
-        copy: props.takenFrom
-          ? { title: 'RECORD RECLAIMED', sub: 'The course record is back where it belongs.' }
-          : { title: 'COURSE RECORD', sub: 'The whole clubhouse is chasing you now.' },
-        meta: `${toParLabel(props.toPar)} · course record · ${shortDate(props.dateKey)}`,
+        copy: props.season
+          ? { title: `${props.season.name.replace(' Season', '').toUpperCase()} RECORD`, sub: 'Best round of the season on this course.' }
+          : props.takenFrom
+            ? { title: 'RECORD RECLAIMED', sub: 'The course record is back where it belongs.' }
+            : { title: 'COURSE RECORD', sub: 'The whole clubhouse is chasing you now.' },
+        meta: props.season
+          ? `${toParLabel(props.toPar)} · ${props.season.label} record · ${shortDate(props.dateKey)}`
+          : `${toParLabel(props.toPar)} · course record · ${shortDate(props.dateKey)}`,
       })
       const outcome = await shareMomentCard(blob, {
         filename: 'dogleg-course-record.png',
-        text: `${props.takenFrom ? 'Reclaimed' : 'Set'} the course record on ${props.courseName} (${toParLabel(props.toPar)}) — DogLeg`,
+        text: props.season
+          ? `${props.season.name} record on ${props.courseName} (${toParLabel(props.toPar)}) — DogLeg`
+          : `${props.takenFrom ? 'Reclaimed' : 'Set'} the course record on ${props.courseName} (${toParLabel(props.toPar)}) — DogLeg`,
         url: `https://${SITE_URL}`,
       })
       if (outcome === 'cancelled') return
@@ -73,11 +83,15 @@ export function RecordSplash(props: {
       ))}
       <div className="record-splash-card" onClick={(e) => e.stopPropagation()}>
         <div className="moment-kicker">⛳ DogLeg · {props.courseName}</div>
-        <h2 className="record-splash-title">{props.takenFrom ? 'Record reclaimed' : 'Course record'}</h2>
+        <h2 className="record-splash-title">
+          {props.season ? `${props.season.name} record` : props.takenFrom ? 'Record reclaimed' : 'Course record'}
+        </h2>
         <p className="record-splash-sub">
-          {props.takenFrom
-            ? `${toParLabel(props.toPar)} takes back the course record from ${props.takenFrom}. Order restored.`
-            : `${toParLabel(props.toPar)} — your name's on the wall. Now everyone's chasing you.`}
+          {props.season
+            ? `${toParLabel(props.toPar)} — best round of the ${props.season.name.toLowerCase()} on this course. Hold it to the horn.`
+            : props.takenFrom
+              ? `${toParLabel(props.toPar)} takes back the course record from ${props.takenFrom}. Order restored.`
+              : `${toParLabel(props.toPar)} — your name's on the wall. Now everyone's chasing you.`}
         </p>
         <button className="cta moment-share" onClick={share} disabled={busy}>
           {busy ? 'Making your card…' : '📸 Share'}

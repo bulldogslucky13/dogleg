@@ -7,7 +7,8 @@ import { decisionsFromScores, encodeReplay } from '../engine/replay'
 import type { CharacterId, HoleResult } from '../engine/types'
 import { track } from '../lib/analytics'
 import { backendEnabled } from '../lib/backend'
-import { fetchCourseRecords, loadPlayer, type CourseRecord } from '../lib/leaderboard'
+import { fetchCourseRecords, fetchSeasonRecords, loadPlayer, type CourseRecord } from '../lib/leaderboard'
+import { seasonCountdown, seasonForDate } from '../engine/season'
 import { dismissSteals, pendingSteals, syncLedger, type StolenRecord } from '../lib/records'
 import { loadGhost, type Ghost } from '../state/ghost'
 import { currentHandicap, formatHandicap } from '../state/stats'
@@ -37,14 +38,32 @@ export function HomeScreen(props: {
   const [showCourses, setShowCourses] = useState(false)
   const [courseTab, setCourseTab] = useState<'courses' | 'par3'>('courses')
   const [courseRecs, setCourseRecs] = useState<Map<string, CourseRecord> | null>(null)
+  const [seasonRecs, setSeasonRecs] = useState<Map<string, CourseRecord> | null>(null)
+  /** which season the loaded seasonRecs belong to — a rollover while the
+   * panel sits open must refetch for the new key, not show last season's
+   * holders under the new season's name */
+  const [seasonRecsKey, setSeasonRecsKey] = useState<string | null>(null)
   const [steals, setSteals] = useState(() => pendingSteals())
+  const season = seasonForDate()
 
-  // course records load once when the browser opens — free-play bragging rights
+  // the all-time board loads once when the browser opens — the wall of legends
   useEffect(() => {
     if (showCourses && backendEnabled && courseRecs === null) {
       void fetchCourseRecords().then((r) => setCourseRecs(r ?? new Map()))
     }
   }, [showCourses, courseRecs])
+
+  // the season board is the live race: fetched per season KEY, so any render
+  // after a quarterly rollover swaps in the fresh board
+  useEffect(() => {
+    if (showCourses && backendEnabled && seasonRecsKey !== season.key) {
+      setSeasonRecsKey(season.key)
+      setSeasonRecs(null)
+      // a FAILED season fetch stays null (no lines) — an empty season board is
+      // "open, be the first"; an unreachable one must not pretend to know
+      void fetchSeasonRecords(season.key).then((r) => setSeasonRecs(r))
+    }
+  }, [showCourses, seasonRecsKey, season.key])
 
   // the record-stolen check: compare the records this device holds against
   // the server's holders. Purely a read — the "notification" is derived.
@@ -183,21 +202,67 @@ export function HomeScreen(props: {
             </button>
           </div>
           {courseTab === 'par3' && <Par3Intro />}
-          {(courseTab === 'par3' ? PAR3_COURSES : COURSES).map((c) => (
-            <button key={c.slug} className="course-row" onClick={() => props.onPractice(c.slug)}>
-              <b>{c.name}</b>
-              <span>
-                {c.location} · {c.holes.length} holes · Play Rating {playRatingFor(c.slug)}/10
-              </span>
-              {courseRecs?.get(c.slug) && (
-                <em className="course-cr">
-                  CR {toParLabel(courseRecs.get(c.slug)!.to_par)} ·{' '}
-                  {characterById(courseRecs.get(c.slug)!.character ?? undefined)?.emoji ?? ''}{' '}
-                  {courseRecs.get(c.slug)!.player_name}
-                </em>
-              )}
-            </button>
-          ))}
+          {courseTab === 'courses' && (
+            <p className="season-countdown">
+              ⏳ {season.name} ends in {seasonCountdown(season)} — season records are up for grabs
+            </p>
+          )}
+          {courseTab === 'courses' &&
+            COURSES.map((c) => {
+              const sr = seasonRecs?.get(c.slug)
+              const at = courseRecs?.get(c.slug)
+              return (
+                <button key={c.slug} className="course-row" onClick={() => props.onPractice(c.slug)}>
+                  <b>{c.name}</b>
+                  <span>
+                    {c.location} · Play Rating {playRatingFor(c.slug)}/10
+                  </span>
+                  {seasonRecs &&
+                    (sr ? (
+                      <em className="course-cr">
+                        Season {toParLabel(sr.to_par)} · {characterById(sr.character ?? undefined)?.emoji ?? ''}{' '}
+                        {sr.player_name}
+                      </em>
+                    ) : (
+                      <em className="course-cr open">Season record open — be the first</em>
+                    ))}
+                  {at && (
+                    <em className="course-cr alltime">
+                      All-time {toParLabel(at.to_par)} · {characterById(at.character ?? undefined)?.emoji ?? ''}{' '}
+                      {at.player_name}
+                    </em>
+                  )}
+                </button>
+              )
+            })}
+          {courseTab === 'par3' &&
+            PAR3_COURSES.map((c) => {
+              const sr = seasonRecs?.get(c.slug)
+              const at = courseRecs?.get(c.slug)
+              return (
+                <button key={c.slug} className="course-row" onClick={() => props.onPractice(c.slug)}>
+                  <b>{c.name}</b>
+                  <span>
+                    {c.location} · {c.holes.length} holes · Play Rating {playRatingFor(c.slug)}/10
+                  </span>
+                  {seasonRecs &&
+                    (sr ? (
+                      <em className="course-cr">
+                        Season {toParLabel(sr.to_par)} · {characterById(sr.character ?? undefined)?.emoji ?? ''}{' '}
+                        {sr.player_name}
+                      </em>
+                    ) : (
+                      <em className="course-cr open">Season record open — be the first</em>
+                    ))}
+                  {at && (
+                    <em className="course-cr alltime">
+                      All-time {toParLabel(at.to_par)} · {characterById(at.character ?? undefined)?.emoji ?? ''}{' '}
+                      {at.player_name}
+                    </em>
+                  )}
+                </button>
+              )
+            })}
           <p className="fine">Practice rounds don't touch your streak.</p>
         </div>
       )}

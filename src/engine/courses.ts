@@ -1,11 +1,11 @@
-import type { CourseSpec, HoleSpec, Dogleg, HazardStyle } from './types'
+import type { CourseSpec, HoleSpec, Dogleg, HazardStyle, Landmark } from './types'
 import { OSM_GEOMETRY } from './geometry'
 import { PLAY_RATINGS } from './playRatings'
 
-type Row = [3 | 4 | 5, number, number, Dogleg, HazardStyle, string?, boolean?]
+type Row = [3 | 4 | 5, number, number, Dogleg, HazardStyle, string?, boolean?, Landmark?]
 
 function holes(rows: Row[]): HoleSpec[] {
-  return rows.map(([par, yards, strokeIndex, dogleg, hazard, signature, island], i) => ({
+  return rows.map(([par, yards, strokeIndex, dogleg, hazard, signature, island, landmark], i) => ({
     number: i + 1,
     par,
     yards,
@@ -14,6 +14,7 @@ function holes(rows: Row[]): HoleSpec[] {
     hazard,
     signature,
     island,
+    landmark,
   }))
 }
 
@@ -163,7 +164,7 @@ export const COURSES: CourseSpec[] = [
       [5, 575, 10, 'R', 'water'],
       [4, 439, 2, 'L', 'sand'],
       [3, 185, 14, 'S', 'water'],
-      [4, 472, 18, 'L', 'ocean', 'Into the wind to the candy-striped lighthouse'],
+      [4, 472, 18, 'L', 'ocean', 'Into the wind to the candy-striped lighthouse', undefined, 'lighthouse'],
     ]),
   },
   {

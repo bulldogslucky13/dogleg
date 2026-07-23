@@ -218,6 +218,51 @@ function Tree({ x, y, s, tone = 0 }: { x: number; y: number; s: number; tone?: n
 /** clamp a yard-based size into a readable on-screen range */
 const clampPx = (px: number, min: number, max: number) => Math.max(min, Math.min(max, px))
 
+/**
+ * Harbour Town's candy-striped lighthouse, drawn behind the green as flavor.
+ * `s` is the tower height in px; everything scales off it. Purely decorative —
+ * gated on the hole's `landmark` field, never in play.
+ */
+function Lighthouse({ x, y, s }: { x: number; y: number; s: number }) {
+  const wTop = s * 0.26
+  const wBot = s * 0.42
+  const bands = 6
+  const bandH = s / bands
+  const stripes = []
+  for (let i = 0; i < bands; i++) {
+    // trapezoid slice for band i (0 = top of tower)
+    const t0 = i / bands
+    const t1 = (i + 1) / bands
+    const w0 = wTop + (wBot - wTop) * t0
+    const w1 = wTop + (wBot - wTop) * t1
+    const y0 = y + bandH * i
+    const y1 = y + bandH * (i + 1)
+    stripes.push(
+      <path
+        key={i}
+        d={`M${x - w0 / 2},${y0} L${x + w0 / 2},${y0} L${x + w1 / 2},${y1} L${x - w1 / 2},${y1} Z`}
+        fill={i % 2 === 0 ? '#c9463b' : '#f4efe3'}
+      />,
+    )
+  }
+  const galleryW = wTop * 1.5
+  return (
+    <g aria-hidden opacity={0.96}>
+      <ellipse cx={x + s * 0.05} cy={y + s + bandH * 0.25} rx={wBot * 0.75} ry={s * 0.06} fill="#101f15" opacity={0.3} />
+      {/* tower */}
+      <g stroke="#8a3730" strokeWidth={0.6}>{stripes}</g>
+      {/* gallery deck */}
+      <rect x={x - galleryW / 2} y={y - s * 0.06} width={galleryW} height={s * 0.07} rx={s * 0.015} fill="#3a2c26" />
+      {/* lantern room */}
+      <rect x={x - wTop * 0.42} y={y - s * 0.2} width={wTop * 0.84} height={s * 0.15} rx={s * 0.02} fill="#8fb8cf" stroke="#3a2c26" strokeWidth={0.8} />
+      {/* roof + finial */}
+      <path d={`M${x - wTop * 0.5},${y - s * 0.2} L${x + wTop * 0.5},${y - s * 0.2} L${x},${y - s * 0.34} Z`} fill="#2b2320" />
+      <line x1={x} y1={y - s * 0.34} x2={x} y2={y - s * 0.4} stroke="#2b2320" strokeWidth={1} />
+      <circle cx={x} cy={y - s * 0.41} r={s * 0.02} fill="#2b2320" />
+    </g>
+  )
+}
+
 /** flank water at least this long is a lake shoreline, not a pond ellipse */
 const LAKE_SPAN_YD = 60
 
@@ -630,6 +675,15 @@ export function HoleMap(props: {
       })}
 
       {zoneEls}
+
+      {/* landmark beside the green (Harbour Town lighthouse) — on the land side
+          (right; water is left), base near the green's height so it reads as
+          standing on the point behind the putting surface */}
+      {layout.spec.landmark === 'lighthouse' &&
+        (() => {
+          const s = clampPx(34 * uPerYd, 40, 66)
+          return <Lighthouse x={greenPt.x + greenRx + s * 0.7} y={greenPt.y - s * 0.72} s={s} />
+        })()}
 
       {/* green + fringe, at true scale */}
       <ellipse cx={greenPt.x} cy={greenPt.y} rx={greenRx + clampPx(3.5 * uPerYd, 4, 12)} ry={greenRy + clampPx(3 * uPerYd, 4, 10)} fill="#8fbc74" opacity={0.55} />

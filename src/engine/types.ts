@@ -10,6 +10,25 @@ export type HazardStyle = 'none' | 'sand' | 'water' | 'ocean'
 
 export type Greens = 'Slow' | 'Medium' | 'Firm' | 'Fast'
 
+/**
+ * How much the stuff off the fairway costs you — a course-level dial, the
+ * rough's answer to `greens`. Gorse at Portrush, hay at a US Open setup: the
+ * kind of course whose defense is what happens when you miss, not what you
+ * have to carry.
+ *
+ * This is deliberately NOT a hazard zone. Gorse and penal rough surround a
+ * links or Open course everywhere rather than sitting in mappable patches,
+ * and OSM's scrub coverage is far too patchy to place them honestly (Dornoch
+ * has 6 scrub polygons, Troon 7, Portrush none at all). A dial needs no
+ * geometry, so it works on every course, imported or procedural.
+ *
+ * `normal` is the historical behaviour exactly — untagged courses are
+ * unchanged, so adding this field alone is not replay-affecting. TAGGING a
+ * course is: it moves that course's approach odds, so it needs an
+ * ENGINE_VERSION bump and a `pnpm gen:ratings` in the same PR.
+ */
+export type Rough = 'normal' | 'penal' | 'severe'
+
 /** A recognizable structure drawn behind the green as pure map flavor —
  * cosmetic only, never touches odds/geometry/seed replay. */
 export type Landmark = 'lighthouse' | 'bridge'
@@ -48,6 +67,11 @@ export interface CourseSpec {
   greens: Greens
   /** typical wind, mph; daily conditions jitter around it */
   wind: number
+  /** how punishing the miss is off the fairway (default 'normal'). */
+  rough?: Rough
+  /** what this course calls its penal rough, for chips and recap copy
+   * ('gorse', 'hay', 'fescue'). Cosmetic — never read by the odds. */
+  roughLabel?: string
   blurb: string
   holes: HoleSpec[]
   /** true = a par-3 short course: unlimited play only, never in the daily
@@ -115,6 +139,11 @@ export interface HoleLayout {
   pin?: PinPosition
   /** this hole's wind delta (mph) on a par-3 short course, from Conditions.gusts */
   gust?: number
+  /** the course's rough severity, copied down by `buildLayout` so the odds
+   * never need a course lookup. Absent = 'normal'. */
+  rough?: Rough
+  /** the course's name for its rough ('gorse'), for chips/recap copy only. */
+  roughLabel?: string
 }
 
 // ---------- Ball / stage state ----------

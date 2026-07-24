@@ -71,6 +71,24 @@ export const OSM_BEND: Record<string, number[]> = {
   'carnoustie:14': [0, -7, -14, -22, -29, -34, -38, -38, -36, -31, -20, -10, 0],
   'carnoustie:15': [0, -6, -13, -19, -26, -30, -33, -33, -30, -25, -17, -8, 0],
   'carnoustie:18': [0, -2, -3, -5, -6, -7, -8, -8, -7, -6, -4, -2, 0],
+
+  // Royal Portrush — Dunluce — real centreline curvature. Lateral yards are
+  // unaffected by the tee-end shift applied to the zones (see OSM_GEOMETRY),
+  // so these are the raw import values. Signs correct the tuple again: 5 and
+  // 10 bend LEFT hard (tuple said R and S), 11 and 18 bend LEFT (tuple said L
+  // and S), 8 and 9 bend RIGHT (tuple said S and R), 15 bends RIGHT (tuple
+  // said L). 10's 75-yd bend is the Himalayas dogleg.
+  'royal-portrush-dunluce:2': [0, -10, -20, -30, -38, -43, -45, -43, -38, -29, -20, -10, 0],
+  'royal-portrush-dunluce:4': [0, -6, -12, -18, -24, -28, -30, -30, -26, -21, -14, -7, 0],
+  'royal-portrush-dunluce:5': [0, 14, 29, 43, 55, 63, 66, 61, 53, 43, 29, 15, 0],
+  'royal-portrush-dunluce:6': [0, 1, 3, 4, 5, 7, 7, 8, 8, 7, 5, 2, 0],
+  'royal-portrush-dunluce:8': [0, -10, -20, -30, -39, -44, -46, -45, -40, -31, -20, -10, 0],
+  'royal-portrush-dunluce:9': [0, -8, -15, -23, -30, -34, -35, -33, -30, -23, -15, -8, 0],
+  'royal-portrush-dunluce:10': [0, 13, 26, 39, 52, 63, 71, 75, 72, 64, 48, 25, 0],
+  'royal-portrush-dunluce:11': [0, 8, 15, 23, 30, 35, 38, 38, 35, 28, 19, 9, 0],
+  'royal-portrush-dunluce:14': [0, -1, -3, -4, -6, -7, -8, -9, -9, -8, -6, -3, 0],
+  'royal-portrush-dunluce:15': [0, -9, -17, -26, -34, -42, -47, -49, -48, -42, -28, -14, 0],
+  'royal-portrush-dunluce:18': [0, 11, 21, 32, 43, 51, 57, 57, 53, 44, 30, 15, 0],
 }
 
 export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
@@ -1380,6 +1398,234 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
       { id: 'z4', kind: 'water', from: 403, to: 411, side: 'cross' },
       { id: 'z5', kind: 'bunker', from: 424, to: 428, side: 'left' },
       { id: 'z6', kind: 'bunker', from: 429, to: 444, side: 'right' },
+    ],
+  },
+
+  // ---------------------------------------------------------------------
+  // Royal Portrush — Dunluce Links. OSM for shape, the club's Open
+  // Championship card for distance (par 71, 7,344 yd).
+  //
+  // TEE-END SHIFT, not scale: every OSM centreline starts at a members' tee
+  // pad short of the Open tee, so the missing yardage is entirely at the tee
+  // end — zones are SHIFTED by (card - import), never stretched. Verified on
+  // 14, where the import ran 67 yd short: shifting predicts sand at 253 R /
+  // 333 L and the imagery shows ~246 / ~330; scaling predicted 217 / 310 and
+  // is plainly wrong. Greenside features stay greenside under a shift.
+  //
+  // Hand deviations from the raw import, each read off ProVisualizer's 2D
+  // planner (see scripts/README.md step 4). OSM has Portrush's fairway sand
+  // but drops most green complexes:
+  //   3   — greenside bunker front-left added; import returned zero zones.
+  //   13  — Feathered Bed's ring of six added (front-cross + both flanks);
+  //         import returned only phantom cross bunkers under the tee.
+  //   16  — Calamity Corner: the 2-yd greenside "bunker" was a green-edge
+  //         artifact (the green has no sand) and is dropped; the ravine down
+  //         the right — the hole's entire defense — is hand-laid as
+  //         deeprough. Locke's Hollow LEFT is a bail-out, so it stays clean.
+  //   17  — two greenside bunkers added; import had none.
+  //   4/10/13/17 — sand beside the tee (inside 75 yd) dropped; nothing is in
+  //         play there and two of them imported as `cross` bands under the
+  //         tee, the phantom-cross artifact.
+  //
+  // NOT modelled as zones: gorse and dune rough. OSM has no scrub polygons
+  // here (checked `natural=scrub|heath`, `golf=rough`: one grassland way and
+  // nothing else), and inventing 18 holes of gorse extents would be authoring
+  // the course rather than importing it (step 0). It is carried instead as
+  // `rough: 'penal'` on the course — a severity dial that needs no geometry.
+  // See the `Rough` note in types.ts. The Atlantic is likewise
+  // absent on purpose — it sits ~52 yd THROUGH the 5th green and beside the
+  // 6th tee, never lateral, and the 1-D model has no honest way to say
+  // "long is dead". Both are documented gaps, not oversights.
+  // ---------------------------------------------------------------------
+  'royal-portrush-dunluce:1': {
+    length: 421,
+    fairwayFrom: 154,
+    fairwayTo: 409,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 274, to: 280, side: 'right' },
+      { id: 'z2', kind: 'bunker', from: 300, to: 308, side: 'left' },
+      { id: 'z3', kind: 'bunker', from: 386, to: 392, side: 'left' },
+      { id: 'z4', kind: 'bunker', from: 412, to: 416, side: 'left' },
+    ],
+  },
+  'royal-portrush-dunluce:2': {
+    length: 574,
+    fairwayFrom: 209,
+    fairwayTo: 561,
+    greenDepth: 22,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 250, to: 258, side: 'right' },
+      { id: 'z2', kind: 'bunker', from: 268, to: 288, side: 'right' },
+      { id: 'z3', kind: 'bunker', from: 314, to: 322, side: 'left' },
+      { id: 'z4', kind: 'bunker', from: 458, to: 466, side: 'left' },
+      { id: 'z5', kind: 'bunker', from: 476, to: 484, side: 'right' },
+      { id: 'z6', kind: 'bunker', from: 546, to: 552, side: 'right' },
+    ],
+  },
+  'royal-portrush-dunluce:3': {
+    length: 177,
+    fairwayFrom: 65,
+    fairwayTo: 165,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 144, to: 154, side: 'left' },
+    ],
+  },
+  'royal-portrush-dunluce:4': {
+    length: 482,
+    fairwayFrom: 171,
+    fairwayTo: 470,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 250, to: 256, side: 'left' },
+      { id: 'z2', kind: 'bunker', from: 278, to: 284, side: 'left' },
+      { id: 'z3', kind: 'bunker', from: 354, to: 358, side: 'right' },
+      { id: 'z4', kind: 'bunker', from: 360, to: 364, side: 'left' },
+    ],
+  },
+  'royal-portrush-dunluce:5': {
+    length: 374,
+    fairwayFrom: 132,
+    fairwayTo: 357,
+    greenDepth: 30,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 324, to: 328, side: 'right' },
+    ],
+  },
+  'royal-portrush-dunluce:6': {
+    length: 194,
+    fairwayFrom: 76,
+    fairwayTo: 182,
+    greenDepth: 20,
+    zones: [],
+  },
+  'royal-portrush-dunluce:7': {
+    length: 592,
+    fairwayFrom: 212,
+    fairwayTo: 580,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 265, to: 281, side: 'right' },
+      { id: 'z2', kind: 'bunker', from: 315, to: 321, side: 'left' },
+      { id: 'z3', kind: 'bunker', from: 517, to: 523, side: 'left' },
+      { id: 'z4', kind: 'bunker', from: 555, to: 559, side: 'right' },
+      { id: 'z5', kind: 'bunker', from: 579, to: 583, side: 'right' },
+    ],
+  },
+  'royal-portrush-dunluce:8': {
+    length: 434,
+    fairwayFrom: 156,
+    fairwayTo: 422,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 269, to: 277, side: 'right' },
+      { id: 'z2', kind: 'bunker', from: 305, to: 311, side: 'right' },
+      { id: 'z3', kind: 'bunker', from: 419, to: 425, side: 'right' },
+    ],
+  },
+  'royal-portrush-dunluce:9': {
+    length: 432,
+    fairwayFrom: 154,
+    fairwayTo: 418,
+    greenDepth: 24,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 246, to: 252, side: 'right' },
+      { id: 'z2', kind: 'bunker', from: 300, to: 306, side: 'right' },
+      { id: 'z3', kind: 'bunker', from: 376, to: 380, side: 'right' },
+      { id: 'z4', kind: 'bunker', from: 382, to: 386, side: 'left' },
+    ],
+  },
+  'royal-portrush-dunluce:10': {
+    length: 447,
+    fairwayFrom: 157,
+    fairwayTo: 434,
+    greenDepth: 22,
+    zones: [],
+  },
+  'royal-portrush-dunluce:11': {
+    length: 474,
+    fairwayFrom: 178,
+    fairwayTo: 462,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 463, to: 471, side: 'left' },
+    ],
+  },
+  'royal-portrush-dunluce:12': {
+    length: 532,
+    fairwayFrom: 188,
+    fairwayTo: 520,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 244, to: 254, side: 'right' },
+      { id: 'z2', kind: 'bunker', from: 288, to: 294, side: 'right' },
+      { id: 'z3', kind: 'bunker', from: 318, to: 324, side: 'right' },
+      { id: 'z4', kind: 'bunker', from: 440, to: 448, side: 'left' },
+    ],
+  },
+  'royal-portrush-dunluce:13': {
+    length: 194,
+    fairwayFrom: 72,
+    fairwayTo: 182,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 163, to: 172, side: 'cross' },
+      { id: 'z2', kind: 'bunker', from: 176, to: 192, side: 'left' },
+      { id: 'z3', kind: 'bunker', from: 178, to: 192, side: 'right' },
+    ],
+  },
+  'royal-portrush-dunluce:14': {
+    length: 473,
+    fairwayFrom: 209,
+    fairwayTo: 461,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 253, to: 259, side: 'right' },
+      { id: 'z2', kind: 'bunker', from: 313, to: 321, side: 'right' },
+      { id: 'z3', kind: 'bunker', from: 333, to: 341, side: 'left' },
+    ],
+  },
+  'royal-portrush-dunluce:15': {
+    length: 426,
+    fairwayFrom: 157,
+    fairwayTo: 414,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 258, to: 264, side: 'right' },
+      { id: 'z2', kind: 'bunker', from: 296, to: 300, side: 'right' },
+      { id: 'z3', kind: 'bunker', from: 398, to: 402, side: 'left' },
+    ],
+  },
+  'royal-portrush-dunluce:16': {
+    length: 236,
+    fairwayFrom: 93,
+    fairwayTo: 224,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'deeprough', from: 70, to: 215, side: 'right' },
+    ],
+  },
+  'royal-portrush-dunluce:17': {
+    length: 408,
+    fairwayFrom: 146,
+    fairwayTo: 396,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 388, to: 400, side: 'left' },
+      { id: 'z2', kind: 'bunker', from: 396, to: 406, side: 'right' },
+    ],
+  },
+  'royal-portrush-dunluce:18': {
+    length: 474,
+    fairwayFrom: 178,
+    fairwayTo: 462,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 297, to: 307, side: 'right' },
+      { id: 'z2', kind: 'bunker', from: 399, to: 403, side: 'left' },
+      { id: 'z3', kind: 'bunker', from: 405, to: 409, side: 'right' },
+      { id: 'z4', kind: 'bunker', from: 445, to: 453, side: 'right' },
     ],
   },
 }

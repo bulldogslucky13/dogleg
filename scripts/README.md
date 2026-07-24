@@ -79,6 +79,36 @@ find the polygon name for a new course, query Overpass for
 
 ### The freeze process (repeatable)
 
+0. **Preflight: confirm the course is real, identifiable, and mapped — before
+   touching anything else.** The hard rule for this whole process: **if you
+   cannot reliably establish the course's geography, do not press forward with
+   inaccurate or missing geo data. Propose another solution, or stop.**
+   Shipping guessed, partial, or wrong-course geometry is worse than shipping
+   the procedural layout — procedural geometry is honest about being generic,
+   while a bad import claims to be the real place and quietly poisons the odds,
+   the map, the Play Rating, and every replay of that seed. Three checks:
+   - **Does the course exist?** Roughly a sixth of the library is *original
+     fiction* — `copper-canyon`, `gullwing-point`, `birchwood-national`,
+     `millbrook-valley`, `cypress-hollow`, `old-wick-links` (see
+     `docs/DESIGN.md`). These have no real-world counterpart and are
+     **permanently import-ineligible**. Beware near-name collisions: real
+     "Copper Canyon" courses exist in Buckeye / Sun City Festival, AZ, but they
+     are not DogLeg's Scottsdale course and their geography must never be
+     imported under its slug.
+   - **Is it the right course?** Match name *and* location, then pin the exact
+     OSM `golf_course` polygon (`osmName`) before importing. Multi-course sites
+     and shared hole `ref`s are the standard trap — see `osmHolePrefix`.
+   - **Is it actually mapped?** No `golf=hole` centerlines, missing greens or
+     hazard polygons, or a card you can't source means the data isn't there.
+     Don't fill the gap with invention.
+
+   When a check fails, say so plainly and pick a real option instead: import a
+   different course (the next real one in the rotation is usually the right
+   call — the rotation order in `courses.ts` is fixed history and must **not**
+   be reshuffled to dodge a fictional course), leave the course procedural, or
+   stop and hand it back. Hand-authoring a *few* zones against verified imagery
+   is part of the process (step 4); hand-authoring a *whole course* from
+   imagination is not an import.
 1. **Pull the club's published scorecard first** — it is the ground truth for
    par, stroke index, and length; OSM is the ground truth for *geography*
    only. BlueGolf's detailed scorecard
@@ -93,9 +123,19 @@ find the polygon name for a new course, query Overpass for
      card. (The Harbour Town import shipped 18 as SI 18; the card says HCP 2.)
    - **Yardage** — note the tee set you're matching. Imported lengths within
      ~10 yd of the card are tee-box variance; bigger gaps usually mean OSM's
-     centerline starts at the wrong tee pad. For those, scale the hole's
-     zones so `length` equals the card (the Palm Beach entries in
-     `geometry.ts` are the precedent: card for distance, OSM for shape).
+     centerline starts at the wrong tee pad. Either way the rule is card for
+     distance, OSM for shape.
+     **SHIFT the zones, don't scale them.** A centreline that starts at the
+     members' pad is missing its yardage entirely at the *tee end*, so every
+     zone's distance-from-tee is short by one constant — add `(card - import)`
+     to every `from`/`to`/`fairwayFrom`/`fairwayTo` and leave `greenDepth`
+     alone. Scaling stretches the gap across the whole hole and walks the
+     fairway bunkers backwards. Proved on `royal-portrush-dunluce:14`, which
+     imported 67 yd short: shifting puts sand at 253 R / 333 L and the imagery
+     shows ~246 / ~330, while scaling predicted 217 / 310. A shift also keeps
+     greenside features greenside, which is what makes it safe to apply
+     blindly to all 18. (`bend` profiles are lateral yards and need no
+     adjustment either way.)
 2. `pnpm import:osm <course> <hole> --compare` — sanity-check vs the shipped
    layout and the card from step 1.
 3. Paste the `--json` zones into `src/engine/geometry.ts` under `${slug}:${hole}`.

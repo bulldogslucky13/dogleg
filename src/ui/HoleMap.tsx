@@ -81,6 +81,8 @@ interface ZonePlace {
   anchor: Pt
   /** ellipses to draw (bunkers, ponds, clusters) — empty for band/flank/trees */
   ellipses: { cx: number; cy: number; rx: number; ry: number }[]
+  /** long side bunkers draw as a ribbon along the hole instead of ellipses */
+  ribbon?: { from: number; to: number; offYd: number; halfYd: number }
   kind: HazardZone['kind']
 }
 
@@ -234,6 +236,46 @@ function ribbonPath(geo: Geo, from: number, to: number, widthYd: (t: number) => 
     rightPts.unshift(`${(p.x - n.x * w).toFixed(1)},${(p.y - n.y * w).toFixed(1)}`)
   }
   return `M${leftPts.join(' L')} L${rightPts.join(' L')} Z`
+}
+
+/**
+ * A sand ribbon running ALONGSIDE the hole: centred `offYd` off the centreline
+ * (signed, golfer-left positive) and `halfYd` wide, tapered at both ends so it
+ * reads as a shaped bunker rather than a cut bar.
+ *
+ * Long bunkers used to draw as a single ~10-yd pot no matter their length,
+ * which is how Oakmont's 104-yd Church Pews rendered as a blob you could miss
+ * entirely — on a hole whose own signature line names them.
+ */
+function sideRibbonPath(geo: Geo, from: number, to: number, offYd: number, halfYd: number): string {
+  const STEPS = 24
+  const near: string[] = []
+  const far: string[] = []
+  for (let i = 0; i <= STEPS; i++) {
+    const t = i / STEPS
+    const yards = from + (to - from) * t
+    const p = geo.at(yards)
+    const n = geo.normalAt(yards)
+    const w = halfYd * Math.sin(t * Math.PI) ** 0.3 * geo.uPerYd
+    const c = offYd * geo.uPerYd
+    near.push(`${(p.x + n.x * (c - w)).toFixed(1)},${(p.y + n.y * (c - w)).toFixed(1)}`)
+    far.unshift(`${(p.x + n.x * (c + w)).toFixed(1)},${(p.y + n.y * (c + w)).toFixed(1)}`)
+  }
+  return `M${near.join(' L')} L${far.join(' L')} Z`
+}
+
+/** Side bunkers at least this long draw as a ribbon instead of a pot. */
+const LONG_BUNKER_YD = 32
+/** Deep rough at least this long draws as a continuous band down the side. */
+const LONG_ROUGH_YD = 45
+
+/** Draw order by hazard kind — see the note where zoneEls is built. */
+const PAINT_RANK: Record<HazardZone['kind'], number> = {
+  deeprough: 0,
+  trees: 0,
+  water: 1,
+  ocean: 1,
+  bunker: 2,
 }
 
 // Hazard kinds whose importer-split zones we stitch back into one drawn shape.
@@ -484,9 +526,18 @@ function placeZones(layout: HoleLayout, geo: Geo): Map<string, ZonePlace> {
 
     if (z.kind === 'trees' || z.kind === 'deeprough') {
       const off = (corridorYd + 11) * u
+      // A long band of deep rough — gorse, dune scrub, Calamity Corner's
+      // ravine — is a wall you play away from, not two smudges beside the
+      // fairway. Draw it at its true length, the same fix long bunkers got.
+      // Trees keep their scattered sprites: a treeline already reads as one.
+      const ribbon =
+        z.kind === 'deeprough' && (z.side === 'left' || z.side === 'right') && span >= LONG_ROUGH_YD
+          ? { from: z.from, to: z.to, offYd: sideSign * (corridorYd + 13), halfYd: 12 }
+          : undefined
       out.set(z.id, {
         anchor: { x: p.x + n.x * sideSign * off, y: p.y + n.y * sideSign * off },
         ellipses: [],
+        ribbon,
         kind: z.kind,
       })
       continue
@@ -511,6 +562,23 @@ function placeZones(layout: HoleLayout, geo: Geo): Map<string, ZonePlace> {
         })
       }
       out.set(z.id, { anchor: { x: ellipses[0].cx, y: ellipses[0].cy }, ellipses, kind: z.kind })
+      continue
+    }
+
+    // Long side bunkers (waste bunkers, the Church Pews) run ALONGSIDE the
+    // hole, so draw them at their true length rather than collapsing a 100-yd
+    // hazard into one pot the eye reads as incidental.
+    if (z.kind === 'bunker' && (z.side === 'left' || z.side === 'right') && span >= LONG_BUNKER_YD) {
+      const halfYd = z.style === 'pews' ? 11 : 8
+      const offYd = sideSign * (corridorYd + halfYd + 2)
+      const a = geo.at(mid)
+      const nn = geo.normalAt(Math.min(mid, L - 1))
+      out.set(z.id, {
+        anchor: { x: a.x + nn.x * offYd * u, y: a.y + nn.y * offYd * u },
+        ellipses: [],
+        ribbon: { from: z.from, to: z.to, offYd, halfYd },
+        kind: z.kind,
+      })
       continue
     }
 
@@ -781,11 +849,87 @@ export function HoleMap(props: {
       return <g key={z.id}>{trees}</g>
     }
     if (z.kind === 'deeprough') {
+      // long band: a continuous run of broken, scrubby ground at true length
+      if (place.ribbon) {
+        const r = place.ribbon
+        const clumps = []
+        for (let y = r.from + 7, i = 0; y < r.to - 5; y += 19, i++) {
+          const t = (y - r.from) / (r.to - r.from)
+          const wYd = r.halfYd * Math.sin(t * Math.PI) ** 0.3
+          const pq = at(y)
+          const nq = normalAt(y)
+          // alternate the clumps across the band so the edge reads torn
+          const c = (r.offYd + (i % 2 ? wYd * 0.34 : -wYd * 0.34)) * uPerYd
+          clumps.push(
+            <ellipse
+              key={y}
+              cx={pq.x + nq.x * c}
+              cy={pq.y + nq.y * c}
+              rx={clampPx(wYd * 0.5 * uPerYd, 3.5, 17)}
+              ry={clampPx(wYd * 0.34 * uPerYd, 2.5, 12)}
+              fill="#2b3a1c"
+              opacity={0.9}
+            />,
+          )
+        }
+        return (
+          <g key={z.id}>
+            {/* Warmer and edged rather than just darker: on a course tagged
+                penal/severe the whole surround is already dark scrub, so a
+                dark band vanishes into it. Scorched olive + a hard rim reads
+                as broken ground on both light and dark surrounds. */}
+            <path
+              d={sideRibbonPath(geo, r.from, r.to, r.offYd, r.halfYd)}
+              fill="#4a5a30"
+              stroke="#16301d"
+              strokeWidth={1.6}
+              opacity={0.92}
+            />
+            {clumps}
+          </g>
+        )
+      }
       const pp = place.anchor
       return (
         <g key={z.id} opacity={0.5}>
           <ellipse cx={pp.x} cy={pp.y} rx={clampPx(14 * uPerYd, 12, 40)} ry={clampPx(9 * uPerYd, 8, 27)} fill="#28502f" />
           <ellipse cx={pp.x - 14} cy={pp.y + 10} rx={clampPx(8 * uPerYd, 8, 24)} ry={clampPx(5 * uPerYd, 5, 16)} fill="#2b5433" />
+        </g>
+      )
+    }
+    // long side bunkers: one sand ribbon at true length. The Church Pews get
+    // their ladder — sand crossed by grass rungs, which is what the real
+    // hazard is and why the hole's signature line calls it a ladder.
+    if (place.ribbon) {
+      const r = place.ribbon
+      const rungs = []
+      if (z.style === 'pews') {
+        const every = 8
+        for (let y = r.from + 5; y < r.to - 3; y += every) {
+          const t = (y - r.from) / (r.to - r.from)
+          const w = r.halfYd * Math.sin(t * Math.PI) ** 0.3 * uPerYd
+          const pp = at(y)
+          const nn = normalAt(y)
+          const c = r.offYd * uPerYd
+          rungs.push(
+            <line
+              key={y}
+              x1={pp.x + nn.x * (c - w)}
+              y1={pp.y + nn.y * (c - w)}
+              x2={pp.x + nn.x * (c + w)}
+              y2={pp.y + nn.y * (c + w)}
+              stroke="#4f7d45"
+              strokeWidth={clampPx(2.4 * uPerYd, 1.4, 6)}
+              strokeLinecap="round"
+            />,
+          )
+        }
+      }
+      return (
+        <g key={z.id}>
+          <path d={sideRibbonPath(geo, r.from, r.to, r.offYd + 0.6, r.halfYd)} fill="#a8916a" opacity={0.7} />
+          <path d={sideRibbonPath(geo, r.from, r.to, r.offYd, r.halfYd)} fill="#e2d2a8" stroke="#b49b6c" strokeWidth={1.3} />
+          {rungs}
         </g>
       )
     }
@@ -806,9 +950,16 @@ export function HoleMap(props: {
     )
   }
 
-  // All zones in their authored order, so a shoreline bunker still sits on top
-  // of a flank lake as intended.
-  const zoneEls = layout.zones.map(renderZone)
+  // Paint order: ground cover (deep rough, trees) first, then water, then sand
+  // on top. A trap is somewhere the ball can actually come to rest, and the
+  // ball marker anchors to its zone — so a bunker buried under the band of
+  // rough beside it would put your ball in a hazard the map isn't showing.
+  // Stable within a rank, so authored order still breaks ties and a shoreline
+  // bunker keeps sitting on top of a flank lake as intended.
+  const zoneEls = layout.zones
+    .map((z, i) => ({ z, i }))
+    .sort((a, b) => PAINT_RANK[a.z.kind] - PAINT_RANK[b.z.kind] || a.i - b.i)
+    .map(({ z }) => renderZone(z))
   // A `cross` bunker is sand you thread, not a wall: lay a slim strip of fairway
   // (LANE_HALF yд half-width) back down the middle of the corridor, over
   // everything, so crossing sand keeps a visible lane through it and a

@@ -106,7 +106,7 @@ export const PLAY_INDEX: Record<string, number> = {
   'millbrook-valley': 1.115,
   'lacc-north': 1.433,
   'cabot-links': 1.341,
-  'oakmont': 2.554,
+  'oakmont': 2.660,
   'camargo': 0.564,
   'doral-blue-monster': 2.184,
   'erin-hills': 1.147,

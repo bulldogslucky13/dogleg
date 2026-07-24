@@ -457,6 +457,24 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
     void target // (the exact diff depends on live dice — presence is the contract)
   })
 
+  it('the classic side map shows the rough grade too, not just the modern map', async () => {
+    const { SideMap } = await import('./ui/SideMap')
+    const { buildLayout } = await import('./engine/layout')
+    const ball = { pos: 150, lie: 'fairway' as const, side: 'center' as const }
+    // How to Play promises the map shows which grade you're in — that has to
+    // hold in BOTH display modes, or the lesson is false for classic players
+    const oakmont = COURSES.find((c) => c.slug === 'oakmont')!
+    const severe = render(<SideMap layout={buildLayout(oakmont.slug, oakmont.holes[0])} ball={ball} />)
+    const scrubbed = document.querySelector('path.side-rough-scrub')
+    expect(scrubbed).not.toBeNull()
+    severe.unmount()
+
+    // ...and an ordinary course stays clean, so the signal means something
+    const plain = COURSES.find((c) => c.slug === 'pebble-beach')!
+    render(<SideMap layout={buildLayout(plain.slug, plain.holes[0])} ball={ball} />)
+    expect(document.querySelector('path.side-rough-scrub')).toBeNull()
+  })
+
   it('the ghost ball renders faded on the map, and never when it overlaps the live ball', async () => {
     const { HoleMap } = await import('./ui/HoleMap')
     const { buildLayout } = await import('./engine/layout')

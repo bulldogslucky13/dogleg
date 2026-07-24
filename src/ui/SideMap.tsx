@@ -67,6 +67,15 @@ export function SideMap(props: { layout: HoleLayout; ball: BallState }) {
   const yardsLeft = Math.max(0, Math.round(L - ball.pos))
   const labelX = Math.max(X0 + 40, Math.min(X1 - 60, (ballX + greenX) / 2))
 
+  // 0 = ordinary rough, 1 = penal, 2 = severe (see CourseSpec.rough). The
+  // classic view has to carry this too: How to Play tells the player the map
+  // shows which grade they're on, and that promise can't hold in only one of
+  // two display modes. Darker, scrubbier ground as the grade climbs — the
+  // same signal HoleMap gives its surround, in this view's lighter palette.
+  const roughSeverity = layout.rough === 'severe' ? 2 : layout.rough === 'penal' ? 1 : 0
+  const ground = ['#4a7a44', '#3d6a3a', '#335a31'][roughSeverity]
+  const groundEdge = ['#3f6b3b', '#345c32', '#2b4d2a'][roughSeverity]
+
   const STEPS = 24
   const pts: string[] = []
   for (let i = 0; i <= STEPS; i++) {
@@ -86,10 +95,24 @@ export function SideMap(props: { layout: HoleLayout; ball: BallState }) {
       role="img"
       aria-label={`Hole ${layout.spec.number} side view, ${yardsLeft} yards to the pin`}
     >
+      {roughSeverity > 0 && (
+        <defs>
+          <pattern id="sideScrub" width="18" height="18" patternUnits="userSpaceOnUse" patternTransform="rotate(12)">
+            <circle cx="4" cy="5" r="2.2" fill="#25401f" opacity="0.8" />
+            <circle cx="12" cy="11" r="1.8" fill="#2b4a25" opacity="0.75" />
+            <circle cx="8" cy="15" r="1.2" fill="#33552c" opacity="0.65" />
+          </pattern>
+        </defs>
+      )}
+
       <rect width={W} height={H} fill="#d5e6cf" />
 
       {/* ground strip */}
-      <path d={strip} fill="#4a7a44" stroke="#3f6b3b" strokeWidth={1.5} strokeLinejoin="round" />
+      <path d={strip} fill={ground} stroke={groundEdge} strokeWidth={1.5} strokeLinejoin="round" />
+      {/* gorse/hay scrub, drawn on the SAME path so it can't spill off the ground */}
+      {roughSeverity > 0 && (
+        <path className="side-rough-scrub" d={strip} fill="url(#sideScrub)" opacity={roughSeverity > 1 ? 0.55 : 0.35} />
+      )}
 
       {/* green + flag, under the hazards so nothing can hide beneath the putting surface */}
       <ellipse cx={greenX} cy={gy + 4} rx={greenRx} ry={8.5} fill="#2f5b3c" />

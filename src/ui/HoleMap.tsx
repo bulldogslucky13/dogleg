@@ -266,6 +266,8 @@ function sideRibbonPath(geo: Geo, from: number, to: number, offYd: number, halfY
 
 /** Side bunkers at least this long draw as a ribbon instead of a pot. */
 const LONG_BUNKER_YD = 32
+/** Deep rough at least this long draws as a continuous band down the side. */
+const LONG_ROUGH_YD = 45
 
 // Hazard kinds whose importer-split zones we stitch back into one drawn shape.
 // Ocean (a seaward half-plane) and trees/deeprough (scattered sprites) are not
@@ -512,9 +514,18 @@ function placeZones(layout: HoleLayout, geo: Geo): Map<string, ZonePlace> {
 
     if (z.kind === 'trees' || z.kind === 'deeprough') {
       const off = (corridorYd + 11) * u
+      // A long band of deep rough — gorse, dune scrub, Calamity Corner's
+      // ravine — is a wall you play away from, not two smudges beside the
+      // fairway. Draw it at its true length, the same fix long bunkers got.
+      // Trees keep their scattered sprites: a treeline already reads as one.
+      const ribbon =
+        z.kind === 'deeprough' && (z.side === 'left' || z.side === 'right') && span >= LONG_ROUGH_YD
+          ? { from: z.from, to: z.to, offYd: sideSign * (corridorYd + 13), halfYd: 12 }
+          : undefined
       out.set(z.id, {
         anchor: { x: p.x + n.x * sideSign * off, y: p.y + n.y * sideSign * off },
         ellipses: [],
+        ribbon,
         kind: z.kind,
       })
       continue
@@ -803,6 +814,46 @@ export function HoleMap(props: {
       return <g key={z.id}>{trees}</g>
     }
     if (z.kind === 'deeprough') {
+      // long band: a continuous run of broken, scrubby ground at true length
+      if (place.ribbon) {
+        const r = place.ribbon
+        const clumps = []
+        for (let y = r.from + 7, i = 0; y < r.to - 5; y += 19, i++) {
+          const t = (y - r.from) / (r.to - r.from)
+          const wYd = r.halfYd * Math.sin(t * Math.PI) ** 0.3
+          const pq = at(y)
+          const nq = normalAt(y)
+          // alternate the clumps across the band so the edge reads torn
+          const c = (r.offYd + (i % 2 ? wYd * 0.34 : -wYd * 0.34)) * uPerYd
+          clumps.push(
+            <ellipse
+              key={y}
+              cx={pq.x + nq.x * c}
+              cy={pq.y + nq.y * c}
+              rx={clampPx(wYd * 0.5 * uPerYd, 3.5, 17)}
+              ry={clampPx(wYd * 0.34 * uPerYd, 2.5, 12)}
+              fill="#2b3a1c"
+              opacity={0.9}
+            />,
+          )
+        }
+        return (
+          <g key={z.id}>
+            {/* Warmer and edged rather than just darker: on a course tagged
+                penal/severe the whole surround is already dark scrub, so a
+                dark band vanishes into it. Scorched olive + a hard rim reads
+                as broken ground on both light and dark surrounds. */}
+            <path
+              d={sideRibbonPath(geo, r.from, r.to, r.offYd, r.halfYd)}
+              fill="#4a5a30"
+              stroke="#16301d"
+              strokeWidth={1.6}
+              opacity={0.92}
+            />
+            {clumps}
+          </g>
+        )
+      }
       const pp = place.anchor
       return (
         <g key={z.id} opacity={0.5}>

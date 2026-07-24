@@ -1,4 +1,4 @@
-import { loadHistory } from './store'
+import { lifetimeRounds } from './store'
 
 /**
  * The what's-new splash ack: shown once per drop to players who were already
@@ -32,10 +32,16 @@ export function ackedWhatsNewVersion(): string | null {
  * played, and this check runs during render, ahead of `primeWhatsNew`'s
  * mount effect. Both are needed: this one keeps the splash off a fresh
  * device NOW, prime keeps it off that same device after its first round.
+ *
+ * `lifetimeRounds` rather than daily history, because a player whose rounds
+ * are all unlimited/practice is every bit as much an existing player — their
+ * rounds live in the archive, not in `dogleg:history:v1`. It also survives
+ * archive pruning and self-seeds for pre-counter devices, so a long-time
+ * player can't read as brand new.
  */
 export function needsWhatsNew(): boolean {
   if (ackedWhatsNewVersion() === WHATS_NEW_VERSION) return false
-  return loadHistory().length > 0
+  return lifetimeRounds() > 0
 }
 
 export function ackWhatsNew(): void {
@@ -56,5 +62,5 @@ export function ackWhatsNew(): void {
  * drop for a returning player between rounds.
  */
 export function primeWhatsNew(): void {
-  if (ackedWhatsNewVersion() === null && loadHistory().length === 0) ackWhatsNew()
+  if (ackedWhatsNewVersion() === null && lifetimeRounds() === 0) ackWhatsNew()
 }

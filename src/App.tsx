@@ -104,8 +104,13 @@ export default function App() {
   const [lockerAccount, setLockerAccount] = useState(false)
   const [uiMode, setUiMode] = useState<UiMode>(loadUiMode)
   const [pending, setPending] = useState<PendingStart | null>(null)
-  /** which single announcement this load earns, if any (see pickLandingModal) */
-  const [landing, setLanding] = useState<LandingModal | null>(pickLandingModal)
+  /** which single announcement this load earns, if any (see pickLandingModal).
+   * Only a load that actually LANDS on home earns one: booting straight into
+   * an unfinished round or a #watch replay is not an arrival at the home
+   * screen, and a dialog that waited for the player to navigate there later
+   * would ambush a screen they chose. Those loads pick nothing — every ack
+   * stays pending, and the announcement takes its turn on the next open. */
+  const [landing, setLanding] = useState<LandingModal | null>(() => (view === 'home' ? pickLandingModal() : null))
   /** How to Play reopened from the masthead — orthogonal to the landing pick */
   const [manualTutorial, setManualTutorial] = useState(false)
   const showTutorial = manualTutorial || landing === 'tutorial'

@@ -195,6 +195,62 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
     expect(screen.queryByText(/Not all rough is rough/)).toBeNull()
   })
 
+  it("counts an unlimited-only player as existing, not as a first-timer", () => {
+    localStorage.removeItem('dogleg:whatsnew-ack:v1')
+    // practice rounds never touch daily history — they live in the archive,
+    // so a player who only plays unlimited would read as brand new if the
+    // gate looked at history alone, and get silently primed out of the drop
+    localStorage.setItem(
+      'dogleg:archive:v1',
+      JSON.stringify([
+        {
+          seed: 'practice:pebble-beach:whatsnew',
+          mode: 'practice',
+          courseSlug: 'pebble-beach',
+          character: CHARACTERS[0].id,
+          dateKey: '2026-07-01',
+          toPar: 0,
+          strokes: 72,
+          results: [],
+          decisions: [],
+          playedAt: 1,
+        },
+      ]),
+    )
+    render(<App />)
+    expect(screen.getByText(/Not all rough is rough/)).toBeTruthy()
+  })
+
+  it("a load that doesn't land on home picks no announcement at all", () => {
+    localStorage.removeItem('dogleg:whatsnew-ack:v1')
+    seedPlayedRound()
+    // boot straight into an unfinished round: this is not an arrival at the
+    // home screen, so nothing is picked and nothing is acked
+    const first = render(<App />)
+    fireEvent.click(screen.getByText(/I'll find the fairway/))
+    fireEvent.click(screen.getByText('Tee off'))
+    fireEvent.click(screen.getByText(CHARACTERS[1].name))
+    first.unmount()
+    localStorage.removeItem('dogleg:whatsnew-ack:v1')
+
+    const second = render(<App />)
+    expect(screen.getByText(/Par \d · SI \d+/)).toBeTruthy()
+    expect(screen.queryByText(/Not all rough is rough/)).toBeNull()
+    // and walking back to the teebox mid-round must not spring it either —
+    // the home screen they chose to open is not an arrival
+    fireEvent.click(screen.getByRole('button', { name: 'Back to the teebox' }))
+    expect(screen.getByText(/Resume today's round/)).toBeTruthy()
+    expect(screen.queryByText(/Not all rough is rough/)).toBeNull()
+    // still pending — an unshown announcement must not be acked
+    expect(localStorage.getItem('dogleg:whatsnew-ack:v1')).toBeNull()
+    second.unmount()
+
+    // ...and it takes its turn on the next load that DOES land home
+    localStorage.removeItem('dogleg:round:v1')
+    render(<App />)
+    expect(screen.getByText(/Not all rough is rough/)).toBeTruthy()
+  })
+
   it('lands at most one modal deep, in tutorial → what\'s-new → season order', () => {
     // every announcement pending at once, on a device with a round played
     localStorage.removeItem('dogleg:tutorial:v1')

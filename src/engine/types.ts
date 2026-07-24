@@ -12,7 +12,7 @@ export type Greens = 'Slow' | 'Medium' | 'Firm' | 'Fast'
 
 /** A recognizable structure drawn behind the green as pure map flavor —
  * cosmetic only, never touches odds/geometry/seed replay. */
-export type Landmark = 'lighthouse'
+export type Landmark = 'lighthouse' | 'bridge'
 
 export interface HoleSpec {
   number: number

@@ -91,6 +91,10 @@ const COURSE_GEO: Record<string, CourseGeo> = {
   palmbeach: { name: 'Palm Beach Par 3', center: [26.6321, -80.0385], radius: 1200, osmName: 'Palm Beach Par 3', engineSlug: 'palm-beach-par-3', packed: true },
   cobblestone: { name: 'Cobblestone Creek', center: [35.1638, -97.4215], radius: 900, osmName: 'Cobblestone Creek', engineSlug: 'cobblestone-creek', packed: true },
   harbourtown: { name: 'Harbour Town Golf Links', center: [32.1307, -80.8093], radius: 1600, osmName: 'Harbour Town Golf Links', engineSlug: 'harbour-town' },
+  // Carnoustie shares its site with Burnside/Buddon/Nestie; Championship hole
+  // ways are named "6. Hogan's Alley" (siblings use "(6) …" / "[6] …"), so the
+  // prefix regex pins the right ref=N per hole.
+  carnoustie: { name: 'Carnoustie — Championship', center: [56.4936, -2.7272], radius: 1600, osmName: 'The Carnoustie Championship Course', osmHolePrefix: '^\\d+\\.', engineSlug: 'carnoustie' },
 }
 
 // ---------- Overpass ----------

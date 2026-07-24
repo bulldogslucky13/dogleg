@@ -370,6 +370,38 @@ function Tree({ x, y, s, tone = 0 }: { x: number; y: number; s: number; tone?: n
 const clampPx = (px: number, min: number, max: number) => Math.max(min, Math.min(max, px))
 
 /**
+ * Carnoustie's white-railed Barry Burn footbridge, drawn straddling the last
+ * water crossing before the green. `s` is the deck span in px. Purely
+ * decorative — gated on the hole's `landmark` field, never in play.
+ */
+function Footbridge({ x, y, s }: { x: number; y: number; s: number }) {
+  const deckH = s * 0.14
+  const railH = s * 0.3
+  const posts = 4
+  const rails = []
+  for (let i = 0; i <= posts; i++) {
+    const px = x - s / 2 + (s / posts) * i
+    rails.push(<line key={i} x1={px} y1={y - deckH / 2} x2={px} y2={y - deckH / 2 - railH} stroke="#f0ece0" strokeWidth={s * 0.045} />)
+  }
+  return (
+    <g aria-hidden opacity={0.95}>
+      <ellipse cx={x} cy={y + deckH} rx={s * 0.55} ry={s * 0.08} fill="#101f15" opacity={0.3} />
+      {/* arched stone deck */}
+      <path
+        d={`M${x - s / 2},${y + deckH / 2} Q${x},${y - deckH} ${x + s / 2},${y + deckH / 2} L${x + s / 2},${y - deckH / 2} Q${x},${y - deckH * 1.8} ${x - s / 2},${y - deckH / 2} Z`}
+        fill="#c9c2b2"
+        stroke="#8f887a"
+        strokeWidth={0.8}
+      />
+      {/* white railings */}
+      {rails}
+      <line x1={x - s / 2} y1={y - deckH / 2 - railH} x2={x + s / 2} y2={y - deckH / 2 - railH} stroke="#f0ece0" strokeWidth={s * 0.055} />
+      <line x1={x - s / 2} y1={y - deckH / 2 - railH * 0.55} x2={x + s / 2} y2={y - deckH / 2 - railH * 0.55} stroke="#f0ece0" strokeWidth={s * 0.04} />
+    </g>
+  )
+}
+
+/**
  * Harbour Town's candy-striped lighthouse, drawn behind the green as flavor.
  * `s` is the tower height in px; everything scales off it. Purely decorative —
  * gated on the hole's `landmark` field, never in play.
@@ -898,6 +930,20 @@ export function HoleMap(props: {
         (() => {
           const s = clampPx(34 * uPerYd, 40, 66)
           return <Lighthouse x={greenPt.x + greenRx + s * 0.7} y={greenPt.y - s * 0.72} s={s} />
+        })()}
+
+      {/* landmark on the burn (Carnoustie's Barry Burn footbridge) — straddles
+          the last water crossing short of the green, nudged off the aim line
+          so the flag and preview stay readable */}
+      {layout.spec.landmark === 'bridge' &&
+        (() => {
+          const wet = layout.zones.filter((z) => z.kind === 'water' && z.side === 'cross' && z.to < L - layout.greenDepth)
+          const zz = wet.length ? wet[wet.length - 1] : null
+          const yd = zz ? (zz.from + zz.to) / 2 : Math.max(10, L - layout.greenDepth - 14)
+          const p = at(yd)
+          const n = normalAt(Math.min(yd, L - 1))
+          const s = clampPx(24 * uPerYd, 28, 46)
+          return <Footbridge x={p.x + n.x * 9 * uPerYd} y={p.y + n.y * 9 * uPerYd} s={s} />
         })()}
 
       {/* green + fringe, at true scale */}

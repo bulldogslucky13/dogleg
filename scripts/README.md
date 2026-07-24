@@ -112,9 +112,15 @@ find the polygon name for a new course, query Overpass for
      `bend: straight` and get no entry — they render on the flag fallback.
 4. **QA pass against satellite/aerial imagery** — walk every hole and compare
    the zone report (kind / side / yardage) to what's actually on the ground.
-   ProVisualizer's 2D planner (`provisualizer.com/courses/<slug>.php`,
-   Cesium satellite with hole lines, `>` steps hole-by-hole) works well; any
-   aerial source does. Hunt specifically for the artifact modes listed above,
+   Use ProVisualizer's **3D planner**: `provisualizer.com/3dplanner.php?n=
+   <Course Name>` — get the link (with the course name and full tee/pin data
+   in the querystring) from the course's main page,
+   `provisualizer.com/courses/<slug>.php`. It gives a per-hole tee-perspective
+   satellite view with a hole dropdown + Next/Prev Hole stepping, which is
+   much more reliable for reading hazards than the top-down 2D overview
+   (the Carnoustie burns were unmistakable from the tee view and easy to
+   miss from above). Any aerial source works in a pinch.
+   Hunt specifically for the artifact modes listed above,
    and fix by hand **with a comment explaining the deviation from the raw
    import** (`tpc-sawgrass:2`, `harbour-town:4`/`18` are the house style).
 5. **Landmark pass.** While you're in the imagery, ask: does any hole have a

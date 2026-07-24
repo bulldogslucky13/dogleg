@@ -198,8 +198,12 @@ export const COURSES: CourseSpec[] = [
     ]),
   },
   {
+    // FICTIONAL — no real-world counterpart, permanently import-ineligible.
+    // Renamed off "Copper Canyon": real Copper Canyon clubs exist in Buckeye /
+    // Sun City Festival, AZ, and the near-name match invited an import of the
+    // wrong course's geography. See step 0 of scripts/README.md.
     slug: 'copper-canyon',
-    name: 'Copper Canyon',
+    name: 'Cinder Mesa',
     location: 'Scottsdale, Arizona',
     difficulty: 5,
     greens: 'Medium',
@@ -233,26 +237,36 @@ export const COURSES: CourseSpec[] = [
     difficulty: 9,
     greens: 'Firm',
     wind: 20,
+    // The gorse IS the course. OSM has no scrub polygons at Dunluce at all
+    // (checked: one grassland way, nothing else), so this is carried as a
+    // course-level severity dial rather than hand-drawn zones — see the
+    // `Rough` note in types.ts and the geometry.ts header.
+    rough: 'penal',
+    roughLabel: 'gorse',
     blurb: 'Dunes and drama on the Antrim coast, home of Calamity Corner.',
+    // YDS / PAR / HCP from the club's Open Championship card (par 71, 7,344):
+    // course.bluegolf.com/bluegolf/course/course/royalportrushdunluce. Par was
+    // already right; 15 of 18 stroke indexes were not (SI feeds pressure() in
+    // the odds), and 10 shipped 74 yd short of the card.
     holes: holes([
-      [4, 420, 7, 'S', 'sand'],
-      [5, 575, 11, 'R', 'sand'],
-      [3, 176, 15, 'S', 'sand'],
-      [4, 502, 1, 'L', 'sand'],
-      [4, 372, 13, 'R', 'ocean', 'White Rocks — the beach and the sea wait behind the green'],
-      [3, 193, 9, 'S', 'ocean'],
-      [5, 607, 5, 'L', 'sand'],
-      [4, 434, 3, 'S', 'sand'],
-      [4, 432, 17, 'R', 'sand'],
-      [4, 373, 12, 'S', 'sand'],
-      [4, 475, 2, 'L', 'sand'],
-      [5, 532, 16, 'R', 'sand'],
-      [3, 199, 14, 'S', 'sand'],
-      [4, 466, 4, 'S', 'sand'],
-      [4, 429, 8, 'L', 'sand'],
+      [4, 421, 11, 'S', 'sand'],
+      [5, 574, 5, 'R', 'sand'],
+      [3, 177, 17, 'S', 'sand'],
+      [4, 482, 1, 'L', 'sand'],
+      [4, 374, 15, 'R', 'ocean', 'White Rocks — the beach and the sea wait behind the green'],
+      [3, 194, 7, 'S', 'ocean'],
+      [5, 592, 3, 'L', 'sand'],
+      [4, 434, 13, 'S', 'sand'],
+      [4, 432, 9, 'R', 'sand'],
+      [4, 447, 12, 'S', 'sand'],
+      [4, 474, 8, 'L', 'sand'],
+      [5, 532, 4, 'R', 'sand'],
+      [3, 194, 18, 'S', 'sand'],
+      [4, 473, 2, 'S', 'sand'],
+      [4, 426, 14, 'L', 'sand'],
       [3, 236, 6, 'S', 'sand', 'Calamity Corner — a long iron over a yawning chasm'],
-      [4, 409, 10, 'R', 'sand'],
-      [4, 474, 18, 'S', 'sand'],
+      [4, 408, 16, 'R', 'sand'],
+      [4, 474, 10, 'S', 'sand'],
     ]),
   },
   {
@@ -344,7 +358,8 @@ export const COURSES: CourseSpec[] = [
   },
   {
     slug: 'gullwing-point',
-    name: 'Gullwing Point',
+    // FICTIONAL — no real-world counterpart, permanently import-ineligible.
+    name: 'Petrel Point',
     location: 'Mendocino, California',
     difficulty: 7,
     greens: 'Firm',
@@ -402,7 +417,8 @@ export const COURSES: CourseSpec[] = [
   },
   {
     slug: 'birchwood-national',
-    name: 'Birchwood National',
+    // FICTIONAL — no real-world counterpart, permanently import-ineligible.
+    name: 'Aspenwood National',
     location: 'Grand Rapids, Michigan',
     difficulty: 6,
     greens: 'Firm',
@@ -634,7 +650,8 @@ export const COURSES: CourseSpec[] = [
   },
   {
     slug: 'millbrook-valley',
-    name: 'Millbrook Valley',
+    // FICTIONAL — no real-world counterpart, permanently import-ineligible.
+    name: 'Ridgemill Valley',
     location: 'Hollow Creek, Tennessee',
     difficulty: 7,
     greens: 'Fast',
@@ -1156,7 +1173,10 @@ export const COURSES: CourseSpec[] = [
   },
   {
     slug: 'cypress-hollow',
-    name: 'Cypress Hollow',
+    // FICTIONAL — no real-world counterpart, permanently import-ineligible.
+    // Renamed off "Cypress Hollow", which read as a sibling of the real
+    // Cypress Point two dozen rows up.
+    name: 'Sabal Landing',
     location: 'Ponte Vedra, Florida',
     difficulty: 8,
     greens: 'Fast',
@@ -1388,7 +1408,9 @@ export const COURSES: CourseSpec[] = [
   },
   {
     slug: 'old-wick-links',
-    name: 'Old Wick Links',
+    // FICTIONAL — no real-world counterpart, permanently import-ineligible.
+    // Renamed off "Old Wick Links"; a real Wick Golf Club plays in Caithness.
+    name: 'Brackenmuir Links',
     location: 'East Lothian, Scotland',
     difficulty: 6,
     greens: 'Fast',

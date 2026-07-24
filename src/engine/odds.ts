@@ -253,6 +253,38 @@ const HOLEOUT_LIE: Record<LieRow, number> = {
   trees: 0.15,
 }
 
+/**
+ * Course-level rough severity (`CourseSpec.rough`) as a blend from the `rough`
+ * approach row toward the `trees` row — the two calibrated ends we already
+ * ship. `trees` is exactly the "hack it out and take your medicine" shape that
+ * gorse and US Open hay have, so severity interpolates between two known-good
+ * rows rather than inventing a third.
+ *
+ * What this does NOT do, deliberately: create penalty strokes. The approach
+ * table's four columns are all "ball advanced" — a drop only ever comes from a
+ * reachable water/ocean zone, and this dial creates no zones. Penal rough
+ * costs you the birdie look (kickin+makeable falls ~28% → ~22% at `penal`),
+ * not the ball. It also doesn't change how OFTEN you're in the rough — that's
+ * `longOdds` and the layout — only what being there costs.
+ */
+const ROUGH_BLEND: Record<NonNullable<HoleLayout['rough']>, number> = {
+  normal: 0,
+  penal: 0.35,
+  severe: 0.6,
+}
+
+/** Blend one approach row toward the `trees` row by `t` (0 = unchanged). */
+function applyRoughSeverity(row: ApproachRow, choice: Choice, t: number): ApproachRow {
+  if (t <= 0) return row
+  const hard = APPROACH_BASE.trees[choice]
+  return {
+    kickin: row.kickin + t * (hard.kickin - row.kickin),
+    makeable: row.makeable + t * (hard.makeable - row.makeable),
+    lag: row.lag + t * (hard.lag - row.lag),
+    scramble: row.scramble + t * (hard.scramble - row.scramble),
+  }
+}
+
 export interface ApproachOddsDetail {
   odds: ApproachOdds
   missShares: ZoneShare[]
@@ -295,7 +327,11 @@ export function approachOdds(
 ): ApproachOddsDetail {
   const m = pressure(layout.spec.strokeIndex, layout.spec.par, cond, layout.gust ?? 0)
   const lie: LieRow = ball.lie === 'tee' ? 'tee' : (ball.lie as LieRow)
-  const row = { ...APPROACH_BASE[lie][choice] }
+  // A course whose rough is its defense (gorse, US Open hay) taxes the shot
+  // FROM the rough — applied before every other modifier so pressure, the
+  // character buffs and the distance taper all compose on top as usual.
+  const severity = lie === 'rough' ? ROUGH_BLEND[layout.rough ?? 'normal'] : 0
+  const row = applyRoughSeverity({ ...APPROACH_BASE[lie][choice] }, choice, severity)
 
   // the Dart Thrower's edge: every approach-style swing flies truer
   if (character === 'dart') {
@@ -406,6 +442,10 @@ export function approachOdds(
         : mode === 'wedge'
           ? HOLEOUT.wedge[choice]
           : HOLEOUT.approach[choice] * HOLEOUT_LIE[lie]
+  // …and jarring one from gorse is rarer still: fade the rough lie's holeout
+  // toward the trees lie by the same severity blend, so a penal course doesn't
+  // hole out from hay as often as from ordinary rough.
+  if (severity > 0) holeoutBase *= 1 + severity * (HOLEOUT_LIE.trees / HOLEOUT_LIE.rough - 1)
   holeoutBase *= taper.kickin // jarring it from 220 is rarer than from a wedge
   if (character === 'dart') holeoutBase *= DART_BUFF.holeout
   // fortune floor: ace odds on par-3 tees, albatross odds on go-for-it shots.

@@ -349,6 +349,13 @@ export function HazardChips(props: { hole: HoleInPlay }) {
   else if (wind >= 12) chips.push(`Breezy · ${wind} mph`)
   else if (gustHole) chips.push(`Wind · ${wind} mph`)
   if (cond.greens === 'Fast' || cond.greens === 'Firm') chips.push('Slick greens')
+  // Penal rough is a course-wide condition, not a zone, so the caddy names it
+  // rather than the map pointing at it. Sharper once you're actually in it.
+  if (layout.rough && layout.rough !== 'normal') {
+    const what = layout.roughLabel ?? 'Deep rough'
+    const name = what.charAt(0).toUpperCase() + what.slice(1)
+    chips.push(ball.lie === 'rough' ? `In the ${what} — just advance it` : `${name} punishes the miss`)
+  }
 
   const sig = atTee ? spec.signature : undefined
   if (chips.length === 0 && !sig) return null

@@ -25,4 +25,8 @@
  */
 // v2 = #65 (Harbour Town scorecard + geometry). v3 = #71 (greenside odds
 // weight). v4 = Carnoustie real geometry (OSM import + hand-laid burns).
-export const ENGINE_VERSION = 4
+// v5 = Royal Portrush real geometry, the Dunluce stroke-index fix (15 of 18
+// SIs were wrong, and SI feeds pressure() in the odds), and the course-level
+// rough-severity dial (CourseSpec.rough) with Portrush tagged 'penal'. One
+// version covers all three: v5 has never been deployed, so they ship together.
+export const ENGINE_VERSION = 5

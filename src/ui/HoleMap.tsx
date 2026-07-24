@@ -877,6 +877,9 @@ export function HoleMap(props: {
     )
   })()
 
+  // 0 = ordinary rough, 1 = penal, 2 = severe (see CourseSpec.rough)
+  const roughSeverity = layout.rough === 'severe' ? 2 : layout.rough === 'penal' ? 1 : 0
+
   const yardsLeft = Math.max(0, Math.round(L - ball.pos))
   const labelPt = at(Math.min(ball.pos + (L - ball.pos) / 2, L - 20))
   const teePt = at(0)
@@ -897,9 +900,27 @@ export function HoleMap(props: {
           <rect width="7" height="14" fill="#79ad63" />
           <rect x="7" width="7" height="14" fill="#71a55c" />
         </pattern>
+        {/* Penal rough (gorse, US Open hay): a darker, scrubbier surround so
+            the fairway reads as the only safe ground. Tufts are decorative —
+            the cost lives in the odds (CourseSpec.rough), not here. */}
+        {roughSeverity > 0 && (
+          <>
+            <linearGradient id="skyRough" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stopColor={roughSeverity > 1 ? '#24402c' : '#2a4a32'} />
+              <stop offset="1" stopColor={roughSeverity > 1 ? '#172d1f' : '#1b3524'} />
+            </linearGradient>
+            <pattern id="gorse" width="26" height="26" patternUnits="userSpaceOnUse" patternTransform="rotate(12)">
+              <circle cx="6" cy="7" r="3.1" fill="#1f3a26" opacity="0.85" />
+              <circle cx="18" cy="16" r="2.6" fill="#22412a" opacity="0.8" />
+              <circle cx="11" cy="20" r="1.7" fill="#2b5233" opacity="0.7" />
+              <circle cx="21" cy="5" r="1.3" fill="#6f7c31" opacity="0.55" />
+            </pattern>
+          </>
+        )}
       </defs>
 
-      <rect width={fr.w} height={fr.h} fill="url(#sky)" />
+      <rect width={fr.w} height={fr.h} fill={roughSeverity > 0 ? 'url(#skyRough)' : 'url(#sky)'} />
+      {roughSeverity > 0 && <rect width={fr.w} height={fr.h} fill="url(#gorse)" opacity={roughSeverity > 1 ? 0.7 : 0.5} />}
 
       {/* fairway / apron */}
       {!par3 && (

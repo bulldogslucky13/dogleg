@@ -1,6 +1,7 @@
 import type { Conditions, HazardZone, HoleLayout, HoleSpec } from './types'
 import { rngFromString } from './rng'
 import { OSM_GEOMETRY, OSM_BEND } from './geometry'
+import { courseBySlug } from './courses'
 
 /**
  * Generate the geometric layout for a hole. Deterministic per course+hole.
@@ -17,6 +18,12 @@ import { OSM_GEOMETRY, OSM_BEND } from './geometry'
 export function buildLayout(courseSlug: string, spec: HoleSpec, cond?: Conditions): HoleLayout {
   const pin = spec.par === 3 ? cond?.pins?.[spec.number] : undefined
   const gust = cond?.gusts?.[spec.number]
+  // Course-level rough severity rides down onto every hole so the odds engine
+  // never has to look a course up. Unknown slugs (tests use fakes) get
+  // undefined = 'normal' = the historical numbers.
+  const course = courseBySlug(courseSlug)
+  const rough = course?.rough
+  const roughLabel = course?.roughLabel
   const real = OSM_GEOMETRY[`${courseSlug}:${spec.number}`]
   if (real) {
     return {
@@ -29,6 +36,8 @@ export function buildLayout(courseSlug: string, spec: HoleSpec, cond?: Condition
       bend: OSM_BEND[`${courseSlug}:${spec.number}`],
       pin,
       gust,
+      rough,
+      roughLabel,
     }
   }
 
@@ -63,7 +72,7 @@ export function buildLayout(courseSlug: string, spec: HoleSpec, cond?: Condition
       add({ kind: 'bunker', from: L - 16, to: L - 2, side: 'right' })
       if (rng() < 0.5) add({ kind: 'bunker', from: L - 34, to: L - 20, side: 'cross' })
     }
-    return { spec, length: L, zones, fairwayFrom: 0, fairwayTo: 0, greenDepth, pin, gust }
+    return { spec, length: L, zones, fairwayFrom: 0, fairwayTo: 0, greenDepth, pin, gust, rough, roughLabel }
   }
 
   // --- par 4 / par 5 ---
@@ -114,7 +123,7 @@ export function buildLayout(courseSlug: string, spec: HoleSpec, cond?: Condition
     add({ kind: 'deeprough', from: fairwayFrom, to: fairwayTo - 40, side: offSide })
   }
 
-  return { spec, length: L, zones, fairwayFrom, fairwayTo, greenDepth }
+  return { spec, length: L, zones, fairwayFrom, fairwayTo, greenDepth, rough, roughLabel }
 }
 
 /**

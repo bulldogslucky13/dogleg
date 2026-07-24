@@ -20,6 +20,14 @@
  * golf_course polygon name (osmName), and the engine slug (for --compare).
  * Add an entry per course you want to import.
  *
+ * HARD RULE before adding an entry: if you cannot reliably establish the
+ * course's real geography — it's one of the library's original fictional
+ * courses, you can't pin the right golf_course polygon, or OSM simply hasn't
+ * mapped it — DO NOT press forward with inaccurate or missing geo data.
+ * Propose another course (or leave it procedural) or stop. A near-name match
+ * in the wrong town is the trap to watch for. See step 0 of the freeze process
+ * in scripts/README.md.
+ *
  * Known gaps (prototype):
  *  - OSM coverage varies; obscure courses may lack golf=hole centerlines, and
  *    many resorts have no natural=wood polygons even where trees define the
@@ -95,6 +103,12 @@ const COURSE_GEO: Record<string, CourseGeo> = {
   // ways are named "6. Hogan's Alley" (siblings use "(6) …" / "[6] …"), so the
   // prefix regex pins the right ref=N per hole.
   carnoustie: { name: 'Carnoustie — Championship', center: [56.4936, -2.7272], radius: 1600, osmName: 'The Carnoustie Championship Course', osmHolePrefix: '^\\d+\\.', engineSlug: 'carnoustie' },
+  // Royal Portrush maps Dunluce and Valley as separate golf_course polygons
+  // (ways 1413316756 / 1413316754), so map_to_area on "Dunluce Links" is
+  // enough to keep Valley's ref=N holes out — no osmHolePrefix needed. All 18
+  // Dunluce centrelines are mapped and named (Calamity Corner, White Rocks).
+  // Radius reaches past the 807 m polygon for the Atlantic coastline.
+  portrush: { name: 'Royal Portrush — Dunluce', center: [55.2028, -6.6253], radius: 1600, osmName: 'Dunluce Links', engineSlug: 'royal-portrush-dunluce' },
 }
 
 // ---------- Overpass ----------

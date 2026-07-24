@@ -89,7 +89,7 @@ export const PLAY_INDEX: Record<string, number> = {
   'harbour-town': 1.645,
   'carnoustie': 1.658,
   'copper-canyon': -0.982,
-  'royal-portrush-dunluce': 2.065,
+  'royal-portrush-dunluce': 1.823,
   'cypress-point': -0.641,
   'whistling-straits': 1.893,
   'tpc-potomac': 1.707,

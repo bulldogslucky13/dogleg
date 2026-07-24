@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { CharacterAvatar } from './Avatars'
+import { RoughGradeList } from './RoughGrades'
 import { SyncCta } from './RoundsScreen'
 
 const STORAGE_KEY = 'dogleg:tutorial:v1'
@@ -58,6 +59,18 @@ const STEPS: Step[] = [
         pays the aggressive hunt with closer looks — and punishes the miss harder. A{' '}
         <b>friendly flag</b> is green light for everyone. The chips at the tee tell you
         which one you're facing, and the odds bar always tells the truth about it.
+      </>
+    ),
+  },
+  {
+    title: 'Not all rough is rough',
+    body: (
+      <>
+        Miss the fairway and the lie is part of the story. Three grades of it, and the map
+        always shows you which you're in:
+        <RoughGradeList />
+        Out of the deep stuff you'll save par a lot less often — sometimes the play is simply
+        to wedge out and live with the bogey.
       </>
     ),
   },

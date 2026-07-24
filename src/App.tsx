@@ -49,8 +49,31 @@ import { bundleIsStale, bundleKnownStale } from './lib/freshness'
 import { Tutorial, hasSeenTutorial } from './ui/Tutorial'
 import { SeasonSplash } from './ui/SeasonSplash'
 import { ackSeason, needsSeasonSplash } from './state/seasonStore'
+import { WhatsNewSplash } from './ui/WhatsNewSplash'
+import { ackWhatsNew, needsWhatsNew, primeWhatsNew, WHATS_NEW_VERSION } from './state/whatsNew'
 
 type View = 'home' | 'pick' | 'play' | 'result' | 'watch' | 'rounds'
+
+/**
+ * The landing modal: AT MOST ONE, ever. Landing on the home screen behind two
+ * stacked dialogs is a worse welcome than hearing one thing at a time, so the
+ * three announcements are ranked rather than queued — the winner shows, the
+ * losers stay pending and take their turn on a later landing (each keeps its
+ * own ack, so nothing is lost, only deferred).
+ *
+ * The order is deliberate: a player who doesn't know the rules yet can't use
+ * either announcement, and a change to how the game PLAYS outranks the season
+ * board reset. Decided once, at mount — never re-derived mid-session, so a
+ * dialog can't appear over a screen the player navigated to themselves.
+ */
+type LandingModal = 'tutorial' | 'whatsnew' | 'season'
+
+function pickLandingModal(): LandingModal | null {
+  if (!hasSeenTutorial()) return 'tutorial'
+  if (needsWhatsNew()) return 'whatsnew'
+  if (needsSeasonSplash()) return 'season'
+  return null
+}
 
 /** a #watch=<code> link opens straight into the replay viewer. 'bad' means
  * the hash IS a watch link but the code doesn't decode (truncated in a chat,
@@ -81,9 +104,16 @@ export default function App() {
   const [lockerAccount, setLockerAccount] = useState(false)
   const [uiMode, setUiMode] = useState<UiMode>(loadUiMode)
   const [pending, setPending] = useState<PendingStart | null>(null)
-  const [showTutorial, setShowTutorial] = useState(() => !hasSeenTutorial())
-  /** once per rollover: the new-season announcement + last season's recap */
-  const [showSeason, setShowSeason] = useState(() => needsSeasonSplash())
+  /** which single announcement this load earns, if any (see pickLandingModal).
+   * Only a load that actually LANDS on home earns one: booting straight into
+   * an unfinished round or a #watch replay is not an arrival at the home
+   * screen, and a dialog that waited for the player to navigate there later
+   * would ambush a screen they chose. Those loads pick nothing — every ack
+   * stays pending, and the announcement takes its turn on the next open. */
+  const [landing, setLanding] = useState<LandingModal | null>(() => (view === 'home' ? pickLandingModal() : null))
+  /** How to Play reopened from the masthead — orthogonal to the landing pick */
+  const [manualTutorial, setManualTutorial] = useState(false)
+  const showTutorial = manualTutorial || landing === 'tutorial'
   /** which result the result view shows — the daily card or a finished practice round */
   const [resultFor, setResultFor] = useState<'daily' | 'practice'>('daily')
   const [animating, setAnimating] = useState(false)
@@ -107,6 +137,9 @@ export default function App() {
   // mint an anonymous player id early so the daily dice can be salted per
   // player — long done by the time a human reaches the first tee
   useEffect(() => {
+    // a device with no rounds behind it has nothing to catch up on — stamp the
+    // current drop so a first-timer never gets a "what's changed" card later
+    primeWhatsNew()
     ensureIdentity()
     // a device that already holds a NAMED player is a returning known user —
     // attach their events to that stable id so cross-device stats line up.
@@ -190,12 +223,23 @@ export default function App() {
   }, [view])
 
   // the tutorial auto-opens on a first visit — that impression is the top of
-  // the activation funnel, worth its own event (manual opens tagged below)
+  // the activation funnel, worth its own event (manual opens tagged below).
+  // The what's-new impression rides along so reach is measurable: it fires at
+  // most once per player per drop, which is exactly its ceiling.
   useEffect(() => {
-    if (showTutorial) track('tutorial_shown', { trigger: 'auto' })
+    if (landing === 'tutorial') track('tutorial_shown', { trigger: 'auto' })
+    if (landing === 'whatsnew') track('whats_new_shown', { version: WHATS_NEW_VERSION })
     // mount-only: the auto-open decision is made once, at load
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  /** Closes the tutorial from either origin. A landing tutorial retires the
+   * landing slot rather than handing off to the next announcement — one
+   * dialog per arrival, whatever is pending. */
+  const closeTutorial = () => {
+    setManualTutorial(false)
+    setLanding((l) => (l === 'tutorial' ? null : l))
+  }
 
   const playedToday = history.find((e) => e.dateKey === localDateKey()) ?? null
 
@@ -294,21 +338,31 @@ export default function App() {
   if (view === 'home') {
     return (
       <>
-        {!showTutorial && showSeason && (
+        {/* exactly one of these three can be live at a time — `landing` holds a
+            single value and the manual tutorial replaces rather than stacks */}
+        {landing === 'season' && !showTutorial && (
           <SeasonSplash
             onClose={() => {
               ackSeason()
-              setShowSeason(false)
+              setLanding(null)
+            }}
+          />
+        )}
+        {landing === 'whatsnew' && !showTutorial && (
+          <WhatsNewSplash
+            onClose={() => {
+              ackWhatsNew()
+              setLanding(null)
             }}
           />
         )}
         {showTutorial && (
           <Tutorial
-            onClose={() => setShowTutorial(false)}
+            onClose={closeTutorial}
             onSync={() => {
               // the same account flow as the Locker CTA: land in the locker
               // with the panel open
-              setShowTutorial(false)
+              closeTutorial()
               setLockerView('main')
               setLockerAccount(true)
               setView('rounds')
@@ -319,7 +373,7 @@ export default function App() {
           history={history}
           onHowToPlay={() => {
             track('tutorial_shown', { trigger: 'manual' })
-            setShowTutorial(true)
+            setManualTutorial(true)
           }}
           onMyRounds={() => {
             setLockerView('main')

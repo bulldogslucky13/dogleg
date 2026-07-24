@@ -2060,6 +2060,57 @@ button {
   text-align: right;
 }
 
+.whats-new .tut-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* the three grades of rough, as a legend: [map swatch][name + one line], so a
+   wrapped line stays aligned under the text rather than under the swatch */
+.rough-grades {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  list-style: none;
+}
+
+/* in How to Play the legend sits inside a run of prose rather than a flex
+   column, so it needs its own breathing room */
+.tut-card:not(.whats-new) .rough-grades {
+  margin: 10px 0;
+}
+
+.rough-grades li {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  font-size: 0.92rem;
+  line-height: 1.4;
+}
+
+.rough-swatch {
+  flex: 0 0 auto;
+  width: 52px;
+  height: 34px;
+  margin-top: 2px;
+  border-radius: 7px;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+}
+
+.rough-grades em {
+  font-style: normal;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: rgba(29, 43, 32, 0.45);
+}
+
+.whats-new .fine {
+  margin-top: 2px;
+}
+
 /* the season-launch splash: podium + holder list inside the tutorial card */
 .season-splash {
   max-height: calc(100dvh - 60px);
@@ -2673,6 +2724,11 @@ button {
   position: relative;
   width: 100%;
   max-width: 420px;
+  /* a tall step (the rough legend, the season recap) must scroll INSIDE the
+     card on a short viewport — without this the card overflows the backdrop
+     and clips its own title off the top, with no way to reach it */
+  max-height: calc(100dvh - 36px);
+  overflow-y: auto;
   background: var(--paper);
   border-radius: 18px;
   padding: 24px 20px 20px;
@@ -2681,6 +2737,12 @@ button {
   flex-direction: column;
   gap: 12px;
   animation: tut-rise 0.28s cubic-bezier(0.2, 1.1, 0.4, 1) both;
+}
+
+/* ...and the column must not SHRINK to fit that cap, or the body silently
+   clips its last lines instead of the card scrolling */
+.tut-card > * {
+  flex-shrink: 0;
 }
 
 .tut-skip {

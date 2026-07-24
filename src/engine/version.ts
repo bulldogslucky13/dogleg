@@ -23,4 +23,6 @@
  * sides pick up the new number together; only clients holding a stale bundle
  * see the handshake fail, which is exactly the point.
  */
-export const ENGINE_VERSION = 2
+// v2 = #65 (Harbour Town scorecard + geometry). v3 = this change: the greenside
+// odds weight, a fresh generation stacked on top of #65.
+export const ENGINE_VERSION = 3

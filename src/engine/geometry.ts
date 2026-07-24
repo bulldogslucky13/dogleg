@@ -1727,8 +1727,13 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
       { id: 'z3', kind: 'bunker', from: 235, to: 267, side: 'right' },
       { id: 'z4', kind: 'bunker', from: 267, to: 281, side: 'cross' },
       { id: 'z5', kind: 'bunker', from: 285, to: 305, side: 'left' },
-      // the Church Pews again, seen from the 4th — same sand, other flank
-      { id: 'z6', kind: 'bunker', from: 305, to: 363, side: 'right', style: 'pews' },
+      // The Church Pews again, seen from the 4th. LEFT here too, not right:
+      // 3 and 4 run antiparallel with the Pews between them, so the same sand
+      // is on the golfer's left from both tees. The importer had this zone as
+      // a `cross` band and the flank-overlap rule converted it to `right`,
+      // which imagery disproves — a reminder that the rule resolves the
+      // artifact but not necessarily the side. Verified against ProVisualizer.
+      { id: 'z6', kind: 'bunker', from: 305, to: 363, side: 'left', style: 'pews' },
       { id: 'z7', kind: 'bunker', from: 373, to: 421, side: 'right' },
       { id: 'z8', kind: 'bunker', from: 519, to: 531, side: 'cross' },
       { id: 'z9', kind: 'bunker', from: 531, to: 551, side: 'right' },

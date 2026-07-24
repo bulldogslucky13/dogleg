@@ -523,7 +523,16 @@ function resolveApproach(
     h.shots.push({ stage: stageWas, choice, outcome: bucket, penalty, faced, after: h.ball, strokesAfter: h.strokes })
     return
   }
-  // fringe / sand: greenside scramble
+  // fringe / sand: greenside scramble.
+  //
+  // Deliberately NOT routed into deep rough here, though it was tempting: a
+  // `fringe` outcome that secretly played from a `trees` lie would make the
+  // displayed odds lie about what the miss costs, and the grade model caught
+  // it immediately (meanDiff 1.32 against a 0.7 ceiling — actual strokes
+  // drifting above expected-best, which is the telescoping identity detecting
+  // a hidden penalty). "The odds never lie" has exactly one sanctioned
+  // exception and this isn't it. Deep rough's cost is priced where the player
+  // can see it: fewer greens hit, scaled by distance (see JUNK_MAX_BITE).
   const zone = bucket === 'sand' ? pickZone(detail.missShares, 'sand', rng) : null
   h.ball = {
     pos: Math.min(L - 8 - rng() * 18, L - 5),

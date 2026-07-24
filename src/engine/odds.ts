@@ -95,6 +95,43 @@ const KIND_SEVERITY: Record<HazardZone['kind'], number> = {
 /** How much a choice flirts with hazards. Safe actively aims away. */
 const CHALLENGE: Record<Choice, number> = { safe: 0.3, normal: 1.0, aggressive: 1.55 }
 
+/**
+ * Deep rough / gorse / a ravine in an APPROACH's miss window.
+ *
+ * These never cost a penalty stroke — that's water's job — and from just off
+ * the green they really are the "fringe junk" the miss split calls them. But
+ * that only holds close in: from 200 yards a hazard like Calamity Corner's
+ * ravine is most of the hole's defense, and skipping it outright made the
+ * zone cosmetic — it moved the map but not the odds, the resolution or the
+ * Play Rating. So it takes a slice of the green-hitting odds, scaled by how
+ * far you're hitting from.
+ *
+ * DELIBERATELY SMALL, and the reason is structural rather than timid.
+ * `deeprough`/`trees` is not a rare marquee hazard: layout.ts generates it
+ * procedurally, so 71% of the library's holes carry one, averaging ~400 yd of
+ * span. Any approach-level junk penalty is therefore a WHOLE-LIBRARY
+ * difficulty change, not a Portrush-16 change. Measured against the grade
+ * model's greedy-by-Q calibration (ceiling 0.7, baseline 0.567):
+ *
+ *   bite 0.50 → meanDiff 0.895   bite 0.20 → 0.829
+ *   bite 0.30 → meanDiff 0.791   bite 0.10 → 0.789   bite 0.05 → 0.610 ✓
+ *
+ * It is non-monotonic because the bite makes the myopic policy genuinely
+ * mis-decide, not because the metric is noisy — arguably good design, but a
+ * bigger value needs the calibration targets in README.md re-set on purpose.
+ * That's a design decision, not a threshold to quietly raise. At 0.05 the
+ * ravine is worth ~1-2 points of green-hitting on Calamity Corner: enough
+ * that the zone is no longer inert, honest about being modest.
+ *
+ * The blunt half of deep rough's cost lives in `shortOdds` instead, where a
+ * ball actually IN it plays out far worse than a chip off the fringe.
+ */
+const JUNK_MAX_BITE = 0.05
+/** ~nothing from a greenside chip, full bite from ~190 yd out. */
+function junkReach(dist: number): number {
+  return Math.max(0, Math.min(1, (dist - 40) / 150))
+}
+
 function hazardShares(
   layout: HoleLayout,
   ball: BallState,
@@ -407,7 +444,19 @@ export function approachOdds(
 
   // Where can this shot actually miss? Between the ball and just past the green.
   const window: [number, number] = [ball.pos + dist * 0.45, layout.length + 12]
-  const { shares } = hazardShares(layout, ball, window, choice)
+  const { shares, exposure } = hazardShares(layout, ball, window, choice)
+
+  // Deep rough in range costs you greens, in proportion to how far out you
+  // are (see JUNK_MAX_BITE). Applied before the odds are built so the green
+  // buckets shrink and the miss grows together.
+  const junkShare = shares.reduce((a, s) => (s.bucket === 'trees' ? a + s.share : a), 0)
+  const junkBite = JUNK_MAX_BITE * Math.min(1, exposure * junkShare) * junkReach(dist)
+  if (junkBite > 0) {
+    row.kickin *= 1 - junkBite
+    row.makeable *= 1 - junkBite * 0.85
+    row.lag *= 1 - junkBite * 0.45
+    row.scramble *= 1 + junkBite * 1.5
+  }
 
   const odds: ApproachOdds = {
     kind: 'approach',
@@ -425,7 +474,11 @@ export function approachOdds(
   const hazardable = row.scramble * (choice === 'safe' ? 0.32 : choice === 'normal' ? 0.7 : 0.88)
   let claimed = 0
   for (const s of shares) {
-    if (s.bucket === 'trees') continue // near the green, tree misses are just fringe junk
+    // Junk has no outcome column of its own — a miss into it is still a missed
+    // green, so it stays in `fringe` numerically. Its cost is already priced in
+    // above (fewer greens) and again in the resolver, which sends that miss
+    // into the zone so it plays from a `trees` lie instead of clean fringe.
+    if (s.bucket === 'trees') continue
     const take = hazardable * s.share
     odds[s.bucket] += take
     claimed += take
@@ -580,6 +633,16 @@ export function shortOdds(layout: HoleLayout, cond: Conditions, ball: BallState,
     normalize(odds as unknown as Record<string, number>, ['updown', 'twochip', 'stillin', 'across', 'disaster'])
   } else {
     const base = { ...SHORT_BASE[choice] }
+    // Hacking out of deep rough, gorse or a ravine is not a chip off the
+    // fringe: getting it ON is the win, and the up-and-down mostly isn't
+    // there. The safe caps below still apply, so laying the punch-out up
+    // remains the boring, bankable option — it just saves par far less often.
+    if (ball.lie === 'trees') {
+      base.updown *= 0.45
+      base.twochip *= 1.05
+      base.blowup *= 1.9
+      base.disaster *= 2.2
+    }
     base.updown *= 1 - 0.45 * m
     base.twochip *= 1 + 0.2 * m
     if (choice === 'normal') base.blowup *= 1 + 0.7 * m

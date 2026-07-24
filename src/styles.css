@@ -2060,14 +2060,6 @@ button {
   text-align: right;
 }
 
-/* the what's-new splash: a prose card inside the tutorial shell. Scrolls on a
-   short viewport the same way the season splash does, so the CTA is always
-   reachable rather than clipped off the bottom. */
-.whats-new {
-  max-height: calc(100dvh - 60px);
-  overflow-y: auto;
-}
-
 .whats-new .tut-body {
   display: flex;
   flex-direction: column;
@@ -2081,6 +2073,12 @@ button {
   flex-direction: column;
   gap: 10px;
   list-style: none;
+}
+
+/* in How to Play the legend sits inside a run of prose rather than a flex
+   column, so it needs its own breathing room */
+.tut-card:not(.whats-new) .rough-grades {
+  margin: 10px 0;
 }
 
 .rough-grades li {
@@ -2726,6 +2724,11 @@ button {
   position: relative;
   width: 100%;
   max-width: 420px;
+  /* a tall step (the rough legend, the season recap) must scroll INSIDE the
+     card on a short viewport — without this the card overflows the backdrop
+     and clips its own title off the top, with no way to reach it */
+  max-height: calc(100dvh - 36px);
+  overflow-y: auto;
   background: var(--paper);
   border-radius: 18px;
   padding: 24px 20px 20px;
@@ -2734,6 +2737,12 @@ button {
   flex-direction: column;
   gap: 12px;
   animation: tut-rise 0.28s cubic-bezier(0.2, 1.1, 0.4, 1) both;
+}
+
+/* ...and the column must not SHRINK to fit that cap, or the body silently
+   clips its last lines instead of the card scrolling */
+.tut-card > * {
+  flex-shrink: 0;
 }
 
 .tut-skip {

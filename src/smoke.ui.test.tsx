@@ -114,6 +114,21 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
     expect(screen.getByText('One round, one goal')).toBeTruthy()
   })
 
+  it('How to Play teaches the three grades of rough, since the splash never will', () => {
+    // a brand-new player is gated out of the what's-new splash by design, so
+    // How to Play is the ONLY place they can meet the grades — same legend,
+    // taught as how the game works rather than as a change
+    render(<App />)
+    fireEvent.click(screen.getByText('How to play'))
+    while (screen.queryByText('Next') && !screen.queryByText('Not all rough is rough')) {
+      fireEvent.click(screen.getByText('Next'))
+    }
+    expect(screen.getByText('Not all rough is rough')).toBeTruthy()
+    for (const grade of ['Rough', 'Gorse', 'Hay']) {
+      expect(screen.getByRole('img', { name: new RegExp(`^${grade}: how it looks`) })).toBeTruthy()
+    }
+  })
+
   it('How to Play ends on Fortunes, whose sync line opens the account flow', () => {
     render(<App />)
     fireEvent.click(screen.getByText('How to play'))

@@ -633,7 +633,25 @@ export function HoleMap(props: {
       const sideX = b.side === 'left' ? -1 : 1
       return { x: greenPt.x + sideX * (greenRx + 4 * uPerYd), y: greenPt.y + greenRy * 0.45 }
     }
-    const offYd = (b.side === 'left' ? 1 : b.side === 'right' ? -1 : 0) * (b.lie === 'rough' || b.lie === 'trees' ? 20 : 10)
+    // golfer-left normal is +1 (matches placeZones' sideSign), so the ball's
+    // own side sets the sign: left → +1, right → -1.
+    let sideDir = b.side === 'left' ? 1 : b.side === 'right' ? -1 : 0
+    // A ball that isn't IN the water must never be *drawn* on the painted water:
+    // the fixed lateral offset knows nothing about a lake hugging the corridor,
+    // so a dry rough/fairway lie on the hazard side lands on top of it (the
+    // "ball in the water" look on Carnoustie 17). If this side is wet at this
+    // yardage and the far flank is dry, draw it on the dry side. A crossing
+    // (water both flanks) can't be dodged — leave those alone.
+    if (sideDir !== 0) {
+      const wet = layout.zones.filter(
+        (z) => (z.kind === 'water' || z.kind === 'ocean') && b.pos > z.from - 4 && b.pos < z.to + 4,
+      )
+      const wetLeft = wet.some((z) => z.side === 'left' || z.side === 'cross')
+      const wetRight = wet.some((z) => z.side === 'right' || z.side === 'cross')
+      if (sideDir > 0 && wetLeft && !wetRight) sideDir = -1
+      else if (sideDir < 0 && wetRight && !wetLeft) sideDir = 1
+    }
+    const offYd = sideDir * (b.lie === 'rough' || b.lie === 'trees' ? 20 : 10)
     const bn = normalAt(Math.min(b.pos, L - 1))
     const p = at(b.pos)
     return { x: p.x + bn.x * offYd * uPerYd, y: p.y + bn.y * offYd * uPerYd }

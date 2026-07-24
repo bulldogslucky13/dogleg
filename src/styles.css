@@ -2060,6 +2060,59 @@ button {
   text-align: right;
 }
 
+/* the what's-new splash: a prose card inside the tutorial shell. Scrolls on a
+   short viewport the same way the season splash does, so the CTA is always
+   reachable rather than clipped off the bottom. */
+.whats-new {
+  max-height: calc(100dvh - 60px);
+  overflow-y: auto;
+}
+
+.whats-new .tut-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* the three grades of rough, as a legend: [map swatch][name + one line], so a
+   wrapped line stays aligned under the text rather than under the swatch */
+.rough-grades {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  list-style: none;
+}
+
+.rough-grades li {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  font-size: 0.92rem;
+  line-height: 1.4;
+}
+
+.rough-swatch {
+  flex: 0 0 auto;
+  width: 52px;
+  height: 34px;
+  margin-top: 2px;
+  border-radius: 7px;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+}
+
+.rough-grades em {
+  font-style: normal;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: rgba(29, 43, 32, 0.45);
+}
+
+.whats-new .fine {
+  margin-top: 2px;
+}
+
 /* the season-launch splash: podium + holder list inside the tutorial card */
 .season-splash {
   max-height: calc(100dvh - 60px);

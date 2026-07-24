@@ -22,6 +22,7 @@ import { setupFromSeed } from './engine/replay'
 import { loadIdentity, loadPlayer } from './lib/leaderboard'
 import { applyChoice, holeInPlay, newRound, saveRound } from './state/store'
 import type { HistoryEntry } from './state/store'
+import { WHATS_NEW_VERSION } from './state/whatsNew'
 
 // jsdom has no ResizeObserver; the map measures itself with one
 class ResizeObserverStub {
@@ -37,6 +38,9 @@ beforeEach(() => {
   localStorage.setItem('dogleg:tutorial:v1', 'done')
   // ...and pre-ack the season splash (its own tests clear this)
   localStorage.setItem('dogleg:season-ack:v1', seasonForDate().key)
+  // ...and the what's-new drop, which any test that seeds history would
+  // otherwise land behind (its own tests clear this)
+  localStorage.setItem('dogleg:whatsnew-ack:v1', WHATS_NEW_VERSION)
 })
 
 afterEach(() => {
@@ -139,6 +143,104 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
     // acked: a second open stays quiet until the next rollover
     render(<App />)
     expect(screen.queryByText(/has begun/)).toBeNull()
+  })
+
+  // a played round on this device: what makes a visitor an EXISTING player,
+  // which is the whole audience for the what's-new splash
+  const seedPlayedRound = () => {
+    const entry: HistoryEntry = {
+      dateKey: '2026-07-01',
+      puzzleNumber: 1,
+      courseSlug: 'pebble-beach',
+      toPar: 0,
+      results: [],
+      character: CHARACTERS[0].id,
+    }
+    localStorage.setItem('dogleg:history:v1', JSON.stringify([entry]))
+  }
+
+  it("the what's-new splash calls out the rough to an existing player, once", () => {
+    localStorage.removeItem('dogleg:whatsnew-ack:v1')
+    seedPlayedRound()
+    const first = render(<App />)
+    expect(screen.getByText(/Not all rough is rough/)).toBeTruthy()
+    // all three grades are named, each with the swatch that shows how it
+    // reads on the hole map — the announcement IS the legend
+    for (const grade of ['Rough', 'Gorse', 'Hay']) {
+      expect(screen.getByText(grade)).toBeTruthy()
+      expect(screen.getByRole('img', { name: new RegExp(`^${grade}: how it looks`) })).toBeTruthy()
+    }
+    // and the two courses that carry the dialled-up grades are named
+    expect(screen.getByText('Royal Portrush')).toBeTruthy()
+    expect(screen.getByText('Oakmont')).toBeTruthy()
+    fireEvent.click(screen.getByText(/I'll find the fairway/))
+    expect(screen.queryByText(/Not all rough is rough/)).toBeNull()
+    first.unmount()
+    // acked: it never shows again until the next version bump
+    render(<App />)
+    expect(screen.queryByText(/Not all rough is rough/)).toBeNull()
+  })
+
+  it("a first-timer never sees the what's-new splash, then or later", () => {
+    localStorage.removeItem('dogleg:whatsnew-ack:v1')
+    // no history: nothing has changed for someone who hasn't teed off yet
+    const first = render(<App />)
+    expect(screen.queryByText(/Not all rough is rough/)).toBeNull()
+    first.unmount()
+    // and the version is stamped at first open, so the splash doesn't ambush
+    // them once they DO have a round on the books
+    expect(localStorage.getItem('dogleg:whatsnew-ack:v1')).toBe(WHATS_NEW_VERSION)
+    seedPlayedRound()
+    render(<App />)
+    expect(screen.queryByText(/Not all rough is rough/)).toBeNull()
+  })
+
+  it('lands at most one modal deep, in tutorial → what\'s-new → season order', () => {
+    // every announcement pending at once, on a device with a round played
+    localStorage.removeItem('dogleg:tutorial:v1')
+    localStorage.removeItem('dogleg:whatsnew-ack:v1')
+    localStorage.removeItem('dogleg:season-ack:v1')
+    seedPlayedRound()
+    const season = seasonForDate()
+
+    // 1. the tutorial wins — a player who doesn't know the rules can't use
+    //    either announcement. The other two wait, unacked.
+    const first = render(<App />)
+    expect(screen.getByText('One round, one goal')).toBeTruthy()
+    expect(screen.queryByText(/Not all rough is rough/)).toBeNull()
+    expect(screen.queryByText(/has begun/)).toBeNull()
+    // dismissing it does NOT hand off to the next one — one dialog per arrival
+    fireEvent.click(screen.getByRole('button', { name: 'Close tutorial' }))
+    expect(screen.queryByText(/Not all rough is rough/)).toBeNull()
+    expect(screen.queryByText(/has begun/)).toBeNull()
+    expect(screen.getByText('Tee off')).toBeTruthy()
+    first.unmount()
+
+    // 2. next landing: what's-new takes its turn, season still waits
+    const second = render(<App />)
+    expect(screen.getByText(/Not all rough is rough/)).toBeTruthy()
+    expect(screen.queryByText(/has begun/)).toBeNull()
+    fireEvent.click(screen.getByText(/I'll find the fairway/))
+    expect(screen.queryByText(/has begun/)).toBeNull()
+    second.unmount()
+
+    // 3. and the season splash lands last, nothing lost along the way
+    render(<App />)
+    expect(screen.getByText(new RegExp(`${season.name} has begun`))).toBeTruthy()
+  })
+
+  it("How to Play still opens on demand over a pending what's-new, without stacking", () => {
+    localStorage.removeItem('dogleg:whatsnew-ack:v1')
+    seedPlayedRound()
+    render(<App />)
+    // the splash owns the landing; dismiss it to reach the home screen
+    fireEvent.click(screen.getByText(/I'll find the fairway/))
+    fireEvent.click(screen.getByText('How to play'))
+    expect(screen.getByText('One round, one goal')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Close tutorial' }))
+    // closing a MANUAL tutorial returns to home, not to another dialog
+    expect(screen.getByText('Tee off')).toBeTruthy()
+    expect(screen.queryByText(/Not all rough is rough/)).toBeNull()
   })
 
   it('the unlimited browser shows the season countdown and both boards per course', () => {

@@ -89,6 +89,17 @@ export const OSM_BEND: Record<string, number[]> = {
   'royal-portrush-dunluce:14': [0, -1, -3, -4, -6, -7, -8, -9, -9, -8, -6, -3, 0],
   'royal-portrush-dunluce:15': [0, -9, -17, -26, -34, -42, -47, -49, -48, -42, -28, -14, 0],
   'royal-portrush-dunluce:18': [0, 11, 21, 32, 43, 51, 57, 57, 53, 44, 30, 15, 0],
+  // Oakmont Country Club — real centreline curvature. Lateral yards, so the
+  // tee-end shift does not apply.
+  'oakmont:1': [0, -1, -2, -3, -5, -6, -7, -7, -8, -8, -7, -4, 0],
+  'oakmont:4': [0, 13, 26, 39, 51, 57, 59, 57, 50, 39, 26, 13, 0],
+  'oakmont:8': [0, -3, -6, -9, -12, -15, -18, -21, -22, -22, -18, -9, 0],
+  'oakmont:11': [0, 2, 3, 5, 7, 9, 10, 11, 11, 10, 7, 4, 0],
+  'oakmont:12': [0, 5, 11, 16, 22, 26, 29, 30, 29, 26, 17, 9, 0],
+  'oakmont:14': [0, -1, -2, -4, -5, -6, -7, -8, -8, -7, -6, -3, 0],
+  'oakmont:15': [0, 2, 4, 5, 7, 9, 10, 10, 9, 8, 5, 3, 0],
+  'oakmont:16': [0, 1, 2, 4, 5, 6, 7, 8, 8, 8, 7, 4, 0],
+  'oakmont:17': [0, -4, -8, -12, -16, -20, -24, -28, -30, -28, -22, -11, 0],
 }
 
 export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
@@ -1626,6 +1637,315 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
       { id: 'z2', kind: 'bunker', from: 399, to: 403, side: 'left' },
       { id: 'z3', kind: 'bunker', from: 405, to: 409, side: 'right' },
       { id: 'z4', kind: 'bunker', from: 445, to: 453, side: 'right' },
+    ],
+  },
+
+  // ---------------------------------------------------------------------
+  // Oakmont Country Club. OSM for shape, the club's Championship card for
+  // distance (par 70, 7,427 yd). Tee-end SHIFT, not scale — see the Royal
+  // Portrush block above and freeze-process step 1. Note the shift is signed
+  // here: 1, 8 and 9 import LONGER than the card and shift backwards.
+  //
+  // Oakmont is exceptionally well mapped (357 OSM features, ~180 bunkers), so
+  // unlike Portrush almost nothing needed hand-authoring. The QA pass was
+  // mostly about the phantom-cross artifact, which this course triggers hard:
+  // fairways threading between bunker complexes make the lateral rake read a
+  // flank as a full-width carry.
+  //
+  // Deviations from the raw import, all applied by rule and spot-checked
+  // against ProVisualizer's 2D planner:
+  //   - 15 `cross` bands that OVERLAP a same-yardage left/right zone were
+  //     converted to that flank. The signature is the documented one, and the
+  //     Church Pews prove it: the same physical complex sits between 3 and 4,
+  //     and the test independently reads it `left` on 3 and `right` on 4 —
+  //     which is exactly the real geography, and matches the imagery. A
+  //     54-yd and a 56-yd "carry" were the two halves of one bunker you
+  //     play ALONGSIDE, never over.
+  //   - 2 `cross` bands overlapping BOTH flanks (13, 14) were dropped: the
+  //     centreline threads between two complexes the flank zones already
+  //     model, and Oakmont has essentially no forced carries — it is a ground
+  //     game course, so inventing one would be the dishonest direction.
+  //   - 23 `cross` bands with no flanking zone were KEPT as real carries.
+  //   - 12 zones inside 75 yd of the tee dropped (tee-complex sand).
+  //   - hole 17 came back with a single zone; the drivable par 4's big left
+  //     complex (~218-273) and its greenside sand are hand-laid from imagery.
+  //
+  // Rough is NOT modelled here: Oakmont's hay is uniform, not patches, and
+  // rides as `rough: 'severe'` on the course. See the `Rough` note in types.ts.
+  // ---------------------------------------------------------------------
+  'oakmont:1': {
+    length: 482,
+    fairwayFrom: 164,
+    fairwayTo: 468,
+    greenDepth: 24,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 66, to: 98, side: 'left' },
+      { id: 'z2', kind: 'bunker', from: 120, to: 166, side: 'left' },
+      { id: 'z3', kind: 'bunker', from: 246, to: 252, side: 'right' },
+      { id: 'z4', kind: 'bunker', from: 254, to: 260, side: 'left' },
+      { id: 'z5', kind: 'bunker', from: 274, to: 282, side: 'left' },
+      { id: 'z6', kind: 'bunker', from: 284, to: 290, side: 'right' },
+      { id: 'z7', kind: 'bunker', from: 294, to: 300, side: 'left' },
+      { id: 'z8', kind: 'bunker', from: 302, to: 310, side: 'right' },
+      { id: 'z9', kind: 'bunker', from: 312, to: 340, side: 'left' },
+      { id: 'z10', kind: 'bunker', from: 448, to: 464, side: 'left' },
+    ],
+  },
+  'oakmont:2': {
+    length: 346,
+    fairwayFrom: 123,
+    fairwayTo: 334,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 193, to: 261, side: 'right' },
+      { id: 'z2', kind: 'bunker', from: 295, to: 303, side: 'right' },
+      { id: 'z3', kind: 'bunker', from: 325, to: 343, side: 'left' },
+      { id: 'z4', kind: 'bunker', from: 343, to: 346, side: 'right' },
+    ],
+  },
+  'oakmont:3': {
+    length: 467,
+    fairwayFrom: 183,
+    fairwayTo: 452,
+    greenDepth: 26,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 220, to: 324, side: 'left' },
+      { id: 'z2', kind: 'bunker', from: 334, to: 346, side: 'right' },
+      { id: 'z3', kind: 'bunker', from: 414, to: 452, side: 'right' },
+    ],
+  },
+  'oakmont:4': {
+    length: 612,
+    fairwayFrom: 234,
+    fairwayTo: 599,
+    greenDepth: 22,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 149, to: 153, side: 'left' },
+      { id: 'z2', kind: 'bunker', from: 163, to: 171, side: 'left' },
+      { id: 'z3', kind: 'bunker', from: 235, to: 267, side: 'right' },
+      { id: 'z4', kind: 'bunker', from: 267, to: 281, side: 'cross' },
+      { id: 'z5', kind: 'bunker', from: 285, to: 305, side: 'left' },
+      { id: 'z6', kind: 'bunker', from: 305, to: 363, side: 'right' },
+      { id: 'z7', kind: 'bunker', from: 373, to: 421, side: 'right' },
+      { id: 'z8', kind: 'bunker', from: 519, to: 531, side: 'cross' },
+      { id: 'z9', kind: 'bunker', from: 531, to: 551, side: 'right' },
+      { id: 'z10', kind: 'bunker', from: 561, to: 595, side: 'right' },
+      { id: 'z11', kind: 'bunker', from: 595, to: 612, side: 'left' },
+    ],
+  },
+  'oakmont:5': {
+    length: 410,
+    fairwayFrom: 160,
+    fairwayTo: 398,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 91, to: 123, side: 'right' },
+      { id: 'z2', kind: 'bunker', from: 135, to: 165, side: 'right' },
+      { id: 'z3', kind: 'bunker', from: 249, to: 285, side: 'left' },
+      { id: 'z4', kind: 'bunker', from: 263, to: 267, side: 'right' },
+      { id: 'z5', kind: 'bunker', from: 287, to: 309, side: 'right' },
+      { id: 'z6', kind: 'bunker', from: 331, to: 339, side: 'right' },
+      { id: 'z7', kind: 'bunker', from: 353, to: 361, side: 'right' },
+      { id: 'z8', kind: 'bunker', from: 391, to: 395, side: 'cross' },
+      { id: 'z9', kind: 'bunker', from: 395, to: 410, side: 'right' },
+    ],
+  },
+  'oakmont:6': {
+    length: 203,
+    fairwayFrom: 72,
+    fairwayTo: 191,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 76, to: 84, side: 'right' },
+      { id: 'z2', kind: 'bunker', from: 166, to: 176, side: 'right' },
+      { id: 'z3', kind: 'bunker', from: 176, to: 196, side: 'cross' },
+      { id: 'z4', kind: 'bunker', from: 196, to: 200, side: 'right' },
+    ],
+  },
+  'oakmont:7': {
+    length: 487,
+    fairwayFrom: 176,
+    fairwayTo: 473,
+    greenDepth: 24,
+    zones: [
+      { id: 'z1', kind: 'trees', from: 13, to: 223, side: 'right' },
+      { id: 'z2', kind: 'bunker', from: 167, to: 187, side: 'left' },
+      { id: 'z3', kind: 'bunker', from: 315, to: 353, side: 'right' },
+      { id: 'z4', kind: 'trees', from: 463, to: 487, side: 'right' },
+      { id: 'z5', kind: 'bunker', from: 465, to: 479, side: 'right' },
+      { id: 'z6', kind: 'bunker', from: 479, to: 487, side: 'left' },
+    ],
+  },
+  'oakmont:8': {
+    length: 293,
+    fairwayFrom: 101,
+    fairwayTo: 281,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 41, to: 89, side: 'right' },
+      { id: 'z2', kind: 'trees', from: 201, to: 229, side: 'right' },
+      { id: 'z3', kind: 'bunker', from: 211, to: 293, side: 'left' },
+    ],
+  },
+  'oakmont:9': {
+    length: 471,
+    fairwayFrom: 160,
+    fairwayTo: 450,
+    greenDepth: 38,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 170, to: 188, side: 'left' },
+      { id: 'z2', kind: 'bunker', from: 190, to: 196, side: 'right' },
+      { id: 'z3', kind: 'bunker', from: 218, to: 236, side: 'right' },
+      { id: 'z4', kind: 'bunker', from: 240, to: 248, side: 'left' },
+      { id: 'z5', kind: 'bunker', from: 258, to: 266, side: 'right' },
+      { id: 'z6', kind: 'bunker', from: 280, to: 290, side: 'right' },
+      { id: 'z7', kind: 'bunker', from: 332, to: 354, side: 'left' },
+      { id: 'z8', kind: 'bunker', from: 354, to: 364, side: 'cross' },
+      { id: 'z9', kind: 'bunker', from: 366, to: 378, side: 'left' },
+      { id: 'z10', kind: 'bunker', from: 400, to: 418, side: 'left' },
+      { id: 'z11', kind: 'bunker', from: 418, to: 432, side: 'cross' },
+      { id: 'z12', kind: 'bunker', from: 432, to: 444, side: 'right' },
+    ],
+  },
+  'oakmont:10': {
+    length: 460,
+    fairwayFrom: 161,
+    fairwayTo: 448,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 208, to: 222, side: 'right' },
+      { id: 'z2', kind: 'bunker', from: 226, to: 232, side: 'left' },
+      { id: 'z3', kind: 'bunker', from: 232, to: 242, side: 'cross' },
+      { id: 'z4', kind: 'bunker', from: 242, to: 258, side: 'left' },
+      { id: 'z5', kind: 'bunker', from: 262, to: 268, side: 'cross' },
+      { id: 'z6', kind: 'bunker', from: 268, to: 280, side: 'left' },
+      { id: 'z7', kind: 'bunker', from: 280, to: 286, side: 'right' },
+      { id: 'z8', kind: 'bunker', from: 296, to: 302, side: 'left' },
+      { id: 'z9', kind: 'bunker', from: 430, to: 436, side: 'left' },
+      { id: 'z10', kind: 'bunker', from: 436, to: 442, side: 'cross' },
+      { id: 'z11', kind: 'bunker', from: 452, to: 460, side: 'right' },
+    ],
+  },
+  'oakmont:11': {
+    length: 398,
+    fairwayFrom: 153,
+    fairwayTo: 386,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 243, to: 295, side: 'left' },
+      { id: 'z2', kind: 'bunker', from: 363, to: 373, side: 'cross' },
+      { id: 'z3', kind: 'bunker', from: 373, to: 381, side: 'right' },
+      { id: 'z4', kind: 'bunker', from: 383, to: 397, side: 'cross' },
+    ],
+  },
+  'oakmont:12': {
+    length: 663,
+    fairwayFrom: 255,
+    fairwayTo: 650,
+    greenDepth: 22,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 114, to: 120, side: 'right' },
+      { id: 'z2', kind: 'bunker', from: 120, to: 134, side: 'cross' },
+      { id: 'z3', kind: 'bunker', from: 136, to: 150, side: 'left' },
+      { id: 'z4', kind: 'bunker', from: 150, to: 166, side: 'cross' },
+      { id: 'z5', kind: 'bunker', from: 166, to: 172, side: 'left' },
+      { id: 'z6', kind: 'bunker', from: 286, to: 290, side: 'cross' },
+      { id: 'z7', kind: 'bunker', from: 290, to: 312, side: 'right' },
+      { id: 'z8', kind: 'bunker', from: 324, to: 328, side: 'left' },
+      { id: 'z9', kind: 'bunker', from: 328, to: 338, side: 'cross' },
+      { id: 'z10', kind: 'bunker', from: 492, to: 544, side: 'left' },
+      { id: 'z11', kind: 'bunker', from: 524, to: 530, side: 'right' },
+      { id: 'z12', kind: 'bunker', from: 544, to: 550, side: 'cross' },
+      { id: 'z13', kind: 'bunker', from: 598, to: 606, side: 'left' },
+      { id: 'z14', kind: 'bunker', from: 642, to: 658, side: 'cross' },
+      { id: 'z15', kind: 'bunker', from: 658, to: 663, side: 'right' },
+    ],
+  },
+  'oakmont:13': {
+    length: 186,
+    fairwayFrom: 70,
+    fairwayTo: 174,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 99, to: 107, side: 'left' },
+      { id: 'z2', kind: 'bunker', from: 151, to: 155, side: 'right' },
+      { id: 'z3', kind: 'bunker', from: 161, to: 165, side: 'left' },
+      { id: 'z4', kind: 'bunker', from: 177, to: 183, side: 'right' },
+    ],
+  },
+  'oakmont:14': {
+    length: 381,
+    fairwayFrom: 160,
+    fairwayTo: 367,
+    greenDepth: 24,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 189, to: 197, side: 'left' },
+      { id: 'z2', kind: 'bunker', from: 219, to: 239, side: 'left' },
+      { id: 'z3', kind: 'bunker', from: 239, to: 245, side: 'cross' },
+      { id: 'z4', kind: 'bunker', from: 245, to: 251, side: 'right' },
+      { id: 'z5', kind: 'bunker', from: 265, to: 273, side: 'right' },
+      { id: 'z6', kind: 'bunker', from: 277, to: 291, side: 'left' },
+      { id: 'z7', kind: 'bunker', from: 297, to: 303, side: 'cross' },
+      { id: 'z8', kind: 'bunker', from: 323, to: 329, side: 'left' },
+      { id: 'z9', kind: 'bunker', from: 329, to: 333, side: 'right' },
+      { id: 'z10', kind: 'bunker', from: 353, to: 363, side: 'cross' },
+      { id: 'z11', kind: 'bunker', from: 363, to: 381, side: 'left' },
+    ],
+  },
+  'oakmont:15': {
+    length: 509,
+    fairwayFrom: 192,
+    fairwayTo: 495,
+    greenDepth: 24,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 21, to: 77, side: 'right' },
+      { id: 'z2', kind: 'bunker', from: 93, to: 121, side: 'left' },
+      { id: 'z3', kind: 'bunker', from: 129, to: 133, side: 'right' },
+      { id: 'z4', kind: 'bunker', from: 143, to: 193, side: 'right' },
+      { id: 'z5', kind: 'bunker', from: 285, to: 299, side: 'right' },
+      { id: 'z6', kind: 'bunker', from: 341, to: 347, side: 'right' },
+      { id: 'z7', kind: 'bunker', from: 447, to: 509, side: 'right' },
+    ],
+  },
+  'oakmont:16': {
+    length: 237,
+    fairwayFrom: 91,
+    fairwayTo: 225,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 55, to: 85, side: 'left' },
+      { id: 'z2', kind: 'bunker', from: 193, to: 199, side: 'left' },
+      { id: 'z3', kind: 'bunker', from: 209, to: 225, side: 'right' },
+      { id: 'z4', kind: 'bunker', from: 229, to: 237, side: 'left' },
+    ],
+  },
+  'oakmont:17': {
+    length: 317,
+    fairwayFrom: 114,
+    fairwayTo: 305,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 218, to: 273, side: 'left' },
+      { id: 'z2', kind: 'bunker', from: 296, to: 317, side: 'right' },
+      { id: 'z3', kind: 'bunker', from: 303, to: 317, side: 'left' },
+    ],
+  },
+  'oakmont:18': {
+    length: 505,
+    fairwayFrom: 188,
+    fairwayTo: 493,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 55, to: 95, side: 'right' },
+      { id: 'z2', kind: 'bunker', from: 253, to: 283, side: 'right' },
+      { id: 'z3', kind: 'bunker', from: 297, to: 325, side: 'left' },
+      { id: 'z4', kind: 'bunker', from: 335, to: 343, side: 'right' },
+      { id: 'z5', kind: 'bunker', from: 407, to: 415, side: 'left' },
+      { id: 'z6', kind: 'bunker', from: 415, to: 421, side: 'cross' },
+      { id: 'z7', kind: 'bunker', from: 421, to: 429, side: 'right' },
+      { id: 'z8', kind: 'bunker', from: 465, to: 471, side: 'left' },
+      { id: 'z9', kind: 'bunker', from: 471, to: 491, side: 'right' },
+      { id: 'z10', kind: 'bunker', from: 491, to: 503, side: 'left' },
     ],
   },
 }

@@ -81,6 +81,8 @@ interface ZonePlace {
   anchor: Pt
   /** ellipses to draw (bunkers, ponds, clusters) — empty for band/flank/trees */
   ellipses: { cx: number; cy: number; rx: number; ry: number }[]
+  /** long side bunkers draw as a ribbon along the hole instead of ellipses */
+  ribbon?: { from: number; to: number; offYd: number; halfYd: number }
   kind: HazardZone['kind']
 }
 
@@ -235,6 +237,35 @@ function ribbonPath(geo: Geo, from: number, to: number, widthYd: (t: number) => 
   }
   return `M${leftPts.join(' L')} L${rightPts.join(' L')} Z`
 }
+
+/**
+ * A sand ribbon running ALONGSIDE the hole: centred `offYd` off the centreline
+ * (signed, golfer-left positive) and `halfYd` wide, tapered at both ends so it
+ * reads as a shaped bunker rather than a cut bar.
+ *
+ * Long bunkers used to draw as a single ~10-yd pot no matter their length,
+ * which is how Oakmont's 104-yd Church Pews rendered as a blob you could miss
+ * entirely — on a hole whose own signature line names them.
+ */
+function sideRibbonPath(geo: Geo, from: number, to: number, offYd: number, halfYd: number): string {
+  const STEPS = 24
+  const near: string[] = []
+  const far: string[] = []
+  for (let i = 0; i <= STEPS; i++) {
+    const t = i / STEPS
+    const yards = from + (to - from) * t
+    const p = geo.at(yards)
+    const n = geo.normalAt(yards)
+    const w = halfYd * Math.sin(t * Math.PI) ** 0.3 * geo.uPerYd
+    const c = offYd * geo.uPerYd
+    near.push(`${(p.x + n.x * (c - w)).toFixed(1)},${(p.y + n.y * (c - w)).toFixed(1)}`)
+    far.unshift(`${(p.x + n.x * (c + w)).toFixed(1)},${(p.y + n.y * (c + w)).toFixed(1)}`)
+  }
+  return `M${near.join(' L')} L${far.join(' L')} Z`
+}
+
+/** Side bunkers at least this long draw as a ribbon instead of a pot. */
+const LONG_BUNKER_YD = 32
 
 // Hazard kinds whose importer-split zones we stitch back into one drawn shape.
 // Ocean (a seaward half-plane) and trees/deeprough (scattered sprites) are not
@@ -511,6 +542,23 @@ function placeZones(layout: HoleLayout, geo: Geo): Map<string, ZonePlace> {
       continue
     }
 
+    // Long side bunkers (waste bunkers, the Church Pews) run ALONGSIDE the
+    // hole, so draw them at their true length rather than collapsing a 100-yd
+    // hazard into one pot the eye reads as incidental.
+    if (z.kind === 'bunker' && (z.side === 'left' || z.side === 'right') && span >= LONG_BUNKER_YD) {
+      const halfYd = z.style === 'pews' ? 11 : 8
+      const offYd = sideSign * (corridorYd + halfYd + 2)
+      const a = geo.at(mid)
+      const nn = geo.normalAt(Math.min(mid, L - 1))
+      out.set(z.id, {
+        anchor: { x: a.x + nn.x * offYd * u, y: a.y + nn.y * offYd * u },
+        ellipses: [],
+        ribbon: { from: z.from, to: z.to, offYd, halfYd },
+        kind: z.kind,
+      })
+      continue
+    }
+
     // side bunkers & ponds: true yardage, just past the corridor edge
     const rxYd = z.kind === 'bunker' ? Math.min(10, 4 + span * 0.25) : Math.min(22, 9 + span * 0.35)
     const offYd = corridorYd + rxYd * 0.75 + 2
@@ -760,6 +808,42 @@ export function HoleMap(props: {
         <g key={z.id} opacity={0.5}>
           <ellipse cx={pp.x} cy={pp.y} rx={clampPx(14 * uPerYd, 12, 40)} ry={clampPx(9 * uPerYd, 8, 27)} fill="#28502f" />
           <ellipse cx={pp.x - 14} cy={pp.y + 10} rx={clampPx(8 * uPerYd, 8, 24)} ry={clampPx(5 * uPerYd, 5, 16)} fill="#2b5433" />
+        </g>
+      )
+    }
+    // long side bunkers: one sand ribbon at true length. The Church Pews get
+    // their ladder — sand crossed by grass rungs, which is what the real
+    // hazard is and why the hole's signature line calls it a ladder.
+    if (place.ribbon) {
+      const r = place.ribbon
+      const rungs = []
+      if (z.style === 'pews') {
+        const every = 8
+        for (let y = r.from + 5; y < r.to - 3; y += every) {
+          const t = (y - r.from) / (r.to - r.from)
+          const w = r.halfYd * Math.sin(t * Math.PI) ** 0.3 * uPerYd
+          const pp = at(y)
+          const nn = normalAt(y)
+          const c = r.offYd * uPerYd
+          rungs.push(
+            <line
+              key={y}
+              x1={pp.x + nn.x * (c - w)}
+              y1={pp.y + nn.y * (c - w)}
+              x2={pp.x + nn.x * (c + w)}
+              y2={pp.y + nn.y * (c + w)}
+              stroke="#4f7d45"
+              strokeWidth={clampPx(2.4 * uPerYd, 1.4, 6)}
+              strokeLinecap="round"
+            />,
+          )
+        }
+      }
+      return (
+        <g key={z.id}>
+          <path d={sideRibbonPath(geo, r.from, r.to, r.offYd + 0.6, r.halfYd)} fill="#a8916a" opacity={0.7} />
+          <path d={sideRibbonPath(geo, r.from, r.to, r.offYd, r.halfYd)} fill="#e2d2a8" stroke="#b49b6c" strokeWidth={1.3} />
+          {rungs}
         </g>
       )
     }

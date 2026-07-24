@@ -163,6 +163,22 @@ find the polygon name for a new course, query Overpass for
    Hunt specifically for the artifact modes listed above,
    and fix by hand **with a comment explaining the deviation from the raw
    import** (`tpc-sawgrass:2`, `harbour-town:4`/`18` are the house style).
+   - **Anything the copy names, the geometry must contain.** Walk every
+     `signature` string on the course's tuples (and any `landmark`) and check
+     the feature it names is actually *there* — a zone at the right yardage,
+     on the right side, big enough to matter, and drawn so a player can see
+     it. Promising something the map doesn't show is worse than staying quiet:
+     the copy is the game telling you where the danger is, so if it names the
+     Church Pews and the map shows two ordinary blobs, the hole is lying.
+     This is the check that caught Oakmont 3 — the geometry had the Pews as a
+     104-yd bunker all along, but the map drew every side bunker as one ~10-yd
+     pot regardless of length, so the course's most famous hazard was
+     invisible. Fix the geometry when the feature is missing; fix the
+     *rendering* when it's present but doesn't read. If a hazard's real shape
+     is famous enough that a generic blob misreads the hole, that's what
+     `ZoneStyle` is for (`style: 'pews'`) — cosmetic only, never in the odds.
+     Conversely, if imagery says the named feature isn't really in play,
+     change the copy rather than inventing geometry to justify it.
 5. **Landmark pass.** While you're in the imagery, ask: does any hole have a
    *classic, instantly-recognizable structure* a golfer would expect to see on
    the map? (Harbour Town 18's candy-striped lighthouse is the archetype;

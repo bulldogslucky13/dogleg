@@ -108,6 +108,18 @@ export interface Conditions {
 export type ZoneKind = 'water' | 'ocean' | 'bunker' | 'trees' | 'deeprough'
 export type ZoneSide = 'left' | 'right' | 'cross' | 'green'
 
+/**
+ * Optional drawing treatment for a zone whose real-world shape is famous
+ * enough that a generic blob misreads the hole — currently just Oakmont's
+ * Church Pews, the ladder of sand between the 3rd and 4th.
+ *
+ * PURE MAP FLAVOR: the odds engine never reads it, so it is not
+ * replay-affecting and needs no ENGINE_VERSION bump — same contract as
+ * `bend` and `landmark`. Reach for it only when a hole's signature copy
+ * names a feature by name; otherwise the normal shapes are the house style.
+ */
+export type ZoneStyle = 'pews'
+
 /** A hazard zone along the hole line. from/to are yards from the tee. */
 export interface HazardZone {
   id: string
@@ -115,6 +127,8 @@ export interface HazardZone {
   from: number
   to: number
   side: ZoneSide
+  /** cosmetic drawing treatment — map only, never read by the odds */
+  style?: ZoneStyle
 }
 
 export interface HoleLayout {

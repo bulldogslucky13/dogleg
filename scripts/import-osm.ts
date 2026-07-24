@@ -109,6 +109,11 @@ const COURSE_GEO: Record<string, CourseGeo> = {
   // Dunluce centrelines are mapped and named (Calamity Corner, White Rocks).
   // Radius reaches past the 807 m polygon for the Atlantic coastline.
   portrush: { name: 'Royal Portrush — Dunluce', center: [55.2028, -6.6253], radius: 1600, osmName: 'Dunluce Links', engineSlug: 'royal-portrush-dunluce' },
+  // Oakmont is one clean multipolygon (rel 6174192, wikidata Q3347853) with no
+  // neighbouring course inside the radius, so the name alone pins it. Anchor
+  // the name to avoid the Oakmont Country Club in Glendale CA and Oakmont Golf
+  // Club in Santa Rosa — different courses that share the word.
+  oakmont: { name: 'Oakmont Country Club', center: [40.529, -79.825], radius: 1400, osmName: '^Oakmont Country Club$', engineSlug: 'oakmont' },
 }
 
 // ---------- Overpass ----------

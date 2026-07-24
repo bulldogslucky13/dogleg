@@ -743,26 +743,40 @@ export const COURSES: CourseSpec[] = [
     difficulty: 10,
     greens: 'Fast',
     wind: 8,
+    // The reference case for 'severe': Oakmont's rough is the whole point of
+    // Oakmont (rating 77.6 / slope 143 off the Championship tees), and unlike
+    // gorse it is uniform hay rather than mappable patches — exactly what the
+    // dial is for. See the `Rough` note in types.ts.
+    rough: 'severe',
+    roughLabel: 'hay',
     blurb: 'The hardest course in America — Church Pew bunkers and greens like polished glass.',
+    // YDS / PAR / HCP from the club's Championship card (par 70, 7,427, rating
+    // 77.6 / slope 143): course.bluegolf.com/bluegolf/course/course/oakmontcc1.
+    // NB there is also an Oakmont Country Club in Glendale, CA whose card is a
+    // par-71 7,005 — a different course entirely; `oakmontcc` is that one.
+    // Par was already right on all 18; 11 of 18 stroke indexes were not. The
+    // tell: a real card runs all-odd on one nine and all-even on the other,
+    // and the shipped tuple mixed them, so the SIs had been invented. SI feeds
+    // pressure() in the odds, so this was mis-weighting most of the round.
     holes: holes([
-      [4, 488, 5, 'S', 'sand'],
-      [4, 346, 13, 'S', 'sand'],
-      [4, 462, 7, 'L', 'sand', 'The Church Pews — a ladder of sand you daren’t pray from'],
-      [5, 611, 9, 'L', 'sand'],
-      [4, 408, 11, 'R', 'sand'],
-      [3, 200, 15, 'S', 'sand'],
-      [4, 485, 3, 'S', 'sand'],
-      [3, 289, 17, 'S', 'sand', 'A par 3 of nearly 300 yards — reach for the driver'],
-      [4, 477, 1, 'S', 'sand'],
-      [4, 461, 4, 'R', 'sand'],
-      [4, 379, 14, 'S', 'sand'],
-      [5, 632, 8, 'S', 'sand'],
-      [3, 183, 16, 'S', 'sand'],
-      [4, 379, 12, 'S', 'sand'],
-      [4, 507, 2, 'L', 'sand'],
-      [3, 231, 10, 'S', 'sand'],
-      [4, 312, 18, 'S', 'sand'],
-      [4, 502, 6, 'S', 'sand'],
+      [4, 482, 5, 'S', 'sand'],
+      [4, 346, 9, 'S', 'sand'],
+      [4, 467, 1, 'L', 'sand', 'The Church Pews — a ladder of sand you daren’t pray from'],
+      [5, 612, 13, 'L', 'sand'],
+      [4, 410, 7, 'R', 'sand'],
+      [3, 203, 15, 'S', 'sand'],
+      [4, 487, 3, 'S', 'sand'],
+      [3, 293, 11, 'S', 'sand', 'A par 3 of nearly 300 yards — reach for the driver'],
+      [4, 471, 17, 'S', 'sand'],
+      [4, 460, 6, 'R', 'sand'],
+      [4, 398, 14, 'S', 'sand'],
+      [5, 663, 8, 'S', 'sand'],
+      [3, 186, 18, 'S', 'sand'],
+      [4, 381, 12, 'S', 'sand'],
+      [4, 509, 2, 'L', 'sand'],
+      [3, 237, 16, 'S', 'sand'],
+      [4, 317, 10, 'S', 'sand'],
+      [4, 505, 4, 'S', 'sand'],
     ]),
   },
   {

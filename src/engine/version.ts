@@ -23,4 +23,6 @@
  * sides pick up the new number together; only clients holding a stale bundle
  * see the handshake fail, which is exactly the point.
  */
-export const ENGINE_VERSION = 3 // Carnoustie real geometry (OSM import + hand-laid burns); 2 was the Harbour Town Heritage-tee card fix
+// v2 = #65 (Harbour Town scorecard + geometry). v3 = #71 (greenside odds
+// weight). v4 = Carnoustie real geometry (OSM import + hand-laid burns).
+export const ENGINE_VERSION = 4

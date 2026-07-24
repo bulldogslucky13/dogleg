@@ -117,6 +117,25 @@ export function buildLayout(courseSlug: string, spec: HoleSpec, cond?: Condition
   return { spec, length: L, zones, fairwayFrom, fairwayTo, greenDepth }
 }
 
+/**
+ * A bunker close enough to the green to play as *greenside* sand — it guards the
+ * green rather than being a fairway carry (`cross`) or a lateral miss
+ * (`left`/`right`). True when the bunker reaches the green front (within 8 yд)
+ * and is compact (≤45 yд), so long waste bunkers that merely run up to the green
+ * (e.g. Harbour Town 5's 82-yд z8) stay what they are.
+ *
+ * Distance-derived on purpose: the zone keeps its real `side` so the map still
+ * draws it on the correct side of the green; only the odds treat it as
+ * greenside (a middling weight — see `hazardShares` in odds.ts). Read by both
+ * the odds engine and the referee via the same buildLayout output, so client
+ * and validator stay in agreement.
+ */
+export function isGreenside(zone: HazardZone, length: number, greenDepth: number): boolean {
+  if (zone.kind !== 'bunker') return false
+  const greenFront = length - greenDepth / 2
+  return zone.to >= greenFront - 8 && zone.to - zone.from <= 45
+}
+
 /** Zones that overlap [from,to] on the given side reach. Zones fully behind `ballPos` never count. */
 export function reachableZones(
   layout: HoleLayout,

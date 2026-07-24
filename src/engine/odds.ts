@@ -11,7 +11,7 @@ import type {
   ShortOdds,
 } from './types'
 import { DART_BUFF, FAIRWAY_BUFF, GREENS_BUFF } from './characters'
-import { reachableZones } from './layout'
+import { reachableZones, isGreenside } from './layout'
 
 const clamp01 = (x: number) => Math.max(0, Math.min(1, x))
 
@@ -105,7 +105,13 @@ function hazardShares(
   let total = 0
   const raw: { zone: HazardZone; bucket: 'water' | 'sand' | 'trees'; w: number }[] = []
   for (const { zone, overlap } of reach) {
-    const sideW = zone.side === 'cross' ? 1.15 : zone.side === 'green' ? 1 : 0.85
+    // A greenside bunker guards the green: weight it between a forced carry
+    // (cross) and a lateral miss (side), regardless of which side it sits on.
+    const sideW = isGreenside(zone, layout.length, layout.greenDepth)
+      ? 1
+      : zone.side === 'cross'
+        ? 1.15
+        : 0.85
     const w = overlap * sideW * KIND_SEVERITY[zone.kind] * CHALLENGE[choice]
     if (w > 0.001) {
       raw.push({ zone, bucket: KIND_BUCKET[zone.kind], w })

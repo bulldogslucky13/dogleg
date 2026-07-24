@@ -269,6 +269,15 @@ const LONG_BUNKER_YD = 32
 /** Deep rough at least this long draws as a continuous band down the side. */
 const LONG_ROUGH_YD = 45
 
+/** Draw order by hazard kind — see the note where zoneEls is built. */
+const PAINT_RANK: Record<HazardZone['kind'], number> = {
+  deeprough: 0,
+  trees: 0,
+  water: 1,
+  ocean: 1,
+  bunker: 2,
+}
+
 // Hazard kinds whose importer-split zones we stitch back into one drawn shape.
 // Ocean (a seaward half-plane) and trees/deeprough (scattered sprites) are not
 // footprint hazards, so they keep their own rendering.
@@ -915,9 +924,16 @@ export function HoleMap(props: {
     )
   }
 
-  // All zones in their authored order, so a shoreline bunker still sits on top
-  // of a flank lake as intended.
-  const zoneEls = layout.zones.map(renderZone)
+  // Paint order: ground cover (deep rough, trees) first, then water, then sand
+  // on top. A trap is somewhere the ball can actually come to rest, and the
+  // ball marker anchors to its zone — so a bunker buried under the band of
+  // rough beside it would put your ball in a hazard the map isn't showing.
+  // Stable within a rank, so authored order still breaks ties and a shoreline
+  // bunker keeps sitting on top of a flank lake as intended.
+  const zoneEls = layout.zones
+    .map((z, i) => ({ z, i }))
+    .sort((a, b) => PAINT_RANK[a.z.kind] - PAINT_RANK[b.z.kind] || a.i - b.i)
+    .map(({ z }) => renderZone(z))
   // A `cross` bunker is sand you thread, not a wall: lay a slim strip of fairway
   // (LANE_HALF yд half-width) back down the middle of the corridor, over
   // everything, so crossing sand keeps a visible lane through it and a

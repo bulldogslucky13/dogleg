@@ -317,7 +317,13 @@ export function HazardChips(props: { hole: HoleInPlay }) {
   const ahead = layout.zones.filter((z) => z.to > ball.pos + 2)
   if (ahead.some((z) => z.kind === 'ocean')) chips.push('Ocean in play')
   else if (ahead.some((z) => z.kind === 'water')) {
-    const cross = ahead.find((z) => z.kind === 'water' && z.side === 'cross')
+    // "Water crosses at N yds" is a carry number, so it's only honest when the
+    // crossing's NEAR edge is still ahead of the ball. A cross zone survives the
+    // `ahead` filter on its far edge (z.to), so once the ball has drawn level
+    // with or past `from` the carry goes to zero-or-negative — that's the ball
+    // sitting beside the hazard, not a shot that must clear it. Report the carry
+    // only for a crossing genuinely in front; otherwise it's plain "in play".
+    const cross = ahead.find((z) => z.kind === 'water' && z.side === 'cross' && z.from > ball.pos + 2)
     chips.push(cross ? `Water crosses at ${Math.round(cross.from - ball.pos)} yds` : 'Water in play')
   } else if (layout.zones.some((z) => z.kind === 'water' || z.kind === 'ocean')) {
     chips.push('Water behind you — out of play')

@@ -241,6 +241,9 @@ function ribbonPath(geo: Geo, from: number, to: number, widthYd: (t: number) => 
 // footprint hazards, so they keep their own rendering.
 const MERGE_KINDS = new Set<HazardZone['kind']>(['bunker', 'water'])
 
+// Every hazard kind a dry/rough ball must not be *drawn* sitting on top of.
+const HAZARD_KINDS = new Set<HazardZone['kind']>(['water', 'ocean', 'bunker', 'trees', 'deeprough'])
+
 /** Signed lateral band [lo, hi] (yards from centreline, golfer-left positive)
  * that a single zone covers at a given yardage. `cor` is the corridor
  * half-width in yards there. Water carries more visual body than sand and sits
@@ -633,7 +636,30 @@ export function HoleMap(props: {
       const sideX = b.side === 'left' ? -1 : 1
       return { x: greenPt.x + sideX * (greenRx + 4 * uPerYd), y: greenPt.y + greenRy * 0.45 }
     }
-    const offYd = (b.side === 'left' ? 1 : b.side === 'right' ? -1 : 0) * (b.lie === 'rough' || b.lie === 'trees' ? 20 : 10)
+    // golfer-left normal is +1 (matches placeZones' sideSign), so the ball's
+    // own side sets the sign: left → +1, right → -1.
+    let sideDir = b.side === 'left' ? 1 : b.side === 'right' ? -1 : 0
+    // A ball that isn't IN a hazard must never be *drawn* on top of one. The
+    // fixed lateral offset knows nothing about hazards hugging the corridor, so
+    // a rough/fairway lie on the trouble side lands on the painted lake, bunker,
+    // or grove (the "ball in the water" look on Carnoustie 17 — but the same
+    // goes for sand and trees). If the ball's side is blocked at this yardage
+    // and the far flank is clear, draw it on the clear side. A hazard straddling
+    // both flanks (a crossing) can't be dodged — leave those alone. We skip the
+    // ball's OWN hazard kind so an un-anchored sand or punch-out-from-trees lie
+    // can still rest in the sand / trees it's genuinely in.
+    if (sideDir !== 0) {
+      const ownKind: HazardZone['kind'][] =
+        b.lie === 'sand' ? ['bunker'] : b.lie === 'trees' ? ['trees', 'deeprough'] : []
+      const near = layout.zones.filter(
+        (z) => HAZARD_KINDS.has(z.kind) && !ownKind.includes(z.kind) && b.pos > z.from - 4 && b.pos < z.to + 4,
+      )
+      const blockLeft = near.some((z) => z.side === 'left' || z.side === 'cross')
+      const blockRight = near.some((z) => z.side === 'right' || z.side === 'cross')
+      if (sideDir > 0 && blockLeft && !blockRight) sideDir = -1
+      else if (sideDir < 0 && blockRight && !blockLeft) sideDir = 1
+    }
+    const offYd = sideDir * (b.lie === 'rough' || b.lie === 'trees' ? 20 : 10)
     const bn = normalAt(Math.min(b.pos, L - 1))
     const p = at(b.pos)
     return { x: p.x + bn.x * offYd * uPerYd, y: p.y + bn.y * offYd * uPerYd }

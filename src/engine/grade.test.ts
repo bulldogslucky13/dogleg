@@ -3,7 +3,7 @@ import { COURSES } from './courses'
 import { buildLayout } from './layout'
 import { splitFortune } from './fortune'
 import type { FortuneShotOdds } from './odds'
-import { oddsFor, playShot, startHole, type HoleInPlay } from './resolve'
+import { aceEligible, oddsFor, playShot, startHole, type HoleInPlay } from './resolve'
 import { rngFromString } from './rng'
 import { destinyPlan, fortuneOddsFor, replayRound, setupFromSeed } from './replay'
 import { evaluateChoice, gradeCopy, gradeRound, type GradeInput, type RoundGrade } from './grade'
@@ -39,7 +39,7 @@ function genDecisions(seed: string, character: CharacterId | undefined, policy: 
       if (choice === 'aggressive' && budgeted && aggLeft <= 0) choice = 'normal'
       if (choice === 'aggressive' && budgeted) aggLeft--
       let destiny: 'ace' | 'albatross' | undefined
-      if (plan.ace && spec.par === 3 && h.ball.lie === 'tee') {
+      if (plan.ace && aceEligible(h, choice)) {
         destiny = 'ace'
         plan.ace = false
       } else if (plan.albatross && h.stage === 'second' && choice === 'aggressive' && h.strokes === 1) {
@@ -404,7 +404,11 @@ describe('gradeRound: calibration (Monte Carlo)', () => {
     const meanLoss = sumLoss / shotCount
     // eslint-disable-next-line no-console
     console.log('[grade calibration] greedy-by-Q:', JSON.stringify({ meanDiff, meanLoss, shotCount }))
-    expect(Math.abs(meanDiff)).toBeLessThan(0.7)
+    // 0.75, not 0.7, since Cypress 16 became a bail-out par 3 — the model was
+    // verified exact there (live MC matches Q to ≤0.003) and the cost is the
+    // documented budget-rationing, not drift. See docs/GRADING.md §6 before
+    // moving this again.
+    expect(Math.abs(meanDiff)).toBeLessThan(0.75)
     expect(meanLoss).toBeLessThan(0.1)
   }, 30000)
 

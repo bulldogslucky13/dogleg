@@ -116,13 +116,55 @@ export function startHole(
     cond,
     character,
     fortuneOdds,
-    stage: layout.spec.par === 3 ? 'approach' : 'tee',
+    // A bail-out par 3 poses a par 5's second-shot question from the tee — lay
+    // up to the corner, or take the hazard on — so it starts in that stage and
+    // reuses the whole layup/go branch. See `Bailout` in types.ts.
+    stage: layout.spec.par === 3 ? (layout.bailout ? 'second' : 'approach') : 'tee',
     ball: { pos: 0, lie: 'tee', side: 'center' },
     strokes: 0,
     penalties: 0,
     shots: [],
     status: { tone: 'even', title: `Hole ${layout.spec.number}`, note: pinTeeNote(layout.pin) ?? 'Pick your line.' },
   }
+}
+
+/**
+ * The attacking option out of the `second` stage. On a par 5 it's the go-for-it
+ * second; on a bail-out par 3 it's still a tee shot at a par-3 flag, so it keeps
+ * `par3tee` — that's what carries today's pin, the par-3 approach table, and the
+ * ace odds. Declining the bail-out must never cost you the hole-in-one.
+ *
+ * Exported (not just used internally) so `grade.ts`'s post-round `detailFor`
+ * can share this exact rule instead of re-deriving it — see `aceFiringChoice`
+ * below for the same reasoning applied to destiny detection.
+ */
+export function secondGoMode(par: number): ApproachMode {
+  return par === 3 ? 'par3tee' : 'go'
+}
+
+/**
+ * Can `choice` possibly hole out for the ace on a par-3 tee shot? True for
+ * every choice on an ordinary par 3. A bail-out par 3 is the exception: laying
+ * up cannot possibly finish in the cup, so it must not CONSUME a due destiny
+ * either — spending the guarantee on a shot that can't fire it would silently
+ * break the promise fortune.ts makes.
+ *
+ * Exported so `grade.ts`'s own destiny-attribution pass (a 5th site, alongside
+ * store/replay/replayFrames below) can gate on the identical rule instead of
+ * re-deriving it — see `aceEligible`, which wraps this for the live-play sites
+ * that have a full `HoleInPlay` to hand.
+ */
+export function aceFiringChoice(bailout: HoleLayout['bailout'], choice: Choice): boolean {
+  return bailout ? choice === 'aggressive' : true
+}
+
+/**
+ * Can THIS shot hole out for an ace? Every destiny site (store, replay,
+ * replayFrames, grade) gates on this or on `aceFiringChoice` directly.
+ */
+export function aceEligible(h: HoleInPlay, choice: Choice): boolean {
+  if (h.layout.spec.par !== 3 || h.ball.lie !== 'tee') return false
+  return aceFiringChoice(h.layout.bailout, choice)
 }
 
 function approachMode(h: HoleInPlay): ApproachMode {
@@ -141,7 +183,7 @@ export function oddsFor(h: HoleInPlay, choice: Choice): Odds {
       return longOdds(h.layout, h.cond, h.ball, choice, 'tee', h.character).odds
     case 'second':
       return choice === 'aggressive'
-        ? approachOdds(h.layout, h.cond, h.ball, choice, 'go', h.character, h.fortuneOdds).odds
+        ? approachOdds(h.layout, h.cond, h.ball, choice, secondGoMode(h.layout.spec.par), h.character, h.fortuneOdds).odds
         : longOdds(h.layout, h.cond, h.ball, choice, 'layup', h.character).odds
     case 'approach':
       return approachOdds(h.layout, h.cond, h.ball, choice, approachMode(h), h.character, h.fortuneOdds).odds
@@ -240,7 +282,7 @@ export function playShot(h: HoleInPlay, choice: Choice, rng: Rng, destiny?: 'ace
     case 'tee':
     case 'second': {
       if (h.stage === 'second' && choice === 'aggressive') {
-        resolveApproach(h, choice, rng, faced, 'go', destiny)
+        resolveApproach(h, choice, rng, faced, secondGoMode(h.layout.spec.par), destiny)
         return h
       }
       const mode = h.stage === 'tee' ? 'tee' : 'layup'
@@ -294,6 +336,16 @@ export function playShot(h: HoleInPlay, choice: Choice, rng: Rng, destiny?: 'ace
           side: bucket === 'rough' ? (rng() < 0.5 ? 'left' : 'right') : 'center',
         }
       }
+
+      // A lay-up to a bail-out finishes on the bail-out's side of the dogleg —
+      // that's the whole point of the shot, and both the map and the short-side
+      // logic downstream read it. Grass outcomes only: the rough branch would
+      // otherwise flip a coin and strand the ball on the hazard side (at
+      // Cypress 16 that side is the Pacific), while sand/trees legitimately
+      // take their side from the zone the ball actually found.
+      const bail = h.layout.bailout
+      const onGrass = bucket === 'dialed' || bucket === 'fairway' || bucket === 'rough'
+      if (bail && mode === 'layup' && onGrass) after.side = bail.side
 
       h.ball = after
       const advantage = h.stage === 'tee' ? (longAdvantage(h.layout, h.cond, preBall, choice, h.character, bucket) ?? undefined) : undefined

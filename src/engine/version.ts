@@ -29,4 +29,12 @@
 // SIs were wrong, and SI feeds pressure() in the odds), and the course-level
 // rough-severity dial (CourseSpec.rough) with Portrush tagged 'penal'. One
 // version covers all three: v5 has never been deployed, so they ship together.
-export const ENGINE_VERSION = 5
+// v6 = Cypress Point real geometry (OSM import, three imagery-verified hand
+// fixes) and its stroke-index fix — 16 of 18 SIs were wrong, and SI feeds
+// pressure() in the odds, so both halves change what a seed replays into.
+// v7 = the bail-out par 3 (`Bailout` in types.ts): a par 3 that doglegs round
+// its hazard starts in the `second` stage, so safe/normal lay up and only
+// aggressive goes at the flag. Cypress 16 is the first, re-laid along the line
+// it is actually played. Changes the stage machine, the odds and the geometry —
+// every part of what a seed replays into.
+export const ENGINE_VERSION = 7

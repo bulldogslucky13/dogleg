@@ -1,6 +1,6 @@
 import { buildLayout } from '../engine/layout'
 import { dailySalt, practiceSetup, localDateKey, type DailySetup } from '../engine/daily'
-import { startHole, playShot, type HoleInPlay } from '../engine/resolve'
+import { aceEligible, aceFiringChoice, startHole, playShot, type HoleInPlay } from '../engine/resolve'
 import { rngFromString, skip, type Rng } from '../engine/rng'
 import type { CharacterId, Choice, Conditions, HoleResult, HoleScore, Stage } from '../engine/types'
 import { courseBySlug } from '../engine/courses'
@@ -799,10 +799,21 @@ function destinyFor(state: RoundState, h: HoleInPlay, choice: Choice): 'ace' | '
   const plan = destinyPlan(info)
   const course = courseBySlug(state.courseSlug)
   if (!course) return undefined
-  const spec = course.holes[state.currentHole]
-  if (plan.ace && spec.par === 3 && h.ball.lie === 'tee') {
-    const earlierPar3 = course.holes.slice(0, state.currentHole).some((hh) => hh.par === 3)
-    if (!earlierPar3) return 'ace'
+  if (plan.ace && aceEligible(h, choice)) {
+    // "an earlier par-3 hole happened" used to be equivalent to "the ace's one
+    // chance already happened" — every par-3 tee shot was ace-eligible. A
+    // bail-out par 3 breaks that: laying up (safe/normal) leaves zero
+    // ace-eligible shots on that hole, so it must NOT count as an earlier
+    // chance the way an ordinary par 3, or an aggressive bail-out attempt,
+    // does. Mirrors the albatross guard below: check what was actually
+    // played, not just the hole's par.
+    const earlierAceShot = course.holes.slice(0, state.currentHole).some((hh, i) => {
+      if (hh.par !== 3) return false
+      const firstChoice = state.scores[i]?.shots[0]?.choice
+      if (!firstChoice) return false
+      return aceFiringChoice(buildLayout(course.slug, hh, info.cond).bailout, firstChoice)
+    })
+    if (!earlierAceShot) return 'ace'
   }
   // an albatross attempt only qualifies while the shot is still FOR 2 —
   // after a tee penalty the go would finish as an eagle, so it neither

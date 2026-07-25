@@ -291,17 +291,21 @@ export default function App() {
 
   // Clubhouse decision stats (Layer 2): the real-tally headline for the CURRENT
   // hole's opening stage (the headline decision), from today's posted rounds.
-  // Par 3s start in the approach stage — no tee rows ever exist for them.
-  // Daily only — practice has no shared field to tally against — and null
-  // whenever the rows haven't loaded (or the backend is unavailable), in
-  // which case the cast lines above stand alone, unchanged.
+  // Read off `hole.shots[0]` — the stage actually faced and recorded — rather
+  // than re-deriving it from par: a bail-out par 3 (see `Bailout` in
+  // engine/types.ts) opens in `second`, not `approach`, and a stale par-based
+  // guess would query for rows that don't exist, silently emptying the tally
+  // for that hole. Daily only — practice has no shared field to tally against
+  // — and null whenever the rows haven't loaded (or the backend is
+  // unavailable, or the hole hasn't recorded an opening shot yet), in which
+  // case the cast lines above stand alone, unchanged.
   const clubhouseTally = useMemo(() => {
     if (!round || round.mode !== 'daily' || !holeChoices) return null
-    const par = courseBySlug(round.courseSlug)?.holes[round.currentHole]?.par
-    const stage = par === 3 ? 'approach' : 'tee'
+    const stage = hole?.shots[0]?.stage
+    if (!stage) return null
     const grouped = groupChoices(holeChoices, round.currentHole + 1, stage)
     return clubhouseLine(grouped, stage)
-  }, [round?.mode, round?.courseSlug, round?.currentHole, holeChoices])
+  }, [round?.mode, round?.currentHole, holeChoices, hole])
 
   // the swing coach's report replays the whole round's EV model — memoize so unrelated
   // state changes on the result screen don't recompute it
@@ -773,6 +777,7 @@ export default function App() {
             onNext={next}
             castLines={cast ? castLinesForHole(cast, round.currentHole) : undefined}
             clubhouseTally={clubhouseTally ?? undefined}
+            bailout={Boolean(hole.layout.bailout)}
           />
         ) : (
           <>

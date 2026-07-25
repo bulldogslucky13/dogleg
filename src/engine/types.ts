@@ -131,6 +131,32 @@ export interface HazardZone {
   style?: ZoneStyle
 }
 
+/**
+ * A par 3 you can decline to take on.
+ *
+ * Almost every par 3 in golf offers one shot: at the flag, more or less boldly.
+ * A handful — Cypress Point's 16th is the archetype — offer two *lines*. The
+ * fairway doglegs round a hazard to a bail-out you can lay up to and pitch
+ * from; the shot at the flag cuts the corner and takes on far more of the
+ * trouble. That is a real decision ("do I take this hole on at all?") that the
+ * usual safe/normal/aggressive-at-the-flag axis cannot say.
+ *
+ * When a hole carries this, `safe` and `normal` become lay-ups to the two bands
+ * below — the same shape as a par 5's second shot, which is why a bail-out par
+ * 3 starts in the `second` stage — and only `aggressive` goes at the green.
+ * The differing risk is ordinary geometry: the hazard runs down the inside of
+ * the dogleg, so a lay-up pushed further up the fairway flirts with more of it,
+ * and the shot at the flag is over it the whole way.
+ */
+export interface Bailout {
+  /** which side of the dogleg the lay-up ground sits on — map only */
+  side: 'left' | 'right'
+  /** where a safe lay-up finishes: yards along the hole line */
+  safe: [number, number]
+  /** where an attacking lay-up finishes — further up, closer to the corner */
+  normal: [number, number]
+}
+
 export interface HoleLayout {
   spec: HoleSpec
   /** total playing length, yards from tee to pin */
@@ -149,6 +175,8 @@ export interface HoleLayout {
    * — the odds work in 1-D and never see it, so it's not replay-affecting.
    */
   bend?: number[]
+  /** the lay-up option on a par 3 that doglegs round its hazard. See `Bailout`. */
+  bailout?: Bailout
   /** today's flag on a par 3, when the round's conditions carry one */
   pin?: PinPosition
   /** this hole's wind delta (mph) on a par-3 short course, from Conditions.gusts */

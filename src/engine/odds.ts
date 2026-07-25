@@ -190,13 +190,23 @@ export function longOdds(
 
   let window = driveWindow(choice, ball.pos, layout, finder ? FAIRWAY_BUFF.extraYards : 0)
   if (mode === 'layup') {
-    const target = layout.length - (choice === 'safe' ? 100 : 78)
-    window = [target - (choice === 'safe' ? 14 : 20), target + (choice === 'safe' ? 14 : 20)]
-    // Safe layups automatically stay short of cross hazards in the layup zone.
-    if (choice === 'safe') {
-      for (const z of layout.zones) {
-        if (z.side === 'cross' && z.to > ball.pos + 40 && z.from < window[1] + 10 && z.to < layout.length - 40) {
-          window = [z.from - 32, z.from - 10]
+    // A bail-out par 3 names its own two lay-up bands (see `Bailout`): the
+    // fairway doglegs round the hazard, so "further up" is a real, measured
+    // place rather than a distance-from-pin rule of thumb. Risk still falls out
+    // of ordinary geometry — the hazard runs down the inside of the turn, so
+    // the attacking band overlaps more of it.
+    const bail = layout.bailout
+    if (bail) {
+      window = choice === 'safe' ? [...bail.safe] : [...bail.normal]
+    } else {
+      const target = layout.length - (choice === 'safe' ? 100 : 78)
+      window = [target - (choice === 'safe' ? 14 : 20), target + (choice === 'safe' ? 14 : 20)]
+      // Safe layups automatically stay short of cross hazards in the layup zone.
+      if (choice === 'safe') {
+        for (const z of layout.zones) {
+          if (z.side === 'cross' && z.to > ball.pos + 40 && z.from < window[1] + 10 && z.to < layout.length - 40) {
+            window = [z.from - 32, z.from - 10]
+          }
         }
       }
     }

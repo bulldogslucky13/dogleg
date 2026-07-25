@@ -190,14 +190,52 @@ function useGeometry(layout: HoleLayout, view: [number, number], fr: Frame) {
     const c = Math.hypot(P1.x - P0.x, P1.y - P0.y) || 1
     const ux = (P1.x - P0.x) / c
     const uy = (P1.y - P0.y) / c
-    const s = (fr.yBottom - fr.yTop) / c
+    let s = (fr.yBottom - fr.yTop) / c
+
+    // The window chord is only the tee→pin line of the VIEW; a dogleg bows off
+    // it, and nothing above accounts for that — so a hole that turns hard used
+    // to be drawn with its fairway hanging off the side of the frame. (Cypress
+    // 16 bows 55 yd on a 232-yd hole: a quarter of its own length, and half the
+    // corridor rendered off-screen.) Measure the centreline's real lateral
+    // spread inside the window, then centre it and, only if it still won't fit,
+    // zoom out just enough that it does. A hole already inside the frame is
+    // untouched apart from the centring, which can only improve its framing.
+    const MARGIN = 26 // px of breathing room for the corridor's own width
+    let lateral = { lo: 0, hi: 0 }
+    {
+      const off = (w: Pt) => -uy * (w.x - P0.x) + ux * (w.y - P0.y)
+      let lo = Infinity
+      let hi = -Infinity
+      // Reuse the curve already discretized in `pts` (N=72, spanning 0..L)
+      // instead of re-sampling it through `worldAt`'s O(N) scan — just walk
+      // the existing points that fall inside the view window.
+      const iLo = Math.max(0, Math.floor((Math.max(0, vFrom) / L) * N))
+      const iHi = Math.min(N, Math.ceil((Math.min(L, vTo) / L) * N))
+      for (let i = iLo; i <= iHi; i++) {
+        const o = off(pts[i])
+        lo = Math.min(lo, o)
+        hi = Math.max(hi, o)
+      }
+      // A window edge past the tee or the green is a straight extrapolation
+      // with no further curvature (see `worldAt`'s `yards > L` branch, O(1),
+      // no scan) — just fold its endpoint in, no need to sample the stretch.
+      if (vFrom < 0) { const o = off(P0); lo = Math.min(lo, o); hi = Math.max(hi, o) }
+      if (vTo > L) { const o = off(P1); lo = Math.min(lo, o); hi = Math.max(hi, o) }
+      if (!isFinite(lo)) { lo = 0; hi = 0 }
+      lateral = { lo, hi }
+      const halfSpan = ((hi - lo) / 2) * s
+      const room = Math.max(1, fr.w / 2 - MARGIN)
+      if (halfSpan > room) s *= room / halfSpan
+    }
+    // centre on the path's own midline rather than on the chord
+    const xShift = -s * ((lateral.lo + lateral.hi) / 2)
     const uPerYd = s * worldPerYd
 
     const at = (yards: number): Pt => {
       const w = worldAt(yards)
       const dx = w.x - P0.x
       const dy = w.y - P0.y
-      return { x: fr.cx + s * (-uy * dx + ux * dy), y: fr.yBottom + s * (-ux * dx - uy * dy) }
+      return { x: fr.cx + xShift + s * (-uy * dx + ux * dy), y: fr.yBottom + s * (-ux * dx - uy * dy) }
     }
     /** golfer-left unit normal at yards, in screen space */
     const normalAt = (yards: number): Pt => {
@@ -619,6 +657,11 @@ export function HoleMap(props: {
   const { at, normalAt, uPerYd, greenRx, greenRy } = geo
   const L = layout.length
   const par3 = layout.spec.par === 3
+  // A bail-out par 3 has a real fairway — it doglegs round its hazard to ground
+  // you can lay up to — so it draws the full corridor, lane and carry treatment
+  // that par 3s otherwise skip. Without this the player is offered a lay-up to
+  // somewhere the map shows as open water. See `Bailout` in engine/types.ts.
+  const corridor = !par3 || Boolean(layout.bailout)
   const greenPt = at(L)
   const vFrom = view[0]
   const places = useMemo(() => placeZones(layout, geo), [layout, geo])
@@ -966,7 +1009,7 @@ export function HoleMap(props: {
   // fairway-lie ball reads as grass. Par 3s have no fairway corridor → no lane.
   const LANE_HALF = 9
   const fairwayLane =
-    par3 ? null : (
+    !corridor ? null : (
       <path
         d={ribbonPath(geo, Math.max(Math.max(30, layout.fairwayFrom - 40), vFrom - 10), layout.fairwayTo, () => LANE_HALF)}
         fill="#4f7d45"
@@ -976,7 +1019,7 @@ export function HoleMap(props: {
   // re-lay just that lane-width strip of water back over it — only the center
   // the lane actually covered, so later flank hazards keep their authored order.
   // Gated to the lane case (no lane on a par 3 = nothing to repair).
-  const crossWaterCover = par3
+  const crossWaterCover = !corridor
     ? []
     : layout.zones
         .filter((z) => (z.kind === 'water' || z.kind === 'ocean') && z.side === 'cross')
@@ -1100,7 +1143,7 @@ export function HoleMap(props: {
       {roughSeverity > 0 && <rect width={fr.w} height={fr.h} fill="url(#gorse)" opacity={roughSeverity > 1 ? 0.7 : 0.5} />}
 
       {/* fairway / apron */}
-      {!par3 && (
+      {corridor && (
         <path
           d={ribbonPath(geo, Math.max(Math.max(30, layout.fairwayFrom - 60), vFrom - 10), layout.fairwayTo, (t) => 13 + 8 * Math.sin(Math.min(1, t * 1.15) * Math.PI))}
           fill="#4f7d45"
@@ -1108,7 +1151,7 @@ export function HoleMap(props: {
           strokeWidth={2}
         />
       )}
-      {par3 && <path d={ribbonPath(geo, Math.max(L * 0.62, vFrom), L - layout.greenDepth / 2, (t) => 7 + 7 * t)} fill="#47713f" opacity={0.85} />}
+      {!corridor && <path d={ribbonPath(geo, Math.max(L * 0.62, vFrom), L - layout.greenDepth / 2, (t) => 7 + 7 * t)} fill="#47713f" opacity={0.85} />}
 
       {/* decorative groves (behind features) */}
       {deco.map((g, i) => {

@@ -34,6 +34,7 @@ export function buildLayout(courseSlug: string, spec: HoleSpec, cond?: Condition
       fairwayTo: real.fairwayTo,
       greenDepth: real.greenDepth,
       bend: OSM_BEND[`${courseSlug}:${spec.number}`],
+      bailout: real.bailout,
       pin,
       gust,
       rough,

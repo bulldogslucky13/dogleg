@@ -125,6 +125,33 @@ describe('odds invariants', () => {
     }
   })
 
+  // The two invariants above cover every par-3's opening shot too, EXCEPT this
+  // one: a bail-out par 3 (see `Bailout` in types.ts) opens as a LAYUP (mode
+  // 'layup'), not a tee shot, so `if (spec.par === 3) continue` skips it
+  // entirely above. Unlike a procedural par-5 layup — whose safe window gets an
+  // automatic runtime pull-back off any cross hazard it detects (odds.ts,
+  // longOdds's non-bailout branch) — a bail-out's hand-authored safe/normal
+  // windows get no such check; nothing else here catches one a future course
+  // places badly. This is that same "safe stays safe" contract, extended.
+  it('a bail-out par 3\'s safe lay-up stays bankable, and the flag attempt is meaningfully riskier', () => {
+    const brutal: Conditions = { wind: 25, greens: 'Fast', difficulty: 10 }
+    for (const c of COURSES) {
+      for (const spec of c.holes) {
+        const layout = buildLayout(c.slug, spec)
+        if (!layout.bailout) continue
+        const ball = { pos: 0, lie: 'tee', side: 'center' } as const
+        const safe = longOdds(layout, brutal, ball, 'safe', 'layup').odds
+        const badSafe = safe.sand + safe.trees + safe.water
+        expect(badSafe).toBeLessThanOrEqual(0.045)
+        expect(safe.water).toBeLessThanOrEqual(0.02)
+
+        const agg = approachOdds(layout, brutal, ball, 'aggressive', 'par3tee').odds
+        const badAgg = agg.water + agg.sand
+        expect(badAgg).toBeGreaterThanOrEqual(badSafe * 2.5)
+      }
+    }
+  })
+
   it('lag putting caps three-putt risk, charge does not', () => {
     const fast: Conditions = { wind: 10, greens: 'Fast', difficulty: 8 }
     const lag = puttOdds(fast, 55, 'safe')

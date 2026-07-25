@@ -46,8 +46,23 @@ const SAND_COPY: Record<Choice, { label: string; blurb: string }> = {
   aggressive: { label: 'Flop', blurb: 'Short-side it — go for the save' },
 }
 
-function choiceCopy(stage: Exclude<Stage, 'done'>, lie: string, c: Choice): { label: string; blurb: string } {
+// A bail-out par 3 asks the par-5 question from the tee, but "lay up for a
+// wedge" is the wrong words for it — you're deciding whether to take the hole
+// on at all. See `Bailout` in engine/types.ts.
+const BAILOUT_COPY: Record<Choice, { label: string; blurb: string }> = {
+  safe: { label: 'Safe', blurb: 'Bail out short of the corner' },
+  normal: { label: 'Normal', blurb: 'Push up the fairway' },
+  aggressive: { label: 'Aggressive', blurb: 'Take it on — straight at the flag' },
+}
+
+function choiceCopy(
+  stage: Exclude<Stage, 'done'>,
+  lie: string,
+  c: Choice,
+  bailout?: boolean,
+): { label: string; blurb: string } {
   if (stage === 'shortgame' && lie === 'sand') return SAND_COPY[c]
+  if (stage === 'second' && bailout) return BAILOUT_COPY[c]
   return STAGE_COPY[stage][c]
 }
 
@@ -56,7 +71,8 @@ export function stageName(stage: Stage, par: number, lie?: string): string {
     case 'tee':
       return 'Tee shot'
     case 'second':
-      return 'Second shot'
+      // a bail-out par 3 plays its `second` stage from the tee box
+      return par === 3 ? 'Tee shot' : 'Second shot'
     case 'approach':
       return par === 3 ? 'Tee shot' : 'Approach'
     case 'putt':
@@ -114,7 +130,7 @@ export function ChoiceCards(props: {
       <div className="choices">
         {choices.map((c) => {
           const summary = summarize(oddsFor(hole, c), { strokes: hole.strokes, par: hole.layout.spec.par })
-          const copy = choiceCopy(stage, hole.ball.lie, c)
+          const copy = choiceCopy(stage, hole.ball.lie, c, Boolean(hole.layout.bailout))
           const tag = riskTag(hole, c, summary)
           const lockout = c === 'aggressive' && budgeted && props.aggressiveLeft <= 0
           return (
@@ -408,7 +424,7 @@ const BUCKET_COPY: Record<string, string> = {
   across: 'across the green',
 }
 
-export function OddsRecap(props: { score: HoleScore; par: number }) {
+export function OddsRecap(props: { score: HoleScore; par: number; bailout?: boolean }) {
   const lieBefore = (i: number): string => (i > 0 ? props.score.shots[i - 1].after.lie : 'tee')
   return (
     <div className="recap">
@@ -417,7 +433,7 @@ export function OddsRecap(props: { score: HoleScore; par: number }) {
         <div key={i} className="recap-shot">
           <div className="recap-stage">
             {stageName(shot.stage, props.par, lieBefore(i))} — went{' '}
-            {choiceCopy(shot.stage as Exclude<Stage, 'done'>, lieBefore(i), shot.choice).label.toLowerCase()}, finished{' '}
+            {choiceCopy(shot.stage as Exclude<Stage, 'done'>, lieBefore(i), shot.choice, props.bailout).label.toLowerCase()}, finished{' '}
             {shot.outcome === 'makeable' && shot.strokesAfter != null
               ? LOOK_LABEL[madePuttLook(shot.strokesAfter, props.par)].phrase
               : (BUCKET_COPY[shot.outcome] ?? shot.outcome)}
@@ -433,7 +449,7 @@ export function OddsRecap(props: { score: HoleScore; par: number }) {
             return (
               <div key={c} className={`recap-row${shot.choice === c ? ' chosen' : ''}`}>
                 <span className="recap-label">
-                  {choiceCopy(shot.stage as Exclude<Stage, 'done'>, lieBefore(i), c).label}
+                  {choiceCopy(shot.stage as Exclude<Stage, 'done'>, lieBefore(i), c, props.bailout).label}
                   {shot.choice === c ? ' ✓' : ''}
                 </span>
                 <span className="odds-bar">
@@ -556,6 +572,10 @@ export function HoleComplete(props: {
    * "9 of 12 laid up." Undefined/unavailable renders nothing extra; the cast
    * lines above stand alone unchanged. Post-commit only, never a live signal. */
   clubhouseTally?: string
+  /** was this hole a bail-out par 3 (see `Bailout` in engine/types.ts)? Passed
+   * down to the recap so its `second`-stage entry reads BAILOUT_COPY instead
+   * of falling back to the ordinary par-5-second-shot copy. */
+  bailout?: boolean
 }) {
   const { score } = props
   const [clubhouseOpen, setClubhouseOpen] = useState(false)
@@ -576,7 +596,7 @@ export function HoleComplete(props: {
       )}
       <details className="hc-odds">
         <summary>See the odds you faced</summary>
-        <OddsRecap score={score} par={props.par} />
+        <OddsRecap score={score} par={props.par} bailout={props.bailout} />
       </details>
       <button className="cta" onClick={props.onNext}>
         {props.last ? 'Sign the card' : 'Next hole'}

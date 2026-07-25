@@ -21,7 +21,8 @@ import { splitFortune } from './engine/fortune'
 import { gradeCopy, gradeRound } from './engine/grade'
 import { decisionsFromScores, destinyPlan, fortuneOddsFor, replayRound, setupFromSeed } from './engine/replay'
 import { approachOdds } from './engine/odds'
-import { pinChip } from './engine/resolve'
+import { rngFromString } from './engine/rng'
+import { aceEligible, oddsFor, pinChip, playShot, startHole } from './engine/resolve'
 import { buildLayout } from './engine/layout'
 import type { Choice } from './engine/types'
 import {
@@ -473,11 +474,15 @@ describe('smoke: the clubhouse cast is deterministic, choices-only, for every co
       const budgetLeft: Record<string, number> = Object.fromEntries(CHARACTERS.map((c) => [c.id, AGG_BUDGET]))
       for (let h = 0; h < 18; h++) {
         // every hole yields a line per character, and the lines name the character
-        const lines = castLinesForHole(cast, h)
+        const bailout = Boolean(buildLayout(course.slug, course.holes[h], setup.cond).bailout)
+        const lines = castLinesForHole(cast, h, bailout)
         expect(lines).toHaveLength(CHARACTERS.length)
         lines.forEach((line, i) => {
           expect(line).toContain(CHARACTERS[i].name)
           expect(line.length).toBeGreaterThan(0)
+          // a bail-out lay-up must never be described as going for the green —
+          // that's the one line it explicitly isn't
+          if (bailout) expect(line).not.toContain('going for the green')
         })
       }
       // aggressive budget (8, tee/second/approach only) is never overspent across the round
@@ -596,5 +601,118 @@ describe('smoke: signature flavor + island geometry decoupling', () => {
       expect(h.signature!.length).toBeLessThan(90)
       expect(h.signature!).not.toMatch(/\bdice\b|\bodds\b|\brng\b/i)
     }
+  })
+})
+
+describe('smoke: the bail-out par 3 — laying up on a hole you can decline', () => {
+  // Cypress Point's 16th is the first of these: a par 3 that doglegs round the
+  // Pacific to ground you can lay up to, so safe/normal are lay-ups and only
+  // aggressive goes at the flag. See `Bailout` in engine/types.ts.
+  const cypress = courseBySlug('cypress-point')!
+  const h16 = cypress.holes[15]
+  const layout = buildLayout(cypress.slug, h16)
+
+  it('is wired: par 3, a bail-out inside the fairway, and a right dogleg', () => {
+    expect(h16.par).toBe(3)
+    const bail = layout.bailout
+    expect(bail).toBeTruthy()
+    expect(bail!.side).toBe('left')
+    // both lay-up bands must land on ground the map actually draws as fairway,
+    // or the player is being offered a lay-up into the sea
+    for (const band of [bail!.safe, bail!.normal]) {
+      expect(band[0]).toBeLessThan(band[1])
+      expect(band[0]).toBeGreaterThanOrEqual(layout.fairwayFrom - 4)
+      expect(band[1]).toBeLessThanOrEqual(layout.fairwayTo)
+    }
+    // …and the attacking band has to be the one further up
+    expect(bail!.normal[0]).toBeGreaterThan(bail!.safe[0])
+    // the carry crosses the whole fairway, then the water runs down the inside
+    expect(layout.zones.some((z) => z.kind === 'ocean' && z.side === 'cross' && z.from < layout.fairwayFrom)).toBe(true)
+    // positive bend = path bows golfer-left = "Dogleg right" (see panels.tsx)
+    const peak = layout.bend!.reduce((a, v) => (Math.abs(v) > Math.abs(a) ? v : a), 0)
+    expect(peak).toBeGreaterThanOrEqual(20)
+  })
+
+  it('starts in the lay-up stage and only the attacking line goes at the green', () => {
+    const h = startHole(layout, practiceSetup('cypress-point', 'bail').cond)
+    expect(h.stage).toBe('second')
+    // safe/normal are long shots (a lay-up); aggressive is an approach at the pin
+    expect(oddsFor(h, 'safe').kind).toBe('long')
+    expect(oddsFor(h, 'normal').kind).toBe('long')
+    expect(oddsFor(h, 'aggressive').kind).toBe('approach')
+  })
+
+  it('prices the three lines in the order the hole actually poses them', () => {
+    const h = startHole(layout, practiceSetup('cypress-point', 'bail').cond)
+    const water = (c: Choice) => (oddsFor(h, c) as { water: number }).water
+    // some water on the bail-out, more pushing up the fairway, most at the flag
+    expect(water('safe')).toBeGreaterThan(0)
+    expect(water('normal')).toBeGreaterThan(water('safe'))
+    expect(water('aggressive')).toBeGreaterThan(water('normal') * 3)
+  })
+
+  it('plays through: a lay-up leaves a pitch, the attack goes for the green', () => {
+    const cond = practiceSetup('cypress-point', 'bail').cond
+    for (const first of ['safe', 'normal'] as Choice[]) {
+      const h = startHole(layout, cond)
+      playShot(h, first, rngFromString(`bail:${first}`))
+      expect(h.strokes).toBe(1)
+      // laid up short of the green, on the bail-out's side of the dogleg
+      expect(h.ball.pos).toBeLessThan(layout.length - layout.greenDepth)
+      expect(h.ball.side).toBe('left')
+      expect(h.stage).toBe('approach')
+    }
+    const attack = startHole(layout, cond)
+    playShot(attack, 'aggressive', rngFromString('bail:aggressive'))
+    // one swing and the hole is either finished or on/around the green
+    expect(['putt', 'shortgame', 'done']).toContain(attack.stage)
+  })
+
+  it('never spends a due ace on a shot that cannot hole out', () => {
+    const cond = practiceSetup('cypress-point', 'bail').cond
+    const h = startHole(layout, cond)
+    // the guarantee may only be consumed by the line that goes at the flag
+    expect(aceEligible(h, 'safe')).toBe(false)
+    expect(aceEligible(h, 'normal')).toBe(false)
+    expect(aceEligible(h, 'aggressive')).toBe(true)
+    // an ordinary par 3 is unchanged: every tee shot can still hole out
+    const plain = startHole(buildLayout(cypress.slug, cypress.holes[14]), cond)
+    expect(plain.stage).toBe('approach')
+    for (const c of ['safe', 'normal', 'aggressive'] as Choice[]) expect(aceEligible(plain, c)).toBe(true)
+  })
+
+  it('finishes a full round on the course that owns it, laying up every time', () => {
+    const setup = practiceSetup('cypress-point', 'bail-round')
+    const done = playRound(newRound(setup, 'practice'), () => 'safe')
+    expectCompleteAndSane(done)
+    // the 16th took at least two strokes — you cannot lay up and hole out
+    expect(done.scores[15]!.strokes).toBeGreaterThanOrEqual(2)
+  })
+
+  it('describes the clubhouse cast\'s opener honestly — a lay-up is never "going for the green"', () => {
+    const setup = practiceSetup('cypress-point', 'bail-cast')
+    const cast = castRound({ course: cypress, cond: setup.cond, seed: setup.seed })
+    // whatever the real cast actually did, none of it reads as attacking the
+    // green unless it truly did (the budget model means which character goes
+    // aggressive by hole 16 varies by seed, so this checks the general ban)
+    for (const line of castLinesForHole(cast, 15, true)) expect(line).not.toContain('going for the green')
+
+    // exact wording, both directions, pinned with a hand-built cast so it
+    // doesn't depend on which character's aggressive budget survives to hole
+    // 16 for this seed
+    const fakeCast: typeof cast = cast.map((entry, i) => ({
+      ...entry,
+      holes: entry.holes.map((shots, h) =>
+        h === 15 ? [{ stage: 'second', choice: i === 0 ? 'safe' : 'aggressive' } as const, ...shots.slice(1)] : shots,
+      ),
+    }))
+    const lines = castLinesForHole(fakeCast, 15, true)
+    expect(lines[0]).toContain('off the tee')
+    expect(lines[0]).not.toContain('going for the green')
+    expect(lines[1]).toContain('at the flag')
+
+    // omitting the flag (the pre-fix default) reproduces the bad phrasing —
+    // guards against the bailout param silently going unused again
+    expect(castLinesForHole(fakeCast, 15)[0]).toContain('going for the green')
   })
 })

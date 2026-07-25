@@ -114,6 +114,13 @@ const COURSE_GEO: Record<string, CourseGeo> = {
   // the name to avoid the Oakmont Country Club in Glendale CA and Oakmont Golf
   // Club in Santa Rosa — different courses that share the word.
   oakmont: { name: 'Oakmont Country Club', center: [40.529, -79.825], radius: 1400, osmName: '^Oakmont Country Club$', engineSlug: 'oakmont' },
+  // Cypress Point is way 36435651 (wikidata Q5200356), mapped as "Cypress
+  // Point Golf Course". Five other courses sit inside the radius — Spyglass
+  // Hill, MPCC Shore, Poppy Hills, The Hay, Pebble Beach — and every one of
+  // them has ref=N holes, so the name is anchored to pin exactly this polygon.
+  // Radius reaches past the ~700 m polygon for the Pacific coastline that
+  // makes 15/16/17.
+  cypress: { name: 'Cypress Point', center: [36.5788, -121.9677], radius: 1600, osmName: '^Cypress Point Golf Course$', engineSlug: 'cypress-point' },
 }
 
 // ---------- Overpass ----------

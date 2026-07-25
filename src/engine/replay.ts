@@ -2,7 +2,7 @@ import { courseBySlug } from './courses'
 import { dailyConditions, courseForPuzzle, practiceConditions, puzzleNumberForDateKey } from './daily'
 import { destinyDue, fortuneEligible, fortuneShotOdds, splitFortune, type FortuneState, type MomentKind } from './fortune'
 import { buildLayout } from './layout'
-import { playShot, startHole, type HoleInPlay } from './resolve'
+import { aceEligible, playShot, startHole, type HoleInPlay } from './resolve'
 import { rngFromString } from './rng'
 import type { CharacterId, Choice, Conditions, CourseSpec, HoleResult, HoleScore, Stage } from './types'
 
@@ -148,7 +148,7 @@ export function replayRound(seed: string, character: CharacterId | undefined, de
       // an eagle, so it neither fires nor spends the guarantee — the plan
       // stays live for the next clean chance.
       let destiny: MomentKind | undefined
-      if (plan.ace && spec.par === 3 && h.ball.lie === 'tee') {
+      if (plan.ace && aceEligible(h, choice)) {
         destiny = 'ace'
         plan.ace = false
       } else if (plan.albatross && h.stage === 'second' && choice === 'aggressive' && h.strokes === 1) {
@@ -244,7 +244,7 @@ export function replayFrames(seed: string, character: CharacterId | undefined, d
     frames.push({ holeIndex: i, shotIndex: 0, hole: snapshot(h), runningToPar: runToPar })
     decisions[i].forEach((choice, j) => {
       let destiny: MomentKind | undefined
-      if (plan.ace && spec.par === 3 && h.ball.lie === 'tee') {
+      if (plan.ace && aceEligible(h, choice)) {
         destiny = 'ace'
         plan.ace = false
       } else if (plan.albatross && h.stage === 'second' && choice === 'aggressive' && h.strokes === 1) {

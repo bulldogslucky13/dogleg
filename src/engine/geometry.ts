@@ -1,4 +1,4 @@
-import type { HazardZone } from './types'
+import type { Bailout, HazardZone } from './types'
 
 /**
  * Real per-hole geometry imported from OpenStreetMap and frozen as static data.
@@ -18,6 +18,9 @@ export interface OsmHoleGeometry {
   fairwayFrom: number
   fairwayTo: number
   greenDepth: number
+  /** par 3s that dogleg round their hazard to a lay-up. See `Bailout` in
+   * types.ts. Hand-authored from measured imagery, never imported. */
+  bailout?: Bailout
 }
 
 /**
@@ -100,6 +103,33 @@ export const OSM_BEND: Record<string, number[]> = {
   'oakmont:15': [0, 2, 4, 5, 7, 9, 10, 10, 9, 8, 5, 3, 0],
   'oakmont:16': [0, 1, 2, 4, 5, 6, 7, 8, 8, 8, 7, 4, 0],
   'oakmont:17': [0, -4, -8, -12, -16, -20, -24, -28, -30, -28, -22, -11, 0],
+
+  // Cypress Point — real centreline curvature. Lateral yards are unaffected by
+  // the tee-end shift applied to the zones (see OSM_GEOMETRY), so these are the
+  // raw import values. Signs correct the tuple again: 2, 5 and 6 bend RIGHT
+  // (tuple said S, S and R), 8, 12 and 14 bend LEFT (tuple said L, L and R),
+  // 17 bends LEFT (tuple said L). 12's 61-yd bend and 5's 70-yd are the two
+  // real doglegs; 9's 9-yd sits right on the persistence threshold.
+  'cypress-point:1': [0, 2, 4, 6, 9, 11, 12, 14, 14, 13, 10, 5, 0],
+  'cypress-point:2': [0, -11, -21, -32, -41, -47, -49, -47, -41, -32, -23, -13, 0],
+  'cypress-point:4': [0, 1, 3, 4, 6, 7, 8, 9, 9, 8, 6, 3, 0],
+  'cypress-point:5': [0, -15, -29, -44, -57, -66, -70, -68, -59, -47, -34, -18, 0],
+  'cypress-point:6': [0, -10, -21, -31, -41, -48, -52, -53, -50, -43, -34, -21, 0],
+  'cypress-point:8': [0, 6, 12, 18, 24, 29, 35, 39, 41, 41, 35, 18, 0],
+  'cypress-point:9': [0, -1, -2, -4, -5, -6, -7, -8, -9, -9, -9, -6, 0],
+  'cypress-point:10': [0, 4, 8, 11, 15, 18, 20, 20, 19, 16, 12, 7, 0],
+  'cypress-point:11': [0, 3, 6, 10, 13, 15, 17, 18, 17, 15, 10, 5, 0],
+  'cypress-point:12': [0, 10, 21, 31, 42, 52, 58, 61, 60, 52, 35, 18, 0],
+  'cypress-point:14': [0, 4, 8, 12, 16, 19, 22, 24, 25, 23, 18, 9, 0],
+  // 16 is the one hand-authored profile in this map. Its OSM centreline is a
+  // straight tee→pin chord across the cove, which is the line you play only if
+  // you take the hole on; the hole itself doglegs RIGHT round the water to the
+  // bail-out, peaking ~55 yd golfer-left of the chord at the corner (~165 yd,
+  // the middle of the measured landing area). Positive = golfer-left = the
+  // path bows left = "Dogleg right" on the chip, per the sign note above.
+  'cypress-point:16': [0, 10, 20, 29, 37, 44, 49, 53, 55, 54, 43, 24, 0],
+  'cypress-point:17': [0, 7, 14, 21, 28, 36, 40, 43, 43, 39, 28, 14, 0],
+  'cypress-point:18': [0, 3, 6, 10, 13, 16, 18, 20, 20, 18, 14, 7, 0],
 }
 
 export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
@@ -1954,6 +1984,312 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
       { id: 'z8', kind: 'bunker', from: 465, to: 471, side: 'left' },
       { id: 'z9', kind: 'bunker', from: 471, to: 491, side: 'right' },
       { id: 'z10', kind: 'bunker', from: 491, to: 503, side: 'left' },
+    ],
+  },
+
+  // ---------------------------------------------------------------------
+  // Cypress Point Club. OSM for shape, the club's published Blue card for
+  // distance (par 72, 6,553 yd). Tee-end SHIFT, not scale — see the Royal
+  // Portrush block above and freeze-process step 1. The shift is signed here:
+  // 7, 11, 15 and 16 import LONGER than the card and shift backwards. Sixteen
+  // of eighteen land within 12 yd of the card; only 8 (+27) and 17 (+23) are
+  // real tee-pad gaps.
+  //
+  // Cypress is well mapped (292 OSM features, 107 bunkers, all 18 centrelines,
+  // and a 366-node mainland coastline), so most of the QA pass was the two
+  // documented artifact modes plus three hand fixes read off ProVisualizer's
+  // 3D planner:
+  //   1  — greenDepth 45 -> 20 and fairwayTo 392 -> 405. The centreline clips
+  //        the practice putting green beside the 1st tee (way 1138134210 sits
+  //        on the line 28-54 yd), so the importer's green span ran 28 -> 415
+  //        and pinned the 45-yd ceiling. The real green is way 1138132397, on
+  //        the line 399-415.
+  //   16  — THE hole, and the straight import could not say what it is. Rebuilt
+  //        as a bail-out dogleg — see the block on the entry itself, and
+  //        `Bailout` in types.ts. (The raw import read `cross 28-102` then
+  //        `right 102-202`: a 74-yd poke on a 232-yd par 3, because OSM's
+  //        coastline is drawn at the high-water rock line and the reef across
+  //        the cove came back as land.)
+  //   17  — the +23 tee-end shift opened a clean 0-23 gap in front of a tee
+  //        that sits on the cliff edge; the Pacific is down the right from the
+  //        first yard, so the ocean zone is extended back to 0.
+  // Applied by rule, in the house style: 11 zones wholly inside 75 yd of the
+  // tee dropped (tee-complex sand; ocean is exempt, on 15/16/17 the Pacific
+  // starts at the tee and IS the hole), 7 `cross` bands overlapping a
+  // same-yardage flank folded into that flank, and 2 overlapping BOTH flanks
+  // dropped.
+  //
+  // One rule is new here, and it is the Oakmont cross rule pointed at the green
+  // instead of the fairway: a `cross` band that runs INTO the green (3, 10, 11,
+  // 13) is a greenside bunker ring rasterised as a full-width carry. You cannot
+  // carry the green you are trying to hit, and every other course in this file
+  // models greenside sand as flanks. Where one flank adjoins, the band folds
+  // into it (3 and 11 right, 13 left); where both do, the ring is already
+  // modelled and the overlap is dropped (10). Left as `cross`, the four of them
+  // together cost the greedy-by-Q calibration ~0.02 strokes a round — the odds
+  // invariants' quieter cousin catching the same class of lie.
+  //
+  // NOT modelled as zones: the Monterey cypress groves beyond the two `trees`
+  // polygons OSM actually carries (1, 14). Inventing tree extents for the
+  // inland holes would be authoring the course rather than importing it
+  // (step 0). The dunes and ice plant are likewise absent — ice plant is a
+  // strong candidate for the `rough: 'penal'` dial that Portrush carries for
+  // its gorse (see the `Rough` note in types.ts), but that is a difficulty
+  // decision, not an import, so it is left unset and flagged here rather than
+  // slipped in with the geometry.
+  // ---------------------------------------------------------------------
+  'cypress-point:1': {
+    length: 417,
+    fairwayFrom: 147,
+    fairwayTo: 405,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 265, to: 311, side: 'left' },
+      { id: 'z2', kind: 'bunker', from: 359, to: 381, side: 'left' },
+      { id: 'z3', kind: 'trees', from: 369, to: 417, side: 'right' },
+      { id: 'z4', kind: 'bunker', from: 381, to: 387, side: 'cross' },
+      { id: 'z5', kind: 'bunker', from: 387, to: 399, side: 'right' },
+    ],
+  },
+  'cypress-point:2': {
+    length: 555,
+    fairwayFrom: 196,
+    fairwayTo: 543,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 391, to: 405, side: 'right' },
+      { id: 'z2', kind: 'bunker', from: 405, to: 421, side: 'cross' },
+      { id: 'z3', kind: 'bunker', from: 421, to: 425, side: 'left' },
+      { id: 'z4', kind: 'bunker', from: 509, to: 555, side: 'left' },
+    ],
+  },
+  'cypress-point:3': {
+    length: 156,
+    fairwayFrom: 55,
+    fairwayTo: 144,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 90, to: 98, side: 'left' },
+      { id: 'z2', kind: 'bunker', from: 98, to: 108, side: 'cross' },
+      { id: 'z3', kind: 'bunker', from: 120, to: 152, side: 'right' },
+    ],
+  },
+  'cypress-point:4': {
+    length: 390,
+    fairwayFrom: 137,
+    fairwayTo: 378,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 154, to: 160, side: 'right' },
+      { id: 'z2', kind: 'bunker', from: 160, to: 210, side: 'left' },
+      { id: 'z3', kind: 'bunker', from: 280, to: 306, side: 'right' },
+      { id: 'z4', kind: 'bunker', from: 350, to: 358, side: 'right' },
+      { id: 'z5', kind: 'bunker', from: 358, to: 370, side: 'cross' },
+      { id: 'z6', kind: 'bunker', from: 370, to: 378, side: 'left' },
+    ],
+  },
+  'cypress-point:5': {
+    length: 487,
+    fairwayFrom: 176,
+    fairwayTo: 475,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 167, to: 191, side: 'left' },
+      { id: 'z2', kind: 'bunker', from: 241, to: 249, side: 'cross' },
+      { id: 'z3', kind: 'bunker', from: 249, to: 271, side: 'left' },
+      { id: 'z4', kind: 'bunker', from: 325, to: 361, side: 'right' },
+      { id: 'z5', kind: 'bunker', from: 421, to: 459, side: 'right' },
+      { id: 'z6', kind: 'bunker', from: 469, to: 477, side: 'right' },
+      { id: 'z7', kind: 'bunker', from: 477, to: 487, side: 'left' },
+    ],
+  },
+  'cypress-point:6': {
+    length: 523,
+    fairwayFrom: 184,
+    fairwayTo: 511,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 66, to: 78, side: 'left' },
+      { id: 'z2', kind: 'bunker', from: 170, to: 214, side: 'right' },
+      { id: 'z3', kind: 'bunker', from: 316, to: 350, side: 'left' },
+      { id: 'z4', kind: 'bunker', from: 426, to: 456, side: 'right' },
+      { id: 'z5', kind: 'bunker', from: 456, to: 462, side: 'cross' },
+      { id: 'z6', kind: 'bunker', from: 462, to: 474, side: 'left' },
+      { id: 'z7', kind: 'bunker', from: 504, to: 523, side: 'left' },
+    ],
+  },
+  'cypress-point:7': {
+    length: 170,
+    fairwayFrom: 56,
+    fairwayTo: 158,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 117, to: 125, side: 'left' },
+      { id: 'z2', kind: 'bunker', from: 125, to: 133, side: 'cross' },
+      { id: 'z3', kind: 'bunker', from: 133, to: 165, side: 'right' },
+    ],
+  },
+  'cypress-point:8': {
+    length: 356,
+    fairwayFrom: 142,
+    fairwayTo: 344,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 311, to: 353, side: 'left' },
+    ],
+  },
+  'cypress-point:9': {
+    length: 292,
+    fairwayFrom: 104,
+    fairwayTo: 280,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 35, to: 79, side: 'left' },
+      { id: 'z2', kind: 'bunker', from: 251, to: 259, side: 'right' },
+      { id: 'z3', kind: 'bunker', from: 263, to: 285, side: 'left' },
+    ],
+  },
+  'cypress-point:10': {
+    length: 477,
+    fairwayFrom: 167,
+    fairwayTo: 465,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 68, to: 104, side: 'right' },
+      { id: 'z2', kind: 'bunker', from: 118, to: 152, side: 'left' },
+      { id: 'z3', kind: 'bunker', from: 272, to: 302, side: 'right' },
+      { id: 'z4', kind: 'bunker', from: 384, to: 414, side: 'right' },
+      { id: 'z5', kind: 'bunker', from: 450, to: 457, side: 'left' },
+      { id: 'z6', kind: 'bunker', from: 457, to: 474, side: 'right' },
+    ],
+  },
+  'cypress-point:11': {
+    length: 437,
+    fairwayFrom: 145,
+    fairwayTo: 425,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 86, to: 118, side: 'right' },
+      { id: 'z2', kind: 'bunker', from: 142, to: 172, side: 'right' },
+      { id: 'z3', kind: 'bunker', from: 280, to: 284, side: 'right' },
+      { id: 'z4', kind: 'bunker', from: 284, to: 312, side: 'cross' },
+      { id: 'z5', kind: 'bunker', from: 312, to: 318, side: 'right' },
+      { id: 'z6', kind: 'bunker', from: 400, to: 436, side: 'right' },
+    ],
+  },
+  'cypress-point:12': {
+    length: 408,
+    fairwayFrom: 151,
+    fairwayTo: 396,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 78, to: 118, side: 'left' },
+      { id: 'z2', kind: 'bunker', from: 214, to: 224, side: 'left' },
+      { id: 'z3', kind: 'bunker', from: 226, to: 240, side: 'right' },
+      { id: 'z4', kind: 'bunker', from: 258, to: 264, side: 'left' },
+      { id: 'z5', kind: 'bunker', from: 356, to: 398, side: 'left' },
+    ],
+  },
+  'cypress-point:13': {
+    length: 388,
+    fairwayFrom: 136,
+    fairwayTo: 376,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 326, to: 346, side: 'left' },
+      { id: 'z2', kind: 'bunker', from: 356, to: 388, side: 'left' },
+    ],
+  },
+  'cypress-point:14': {
+    length: 394,
+    fairwayFrom: 142,
+    fairwayTo: 382,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 48, to: 78, side: 'left' },
+      { id: 'z2', kind: 'bunker', from: 136, to: 178, side: 'left' },
+      { id: 'z3', kind: 'bunker', from: 264, to: 288, side: 'right' },
+      { id: 'z4', kind: 'bunker', from: 312, to: 334, side: 'left' },
+      { id: 'z5', kind: 'bunker', from: 352, to: 366, side: 'cross' },
+      { id: 'z6', kind: 'bunker', from: 366, to: 372, side: 'right' },
+      { id: 'z7', kind: 'bunker', from: 372, to: 392, side: 'left' },
+      { id: 'z8', kind: 'trees', from: 380, to: 394, side: 'right' },
+    ],
+  },
+  'cypress-point:15': {
+    length: 137,
+    fairwayFrom: 45,
+    fairwayTo: 125,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'ocean', from: 0, to: 51, side: 'right' },
+      { id: 'z2', kind: 'ocean', from: 51, to: 99, side: 'cross' },
+      { id: 'z3', kind: 'ocean', from: 99, to: 137, side: 'right' },
+      { id: 'z4', kind: 'bunker', from: 103, to: 111, side: 'right' },
+      { id: 'z5', kind: 'bunker', from: 123, to: 127, side: 'right' },
+      { id: 'z6', kind: 'bunker', from: 131, to: 137, side: 'left' },
+    ],
+  },
+  // The 16th is laid out along the line the hole is PLAYED, not the tee→pin
+  // chord — it is a dogleg right round the cove, and the two lines cross very
+  // different amounts of Pacific. Measured off the OSM coastline and the golf
+  // polygons, straight-line from the tee to every playable point:
+  //   • the near corner of the bail-out (left, ~110 yd out) — a 135-yd shot
+  //     over ~106 yd of water
+  //   • up the bail-out toward the corner (~180 yd out) — a 190-yd shot, still
+  //     ~110 yd of water but far less room, because the cove bites in as you
+  //     near the turn (lines that cut it carry 150-158)
+  //   • the green — a 230-yd shot over ~192 yd of water, nearly all of it
+  // So: the carry crosses the fairway completely off the tee, and past it the
+  // cove runs down the INSIDE (right) of the dogleg all the way to the green.
+  // That single fact is what prices the three options honestly — a lay-up
+  // pushed further up overlaps more of it, and the shot at the flag is over it
+  // the whole way. `bailout` names the two lay-up bands; see types.ts.
+  'cypress-point:16': {
+    length: 232,
+    fairwayFrom: 106,
+    fairwayTo: 210,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'ocean', from: 14, to: 106, side: 'cross' },
+      { id: 'z2', kind: 'ocean', from: 106, to: 204, side: 'right' },
+      { id: 'z3', kind: 'bunker', from: 204, to: 213, side: 'cross' },
+      { id: 'z4', kind: 'bunker', from: 213, to: 226, side: 'right' },
+      { id: 'z5', kind: 'ocean', from: 224, to: 232, side: 'left' },
+    ],
+    bailout: { side: 'left', safe: [104, 138], normal: [150, 196] },
+  },
+  'cypress-point:17': {
+    length: 391,
+    fairwayFrom: 152,
+    fairwayTo: 379,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'ocean', from: 0, to: 79, side: 'right' },
+      { id: 'z2', kind: 'ocean', from: 79, to: 135, side: 'cross' },
+      { id: 'z3', kind: 'ocean', from: 135, to: 391, side: 'right' },
+      { id: 'z4', kind: 'bunker', from: 283, to: 287, side: 'left' },
+      { id: 'z5', kind: 'bunker', from: 287, to: 295, side: 'right' },
+      { id: 'z6', kind: 'bunker', from: 305, to: 317, side: 'right' },
+      { id: 'z7', kind: 'bunker', from: 317, to: 323, side: 'left' },
+      { id: 'z8', kind: 'bunker', from: 357, to: 387, side: 'left' },
+    ],
+  },
+  'cypress-point:18': {
+    length: 343,
+    fairwayFrom: 121,
+    fairwayTo: 331,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 123, to: 129, side: 'cross' },
+      { id: 'z2', kind: 'bunker', from: 129, to: 139, side: 'left' },
+      { id: 'z3', kind: 'bunker', from: 149, to: 165, side: 'right' },
+      { id: 'z4', kind: 'bunker', from: 205, to: 235, side: 'right' },
+      { id: 'z5', kind: 'bunker', from: 235, to: 239, side: 'cross' },
+      { id: 'z6', kind: 'bunker', from: 239, to: 255, side: 'left' },
+      { id: 'z7', kind: 'bunker', from: 255, to: 279, side: 'right' },
+      { id: 'z8', kind: 'bunker', from: 307, to: 319, side: 'cross' },
+      { id: 'z9', kind: 'bunker', from: 319, to: 329, side: 'left' },
     ],
   },
 }

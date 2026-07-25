@@ -49,6 +49,7 @@ import {
   type ZoneShare,
 } from './odds'
 import { AGGRESSIVE_BUDGET, destinyPlan, fortuneOddsFor, setupFromSeed } from './replay'
+import { aceFiringChoice, secondGoMode } from './resolve'
 
 const CHOICES: Choice[] = ['safe', 'normal', 'aggressive']
 
@@ -206,7 +207,14 @@ function detailFor(
 ): DetailResult {
   if (stage === 'tee') return { kind: 'long', detail: longOdds(layout, cond, ball, choice, 'tee', character) }
   if (stage === 'second') {
-    if (choice === 'aggressive') return { kind: 'approach', detail: approachOdds(layout, cond, ball, choice, 'go', character, fOdds) }
+    // On a bail-out par 3 the attacking option is still a par-3 tee shot (pin,
+    // par-3 table, ace odds), not a par-5 go-for-it. Grading it with the wrong
+    // table values the whole decision wrong — the calibration test catches it
+    // as policy drift. Shares `secondGoMode` with resolve.ts rather than
+    // re-deriving the rule, so the two can never drift apart.
+    if (choice === 'aggressive') {
+      return { kind: 'approach', detail: approachOdds(layout, cond, ball, choice, secondGoMode(par), character, fOdds) }
+    }
     return { kind: 'long', detail: longOdds(layout, cond, ball, choice, 'layup', character) }
   }
   const mode = approachModeFor(par, ball, layout)
@@ -522,7 +530,14 @@ export function gradeRound(input: GradeInput): RoundGrade | null {
       const luckRaw = delta + checkpointV[k + 1] - evChosen
 
       let isDestiny = false
-      if (plan.ace && spec.par === 3 && k === 0 && shot.outcome === 'holeout') {
+      // aceFiringChoice, not just `spec.par === 3`: on a bail-out par 3 a
+      // lay-up can't hole out, so it must never be mistaken for the destined
+      // ace either — see aceEligible's doc comment in resolve.ts. A lay-up
+      // bucket can't produce `outcome === 'holeout'` today (LongOdds has no
+      // holeout column), so this check is currently a no-op guard, but keeps
+      // this 5th destiny site honest about the same rule the other four gate
+      // on rather than relying on that being true forever.
+      if (plan.ace && spec.par === 3 && k === 0 && shot.outcome === 'holeout' && aceFiringChoice(layout.bailout, shot.choice)) {
         isDestiny = true
         plan.ace = false
       } else if (plan.albatross && shot.stage === 'second' && shot.choice === 'aggressive' && strokesBefore === 1 && shot.outcome === 'holeout') {

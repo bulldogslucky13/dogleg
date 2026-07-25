@@ -803,7 +803,12 @@ export function HoleMap(props: {
       )
     }
 
-    if (z.kind === 'water' && z.side === 'cross') {
+    // A `cross` ocean is a full-fairway carry (Cypress 16's tee shot), not a
+    // one-sided shoreline — the generic `ocean` branch below assumes every
+    // non-`left` side is a `right`-side shore and would draw water on only
+    // half the corridor, leaving the other half green. Same full-width ribbon
+    // as a `cross` water zone.
+    if ((z.kind === 'water' || z.kind === 'ocean') && z.side === 'cross') {
       return (
         <path
           key={z.id}

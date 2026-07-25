@@ -119,11 +119,17 @@ const CHOICE_VERB: Record<Choice, string> = {
   aggressive: 'went flag-hunting',
 }
 
-function stageSuffix(stage: Stage): string {
+function stageSuffix(stage: Stage, choice: Choice, bailout: boolean): string {
   switch (stage) {
     case 'tee':
       return 'off the tee'
     case 'second':
+      // A bail-out par 3 (see `Bailout` in types.ts) plays its opening
+      // decision from the `second` stage, at the tee — but safe/normal there
+      // are lay-ups that explicitly DECLINE the green, so "going for the
+      // green" would describe the opposite of what the character just did.
+      // Only the attacking line (aggressive) is actually going for it.
+      if (bailout) return choice === 'aggressive' ? 'at the flag' : 'off the tee'
       return 'going for the green'
     case 'approach':
       return 'into the green'
@@ -139,14 +145,19 @@ function stageSuffix(stage: Stage): string {
 /** Copy for the post-hole recap: one line per character, summarizing the
  * headline decision (their first shot on the hole) plus a flavor callout if
  * they went aggressive again later. Choices only — never mentions an
- * outcome, a score, dice, RNG, or luck. */
-export function castLinesForHole(cast: CastResult, holeIndex: number): string[] {
+ * outcome, a score, dice, RNG, or luck.
+ *
+ * `bailout` — is THIS hole a bail-out par 3? Only affects the `second`-stage
+ * suffix (see `stageSuffix`); the cast itself already played the real hole
+ * correctly (`startHole` starts a bail-out par 3 in `second`), this is purely
+ * about describing that choice with the right words. */
+export function castLinesForHole(cast: CastResult, holeIndex: number, bailout = false): string[] {
   return cast.map((entry) => {
     const spec = CHARACTERS.find((c) => c.id === entry.characterId)!
     const shots = entry.holes[holeIndex]
     const headline = shots[0]
     const verb = CHOICE_VERB[headline.choice]
-    const suffix = stageSuffix(headline.stage)
+    const suffix = stageSuffix(headline.stage, headline.choice, bailout)
     // Flavor names what actually happened after the opener — a charged putt
     // is not "flag-hunting", and "again" only fits if the opener attacked too.
     const laterAgg = shots.slice(1).filter((s) => s.choice === 'aggressive')

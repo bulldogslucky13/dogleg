@@ -474,11 +474,15 @@ describe('smoke: the clubhouse cast is deterministic, choices-only, for every co
       const budgetLeft: Record<string, number> = Object.fromEntries(CHARACTERS.map((c) => [c.id, AGG_BUDGET]))
       for (let h = 0; h < 18; h++) {
         // every hole yields a line per character, and the lines name the character
-        const lines = castLinesForHole(cast, h)
+        const bailout = Boolean(buildLayout(course.slug, course.holes[h], setup.cond).bailout)
+        const lines = castLinesForHole(cast, h, bailout)
         expect(lines).toHaveLength(CHARACTERS.length)
         lines.forEach((line, i) => {
           expect(line).toContain(CHARACTERS[i].name)
           expect(line.length).toBeGreaterThan(0)
+          // a bail-out lay-up must never be described as going for the green —
+          // that's the one line it explicitly isn't
+          if (bailout) expect(line).not.toContain('going for the green')
         })
       }
       // aggressive budget (8, tee/second/approach only) is never overspent across the round
@@ -683,5 +687,32 @@ describe('smoke: the bail-out par 3 — laying up on a hole you can decline', ()
     expectCompleteAndSane(done)
     // the 16th took at least two strokes — you cannot lay up and hole out
     expect(done.scores[15]!.strokes).toBeGreaterThanOrEqual(2)
+  })
+
+  it('describes the clubhouse cast\'s opener honestly — a lay-up is never "going for the green"', () => {
+    const setup = practiceSetup('cypress-point', 'bail-cast')
+    const cast = castRound({ course: cypress, cond: setup.cond, seed: setup.seed })
+    // whatever the real cast actually did, none of it reads as attacking the
+    // green unless it truly did (the budget model means which character goes
+    // aggressive by hole 16 varies by seed, so this checks the general ban)
+    for (const line of castLinesForHole(cast, 15, true)) expect(line).not.toContain('going for the green')
+
+    // exact wording, both directions, pinned with a hand-built cast so it
+    // doesn't depend on which character's aggressive budget survives to hole
+    // 16 for this seed
+    const fakeCast: typeof cast = cast.map((entry, i) => ({
+      ...entry,
+      holes: entry.holes.map((shots, h) =>
+        h === 15 ? [{ stage: 'second', choice: i === 0 ? 'safe' : 'aggressive' } as const, ...shots.slice(1)] : shots,
+      ),
+    }))
+    const lines = castLinesForHole(fakeCast, 15, true)
+    expect(lines[0]).toContain('off the tee')
+    expect(lines[0]).not.toContain('going for the green')
+    expect(lines[1]).toContain('at the flag')
+
+    // omitting the flag (the pre-fix default) reproduces the bad phrasing —
+    // guards against the bailout param silently going unused again
+    expect(castLinesForHole(fakeCast, 15)[0]).toContain('going for the green')
   })
 })

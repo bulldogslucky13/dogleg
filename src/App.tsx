@@ -775,7 +775,7 @@ export default function App() {
             runningToPar={toPar}
             last={round.currentHole >= course.holes.length - 1}
             onNext={next}
-            castLines={cast ? castLinesForHole(cast, round.currentHole) : undefined}
+            castLines={cast ? castLinesForHole(cast, round.currentHole, Boolean(hole.layout.bailout)) : undefined}
             clubhouseTally={clubhouseTally ?? undefined}
             bailout={Boolean(hole.layout.bailout)}
           />

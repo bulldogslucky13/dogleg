@@ -694,11 +694,19 @@ export default function App() {
             aria-label="See your full round card"
           >
             {toParLabel(toPar)} to par
-            {/* the expand glyph is the tell that the chip opens the full card —
-                without it this was a hidden feature */}
-            <span className="topar-expand" aria-hidden>
-              ▤
-            </span>
+            {/* the expand arrows are the tell that the chip opens the full
+                card — without them this was a hidden feature. Drawn inline
+                (not a unicode arrow) so no platform renders a tofu box. */}
+            <svg className="topar-expand" viewBox="0 0 16 16" aria-hidden>
+              <path
+                d="M10 3h3v3M13 3L9.5 6.5M6 13H3v-3M3 13l3.5-3.5"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
           </button>
           <div className="yards">{hole.layout.length} yards</div>
         </div>

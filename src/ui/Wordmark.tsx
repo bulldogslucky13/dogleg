@@ -3,23 +3,30 @@ import type { SVGProps } from 'react'
 /**
  * The DogLeg wordmark.
  *
- * Vectorised from the supplied artwork (the white-background lockup): the
- * letterforms are real Outfit 500 outlines — the face whose stroke weight,
- * descender and widths matched the artwork measurement for measurement — and
- * the three drawn elements are placed on measured coordinates:
+ * Vectorised from the supplied artwork. The letterforms are real Outfit 500
+ * outlines — the face whose stroke weight, descender and widths matched the
+ * artwork measurement for measurement — positioned on per-glyph coordinates
+ * taken off that artwork (x-height 48, baseline y=105). Three parts are drawn
+ * rather than typed:
  *
- *   - the flagpole is the d's OWN stem, extended to the top of the mark
- *   - the l continues below the baseline, doglegs right, and plants in the cup
- *   - the pennant hangs off the pole, tip at its mid-height
+ *   - the flagpole is the d's OWN stem, carried up to the top of the mark. It
+ *     is aligned to that stem's real left edge (37.44), not to a
+ *     nominal stroke width, or the join shows a ledge where it begins.
+ *   - the l continues past the baseline, doglegs right, and plants in the cup
+ *   - the pennant hangs off the pole, its tip at mid-height
  *
- * Baseline sits at y=105 in a 289x159 box. Letters and pin take currentColor,
- * so the mark inherits its ink from whatever it sits in; the pennant and cup
- * are themeable but default to the artwork's own colours.
+ * The lockup is deliberately tighter than the artwork (pole top 2,
+ * cup at 143 rather than 0 and 149): at the size the masthead needs, the
+ * artwork's full vertical reach ate the screen. Letterforms are untouched.
+ * Regenerate with scratchpad/gen-wordmark.js if those need to move again.
+ *
+ * Letters and pin take currentColor, so the mark inherits its ink from
+ * whatever it sits in. The pennant and cup read --logo-* from theme.css.
  */
 export function Wordmark(props: SVGProps<SVGSVGElement>) {
   return (
     <svg
-      viewBox="0 0 289 159"
+      viewBox="0 2 289 151.5"
       role="img"
       aria-label="DogLeg"
       xmlns="http://www.w3.org/2000/svg"
@@ -29,7 +36,7 @@ export function Wordmark(props: SVGProps<SVGSVGElement>) {
       {/* the cup, drawn first so the pin plants in front of it */}
       <ellipse
         cx="211"
-        cy="149"
+        cy="143"
         rx="29"
         ry="9.5"
         fill="var(--logo-cup, #0b3b0b)"
@@ -48,18 +55,21 @@ export function Wordmark(props: SVGProps<SVGSVGElement>) {
         {/* g */}
         <path d="M262.18 125.16L262.18 125.16Q254.88 125.16 249.41 122.52Q243.94 119.88 240.58 115.08L240.58 115.08L247.49 108.17Q250.27 111.62 253.82 113.35Q257.38 115.08 262.37 115.08L262.37 115.08Q268.61 115.08 272.26 111.86Q275.9 108.65 275.9 103.08L275.9 103.08L275.9 91.75L277.73 81.58L275.9 71.3L275.9 58.92L286.46 58.92L286.46 103.08Q286.46 109.7 283.39 114.65Q280.32 119.59 274.85 122.38Q269.38 125.16 262.18 125.16M261.7 104.04L261.7 104.04Q255.55 104.04 250.61 101.02Q245.66 97.99 242.83 92.71Q240 87.43 240 80.9L240 80.9Q240 74.38 242.83 69.19Q245.66 64.01 250.61 60.98Q255.55 57.96 261.7 57.96L261.7 57.96Q267.17 57.96 271.3 60.17Q275.42 62.38 277.73 66.26Q280.03 70.15 280.03 75.34L280.03 75.34L280.03 86.66Q280.03 91.75 277.68 95.69Q275.33 99.62 271.2 101.83Q267.07 104.04 261.7 104.04M263.81 94.06L263.81 94.06Q267.65 94.06 270.53 92.42Q273.41 90.79 274.99 87.86Q276.58 84.94 276.58 81L276.58 81Q276.58 77.06 274.99 74.14Q273.41 71.21 270.53 69.58Q267.65 67.94 263.81 67.94L263.81 67.94Q259.97 67.94 257.04 69.58Q254.11 71.21 252.48 74.14Q250.85 77.06 250.85 81L250.85 81Q250.85 84.84 252.48 87.82Q254.11 90.79 257.04 92.42Q259.97 94.06 263.81 94.06" />
         {/* the flagpole: the d's stem carried to the top of the mark */}
-        <rect x="37" y="0" width="11" height="37.88" />
+        <rect x="37.44" y="2" width="10.56" height="35.88" />
       </g>
       {/* the l, doglegging into the cup */}
       <path
-        d="M174 39L174 110L208.5 133L208.5 157"
+        d="M174 39L174 107.9L208.5 128.8L208.5 151"
         fill="none"
         stroke="currentColor"
         strokeWidth="11"
         strokeLinejoin="miter"
       />
       {/* the pennant */}
-      <path d="M48 2L90 15L48 28Z" fill="var(--logo-flag, #d11b18)" />
+      <path
+        d="M48 4L90 17L48 30Z"
+        fill="var(--logo-flag, #d94a32)"
+      />
     </svg>
   )
 }

@@ -74,10 +74,10 @@
   --focus-ring: var(--tracer-400);
 
   /* Logo — the wordmark's own colours (src/ui/Wordmark.tsx). Its letters take
-     currentColor; these are the two parts that don't. The pennant red is the
-     artwork's own, deliberately truer than --flag-500, because the mark is the
-     brand and shouldn't drift with UI retuning. */
-  --logo-flag: #d11b18;
+     currentColor; these are the two parts that don't. The pennant flies the
+     same red as the rest of the UI, so the mark and the primary action read as
+     one system. */
+  --logo-flag: var(--flag-500);
   --logo-cup: var(--turf-950);
   --logo-cup-rim: #2f7a35;
 

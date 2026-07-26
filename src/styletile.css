@@ -1,0 +1,146 @@
+/* Layout for the dev-only style tile (styletile.html). Not part of the app
+   or the production build — the design system itself lives in ui/theme.css. */
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body.dl-theme {
+  background: var(--bg-page-glow), var(--bg-page);
+  color: var(--text-hi);
+  font-family: var(--font-ui);
+  font-size: var(--type-body);
+  -webkit-font-smoothing: antialiased;
+  min-height: 100dvh;
+  display: flex;
+  justify-content: center;
+}
+
+.tile {
+  width: 100%;
+  max-width: 430px;
+  padding: var(--sp-5) var(--sp-4) 64px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-6);
+}
+
+section { display: flex; flex-direction: column; gap: var(--sp-3); }
+
+/* wordmark */
+.mast { display: flex; flex-direction: column; gap: var(--sp-2); }
+.mast-live {
+  display: inline-flex; align-items: center; gap: 7px;
+  font-size: var(--type-caption); font-weight: 600; color: var(--text-mid);
+  text-transform: uppercase; letter-spacing: 0.08em;
+}
+.live-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--flag-400);
+  box-shadow: 0 0 0 3px rgba(217, 74, 50, 0.25);
+}
+.wordmark {
+  font-size: var(--type-hero);
+  line-height: 0.92;
+  text-transform: uppercase;
+  color: var(--text-hi);
+}
+.wordmark em { font-style: normal; color: var(--flag-400); }
+.mast-tag { color: var(--text-mid); font-weight: 500; }
+
+/* palette */
+.swatches { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--sp-2); }
+.sw {
+  border-radius: var(--r-bug);
+  border: 1px solid var(--edge-hairline);
+  min-height: 58px;
+  padding: 8px 10px;
+  display: flex; flex-direction: column; justify-content: flex-end; gap: 1px;
+}
+.sw span { font-weight: 700; font-size: 0.82rem; }
+.sw i { font-style: normal; font-size: 0.72rem; opacity: 0.75; }
+.sw.lt { color: var(--text-on-block); }
+
+/* type card */
+.type-card {
+  background: var(--bg-card); border-radius: var(--r-card);
+  box-shadow: var(--shadow-card);
+  padding: var(--sp-4); display: flex; flex-direction: column; gap: var(--sp-2);
+}
+.t-hero { font-size: 3.4rem; line-height: 1; color: var(--score-under); }
+.t-tower { font-size: 1.25rem; color: var(--text-hi); }
+.t-title { font-size: var(--type-title); font-weight: 600; }
+.t-body { color: var(--text-mid); }
+
+/* score strip */
+.scorestrip { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--sp-2); }
+.scorebox {
+  background: var(--bg-card); border-radius: var(--r-bug);
+  padding: 10px 6px 8px; text-align: center;
+  display: flex; flex-direction: column; gap: 2px; align-items: center;
+}
+.sb-num { font-size: 1.9rem; line-height: 1; }
+
+/* lower thirds */
+.stack { display: flex; flex-direction: column; gap: var(--sp-2); align-items: flex-start; }
+.stack .dl-cta, .stack .dl-cta-secondary, .stack .row { align-self: stretch; }
+.lt-text { font-size: 1.02rem; }
+
+/* tower */
+.tower {
+  border-radius: var(--r-card); overflow: hidden;
+  background: var(--bg-panel); box-shadow: var(--shadow-card);
+  border: 1px solid var(--edge-hairline);
+}
+.tower-head {
+  background: var(--bg-blocked); color: var(--text-on-block);
+  padding: 9px 14px;
+  display: flex; justify-content: space-between; align-items: baseline; gap: 8px;
+}
+.tower-head .dl-tower { font-size: 1rem; }
+.trow {
+  display: grid; grid-template-columns: 34px 1fr auto 52px;
+  align-items: center; gap: 8px;
+  padding: 9px 14px 9px 10px;
+}
+.trow + .trow { border-top: 1px solid var(--edge-hairline); }
+.trank {
+  font-size: 0.95rem; text-align: center;
+  background: var(--bg-elevated); border-radius: 6px; padding: 4px 0;
+  color: var(--text-mid);
+}
+.trow.champ .trank { background: var(--trophy-400); color: var(--text-on-block); }
+.trow.champ { box-shadow: inset 3px 0 0 var(--trophy-400); }
+.trow.me { background: var(--bg-card); }
+.trow.me .tname::after {
+  content: 'YOU'; font-family: var(--font-ui); font-size: 0.6rem; font-weight: 700;
+  letter-spacing: 0.08em; color: var(--tracer-400);
+  border: 1px solid var(--tracer-400); border-radius: 4px;
+  padding: 1px 5px; margin-left: 8px; vertical-align: 2px;
+}
+.tname { font-size: 1.02rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tscore { font-size: 1.25rem; text-align: right; }
+
+/* bugs */
+.bugs { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--sp-2); }
+.bug-num { font-size: 1.55rem; line-height: 1.1; }
+.bug-num small { font-family: var(--font-ui); font-size: 0.72rem; font-weight: 600; color: var(--text-mid); margin-left: 3px; }
+
+/* CTAs */
+.row { display: flex; gap: var(--sp-2); }
+.row > * { flex: 1; }
+.focus-note { font-size: 0.8rem; color: var(--text-low); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+/* record moment */
+.moment {
+  background:
+    radial-gradient(140% 120% at 50% 0%, rgba(226, 185, 59, 0.14) 0%, transparent 55%),
+    var(--bg-card);
+  border: 1px solid rgba(226, 185, 59, 0.35);
+  border-radius: var(--r-card);
+  box-shadow: var(--shadow-pop);
+  padding: var(--sp-5) var(--sp-4);
+  text-align: center;
+  display: flex; flex-direction: column; gap: var(--sp-2); align-items: center;
+}
+.moment-num { font-size: 3.6rem; line-height: 1; color: var(--record-gold); }
+.moment-holder { font-size: 1rem; color: var(--text-mid); }
+.moment-rule { width: 44px; height: 2px; background: rgba(226, 185, 59, 0.5); border-radius: 2px; }

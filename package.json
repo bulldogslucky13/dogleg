@@ -17,6 +17,8 @@
     "import:osm": "node scripts/import-osm.ts"
   },
   "dependencies": {
+    "@fontsource-variable/archivo": "^5.3.0",
+    "@fontsource/barlow": "^5.3.0",
     "@supabase/supabase-js": "^2.110.7",
     "posthog-js": "^1.404.1",
     "react": "^19.1.0",

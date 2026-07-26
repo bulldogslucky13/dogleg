@@ -1,0 +1,425 @@
+/* ============================================================================
+   Broadcast re-skin — APPLICATION layer (menus + opening screens only)
+   ----------------------------------------------------------------------------
+   Loaded after styles.css; every rule here is scoped to the menu surfaces:
+
+     .screen.home        Teebox (main menu)
+     .screen.rounds      Clubhouse (stats / records / seasons)
+     .tut-card           How to Play + season splash (rides the same card)
+
+   The in-round play screen (.screen.play), pick, result, and replay keep the
+   classic paper look untouched — this pass is menus/opening screens per the
+   re-skin scope. All values come from ui/theme.css tokens; tweak there.
+   ========================================================================= */
+
+/* ------------------------------------------------------------ shared base */
+
+.screen.home,
+.screen.rounds {
+  background: linear-gradient(180deg, var(--turf-800) 0%, var(--turf-900) 60%);
+  color: var(--text-hi);
+  border: 1px solid var(--edge-hairline);
+  box-shadow: var(--shadow-card);
+  font-family: var(--font-ui);
+}
+
+:is(.screen.home, .screen.rounds) .kicker {
+  color: var(--text-low);
+  letter-spacing: var(--track-kicker);
+}
+
+:is(.screen.home, .screen.rounds) .tagline {
+  color: var(--text-mid);
+}
+
+:is(.screen.home, .screen.rounds) .fine {
+  color: var(--text-low);
+}
+
+/* stat tiles become broadcast "bugs": keyline + big display numeral */
+:is(.screen.home, .screen.rounds) .stat {
+  background: var(--bg-card);
+  border: none;
+  border-left: var(--keyline-w) solid var(--tracer-400);
+  border-radius: var(--r-bug);
+  text-align: left;
+  padding: 11px 12px 10px;
+}
+
+:is(.screen.home, .screen.rounds) .stat:nth-child(2) {
+  border-left-color: var(--flag-500);
+}
+
+:is(.screen.home, .screen.rounds) .stat:nth-child(3) {
+  border-left-color: var(--trophy-400);
+}
+
+:is(.screen.home, .screen.rounds) .stat b {
+  font-family: var(--font-display);
+  font-variation-settings: 'wdth' var(--wdth-score);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+:is(.screen.home, .screen.rounds) .stat span {
+  color: var(--text-low);
+}
+
+/* primary CTA: color-blocked flag slab with the corner notch */
+:is(.screen.home, .screen.rounds) .cta {
+  background: linear-gradient(180deg, var(--flag-400), var(--flag-500));
+  color: var(--action-on-primary);
+  clip-path: var(--clip-notch);
+  border-radius: 0;
+  font-family: var(--font-display);
+  font-variation-settings: 'wdth' 88;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  font-size: 1rem;
+}
+
+:is(.screen.home, .screen.rounds) .cta:active {
+  filter: brightness(0.92);
+}
+
+/* secondary actions: hairline outline, no slab */
+:is(.screen.home, .screen.rounds) .cta.ghost {
+  background: transparent;
+  clip-path: none;
+  border-radius: var(--r-bug);
+  border: 1.5px solid var(--edge-strong);
+  color: var(--text-hi);
+}
+
+:is(.screen.home, .screen.rounds) :focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* ----------------------------------------------------------------- Teebox */
+
+.screen.home .masthead h1 {
+  font-family: var(--font-display);
+  font-variation-settings: 'wdth' var(--wdth-score);
+  font-weight: 800;
+  letter-spacing: 0;
+  color: var(--text-hi);
+}
+
+.screen.home .masthead h1 em {
+  color: var(--flag-400);
+}
+
+.screen.home .how-to-play {
+  color: var(--text-mid);
+  border-color: var(--edge-strong);
+}
+
+/* today's course: the light lower-third slab — sand block, flag keyline */
+.screen.home .today-card {
+  background: var(--bg-blocked);
+  color: var(--text-on-block);
+  clip-path: var(--clip-notch);
+  border-radius: 0;
+  box-shadow: inset 4px 0 0 var(--flag-500);
+  padding-left: 20px;
+}
+
+.screen.home .today-card .kicker {
+  color: var(--text-on-block-mid);
+}
+
+.screen.home .today-card h2 {
+  font-family: var(--font-display);
+  font-variation-settings: 'wdth' var(--wdth-tower);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: var(--track-tower);
+  font-size: 1.55rem;
+}
+
+.screen.home .today-card p {
+  color: var(--text-on-block-mid);
+}
+
+.screen.home .today-card .blurb {
+  color: var(--text-on-block-mid);
+}
+
+.screen.home .today-card .chip.dark {
+  background: rgba(15, 34, 22, 0.08);
+  border-color: rgba(15, 34, 22, 0.22);
+  color: var(--text-on-block);
+}
+
+.screen.home .today-card .chip.sig {
+  background: rgba(196, 154, 32, 0.14);
+  border-color: rgba(196, 154, 32, 0.6);
+  color: #8a6c12;
+}
+
+.screen.home .cta-tease {
+  color: var(--text-mid);
+}
+
+/* unlimited-play course browser: tower rows */
+.screen.home .course-tabs {
+  border-color: var(--edge-strong);
+}
+
+.screen.home .course-tab {
+  color: var(--text-mid);
+}
+
+.screen.home .course-tab.active {
+  background: var(--bg-blocked);
+  color: var(--text-on-block);
+  font-weight: 700;
+}
+
+.screen.home .course-row {
+  background: var(--bg-card);
+  border: none;
+  border-radius: var(--r-bug);
+}
+
+.screen.home .course-row b {
+  font-family: var(--font-display);
+  font-variation-settings: 'wdth' var(--wdth-tower);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: var(--track-tower);
+  font-size: 1.02rem;
+}
+
+.screen.home .course-row span {
+  color: var(--text-low);
+}
+
+.screen.home .course-cr {
+  color: var(--text-mid);
+}
+
+.screen.home .course-cr.open {
+  color: var(--success);
+}
+
+.screen.home .season-countdown {
+  border-color: rgba(85, 191, 226, 0.4);
+  color: var(--text-mid);
+}
+
+.screen.home .par3-intro {
+  border-color: var(--edge-strong);
+}
+
+/* character mini-records */
+.screen.home .char-record {
+  border-color: var(--edge-hairline);
+  background: var(--bg-card);
+}
+
+.screen.home .char-record-text span {
+  color: var(--text-low);
+}
+
+/* record-steal rivalry card: already dark — keep it, punch the accents */
+.screen.home .steal-card {
+  background: var(--turf-950);
+  border: 1px solid rgba(226, 185, 59, 0.4);
+}
+
+.screen.home .steal-card .kicker {
+  color: var(--record-gold);
+}
+
+.screen.home .steal-cta {
+  background: linear-gradient(180deg, var(--flag-400), var(--flag-500));
+  color: var(--action-on-primary);
+}
+
+.screen.home .stale-banner {
+  background: var(--bg-blocked);
+  color: var(--text-on-block);
+}
+
+/* -------------------------------------------------------------- Clubhouse */
+
+:is(.screen.home, .screen.rounds) .home-link {
+  color: var(--text-mid);
+}
+
+.screen.rounds .pick-title {
+  font-family: var(--font-display);
+  font-variation-settings: 'wdth' var(--wdth-tower);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: var(--track-tower);
+}
+
+.screen.rounds .locker-tabs {
+  border-color: var(--edge-strong);
+}
+
+.screen.rounds .locker-tab {
+  color: var(--text-mid);
+  border-color: var(--edge-strong);
+}
+
+.screen.rounds .locker-tab.on {
+  background: var(--bg-blocked);
+  border-color: var(--bg-blocked);
+  color: var(--text-on-block);
+}
+
+/* dark-card version of the sync banner (it is cream on the paper theme) */
+.screen.rounds .sync-cta,
+.screen.home .sync-cta {
+  background: var(--bg-card);
+  border-color: var(--edge-strong);
+  color: var(--text-hi);
+}
+
+.screen.rounds .sync-cta em,
+.screen.home .sync-cta em {
+  color: var(--tracer-400);
+}
+
+.screen.rounds .stats-headline b {
+  color: var(--text-hi);
+}
+
+.screen.rounds .stats-headline span {
+  color: var(--text-mid);
+}
+
+/* empty trophy shelf: dashed dark card instead of dashed cream */
+.screen.rounds .trophy.empty {
+  background: var(--bg-card);
+  border-color: var(--edge-strong);
+  color: var(--text-low);
+}
+
+.screen.rounds .round-row {
+  background: var(--bg-card);
+  border: none;
+  border-radius: var(--r-bug);
+}
+
+.screen.rounds .round-row-text b {
+  font-family: var(--font-display);
+  font-variation-settings: 'wdth' var(--wdth-tower);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: var(--track-tower);
+}
+
+.screen.rounds .round-row-text span {
+  color: var(--text-low);
+}
+
+.screen.rounds .round-badge.cr {
+  background: var(--trophy-400);
+  color: var(--text-on-block);
+}
+
+.screen.rounds .stats-headline b {
+  font-family: var(--font-display);
+  font-variation-settings: 'wdth' var(--wdth-score);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.screen.rounds .trophy-row {
+  border-color: rgba(226, 185, 59, 0.35);
+  background: var(--bg-card);
+}
+
+.screen.rounds .podium-spot {
+  border-color: var(--edge-strong);
+  background: var(--bg-card);
+}
+
+.screen.rounds .dist-ref {
+  color: var(--text-low);
+}
+
+.screen.rounds .dist-row > span:first-child {
+  color: var(--text-mid);
+}
+
+.screen.rounds .dist-row > b {
+  color: var(--text-hi);
+}
+
+/* ------------------------------------------- How to Play + season splash */
+
+.tut-card {
+  background: linear-gradient(180deg, var(--turf-800) 0%, var(--turf-900) 70%);
+  color: var(--text-hi);
+  border: 1px solid var(--edge-hairline);
+  font-family: var(--font-ui);
+}
+
+.tut-card .kicker {
+  color: var(--text-low);
+  letter-spacing: var(--track-kicker);
+}
+
+.tut-card .tut-title {
+  font-family: var(--font-display);
+  font-variation-settings: 'wdth' var(--wdth-tower);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: var(--track-tower);
+}
+
+.tut-card .tut-skip {
+  color: var(--text-low);
+}
+
+.tut-card .tut-body {
+  color: var(--text-mid);
+}
+
+.tut-card .tut-players small {
+  color: var(--text-low);
+}
+
+.tut-card .tut-dots span {
+  background: var(--edge-strong);
+}
+
+.tut-card .tut-dots span.on {
+  background: var(--sand-100);
+}
+
+.tut-card .cta {
+  background: linear-gradient(180deg, var(--flag-400), var(--flag-500));
+  color: var(--action-on-primary);
+  clip-path: var(--clip-notch);
+  border-radius: 0;
+  font-family: var(--font-display);
+  font-variation-settings: 'wdth' 88;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+}
+
+.tut-card .cta.ghost {
+  background: transparent;
+  clip-path: none;
+  border-radius: var(--r-bug);
+  border: 1.5px solid var(--edge-strong);
+  color: var(--text-hi);
+}
+
+.tut-card :focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* season splash podium: gold means records here too */
+.tut-card.season-splash .podium-spot {
+  border-color: var(--edge-strong);
+  background: var(--bg-card);
+}

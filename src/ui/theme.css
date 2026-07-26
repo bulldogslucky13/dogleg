@@ -19,11 +19,11 @@
   /* ------------------------------------------------------------ paintbox */
 
   /* Turf — the greens, deep and rich (evening telecast, not near-black) */
-  --turf-950: #0a1a10;
-  --turf-900: #0f2216;
-  --turf-800: #16301f;
-  --turf-700: #1e4029;
-  --turf-600: #2a5638;
+  --turf-950: #0e2114;
+  --turf-900: #142c1c;
+  --turf-800: #1c3a26;
+  --turf-700: #264d33;
+  --turf-600: #336341;
   --fairway-500: #4f9a52; /* the logo's fairway ribbon */
   --fairway-300: #7cc36e; /* the logo's green (putting surface) */
 

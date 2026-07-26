@@ -5,12 +5,18 @@
   --cream: #f4efe3;
   --cream-dim: #e9e2cf;
   --paper: #f8f4e9;
-  --accent: #c05b4d;
-  --gold: #c9a227;
-  --good: #4e8a48;
-  --good-bright: #6fbf66;
+  /* The accents point at the brand paintbox (ui/theme.css) so the paper play
+     screens and the broadcast menus share ONE red, ONE gold, ONE green — the
+     surfaces stay light on purpose (Jackson: game screens don't change under
+     players), but their accent hues must not drift from the rest of the app.
+     --neutral and the paper/ink/forest set stay as they are: they ARE the
+     paper look. */
+  --accent: var(--flag-500, #c05b4d);
+  --gold: var(--trophy-500, #c9a227);
+  --good: var(--fairway-500, #4e8a48);
+  --good-bright: var(--fairway-300, #6fbf66);
   --neutral: #d8c88f;
-  --bad: #c05b4d;
+  --bad: var(--flag-500, #c05b4d);
   --line: rgba(29, 43, 32, 0.16);
   font-size: 16px;
 }
@@ -25,8 +31,10 @@ html,
 body {
   background: radial-gradient(120% 90% at 50% 0%, #23452e 0%, var(--forest-deep) 70%);
   color: var(--ink);
-  font-family:
-    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  /* Barlow is the brand's UI face (theme.css) — the paper screens wear it too,
+     so the game and the menus read as one product. Layout untouched: Barlow's
+     metrics sit close enough to the system stack that nothing reflows. */
+  font-family: 'Barlow', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
   min-height: 100dvh;
 }
@@ -392,6 +400,16 @@ button {
   display: flex;
   gap: 10px;
   align-items: flex-start;
+  /* claim the header row's spare width and pass it down: without these the
+     par/course wrapper was flex-squeezed to ~11px, wrapping "Par 4 · SI 8"
+     and clipping the course line to its first letter */
+  flex: 1;
+  min-width: 0;
+}
+
+.hole-id > div {
+  flex: 1;
+  min-width: 0;
 }
 
 .hole-num {
@@ -407,6 +425,9 @@ button {
   font-weight: 800;
   color: rgba(29, 43, 32, 0.65);
   margin-bottom: 5px;
+  /* one line, always — at phone width this was wrapping to "PAR 4 ·" / "SI 9"
+     and the second line clipped behind the chip row */
+  white-space: nowrap;
 }
 
 /* course name as quiet text under the par line — replaces the chip row on
@@ -1802,6 +1823,14 @@ button {
 }
 
 /* the target on the wall while chasing a stolen record */
+.ghost-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 5px;
+  margin-top: -6px;
+}
+
 .chase-chip {
   margin-top: 5px;
   display: inline-block;

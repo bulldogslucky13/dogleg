@@ -820,6 +820,28 @@
   color: var(--text-mid);
 }
 
+/* --------------------------- paper game screens: brand accents ONLY */
+
+/* The pick and play screens deliberately KEEP the light paper look — they are
+   game-mechanic surfaces, and players shouldn't find the game repainted under
+   them (Jackson's call; clean-and-simple helps play-rate). What they get from
+   the re-skin is alignment, not a repaint: Barlow body type (styles.css), the
+   shared accent tokens, and the display face on the two headline moments
+   below. Nothing here touches a surface, a layout, or an odds colour. */
+.screen.pick h2 {
+  font-family: var(--font-display);
+  font-variation-settings: 'wdth' 96;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+.screen.play .hole-num {
+  font-family: var(--font-display);
+  font-variation-settings: 'wdth' var(--wdth-score);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
 /* ------------------------------------- celebration splash branding */
 
 /* The splashes headed themselves with a text lockup — "⛳ DogLeg · COURSE" —

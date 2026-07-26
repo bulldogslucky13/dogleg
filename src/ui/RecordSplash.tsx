@@ -4,6 +4,7 @@ import type { Season } from '../engine/season'
 import type { CharacterId } from '../engine/types'
 import { track } from '../lib/analytics'
 import { momentCardBlob, shareMomentCard } from './momentCard'
+import { Wordmark } from './Wordmark'
 
 /**
  * The course-record celebration — the fortune splash's little sibling. Same
@@ -82,7 +83,8 @@ export function RecordSplash(props: {
         <span key={i} className="moment-confetti" style={confettiStyle(i)} aria-hidden />
       ))}
       <div className="record-splash-card" onClick={(e) => e.stopPropagation()}>
-        <div className="moment-kicker">⛳ DogLeg · {props.courseName}</div>
+        <Wordmark className="moment-wordmark" />
+        <div className="moment-kicker">{props.courseName}</div>
         <h2 className="record-splash-title">
           {props.season ? `${props.season.name} record` : props.takenFrom ? 'Record reclaimed' : 'Course record'}
         </h2>

@@ -6,6 +6,7 @@ import type { CharacterId } from '../engine/types'
 import { track } from '../lib/analytics'
 import { CharacterAvatar } from './Avatars'
 import { momentCardBlob, shareMomentCard } from './momentCard'
+import { Wordmark } from './Wordmark'
 
 /**
  * The full-screen moment: HOLE IN ONE / ALBATROSS. Composed to be
@@ -130,7 +131,8 @@ export function MomentSplash(props: {
         <span key={i} className="moment-confetti" style={confettiStyle(i)} aria-hidden />
       ))}
       <div className="moment-card">
-        <div className="moment-kicker">⛳ DogLeg · {props.courseName}</div>
+        <Wordmark className="moment-wordmark" />
+        <div className="moment-kicker">{props.courseName}</div>
         <div className="moment-ball" aria-hidden>
           <span />
         </div>

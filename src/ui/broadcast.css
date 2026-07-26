@@ -800,6 +800,28 @@
   color: var(--text-mid);
 }
 
+/* ------------------------------------- celebration splash branding */
+
+/* The splashes headed themselves with a text lockup — "⛳ DogLeg · COURSE" —
+   which put an emoji where the logo goes and wrapped the course name onto a
+   second line with one word orphaned. Now the real mark sits above the course
+   name, matching the shared card. These splashes paint their own full-bleed
+   backgrounds (gold, purple, green) rather than sitting on turf, so the mark
+   takes cream ink and its own flag red. */
+.moment-wordmark {
+  display: block;
+  width: min(52%, 190px);
+  height: auto;
+  margin: 0 auto 2px;
+  color: var(--sand-100);
+}
+
+/* the cup would read as a dark blot on the gold and purple moments */
+:is(.moment-backdrop.ace, .moment-backdrop.albatross) .moment-wordmark {
+  --logo-cup: rgba(10, 26, 16, 0.55);
+  --logo-cup-rim: rgba(248, 243, 228, 0.45);
+}
+
 /* ------------------------------------------- the season-launch splash */
 
 /* Paper-era leftovers on a now-dark card. The podium's sub-labels are dark ink

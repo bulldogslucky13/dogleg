@@ -79,7 +79,7 @@
      one system. */
   --logo-flag: var(--flag-500);
   --logo-cup: var(--turf-950);
-  --logo-cup-rim: #2f7a35;
+  --logo-cup-rim: #2a5f33;
 
   /* Score semantics (broadcast convention: under par runs RED) */
   --score-under: var(--flag-400);

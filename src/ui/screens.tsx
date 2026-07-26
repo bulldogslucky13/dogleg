@@ -119,14 +119,21 @@ export function HomeScreen(props: {
   const playedSlugs = new Set(loadArchive().map((r) => r.courseSlug))
   return (
     <div className="screen home">
+      {/* The masthead is one lockup: the kicker and the tagline sit IN the
+          wordmark's negative space — either side of the pennant up top, either
+          side of the cup below — rather than taking rows of their own. Their
+          positions derive from the mark's own geometry (see .lockup in
+          broadcast.css), so they track it if it resizes. */}
       <header className="masthead">
-        <div className="masthead-top">
-          <div className="kicker">Daily golf challenge · No. {setup.puzzleNumber}</div>
+        <div className="lockup">
+          <h1 className="wordmark">
+            <Wordmark />
+          </h1>
+          <span className="lockup-no">No. {setup.puzzleNumber}</span>
+          <span className="lockup-kicker">Daily Golf Challenge</span>
+          <p className="lockup-tag">18 Holes. Play the Odds.</p>
+          <p className="lockup-tag-end">Beat the course.</p>
         </div>
-        <h1 className="wordmark">
-          <Wordmark />
-        </h1>
-        <p className="tagline">18 holes. Play the odds. Beat the course.</p>
       </header>
 
       {stale && (

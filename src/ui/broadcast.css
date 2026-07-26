@@ -133,19 +133,88 @@
   font-size: 0.64rem;
 }
 
-/* the wordmark: an SVG lockup now, so the h1 just sizes it. Ink is
-   currentColor, so it picks up the screen's text colour; the pennant and cup
-   keep the artwork's own red and green. */
+/* ---------------------------------------------------------- the lockup ----
+   The kicker and tagline sit in the wordmark's negative space instead of
+   taking rows of their own: either side of the pennant (which has nothing
+   under it but empty sky) and either side of the cup (below the descenders).
+   That buys back two rows of vertical space at the top of the screen.
+
+   Every offset below is the mark's OWN geometry, from the viewBox the
+   generator prints (0 2 289 151.5):
+     pole left 37.44 · pennant tip 90 · cup 182..240
+     pennant centre y 17 · cup centre y 143   (both less the viewBox's y=2)
+   Change --mark-w and the whole composition tracks it. */
+.screen.home .masthead .lockup {
+  --mark-w: 236px;
+  position: relative;
+  width: 100%;
+}
+
 .screen.home .masthead h1.wordmark {
-  margin: 2px 0 0;
+  margin: 0;
   line-height: 0;
   color: var(--text-hi);
 }
 
 .screen.home .masthead h1.wordmark svg {
   display: block;
-  width: min(100%, 220px);
+  width: min(100%, var(--mark-w));
   height: auto;
+}
+
+.screen.home .masthead .lockup > :not(h1) {
+  position: absolute;
+  margin: 0;
+}
+
+/* top row — beside the pennant, at its mid-height (17 → 9.9% of the box) */
+.screen.home .lockup-no,
+.screen.home .lockup-kicker {
+  top: 9.9%;
+  transform: translateY(-50%);
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-low);
+  line-height: 1.15;
+}
+
+/* left of the flagpole. Narrow by nature — the d's bowl is below, so this
+   column is only as wide as the pole's left edge. It wraps rather than
+   collides once the puzzle number reaches three digits. */
+.screen.home .lockup-no {
+  left: 0;
+  width: calc(var(--mark-w) * 37.44 / 289 - 4px);
+  text-align: right;
+}
+
+/* right of the pennant's tip, running out past the mark into the screen */
+.screen.home .lockup-kicker {
+  left: calc(var(--mark-w) * 90 / 289 + 7px);
+  right: 0;
+}
+
+/* bottom row — beside the cup, at its mid-height (143 → 93.1% of the box) */
+.screen.home .lockup-tag,
+.screen.home .lockup-tag-end {
+  top: 93.1%;
+  transform: translateY(-50%);
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--text-mid);
+  line-height: 1.2;
+}
+
+.screen.home .lockup-tag {
+  left: 0;
+  width: calc(var(--mark-w) * 182 / 289 - 7px);
+  text-align: right;
+}
+
+.screen.home .lockup-tag-end {
+  left: calc(var(--mark-w) * 240 / 289 + 7px);
+  right: 0;
 }
 
 .screen.home .how-to-play {

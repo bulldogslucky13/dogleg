@@ -42,4 +42,11 @@
 // fix: the shipped ~7497 tuple moves to the club's 7790 BLACK card, changing
 // 16 of 18 yardages and 16 of 18 stroke indices — and SI feeds pressure() in
 // the odds, so the card half changes replays just as much as the geometry.
+// v8 also carries the safe-lay-up fix in odds.ts (MIN_LAYUP_ADVANCE): the
+// stay-short-of-a-crossing rule could collapse a lay-up to a 13-yd nudge, or
+// -5 yd on harbour-town:15, so it now carries crossings too close to lay up
+// behind. That changes lay-up landing spots on Harbour Town and Oakmont as
+// well as Whistling Straits — QA on the new course surfaced it, but the bug
+// was already shipped. One version covers both: v8 has never been deployed,
+// so they go out together.
 export const ENGINE_VERSION = 8

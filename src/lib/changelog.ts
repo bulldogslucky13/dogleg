@@ -9,11 +9,20 @@
  *
  * MAINTENANCE — this is not optional, and it rides an existing rule:
  * a change that bumps `ENGINE_VERSION` (src/engine/version.ts) MUST add an
- * entry here with kind 'odds', in the same PR. That bump is already mandatory
- * for anything altering odds, resolution, geometry, or conditions, so the two
- * rules cover the same ground: if the referee's number changed, the log says
- * why. Player-visible features and fixes get an entry too; refactors, docs,
- * and test-only work don't (they're invisible from the tee).
+ * entry here with kind 'odds', in the same PR. Player-visible features and
+ * fixes get an entry too; refactors, docs, and test-only work don't (they're
+ * invisible from the tee).
+ *
+ * NEVER LOG PER-COURSE WORK (Jackson's rule, 2026-07-26). Courses are
+ * fine-tuned the day before they come up as the daily and shipped then, so
+ * every import, scorecard correction, and geometry pass would flood the feed
+ * with entries no player can act on — and a wall of "odds changed" for routine
+ * course prep reads as constant meddling with the math, which is the opposite
+ * of what this screen is for. Log a course's arrival nowhere; log only changes
+ * to how the GAME behaves everywhere (a new hole type, a new hazard weight, a
+ * new luck rule). This is the one documented exception to the bump-implies-
+ * entry rule above, and it is deliberate: `ENGINE_VERSION` bumps for course
+ * geometry alone get no entry.
  *
  * Entries are newest-first and dated ET. Keep them in the game's voice —
  * plain, specific, no jargon and no PR numbers.
@@ -39,20 +48,14 @@ export const CHANGELOG: ChangeEntry[] = [
   {
     date: '2026-07-25',
     kind: 'odds',
-    title: 'Cypress Point, and a par 3 you can bail out on',
-    note: "Cypress Point joins the rotation, laid out from real map data. Its 16th is the first hole where the dogleg is the whole question: safe and normal lay up, and only aggressive goes at the flag.",
+    title: 'A par 3 you can bail out on',
+    note: 'Some short holes now dogleg around their own trouble: safe and normal lay up short of it, and only aggressive goes at the flag. A new shape of hole rather than a new course.',
   },
   {
     date: '2026-07-24',
     kind: 'odds',
     title: 'Not all rough is rough',
     note: 'Three grades of it now, and the deep stuff genuinely costs you — harder to advance, harder to save par. The map always shows which you are in.',
-  },
-  {
-    date: '2026-07-24',
-    kind: 'odds',
-    title: 'Oakmont and Royal Portrush, drawn from real maps',
-    note: 'Both courses re-laid from real geography, with their true stroke indexes. Oakmont is the first course rated for severe rough — the Church Pews included.',
   },
   {
     date: '2026-07-24',
@@ -63,20 +66,8 @@ export const CHANGELOG: ChangeEntry[] = [
   {
     date: '2026-07-23',
     kind: 'odds',
-    title: 'Carnoustie, burns and all',
-    note: 'Real Carnoustie geography, with the burns hand-laid where they actually cross.',
-  },
-  {
-    date: '2026-07-23',
-    kind: 'odds',
     title: 'Bunkers by the green now carry their own risk',
     note: 'Greenside sand is weighted separately from fairway sand, so a tucked pin behind a trap reads as the danger it is.',
-  },
-  {
-    date: '2026-07-23',
-    kind: 'odds',
-    title: 'Harbour Town matches its real scorecard',
-    note: 'Yardages, pars and stroke indexes aligned to the Heritage tees, and the hole geography redrawn to match.',
   },
   {
     date: '2026-07-23',

@@ -34,7 +34,13 @@ conditions); additions the replay ignores don't need a bump. **A bump also
 requires a `kind: 'odds'` entry in the player-facing change log
 (`src/lib/changelog.ts`) in the same PR** — the log is the public record that
 the odds only move in the open, and it is worthless the moment it lags the
-engine. Player-visible features and fixes get an entry too. Payloads without
+engine. Player-visible features and fixes get an entry too. **One deliberate
+exception: per-course work is never logged** — imports, scorecard corrections
+and geometry passes bump the engine but stay out of the feed, because courses
+are tuned the day before they come up as the daily and logging each one would
+both flood the log and misrepresent routine prep as meddling with the math.
+Log changes to how the game behaves *everywhere*, not a course's arrival; see
+the note at the top of `changelog.ts`. Payloads without
 a version (pre-handshake clients) still replay as before. Preventively, the
 build also emits `version.json` beside the bundle (vite.config.ts) and the
 home screen fetches it no-store (`src/lib/freshness.ts`) — a mismatch shows a

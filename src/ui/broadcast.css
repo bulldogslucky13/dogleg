@@ -102,9 +102,12 @@
   filter: brightness(0.92);
 }
 
-/* the played daily wears the earned notch on its CTA too */
+/* The played daily wears the earned notch on its CTA too — but scaled to the
+   object. The card's 24px cut is 12% of its height; on this ~50px button the
+   identical cut is 48%, which reads as a different, much bigger tool rather
+   than the same punch. Same 45° angle, smaller bite. */
 :is(.screen.home, .screen.rounds) .cta.notched {
-  clip-path: var(--clip-notch);
+  clip-path: polygon(15px 0, 100% 0, 100% 100%, 0 100%, 0 15px);
   border-radius: 0;
 }
 
@@ -233,6 +236,35 @@
 .screen.home .today-card.notched {
   clip-path: var(--clip-notch);
   border-radius: 0;
+}
+
+/* Edge-punched like a notched-edge card: a row of real holes along the top,
+   one per hole of the round (18). Cut with a mask rather than painted, so the
+   turf behind genuinely shows through them.
+   The mapping is the honest one from the real thing: the holes come with the
+   card, and the corner NOTCH is what gets cut later — so the punches are
+   always there and the notch stays the part you earn by playing. The notch
+   swallowing the first hole is how a real notched-edge card works too.
+   NB anything position:fixed inside this card is clipped by the mask, same as
+   by the clip-path — dialogs in here must be portalled (see PlayRating). */
+.screen.home .today-card {
+  --punch-r: 4px;
+  --punch-y: 7.5px;
+  --punch-count: 18;
+  -webkit-mask-image: radial-gradient(
+    circle var(--punch-r) at 50% var(--punch-y),
+    transparent 82%,
+    #000 100%
+  );
+  mask-image: radial-gradient(
+    circle var(--punch-r) at 50% var(--punch-y),
+    transparent 82%,
+    #000 100%
+  );
+  -webkit-mask-size: calc(100% / var(--punch-count)) 100%;
+  mask-size: calc(100% / var(--punch-count)) 100%;
+  -webkit-mask-repeat: repeat-x;
+  mask-repeat: repeat-x;
 }
 
 .screen.home .today-card .kicker {

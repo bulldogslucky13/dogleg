@@ -1895,7 +1895,10 @@ button {
   position: fixed;
   inset: 0;
   z-index: 58;
-  background: radial-gradient(90% 90% at 50% 45%, rgba(63, 122, 68, 0.92) 0%, rgba(14, 36, 21, 0.95) 100%);
+  /* Opaque on purpose. At 0.92/0.95 the screen underneath ghosted straight
+     through the celebration — buttons and text from the result screen legible
+     behind the headline. A full-bleed moment should own the screen. */
+  background: radial-gradient(90% 90% at 50% 45%, rgb(63, 122, 68) 0%, rgb(14, 36, 21) 100%);
   display: flex;
   align-items: center;
   justify-content: center;

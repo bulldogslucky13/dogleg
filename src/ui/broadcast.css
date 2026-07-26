@@ -784,6 +784,36 @@
   color: var(--text-mid);
 }
 
+/* ------------------------------------------- the season-launch splash */
+
+/* Paper-era leftovers on a now-dark card. The podium's sub-labels are dark ink
+   at 60% opacity — measured 1.11:1 against the card, i.e. invisible — and every
+   separator in here is var(--line), a DARK hairline, so the holder list had no
+   visible rows at all. Fixed narrowly rather than by redefining --line for the
+   whole scope: that token is shared with chips sitting on the light sand card,
+   where a dark hairline is still the correct answer. */
+.tut-card.season-splash .podium-spot {
+  border-color: var(--edge-strong);
+}
+
+.tut-card.season-splash .podium-spot > span:not(.podium-medal) {
+  color: var(--text-mid);
+}
+
+/* first place keeps gold, but the theme's gold rather than the old one */
+.tut-card.season-splash .podium-spot.place-1 {
+  border-color: rgba(226, 185, 59, 0.7);
+  background: rgba(226, 185, 59, 0.12);
+}
+
+.tut-card.season-splash .season-holder-row {
+  border-bottom-color: var(--edge-hairline);
+}
+
+.tut-card.season-splash .season-holder-row > span {
+  color: var(--text-mid);
+}
+
 /* ------------------------------------------- How to Play + season splash */
 
 .tut-card {

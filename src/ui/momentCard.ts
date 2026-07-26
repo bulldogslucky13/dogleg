@@ -30,10 +30,24 @@ export type MomentCardProps = {
   meta?: string
 }
 
-// logical design size (2x'd for export so the PNG stays crisp when shared)
+// Logical design size, 2x'd for export so the PNG stays crisp when shared.
+// 9:16 (1080x1920) so a card drops straight into an Instagram/WhatsApp story
+// without the platform cropping it. This is the size for every static share
+// image the game produces.
 const W = 540
-const H = 675
+const H = 960
 const SCALE = 2
+
+/**
+ * The composition was laid out for a 4:5 card and still is — 9:16 just gives it
+ * a taller frame. Centring that block leaves ~285 device px clear top and
+ * bottom, which is roughly what story UI (poster name up top, reply bar below)
+ * covers, so nothing important lands under the chrome. Every content y is
+ * offset by TOP; the confetti still scatters over the full canvas so the extra
+ * height doesn't read as empty.
+ */
+const COMPOSITION_H = 675
+const TOP = (H - COMPOSITION_H) / 2
 const FONTS = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif"
 
 const PALETTE: Record<CardKind, { stops: [string, string, string]; confetti: [string, string, string] }> = {
@@ -56,7 +70,9 @@ export async function momentCardBlob(props: MomentCardProps): Promise<Blob> {
   const copy = props.copy ?? MOMENT_COPY[props.kind as MomentKind]
 
   // backdrop — radial wash centered a touch above the middle, like the CSS
-  const bg = ctx.createRadialGradient(W / 2, H * 0.45, 0, W / 2, H * 0.45, W * 0.95)
+  // centred on the ball rather than the canvas, so the glow stays behind the
+  // composition instead of drifting as the frame gets taller
+  const bg = ctx.createRadialGradient(W / 2, TOP + 245, 0, W / 2, TOP + 245, W * 0.95)
   bg.addColorStop(0, pal.stops[0])
   bg.addColorStop(0.45, pal.stops[1])
   bg.addColorStop(1, pal.stops[2])
@@ -65,7 +81,7 @@ export async function momentCardBlob(props: MomentCardProps): Promise<Blob> {
 
   // sunburst rays from behind the ball (static take on .moment-rays)
   const rayCx = W / 2
-  const rayCy = 245
+  const rayCy = TOP + 245
   ctx.fillStyle = 'rgba(255, 255, 255, 0.11)'
   for (let a = 0; a < 360; a += 24) {
     ctx.beginPath()
@@ -108,14 +124,14 @@ export async function momentCardBlob(props: MomentCardProps): Promise<Blob> {
   // the wordmark, then the course beneath it. Was a text line reading
   // "⛳ DOGLEG · COURSE"; the brand is now the real mark, so the emoji lockup is
   // gone and the course name stands on its own.
-  await drawWordmark(ctx, W / 2, 104, 176)
+  await drawWordmark(ctx, W / 2, TOP + 104, 176)
 
   ctx.save()
   softShadow()
   ctx.fillStyle = 'rgba(248, 244, 233, 0.85)'
   centered(13, 800)
   if ('letterSpacing' in ctx) (ctx as CanvasRenderingContext2D & { letterSpacing: string }).letterSpacing = '3px'
-  ctx.fillText(props.courseName.toUpperCase(), W / 2, 172, W - 48)
+  ctx.fillText(props.courseName.toUpperCase(), W / 2, TOP + 172, W - 48)
   ctx.restore()
 
   // the ball, glowing, freshly dropped
@@ -131,22 +147,22 @@ export async function momentCardBlob(props: MomentCardProps): Promise<Blob> {
     titlePx -= 2
     centered(titlePx, 900)
   }
-  ctx.fillText(copy.title, W / 2, 348)
+  ctx.fillText(copy.title, W / 2, TOP + 348)
   noShadow()
 
   // sub line
   softShadow()
   ctx.fillStyle = 'rgba(248, 244, 233, 0.92)'
   centered(17, 700)
-  ctx.fillText(copy.sub, W / 2, 384, W - 64)
+  ctx.fillText(copy.sub, W / 2, TOP + 384, W - 64)
   ctx.restore()
 
   // character chip
   const char = characterById(props.character)
-  let metaY = 448
+  let metaY = TOP + 448
   if (char) {
-    await drawCharChip(ctx, W / 2, 430, char.id, char.name)
-    metaY = 492
+    await drawCharChip(ctx, W / 2, TOP + 430, char.id, char.name)
+    metaY = TOP + 492
   }
 
   // meta line

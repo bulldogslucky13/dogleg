@@ -613,6 +613,26 @@
   color: var(--text-low);
 }
 
+/* Names are shortened at the variant dash (see ui/courseName.ts), so they fit —
+   and if a long one still doesn't, it wraps rather than ellipsising. Clipping
+   mid-word ("ROYAL PORTRUS…") read as broken; two tidy lines don't. */
+.screen.rounds .round-row-text b {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+}
+
+/* `.slim` is a SIZE modifier from styles.css (.round-actions .cta.slim). The
+   .cta.ghost rule above matches at identical specificity — :is() counts as its
+   heaviest argument, so both are three classes — and this file loads second, so
+   it had been silently inflating these row buttons to full size. They were
+   taking 120px of a 317px row, more than the course name got. Re-assert the
+   compact metrics rather than fight it with :not(). */
+.screen.rounds .round-actions .cta.slim {
+  padding: 5px 9px;
+  font-size: 0.6rem;
+}
+
 /* The two badges are ranked by how much gold they're allowed to wear: a
    personal best gets a gold EDGE (your own wall), a course record gets the
    whole bubble filled (everybody's wall). Gold is the theme's records-only

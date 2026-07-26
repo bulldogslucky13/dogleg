@@ -21,6 +21,7 @@ import { pastSeasons, roundsInSeason, seasonAwards, type SeasonAward } from '../
 import { loadLedger, syncLedger } from '../lib/records'
 import { AccountPanel } from './AccountPanel'
 import { RoundScorecard } from './RoundScorecard'
+import { shortCourseName } from './courseName'
 import { track } from '../lib/analytics'
 
 /**
@@ -165,8 +166,10 @@ export function RoundsScreen(props: {
     <div key={`${r.seed}:${badge ?? ''}:${context ?? ''}`} className="round-row">
       <div className="round-row-text">
         <b>
-          {courseBySlug(r.courseSlug)?.name ?? r.courseSlug}
-          {r.character ? ` ${characterById(r.character)?.emoji ?? ''}` : ''}
+          {shortCourseName(courseBySlug(r.courseSlug)?.name ?? r.courseSlug)}
+          {/* non-breaking space: with the name now allowed to wrap, a plain
+              space let the character emoji orphan onto a line of its own */}
+          {r.character ? ` ${characterById(r.character)?.emoji ?? ''}` : ''}
         </b>
         <span>
           {context ? `${context} · ` : ''}
@@ -524,7 +527,7 @@ function SeasonsTab(props: { awards: SeasonAward[] }) {
                   {award.courses.map((c) => (
                     <div key={c.courseSlug} className="round-row season-held">
                       <div className="round-row-text">
-                        <b>{courseBySlug(c.courseSlug)?.name ?? c.courseSlug}</b>
+                        <b>{shortCourseName(courseBySlug(c.courseSlug)?.name ?? c.courseSlug)}</b>
                         <span>Ended the season as record holder</span>
                       </div>
                       <em className="round-badge cr">CR</em>

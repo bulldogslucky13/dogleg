@@ -41,7 +41,8 @@
   background: var(--bg-card);
   border: none;
   border-left: var(--keyline-w) solid var(--tracer-400);
-  border-radius: var(--r-bug);
+  /* tight left corners keep the keyline a crisp broadcast bar, not a curl */
+  border-radius: 3px var(--r-bug) var(--r-bug) 3px;
   text-align: left;
   padding: 11px 12px 10px;
 }
@@ -257,8 +258,15 @@
   letter-spacing: var(--track-tower);
 }
 
+/* three tabs share one row instead of stranding SEASONS on its own line */
 .screen.rounds .locker-tabs {
-  border-color: var(--edge-strong);
+  display: flex;
+  gap: 8px;
+}
+
+.screen.rounds .locker-tab {
+  flex: 1;
+  white-space: nowrap;
 }
 
 .screen.rounds .locker-tab {
@@ -274,14 +282,16 @@
 
 /* dark-card version of the sync banner (it is cream on the paper theme) */
 .screen.rounds .sync-cta,
-.screen.home .sync-cta {
+.screen.home .sync-cta,
+.tut-card .sync-cta {
   background: var(--bg-card);
   border-color: var(--edge-strong);
   color: var(--text-hi);
 }
 
 .screen.rounds .sync-cta em,
-.screen.home .sync-cta em {
+.screen.home .sync-cta em,
+.tut-card .sync-cta em {
   color: var(--tracer-400);
 }
 

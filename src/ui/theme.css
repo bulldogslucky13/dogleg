@@ -180,7 +180,7 @@
 /* Stat bug: compact stat card with a colored keyline (broadcast "bug") */
 .dl-bug {
   background: var(--bg-card);
-  border-radius: var(--r-bug);
+  border-radius: 3px var(--r-bug) var(--r-bug) 3px;
   border-left: var(--keyline-w) solid var(--tracer-400);
   box-shadow: var(--shadow-card);
   padding: 10px 12px 9px;

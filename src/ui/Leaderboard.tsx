@@ -27,15 +27,26 @@ import { SyncCta } from './RoundsScreen'
  * name inline — no account, the device remembers them.
  */
 /**
- * Dense scoreboard ranks, ties awarded (Jackson's spec, by example): players on
- * the same score share a number and the NEXT distinct score takes the next
- * integer — -3,-3,-1,-1,-1,+1 ranks as 1,1,2,2,2,3. Deliberately not the
- * tour's T1/T1/T3 skip-numbering.
+ * Competition scoreboard ranks, ties awarded: players on the same score share a
+ * number and the next distinct score skips the places the tie consumed —
+ * -3,-3,-1,-1,-1,+1 ranks as 1,1,3,3,3,6. The tour's T1/T1/T3 numbering.
+ *
+ * This started as dense numbering (1,1,2,2,2,3), which read fine on its own but
+ * contradicted the line directly above the board: the referee computes rank as
+ * "players strictly better than you, plus one" (submit-round/index.ts), so a
+ * player behind a two-way tie was told "You're 3rd" over a row labelled 2. The
+ * referee is the authority — it is the only side that can rank a player who
+ * falls outside the fetched board — so the board moved to meet it, which also
+ * happens to be how every golf leaderboard numbers a tie.
+ *
+ * Ties still share a medal (two players on -3 are both rank 1, both gold); the
+ * podium simply skips the metal the tie consumed, so a pair of golds is
+ * followed by bronze and no silver. That is the intended reading.
  */
-export function denseRanks(rows: Array<{ to_par: number }>): number[] {
+export function competitionRanks(rows: Array<{ to_par: number }>): number[] {
   const out: number[] = []
   rows.forEach((r, i) => {
-    out.push(i === 0 ? 1 : r.to_par === rows[i - 1].to_par ? out[i - 1] : out[i - 1] + 1)
+    out.push(i > 0 && r.to_par === rows[i - 1].to_par ? out[i - 1] : i + 1)
   })
   return out
 }
@@ -259,6 +270,9 @@ export function ScoreBoard(props: { round: RoundState }) {
     )
   }
 
+  const shown = board?.slice(0, 10) ?? []
+  const ranks = competitionRanks(shown)
+
   return (
     <div className="board-block">
       <div className="kicker">Today's board</div>
@@ -280,13 +294,11 @@ export function ScoreBoard(props: { round: RoundState }) {
         </>
       )}
       {error && <p className="fine board-error">{error}</p>}
-      {board && board.length > 0 && (
+      {shown.length > 0 && (
         <ol className="board-list">
-          {board.slice(0, 10).map((row, i, shown) => (
+          {shown.map((row, i) => (
             <li key={`${row.player_name}:${i}`} className={player && row.player_name === player.name ? 'me' : ''}>
-              <span className={`board-pos${denseRanks(shown)[i] <= 3 ? ` medal-${denseRanks(shown)[i]}` : ''}`}>
-                {denseRanks(shown)[i]}
-              </span>
+              <span className={`board-pos${ranks[i] <= 3 ? ` medal-${ranks[i]}` : ''}`}>{ranks[i]}</span>
               <span className="board-name">
                 {row.player_name}
                 {row.character ? ` ${characterById(row.character)?.emoji ?? ''}` : ''}
@@ -331,6 +343,9 @@ export function DailyBoardView(props: { dateKey: string }) {
 
   if (!backendEnabled) return null
 
+  const shown = board?.slice(0, 10) ?? []
+  const ranks = competitionRanks(shown)
+
   return (
     <div className="board-block">
       <div className="kicker">Today's board</div>
@@ -340,13 +355,11 @@ export function DailyBoardView(props: { dateKey: string }) {
           Loading the board…
         </p>
       )}
-      {board && board.length > 0 && (
+      {shown.length > 0 && (
         <ol className="board-list">
-          {board.slice(0, 10).map((row, i, shown) => (
+          {shown.map((row, i) => (
             <li key={`${row.player_name}:${i}`} className={player && row.player_name === player.name ? 'me' : ''}>
-              <span className={`board-pos${denseRanks(shown)[i] <= 3 ? ` medal-${denseRanks(shown)[i]}` : ''}`}>
-                {denseRanks(shown)[i]}
-              </span>
+              <span className={`board-pos${ranks[i] <= 3 ? ` medal-${ranks[i]}` : ''}`}>{ranks[i]}</span>
               <span className="board-name">
                 {row.player_name}
                 {row.character ? ` ${characterById(row.character)?.emoji ?? ''}` : ''}

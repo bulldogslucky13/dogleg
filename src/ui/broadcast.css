@@ -828,9 +828,17 @@
 /* ------------------------------------------- the in-round round card sheet */
 
 /* The card itself stays paper (it IS the scorecard) — it gets a paper slab to
-   sit on so its ink stays readable inside the dark sheet. */
+   sit on so its ink stays readable inside the dark sheet.
+
+   The slab must also restate the ink. .tut-card sets cream --text-hi as the
+   inherited colour, and the cells that DON'T carry a score modifier (an
+   ordinary par) never set a colour of their own — so par numerals inherited
+   cream onto cream paper at 1.03:1 and vanished, while birdies/bogeys/unplayed
+   survived on their explicit colours. Setting it here rather than on .csc-cell
+   covers every unstyled descendant of the slab, not just the cells. */
 .tut-card.roundcard-sheet .classic-scorecard {
   background: var(--sand-100);
+  color: var(--ink);
   border-radius: var(--r-bug);
   padding: 12px 12px 10px;
 }
@@ -1009,7 +1017,12 @@
 
 /* Podium metal for RANKS 1-3 (ranks, not rows: ties share a medal — two
    players on -3 are both rank 1, both gold). Silver and bronze are one-off
-   literals like the podium's medal emoji; everyone else keeps plain turf. */
+   literals like the podium's medal emoji; everyone else keeps plain turf.
+
+   Ranks are competition-numbered, so a tie EATS the metal it consumed: two
+   golds are followed by bronze with no silver, and a three-way tie for first
+   pushes the next player off the podium entirely. That is the intended
+   reading — it is how a golf leaderboard numbers a tie. */
 .screen.result .board-pos.medal-1 {
   background: var(--trophy-400);
   color: var(--text-on-block);

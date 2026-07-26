@@ -10,6 +10,7 @@ import { backendEnabled } from '../lib/backend'
 import { bundleIsStale, FRESH_TTL_MS } from '../lib/freshness'
 import { fetchCourseRecords, fetchSeasonRecords, loadPlayer, type CourseRecord } from '../lib/leaderboard'
 import { seasonCountdown, seasonForDate } from '../engine/season'
+import { FortuneInfo } from './Tutorial'
 import { dismissSteals, pendingSteals, syncLedger, type StolenRecord } from '../lib/records'
 import { loadGhost, type Ghost } from '../state/ghost'
 import { currentHandicap, formatHandicap } from '../state/stats'
@@ -45,6 +46,8 @@ export function HomeScreen(props: {
    * holders under the new season's name */
   const [seasonRecsKey, setSeasonRecsKey] = useState<string | null>(null)
   const [steals, setSteals] = useState(() => pendingSteals())
+  /** the Fortune callout's ⓘ opens How to Play's Fortunes page on its own */
+  const [fortuneInfo, setFortuneInfo] = useState(false)
   /** an engine-changing deploy landed after this tab loaded its bundle — a
    * round played now couldn't post, so say "reload" before the first stroke */
   const [stale, setStale] = useState(false)
@@ -174,7 +177,8 @@ export function HomeScreen(props: {
           <span>Best to par</span>
         </div>
       </div>
-      <StreakNote />
+      <StreakNote onInfo={() => setFortuneInfo(true)} />
+      {fortuneInfo && <FortuneInfo onClose={() => setFortuneInfo(false)} />}
       {records.length > 0 && (
         <div className="char-records">
           {records.map((r) => {
@@ -562,15 +566,29 @@ function GhostStakes(props: { courseSlug: string }) {
 /** The fortune disclosure, wherever the current streak is shown. Flavor
  * only, by design: the mechanic is disclosed, the math stays under the
  * hood — never print the multiplier or the ramp. */
-function StreakNote() {
-  // honest by design: the boost only applies to streaks the referee can
-  // verify — dailies posted under a clubhouse name. Anonymous local streaks
-  // don't move the odds (anti-cheat), so the copy says so.
-  return (
-    <p className="fine streak-note">
+/**
+ * The Fortune callout. Honest by design: the boost only applies to streaks the
+ * referee can verify — dailies posted under a clubhouse name. Anonymous local
+ * streaks don't move the odds (anti-cheat), so the copy says so.
+ *
+ * With `onInfo` it becomes tappable and wears an ⓘ, opening the full Fortunes
+ * page; without it (the result screen) it stays a plain note.
+ */
+function StreakNote(props: { onInfo?: () => void }) {
+  const copy = (
+    <>
       <em className="streak-note-head">The golf gods reward the faithful</em>
       Dailies under a clubhouse name boost Fortune odds.
-    </p>
+    </>
+  )
+  if (!props.onInfo) return <p className="fine streak-note">{copy}</p>
+  return (
+    <button className="fine streak-note" onClick={props.onInfo} aria-label="How Fortunes work">
+      {copy}
+      <span className="streak-note-info" aria-hidden>
+        ⓘ
+      </span>
+    </button>
   )
 }
 

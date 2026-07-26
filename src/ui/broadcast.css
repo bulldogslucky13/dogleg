@@ -359,17 +359,62 @@
   font-weight: 700;
 }
 
-/* fortunes note: a gold callout that earns its spot — two lines, no whisper */
+/* fortunes note: a gold callout that earns its spot — two lines, no whisper.
+   It SPOUTS from the streaks row above it (a tail pointing up at the day-streak
+   bug) so the link between keeping a streak and Fortune odds reads visually,
+   not just in the copy. Tapping it opens How to Play's Fortunes page. */
 .screen.home .streak-note {
+  position: relative;
   font-style: normal;
   text-align: left;
+  width: 100%;
   background: var(--bg-card);
+  border: none;
   border-left: var(--keyline-w) solid var(--trophy-400);
   border-radius: 3px var(--r-bug) var(--r-bug) 3px;
-  padding: 8px 12px;
+  padding: 9px 34px 9px 12px;
   font-size: 0.74rem;
   color: var(--text-mid);
-  margin-top: 0;
+  /* pulls up against the streaks row so the tail can bridge the gap */
+  margin-top: -6px;
+  display: block;
+}
+
+/* the tail, aimed at the first (day streak) bug */
+.screen.home .streak-note::before {
+  content: '';
+  position: absolute;
+  left: 15%;
+  top: -8px;
+  width: 18px;
+  height: 9px;
+  background: var(--bg-card);
+  clip-path: polygon(50% 0, 100% 100%, 0 100%);
+}
+
+.screen.home .streak-note-info {
+  position: absolute;
+  top: 50%;
+  right: 11px;
+  transform: translateY(-50%);
+  font-size: 0.95rem;
+  color: var(--trophy-400);
+  line-height: 1;
+}
+
+.screen.home button.streak-note {
+  cursor: pointer;
+  transition: background 120ms ease;
+}
+
+.screen.home button.streak-note:active {
+  background: var(--bg-elevated);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .screen.home button.streak-note {
+    transition: none;
+  }
 }
 
 .screen.home .streak-note .streak-note-head {

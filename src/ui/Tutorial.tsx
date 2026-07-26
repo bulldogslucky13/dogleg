@@ -26,6 +26,24 @@ interface Step {
   body: React.ReactNode
 }
 
+/**
+ * The Fortunes explanation, in one place: it is both the last How-to-Play step
+ * and what the home screen's Fortune callout opens via its ⓘ. Edit here and
+ * both surfaces follow — they must never drift, since this copy carries the
+ * honest disclosure that only NAMED daily streaks move the odds.
+ */
+function FortunesBody() {
+  return (
+    <>
+      Every so often the golf gods simply smile on you: a <b>hole in one</b> or an{' '}
+      <b>albatross</b>, out of pure luck — the best score a hole can give. That's a{' '}
+      <b>Fortune</b>, and it can strike on any hole, any day, for any player. But the golf
+      gods reward the faithful — post your daily cards under a <b>clubhouse name</b>, keep
+      your streak alive, and your odds of striking a Fortune quietly improve.
+    </>
+  )
+}
+
 const STEPS: Step[] = [
   {
     title: 'One round, one goal',
@@ -112,18 +130,52 @@ const STEPS: Step[] = [
   },
   {
     title: 'Fortunes',
-    body: (
-      <>
-        Every so often the golf gods simply smile on you: a <b>hole in one</b> or an{' '}
-        <b>albatross</b>, out of pure luck — the best score a hole can give. That's a{' '}
-        <b>Fortune</b>, and it can strike on any hole, any day, for any player. But the
-        golf gods reward the faithful — post your daily cards under a{' '}
-        <b>clubhouse name</b>, keep your streak alive, and your odds of striking a
-        Fortune quietly improve.
-      </>
-    ),
+    body: <FortunesBody />,
   },
 ]
+
+/**
+ * The Fortunes page on its own, opened from the home screen's Fortune callout.
+ * Deliberately NOT the tutorial: it never marks the tutorial seen (so a new
+ * player still gets the full walkthrough), and it carries no sync line — that
+ * stays How to Play's single mention.
+ */
+export function FortuneInfo(props: { onClose: () => void }) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') props.onClose()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [props])
+
+  return (
+    <div
+      className="tut-backdrop"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Fortunes"
+      onClick={props.onClose}
+    >
+      <div className="tut-card" onClick={(e) => e.stopPropagation()}>
+        <button className="tut-skip" onClick={props.onClose} aria-label="Close">
+          Close
+        </button>
+        <div className="kicker">How to play · Fortunes</div>
+        <h2 className="tut-title">Fortunes</h2>
+        <div className="tut-body">
+          <FortunesBody />
+        </div>
+        <div className="tut-nav">
+          <span />
+          <button className="cta" onClick={props.onClose}>
+            Got it
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 export function Tutorial(props: {
   onClose: () => void

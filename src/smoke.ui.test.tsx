@@ -146,6 +146,28 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
     expect(screen.getByText('Clubhouse')).toBeTruthy()
   })
 
+  it("the home Fortune callout opens How to Play's Fortunes page without consuming the tutorial", () => {
+    localStorage.setItem('dogleg:tutorial:v1', 'done')
+    render(<App />)
+    // the callout is tappable on the home screen and wears the ⓘ
+    fireEvent.click(screen.getByRole('button', { name: 'How Fortunes work' }))
+    // it renders the SAME copy as the tutorial's last step — one source of truth
+    expect(screen.getByText('How to play · Fortunes')).toBeTruthy()
+    expect(screen.getByText(/out of pure luck/)).toBeTruthy()
+    // the popup is not the tutorial: no sync line (How to Play keeps the only
+    // mention), and no step navigation
+    expect(screen.queryByText(/Playing on more than one device/)).toBeNull()
+    expect(screen.queryByText('Next')).toBeNull()
+    fireEvent.click(screen.getByText('Got it'))
+    expect(screen.queryByText('How to play · Fortunes')).toBeNull()
+
+    // a first-time player who taps it must STILL get the full walkthrough
+    localStorage.removeItem('dogleg:tutorial:v1')
+    fireEvent.click(screen.getByRole('button', { name: 'How Fortunes work' }))
+    fireEvent.click(screen.getByText('Got it'))
+    expect(localStorage.getItem('dogleg:tutorial:v1')).toBeNull()
+  })
+
   it('the season splash shows once after a rollover, explains the goal, then never again', () => {
     localStorage.removeItem('dogleg:season-ack:v1')
     const first = render(<App />)

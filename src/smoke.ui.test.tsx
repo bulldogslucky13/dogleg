@@ -894,7 +894,10 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
     expect(document.querySelector('.roundcard-sheet .classic-scorecard')).toBeTruthy()
     // all 18 hole cells render (unplayed cells show their hole numbers)
     expect(document.querySelectorAll('.roundcard-sheet .csc-cell').length).toBe(18)
-    fireEvent.click(screen.getByText('Back to the hole'))
+    // a tap anywhere outside the card dismisses it (there is no CTA — Close
+    // and the backdrop are the two ways out)
+    expect(screen.queryByText('Back to the hole')).toBeNull()
+    fireEvent.click(document.querySelector('.tut-backdrop')!)
     expect(document.querySelector('.roundcard-sheet')).toBeNull()
     // classic view keeps its inline card (the toggle shows the CURRENT view)
     fireEvent.click(screen.getByText(/Modern view/))

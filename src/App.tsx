@@ -694,6 +694,11 @@ export default function App() {
             aria-label="See your full round card"
           >
             {toParLabel(toPar)} to par
+            {/* the expand glyph is the tell that the chip opens the full card —
+                without it this was a hidden feature */}
+            <span className="topar-expand" aria-hidden>
+              ▤
+            </span>
           </button>
           <div className="yards">{hole.layout.length} yards</div>
         </div>

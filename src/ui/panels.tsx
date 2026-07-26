@@ -514,12 +514,6 @@ export function RoundCardSheet(props: {
           {toParLabel(props.toPar)} to par · {left === 0 ? 'round complete' : `${left} hole${left === 1 ? '' : 's'} left`}
         </h2>
         <ClassicScorecard course={props.course} scores={props.scores} currentHole={props.currentHole} />
-        <div className="tut-nav">
-          <span />
-          <button className="cta" onClick={props.onClose}>
-            Back to the hole
-          </button>
-        </div>
       </div>
     </div>,
     document.body,

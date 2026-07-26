@@ -41,6 +41,15 @@ variable, and fails loudly if either is missing. To deploy by hand:
 `pnpm build:validator && supabase functions deploy submit-round --project-ref
 <ref> --no-verify-jwt --use-api`.
 
+**Schema changes are automated the same way**: the deploy workflow applies
+`supabase/schema.sql` in full to the live database on every push to `main`,
+before the function deploy. So a PR that needs a new table or column just
+edits `schema.sql` — no manual step at merge. The contract that makes this
+safe: **every statement in schema.sql must be idempotent** (create ... if not
+exists, create or replace, drop policy if exists then create). Never add a
+bare `create table`/`create policy`/data migration that would error or
+double-apply on re-run.
+
 **Conditions are versioned.** Replay links, archived rounds, and course-record
 ghosts persist only a seed + decisions; conditions re-derive from the seed on
 every replay. So anything that changes what a seed reconstructs (new

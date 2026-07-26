@@ -1,4 +1,8 @@
--- DogLeg leaderboard schema. Run once in the Supabase SQL editor (or via CLI).
+-- DogLeg leaderboard schema. Applied to the live database IN FULL on every
+-- push to main (the "Apply database schema" step in
+-- .github/workflows/deploy.yml), so every statement here must stay idempotent
+-- — safe to re-run: guarded creates (if not exists), create-or-replace,
+-- drop-policy-then-create. It can also still be run by hand in the SQL editor.
 --
 -- Trust model: the anon key (shipped in the site) can only READ the boards.
 -- All writes go through the submit-round edge function, which replays every

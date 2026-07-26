@@ -789,14 +789,19 @@ export function ResultScreen(props: {
           👻 Matched {ghostCloseNoun(props.ghostClose)} to the stroke — ties don't take it. One better.
         </p>
       )}
-      <div className="emoji-grid">
-        <div>{results.slice(0, 9).map((r, i) => (
-          <span key={i}>{RESULT_SQUARE[r]}</span>
-        ))}</div>
-        <div>{results.slice(9).map((r, i) => (
-          <span key={i}>{RESULT_SQUARE[r]}</span>
-        ))}</div>
-      </div>
+      {/* practice only: the square rows ARE the recap there. On the daily the
+          share card carries the same squares right above the board — showing
+          the block twice was one scorecard too many. */}
+      {props.practice && (
+        <div className="emoji-grid">
+          <div>{results.slice(0, 9).map((r, i) => (
+            <span key={i}>{RESULT_SQUARE[r]}</span>
+          ))}</div>
+          <div>{results.slice(9).map((r, i) => (
+            <span key={i}>{RESULT_SQUARE[r]}</span>
+          ))}</div>
+        </div>
+      )}
       {props.recap && (
         <div className="recap-tiles">
           {props.recap.best && (
@@ -867,6 +872,23 @@ export function ResultScreen(props: {
           <p className="fine coach-line">{gradeCopy(props.grade).luckLine}</p>
         </div>
       )}
+      {/* the share card sits ABOVE the board: brag first, standings second */}
+      {!props.practice && (
+        <div className="share-block">
+          <div className="kicker">Your share card</div>
+          <pre className="share-preview">{text}</pre>
+          <div className="share-actions">
+            <button className="cta ghost" onClick={copy}>
+              {copied ? 'Copied ✓' : 'Copy'}
+            </button>
+            {canNativeShare && (
+              <button className="cta" onClick={share}>
+                Share
+              </button>
+            )}
+          </div>
+        </div>
+      )}
       {props.boardRound ? (
         <ScoreBoard round={props.boardRound} />
       ) : (
@@ -894,20 +916,6 @@ export function ResultScreen(props: {
           </div>
           <StreakNote />
         </>
-      )}
-      {!props.practice && (
-        <div className="share-block">
-          <div className="kicker">Your share card</div>
-          <pre className="share-preview">{text}</pre>
-          {canNativeShare && (
-            <button className="cta" onClick={share}>
-              Share your card
-            </button>
-          )}
-          <button className={`cta${canNativeShare ? ' ghost' : ''}`} onClick={copy}>
-            {copied ? 'Copied — paste it in the chat ✓' : 'Copy for the group chat'}
-          </button>
-        </div>
       )}
       {replayUrl && (
         <button

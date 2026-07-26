@@ -1079,6 +1079,18 @@
   border-radius: var(--r-bug);
 }
 
+/* Copy + Share side by side: Copy quiet, Share the headline (it opens the
+   real iOS/Android share sheet — canNativeShare gates it, so desktop just
+   gets Copy at full width) */
+.screen.result .share-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.screen.result .share-actions .cta {
+  flex: 1;
+}
+
 /* The notch is EARNED-AND-LOCKED, not just earned: a signed daily can't be
    replayed until tomorrow, so its primary actions wear the punched corner. A
    practice round can always be played again — "Play another practice round"

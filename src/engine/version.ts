@@ -37,4 +37,9 @@
 // aggressive goes at the flag. Cypress 16 is the first, re-laid along the line
 // it is actually played. Changes the stage machine, the odds and the geometry —
 // every part of what a seed replays into.
-export const ENGINE_VERSION = 7
+// v8 = Whistling Straits real geometry (OSM import, tee-end shifted to the
+// BLACK card, plus the hand-restored Lake Michigan on 17) and its scorecard
+// fix: the shipped ~7497 tuple moves to the club's 7790 BLACK card, changing
+// 16 of 18 yardages and 16 of 18 stroke indices — and SI feeds pressure() in
+// the odds, so the card half changes replays just as much as the geometry.
+export const ENGINE_VERSION = 8

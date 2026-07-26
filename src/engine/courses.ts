@@ -310,24 +310,30 @@ export const COURSES: CourseSpec[] = [
     wind: 18,
     blurb: 'Pete Dye’s faux-Irish links along Lake Michigan with a thousand bunkers.',
     holes: holes([
-      [4, 408, 11, 'S', 'sand'],
-      [5, 593, 7, 'S', 'sand'],
-      [3, 181, 15, 'S', 'water'],
-      [4, 489, 1, 'L', 'sand'],
-      [5, 569, 9, 'R', 'sand'],
-      [4, 355, 13, 'S', 'sand'],
-      [3, 221, 5, 'S', 'water', 'Shipwreck — a par 3 perched above Lake Michigan'],
-      [4, 507, 3, 'S', 'sand'],
-      [4, 446, 17, 'S', 'water'],
-      [4, 361, 12, 'S', 'sand'],
-      [5, 618, 8, 'S', 'sand'],
-      [3, 143, 18, 'S', 'water'],
-      [4, 404, 14, 'S', 'sand'],
-      [4, 372, 10, 'S', 'sand'],
-      [4, 518, 2, 'L', 'sand'],
-      [5, 569, 6, 'R', 'sand'],
-      [3, 223, 4, 'S', 'water', 'Pinched Nerve — 220 yards along the water with it all on the line'],
-      [4, 520, 16, 'L', 'sand', 'Dyeabolical — Pete Dye’s long, cruel last word'],
+      // Card = the BLACK tees, the only tee set BlueGolf publishes for the
+      // Straits (`whistlingstraitsstra`): par 72, 7790 yd, 77.2/152. Replaces a
+      // ~7497 setup whose provenance we could not source; strokeIndex is that
+      // card's HCP row, which disagreed with the shipped tuple on 16 of 18
+      // holes and feeds pressure() in the odds. Par matches on all 18 and is
+      // corroborated by OSM's own `par` tags.
+      [4, 493, 15, 'S', 'sand'],
+      [5, 597, 7, 'S', 'sand'],
+      [3, 188, 17, 'S', 'water'],
+      [4, 494, 1, 'L', 'sand'],
+      [5, 603, 5, 'R', 'sand'],
+      [4, 409, 13, 'S', 'sand'],
+      [3, 221, 9, 'S', 'water', 'Shipwreck — a par 3 perched above Lake Michigan'],
+      [4, 506, 3, 'S', 'sand'],
+      [4, 442, 11, 'S', 'water'],
+      [4, 391, 12, 'S', 'sand'],
+      [5, 645, 6, 'S', 'sand'],
+      [3, 163, 18, 'S', 'water'],
+      [4, 402, 14, 'S', 'sand'],
+      [4, 396, 16, 'S', 'sand'],
+      [4, 503, 4, 'L', 'sand'],
+      [5, 568, 10, 'R', 'sand'],
+      [3, 249, 8, 'S', 'water', 'Pinched Nerve — 250 yards along the water with it all on the line'],
+      [4, 520, 2, 'L', 'sand', 'Dyeabolical — Pete Dye’s long, cruel last word'],
     ]),
   },
   {

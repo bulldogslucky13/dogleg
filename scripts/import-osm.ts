@@ -121,6 +121,16 @@ const COURSE_GEO: Record<string, CourseGeo> = {
   // Radius reaches past the ~700 m polygon for the Pacific coastline that
   // makes 15/16/17.
   cypress: { name: 'Cypress Point', center: [36.5788, -121.9677], radius: 1600, osmName: '^Cypress Point Golf Course$', engineSlug: 'cypress-point' },
+  // Whistling Straits shares its resort with the Irish course, but way
+  // 205111637 ("Whistling Straits") wraps ONLY the Straits — exactly 18 hole
+  // ways sit inside it, all named "Straits Course Hole N" — so map_to_area
+  // pins it and no osmHolePrefix is needed. Do NOT add one: hole 1 is
+  // misspelled "Straights Course Hole 1" in OSM, so a /Straits/ prefix would
+  // silently drop the opener. Radius spans the ~2.9 km lakefront strip so
+  // Lake Michigan reaches every hole; the lake is natural=water here (not
+  // coastline, unlike Pebble/Portrush), so it imports as `water` — see the
+  // geometry.ts block note for the relabel decision.
+  whistling: { name: 'Whistling Straits — Straits', center: [43.8499, -87.7346], radius: 2500, osmName: '^Whistling Straits$', engineSlug: 'whistling-straits' },
 }
 
 // ---------- Overpass ----------

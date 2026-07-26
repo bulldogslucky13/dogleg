@@ -129,8 +129,7 @@ export function HomeScreen(props: {
           <h1 className="wordmark">
             <Wordmark />
           </h1>
-          <span className="lockup-no">No. {setup.puzzleNumber}</span>
-          <span className="lockup-kicker">Daily Golf Challenge</span>
+          <span className="lockup-kicker">Daily Golf Challenge · No. {setup.puzzleNumber}</span>
           <p className="lockup-tag">18 Holes. Play the Odds.</p>
           <p className="lockup-tag-end">Beat the course.</p>
         </div>

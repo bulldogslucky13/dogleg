@@ -145,7 +145,7 @@
      pennant centre y 17 · cup centre y 143   (both less the viewBox's y=2)
    Change --mark-w and the whole composition tracks it. */
 .screen.home .masthead .lockup {
-  --mark-w: 236px;
+  --mark-w: 200px;
   position: relative;
   width: 100%;
 }
@@ -167,43 +167,40 @@
   margin: 0;
 }
 
-/* top row — beside the pennant, at its mid-height (17 → 9.9% of the box) */
-.screen.home .lockup-no,
+/* top row — right of the pennant's tip, at its mid-height (17 → 9.9% of the
+   box), running out past the mark into the screen */
 .screen.home .lockup-kicker {
   top: 9.9%;
   transform: translateY(-50%);
-  font-size: 0.58rem;
+  left: calc(var(--mark-w) * 90 / 289 + 7px);
+  right: 0;
+  font-size: 0.56rem;
   font-weight: 700;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.07em;
   text-transform: uppercase;
   color: var(--text-low);
   line-height: 1.15;
 }
 
-/* left of the flagpole. Narrow by nature — the d's bowl is below, so this
-   column is only as wide as the pole's left edge. It wraps rather than
-   collides once the puzzle number reaches three digits. */
-.screen.home .lockup-no {
-  left: 0;
-  width: calc(var(--mark-w) * 37.44 / 289 - 4px);
-  text-align: right;
-}
-
-/* right of the pennant's tip, running out past the mark into the screen */
-.screen.home .lockup-kicker {
-  left: calc(var(--mark-w) * 90 / 289 + 7px);
-  right: 0;
-}
-
 /* bottom row — beside the cup, at its mid-height (143 → 93.1% of the box) */
+/* Sized to the largest that keeps BOTH halves on one line in their slots at
+   320px, the binding width. The left slot is capped by the cup's left edge, so
+   the tagline is set in the condensed display face rather than the UI face —
+   that alone buys ~20% more size at the same slot width, and it is the same
+   'tower' width the leaderboards use. Re-measure if the copy or --mark-w
+   changes; in Barlow the ceiling here was 11.5px. */
 .screen.home .lockup-tag,
 .screen.home .lockup-tag-end {
   top: 93.1%;
   transform: translateY(-50%);
-  font-size: 0.7rem;
+  font-family: var(--font-display);
+  font-variation-settings: 'wdth' var(--wdth-tower);
+  font-size: 0.81rem;
   font-weight: 600;
+  letter-spacing: 0.005em;
   color: var(--text-mid);
   line-height: 1.2;
+  white-space: nowrap;
 }
 
 .screen.home .lockup-tag {

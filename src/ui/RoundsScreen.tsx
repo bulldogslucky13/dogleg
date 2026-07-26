@@ -452,7 +452,11 @@ export function RoundsScreen(props: {
               {prs.length > 0 && (
                 <section className="rounds-section">
                   <div className="kicker">Personal bests</div>
-                  {prs.map((r) => row(toLogged(r), 'PR'))}
+                  {/* 'PB' on the badge — "personal best", never "personal
+                      record"; Jackson's call, it reads more natural. Internal
+                      identifiers (prs, .round-badge.pr) deliberately keep the
+                      old name for continuity, same as the locker rename. */}
+                  {prs.map((r) => row(toLogged(r), 'PB'))}
                 </section>
               )}
               {records.length + prs.length === 0 && (

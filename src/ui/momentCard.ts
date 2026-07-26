@@ -105,13 +105,17 @@ export async function momentCardBlob(props: MomentCardProps): Promise<Blob> {
     ctx.shadowOffsetY = 0
   }
 
-  // kicker
+  // the wordmark, then the course beneath it. Was a text line reading
+  // "⛳ DOGLEG · COURSE"; the brand is now the real mark, so the emoji lockup is
+  // gone and the course name stands on its own.
+  await drawWordmark(ctx, W / 2, 104, 176)
+
   ctx.save()
   softShadow()
   ctx.fillStyle = 'rgba(248, 244, 233, 0.85)'
   centered(13, 800)
   if ('letterSpacing' in ctx) (ctx as CanvasRenderingContext2D & { letterSpacing: string }).letterSpacing = '3px'
-  ctx.fillText(`⛳ DOGLEG · ${props.courseName.toUpperCase()}`, W / 2, 168, W - 48)
+  ctx.fillText(props.courseName.toUpperCase(), W / 2, 172, W - 48)
   ctx.restore()
 
   // the ball, glowing, freshly dropped
@@ -159,8 +163,8 @@ export async function momentCardBlob(props: MomentCardProps): Promise<Blob> {
   )
   ctx.restore()
 
-  // logo watermark, bottom-right
-  await drawLogo(ctx, W - 60, H - 60, 44)
+  // No bottom-right watermark any more: it stamped the retired mascot icon,
+  // and the wordmark at the top is the branding now. One mark per card.
 
   return await new Promise<Blob>((resolve, reject) => {
     canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('canvas export failed'))), 'image/png')
@@ -234,17 +238,67 @@ async function drawCharChip(ctx: CanvasRenderingContext2D, cx: number, cy: numbe
   ctx.restore()
 }
 
-async function drawLogo(ctx: CanvasRenderingContext2D, x: number, y: number, size: number) {
+/**
+ * The wordmark, centred on (cx, cy) at a given width — rasterised from the same
+ * component the app renders, so the card can't drift from the masthead.
+ *
+ * The colours are pinned here rather than inherited: an SVG loaded as an <img>
+ * gets no page stylesheet, so `currentColor` and the --logo-* custom properties
+ * would fall back to the component's defaults. These values mirror theme.css.
+ */
+async function drawWordmark(ctx: CanvasRenderingContext2D, cx: number, cy: number, width: number) {
   try {
-    const img = await loadImage(`${import.meta.env.BASE_URL}icon.png`)
+    const { renderToStaticMarkup } = await import('react-dom/server')
+    const { Wordmark } = await import('./Wordmark')
+    const aspect = 289 / 151.5 // the mark's viewBox
+    const svg = renderToStaticMarkup(
+      createElement(Wordmark, {
+        // an <img>-loaded SVG needs an intrinsic size; viewBox alone leaves it
+        // to the browser's 300x150 default
+        width: 289,
+        height: 151.5,
+        style: {
+          color: '#f8f3e4',
+          // matches --logo-flag / --logo-cup / --logo-cup-rim in theme.css
+          ['--logo-flag' as string]: '#d94a32',
+          ['--logo-cup' as string]: '#0a1a10',
+          ['--logo-cup-rim' as string]: '#2a5f33',
+        },
+      }),
+    )
+    // Wordmark declares xmlns itself. Adding it unconditionally (as the avatar
+    // helper does, since CharacterAvatar does NOT declare it) produced a
+    // duplicate attribute, which is invalid XML — the SVG then failed to decode
+    // and every card silently fell back to plain text.
+    const withNs = svg.includes('xmlns=')
+      ? svg
+      : svg.replace('<svg', '<svg xmlns="http://www.w3.org/2000/svg"')
+    const url = URL.createObjectURL(new Blob([withNs], { type: 'image/svg+xml' }))
+    try {
+      const img = await loadImage(url)
+      // the mark's own aspect ratio, so it can never be stretched
+      const h = width / aspect
+      ctx.save()
+      ctx.shadowColor = 'rgba(0, 0, 0, 0.35)'
+      ctx.shadowBlur = 10
+      ctx.shadowOffsetY = 2
+      ctx.drawImage(img, cx - width / 2, cy - h / 2, width, h)
+      ctx.restore()
+    } finally {
+      URL.revokeObjectURL(url)
+    }
+  } catch (err) {
+    // wordmark failed to rasterise — fall back to the name so the card is still
+    // branded rather than anonymous. Logged rather than swallowed: a silent
+    // fallback here looks like a design choice, not a failure.
+    console.error('[momentCard] wordmark did not rasterise; using text fallback', err)
     ctx.save()
-    ctx.globalAlpha = 0.9
-    roundRectPath(ctx, x, y, size, size, 10)
-    ctx.clip()
-    ctx.drawImage(img, x, y, size, size)
+    ctx.fillStyle = '#f8f3e4'
+    ctx.font = `900 34px ${FONTS}`
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    ctx.fillText('dogleg', cx, cy)
     ctx.restore()
-  } catch {
-    // logo failed to load (offline?) — ship the card without the watermark
   }
 }
 

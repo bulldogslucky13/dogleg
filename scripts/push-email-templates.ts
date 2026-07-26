@@ -6,14 +6,18 @@
  * they are not something `supabase functions deploy` touches. They live behind
  * the Management API, which is what this script talks to.
  *
- * It is deliberately NOT wired into CI: pushing rewrites live auth mail for a
- * production project, and it needs a personal access token that no workflow
- * has. Run it by hand when the templates change.
+ * CI runs this on every push to main (the email-templates job in
+ * .github/workflows/deploy.yml, after the site deploy — the masthead is served
+ * from the site, so a template must never go out ahead of it). Pushing by hand
+ * is for previewing a change before it merges:
  *
  *   export SUPABASE_ACCESS_TOKEN=$(op read 'op://Private/Supabase Local API Key/credential')
  *   pnpm gen:email-templates
  *   pnpm push:email-templates --dry-run    # show what would change
  *   pnpm push:email-templates
+ *
+ * Idempotent: it diffs against live config first and no-ops when nothing moved,
+ * so running it on every deploy costs one GET and writes nothing.
  *
  * Only the two customised templates are touched (magic link, confirm signup).
  * The other eleven are Supabase stock and are left exactly as they are.
@@ -36,10 +40,12 @@ if (!token) {
   process.exit(1)
 }
 
+// CI passes the ref the same way the rest of deploy.yml gets it; locally it
+// comes from the checked-in config, so a hand run needs no extra setup.
 const config = readFileSync(resolve(root, 'supabase/config.toml'), 'utf8')
-const ref = /^\s*project_id\s*=\s*"([^"]+)"/m.exec(config)?.[1]
+const ref = process.env.SUPABASE_PROJECT_REF || /^\s*project_id\s*=\s*"([^"]+)"/m.exec(config)?.[1]
 if (!ref) {
-  console.error('could not read project_id from supabase/config.toml')
+  console.error('no SUPABASE_PROJECT_REF, and could not read project_id from supabase/config.toml')
   process.exit(1)
 }
 

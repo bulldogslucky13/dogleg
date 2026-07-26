@@ -102,21 +102,32 @@ guards both). There are three, and only three:
 
 The auth pair used to live *only* in the Supabase dashboard, which is how they
 silently missed a rebrand. They are now generated to `supabase/templates/*.html`
-(`pnpm gen:email-templates`, reviewable in the diff, pinned by a test) and
-pushed with `pnpm push:email-templates`, which PATCHes the Management API and
-needs a personal access token:
+(`pnpm gen:email-templates`, reviewable in the diff, pinned by a test).
+
+**Pushing them is automated**, like the schema and the functions: the
+`email-templates` job in `.github/workflows/deploy.yml` runs
+`pnpm push:email-templates` on every push to `main`. A PR that changes email
+copy just edits `_shared/auth-emails.ts` and commits the regenerated HTML — no
+manual step at merge. Two things make that safe: the push diffs against live
+config and no-ops when nothing moved, and CI runs `gen:email-templates --check`
+first, so it refuses to push anything that disagrees with the reviewed files.
+
+That job runs **after** the site deploy — deliberately the opposite of the
+functions job, which goes first so the referee is never older than the clients
+submitting to it. Emails point the other way: the masthead is an `<img>` served
+from the site, so a template must never ship ahead of the asset it references.
+
+To preview a change before it merges:
 
 ```sh
 export SUPABASE_ACCESS_TOKEN=...        # supabase.com/dashboard/account/tokens
 pnpm gen:email-templates && pnpm push:email-templates --dry-run
 ```
 
-This push is **not** in CI, unlike schema.sql and the functions — it rewrites
-live auth mail and no workflow holds that token. Do it by hand when the
-templates change. The other eleven auth templates in the project are Supabase
-stock and deliberately untouched: `src/lib/auth.ts` only ever calls
-`signInWithOtp`, so DogLeg has no password reset, phone, MFA, OAuth-identity or
-invite flow to brand.
+The other eleven auth templates in the project are Supabase stock and
+deliberately untouched: `src/lib/auth.ts` only ever calls `signInWithOtp`, so
+DogLeg has no password reset, phone, MFA, OAuth-identity or invite flow to
+brand.
 
 The masthead is a hosted PNG (`public/brand/`, regenerate with `pnpm
 gen:email-wordmark`) because Gmail strips inline SVG — it is rasterised from

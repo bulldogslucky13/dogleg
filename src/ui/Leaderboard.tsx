@@ -26,6 +26,20 @@ import { SyncCta } from './RoundsScreen'
  * rounds contend for the course record. First-time players pick a clubhouse
  * name inline — no account, the device remembers them.
  */
+/**
+ * Dense scoreboard ranks, ties awarded (Jackson's spec, by example): players on
+ * the same score share a number and the NEXT distinct score takes the next
+ * integer — -3,-3,-1,-1,-1,+1 ranks as 1,1,2,2,2,3. Deliberately not the
+ * tour's T1/T1/T3 skip-numbering.
+ */
+export function denseRanks(rows: Array<{ to_par: number }>): number[] {
+  const out: number[] = []
+  rows.forEach((r, i) => {
+    out.push(i === 0 ? 1 : r.to_par === rows[i - 1].to_par ? out[i - 1] : out[i - 1] + 1)
+  })
+  return out
+}
+
 export function ScoreBoard(props: { round: RoundState }) {
   const { round } = props
   const [player, setPlayer] = useState(loadPlayer)
@@ -267,9 +281,11 @@ export function ScoreBoard(props: { round: RoundState }) {
       {error && <p className="fine board-error">{error}</p>}
       {board && board.length > 0 && (
         <ol className="board-list">
-          {board.slice(0, 10).map((row, i) => (
+          {board.slice(0, 10).map((row, i, shown) => (
             <li key={`${row.player_name}:${i}`} className={player && row.player_name === player.name ? 'me' : ''}>
-              <span className="board-pos">{i + 1}</span>
+              <span className={`board-pos${denseRanks(shown)[i] <= 3 ? ` medal-${denseRanks(shown)[i]}` : ''}`}>
+                {denseRanks(shown)[i]}
+              </span>
               <span className="board-name">
                 {row.player_name}
                 {row.character ? ` ${characterById(row.character)?.emoji ?? ''}` : ''}
@@ -325,9 +341,11 @@ export function DailyBoardView(props: { dateKey: string }) {
       )}
       {board && board.length > 0 && (
         <ol className="board-list">
-          {board.slice(0, 10).map((row, i) => (
+          {board.slice(0, 10).map((row, i, shown) => (
             <li key={`${row.player_name}:${i}`} className={player && row.player_name === player.name ? 'me' : ''}>
-              <span className="board-pos">{i + 1}</span>
+              <span className={`board-pos${denseRanks(shown)[i] <= 3 ? ` medal-${denseRanks(shown)[i]}` : ''}`}>
+                {denseRanks(shown)[i]}
+              </span>
               <span className="board-name">
                 {row.player_name}
                 {row.character ? ` ${characterById(row.character)?.emoji ?? ''}` : ''}

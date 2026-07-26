@@ -838,6 +838,21 @@
    home's hero is the wordmark (pre-game show), here the hero is the SCORE
    (post-round graphic). Covers both round ends — daily and unlimited. */
 
+/* a shade or two lighter than the Teebox/Clubhouse turf — same family, but
+   you can tell the wrap screen from the menus at a glance */
+.screen.result {
+  background: linear-gradient(180deg, var(--turf-700) 0%, var(--turf-800) 70%);
+}
+
+/* the small mark up top: screenshots of the hero score should carry the brand */
+.screen.result .result-wordmark {
+  display: block;
+  width: 88px;
+  height: auto;
+  margin: 0 auto -4px;
+  color: var(--text-hi);
+}
+
 .screen.result > .kicker {
   text-align: center;
   font-size: 0.66rem;
@@ -875,11 +890,12 @@
   color: var(--text-mid);
 }
 
+/* sand-blocked, like the lower thirds — the dark-on-dark version was mud */
 .screen.result .char-chip.result-chip {
   align-self: center;
-  background: var(--bg-card);
-  border: 1px solid var(--edge-hairline);
-  color: var(--text-mid);
+  background: var(--bg-blocked);
+  border: none;
+  color: var(--text-on-block);
 }
 
 /* the wordle-square brag rows, centred as one block */
@@ -900,6 +916,21 @@
 
 .screen.result .coach-panel .kicker {
   color: var(--tracer-400);
+}
+
+/* coach header row: report title left, the difficulty pill right */
+.screen.result .coach-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.screen.result .coach-head .rating-chip {
+  background: var(--bg-elevated);
+  border-color: var(--edge-strong);
+  color: var(--text-mid);
+  white-space: nowrap;
 }
 
 .screen.result .coach-panel .verdict {
@@ -967,9 +998,21 @@
   color: var(--text-mid);
 }
 
-/* the leader's rank block goes gold — records language, sparingly */
-.screen.result .board-list li:first-child .board-pos {
+/* Podium metal for RANKS 1-3 (ranks, not rows: ties share a medal — two
+   players on -3 are both rank 1, both gold). Silver and bronze are one-off
+   literals like the podium's medal emoji; everyone else keeps plain turf. */
+.screen.result .board-pos.medal-1 {
   background: var(--trophy-400);
+  color: var(--text-on-block);
+}
+
+.screen.result .board-pos.medal-2 {
+  background: #c3cad2;
+  color: var(--text-on-block);
+}
+
+.screen.result .board-pos.medal-3 {
+  background: #c98a52;
   color: var(--text-on-block);
 }
 
@@ -1036,9 +1079,11 @@
   border-radius: var(--r-bug);
 }
 
-/* the finished round earned its notch — the wrap screen's primary actions
-   wear the same punched corner as the played daily's CTA on home */
-.screen.result .cta:not(.ghost):not(.slim) {
+/* The notch is EARNED-AND-LOCKED, not just earned: a signed daily can't be
+   replayed until tomorrow, so its primary actions wear the punched corner. A
+   practice round can always be played again — "Play another practice round"
+   stays a whole card. (.daily is set by ResultScreen for non-practice.) */
+.screen.result.daily .cta:not(.ghost):not(.slim) {
   clip-path: polygon(15px 0, 100% 0, 100% 100%, 0 100%, 0 15px);
   border-radius: 0;
 }

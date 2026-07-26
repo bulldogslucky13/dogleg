@@ -753,7 +753,12 @@ export function ResultScreen(props: {
     }
   }
   return (
-    <div className="screen result">
+    // `daily` gates the earned notch: a signed daily is locked until tomorrow,
+    // a practice round can always be replayed — no notch for the replayable
+    <div className={`screen result${props.practice ? '' : ' daily'}`}>
+      {/* small mark up top: the hero score + board is the screenshot people
+          take, and the screenshot should carry the brand */}
+      <Wordmark className="result-wordmark" />
       <div className="kicker">
         {props.practice ? 'Practice round' : `Daily No. ${props.setup.puzzleNumber}`} · {props.setup.course.name}
       </div>
@@ -840,7 +845,13 @@ export function ResultScreen(props: {
       )}
       {props.grade && (
         <div className="coach-panel">
-          <div className="kicker">The Swing Coach's Report</div>
+          <div className="coach-head">
+            <div className="kicker">The Swing Coach's Report</div>
+            {/* the difficulty pill, again — primarily for readers who are mad
+                about their score: tap it and see what the course does to a
+                competent golfer */}
+            <PlayRatingChip slug={props.setup.course.slug} />
+          </div>
           <p className="verdict">{gradeCopy(props.grade).headline}</p>
           <div className="recap-tiles coach-tiles">
             <div className="stat">

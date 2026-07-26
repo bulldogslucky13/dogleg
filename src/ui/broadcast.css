@@ -642,6 +642,22 @@
   color: var(--text-hi);
 }
 
+/* the small print, under the footer links */
+.screen.home .fine-print {
+  margin-top: 2px;
+  font-size: 0.6rem;
+  line-height: 1.5;
+  text-align: center;
+  color: rgba(248, 243, 228, 0.38);
+  text-wrap: pretty;
+}
+
+.screen.home .fine-print a {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
 /* --------------------------------------------------------- the change log */
 
 .tut-card.changelog .changelog-intro {
@@ -780,6 +796,69 @@
 .tut-card :focus-visible {
   outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
+}
+
+/* The Play Rating explainer rides .tut-card, so the broadcast theme makes it
+   dark — but its own rules in styles.css are written for the paper look and
+   are more specific (.rating-card .tut-body.rating-body), so every one of
+   them has to be answered here or the text stays ink-on-ink. */
+.tut-card.rating-card {
+  color: var(--text-hi);
+}
+
+.tut-card.rating-card .kicker {
+  color: var(--text-low);
+}
+
+.tut-card.rating-card .tut-body.rating-body,
+.tut-card.rating-card .tut-body.rating-body p {
+  color: var(--text-mid);
+}
+
+.tut-card.rating-card .tut-body.rating-body b {
+  color: var(--text-hi);
+}
+
+.tut-card.rating-card .rating-scale {
+  background: var(--bg-card);
+  border-color: var(--edge-hairline);
+}
+
+.tut-card.rating-card .rating-scale-cut {
+  color: var(--text-low);
+}
+
+/* the row you're on: gold, the same signal records use */
+.tut-card.rating-card .rating-scale-row.on {
+  background: rgba(246, 194, 33, 0.16);
+  color: var(--record-gold);
+}
+
+.tut-card.rating-card .rating-foot {
+  color: var(--text-low);
+}
+
+/* ------------------------------------------------ avatars on dark surfaces
+   The golfer avatars are drawn in the paper theme's dark greens — legs, shoes,
+   caps and clubs — so on turf they simply disappear. They are still correct on
+   the pick screen, which stays paper, so the artwork isn't touched: instead
+   each one gets the light blocked tile the rest of the system uses, which is
+   the background it was drawn for. Fixes How to Play's player step and the
+   home screen's per-character rows alike. */
+.tut-card .tut-players .avatar,
+.screen.home .char-record .avatar {
+  background: var(--bg-blocked);
+  border-radius: var(--r-bug);
+  padding: 3px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+}
+
+.tut-card .tut-players > span {
+  gap: 5px;
+}
+
+.tut-card .tut-players em {
+  color: var(--text-hi);
 }
 
 /* season splash podium: gold means records here too */

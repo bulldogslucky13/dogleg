@@ -364,6 +364,21 @@ export function HomeScreen(props: {
         </button>
       </div>
       {changeLog && <ChangeLog onClose={() => setChangeLog(false)} />}
+      {/* The OpenStreetMap credit is not decoration: the course geography is
+          imported from OSM (scripts/import-osm.ts), whose ODbL licence requires
+          attribution wherever the data ships — which it does, on every
+          real-geometry course. The trademark line disclaims affiliation in the
+          three ways that matter (affiliated / endorsed / sponsored). */}
+      <p className="fine-print">
+        New course every day at midnight Eastern (ET). Course names and trademarks are the property
+        of their respective owners — DogLeg is not affiliated with, endorsed by, or sponsored by any
+        course, club or tournament. Layouts and yardages are stylized for play, built in part from
+        map data ©{' '}
+        <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer noopener">
+          OpenStreetMap contributors
+        </a>{' '}
+        (ODbL). © 2026 DogLeg. All rights reserved.
+      </p>
     </div>
   )
 }

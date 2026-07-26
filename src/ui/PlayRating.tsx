@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { playRatingFor } from '../engine/courses'
 import { PLAY_INDEX, PLAY_RATING_META } from '../engine/playRatings'
 import { toParLabel } from '../engine/daily'
@@ -42,7 +43,12 @@ function PlayRatingModal(props: { slug: string; onClose: () => void }) {
     return () => window.removeEventListener('keydown', onKey)
   }, [props])
 
-  return (
+  // Portalled to the body on purpose. This chip renders inside content — the
+  // today-card and the course rows — and both wear a clip-path once played
+  // (the earned notch). A clip-path ancestor clips even position:fixed
+  // descendants, which cropped this dialog to the card it was opened from.
+  // A dialog must not inherit its parent's clipping, so it doesn't live there.
+  return createPortal(
     <div
       className="tut-backdrop"
       role="dialog"
@@ -92,6 +98,7 @@ function PlayRatingModal(props: { slug: string; onClose: () => void }) {
           </p>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }

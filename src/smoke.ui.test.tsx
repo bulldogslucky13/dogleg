@@ -146,6 +146,20 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
     expect(screen.getByText('Clubhouse')).toBeTruthy()
   })
 
+  it('the Play Rating explainer opens outside the card it was opened from', () => {
+    localStorage.setItem('dogleg:tutorial:v1', 'done')
+    render(<App />)
+    fireEvent.click(screen.getAllByRole('button', { name: /Play Rating/ })[0])
+    const dialog = screen.getByRole('dialog', { name: /How Play Rating is calculated/i })
+    // It MUST be portalled to the body. The today-card and played course rows
+    // carry a clip-path (the earned notch), and a clip-path ancestor crops even
+    // position:fixed descendants — which cropped this dialog to that card.
+    expect(dialog.parentElement).toBe(document.body)
+    expect(dialog.closest('.today-card')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }))
+    expect(screen.queryByRole('dialog', { name: /How Play Rating/i })).toBeNull()
+  })
+
   it('the Teebox footer opens the change log, whose odds count matches its entries', async () => {
     localStorage.setItem('dogleg:tutorial:v1', 'done')
     const { CHANGELOG } = await import('./lib/changelog')

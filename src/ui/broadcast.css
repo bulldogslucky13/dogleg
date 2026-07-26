@@ -546,6 +546,108 @@
   color: var(--text-hi);
 }
 
+/* ---------------------------------------------------------- Teebox footer */
+
+/* the rules and the receipt: quiet text links under everything else */
+.screen.home .teebox-footer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-2);
+  margin-top: var(--sp-1);
+  color: var(--text-low);
+  font-size: 0.72rem;
+}
+
+.screen.home .footer-link {
+  font-family: var(--font-ui);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-low);
+  padding: 6px 4px;
+}
+
+.screen.home .footer-link:active {
+  color: var(--text-hi);
+}
+
+/* --------------------------------------------------------- the change log */
+
+.tut-card.changelog .changelog-intro {
+  font-size: 0.82rem;
+  line-height: 1.5;
+  color: var(--text-mid);
+}
+
+.tut-card.changelog .changelog-intro b {
+  color: var(--flag-400);
+}
+
+.tut-card.changelog .changelog-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.tut-card.changelog .changelog-entry {
+  background: var(--bg-card);
+  border-left: var(--keyline-w) solid var(--edge-strong);
+  border-radius: 3px var(--r-bug) var(--r-bug) 3px;
+  padding: 9px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* an odds change is the one a player has a right to notice: flag keyline */
+.tut-card.changelog .changelog-entry:has(.changelog-tag.odds) {
+  border-left-color: var(--flag-500);
+}
+
+.tut-card.changelog .changelog-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-size: 0.62rem;
+  letter-spacing: var(--track-kicker);
+  text-transform: uppercase;
+  font-weight: 700;
+  color: var(--text-low);
+}
+
+.tut-card.changelog .changelog-tag.odds {
+  color: var(--flag-400);
+}
+
+.tut-card.changelog .changelog-tag.feature {
+  color: var(--tracer-400);
+}
+
+.tut-card.changelog .changelog-tag.fix {
+  color: var(--text-low);
+}
+
+.tut-card.changelog .changelog-title {
+  font-family: var(--font-display);
+  font-variation-settings: 'wdth' var(--wdth-tower);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: var(--track-tower);
+  font-size: 0.95rem;
+  color: var(--text-hi);
+}
+
+.tut-card.changelog .changelog-note {
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: var(--text-mid);
+}
+
 /* ------------------------------------------- How to Play + season splash */
 
 .tut-card {

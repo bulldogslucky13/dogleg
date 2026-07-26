@@ -11,6 +11,7 @@ import { bundleIsStale, FRESH_TTL_MS } from '../lib/freshness'
 import { fetchCourseRecords, fetchSeasonRecords, loadPlayer, type CourseRecord } from '../lib/leaderboard'
 import { seasonCountdown, seasonForDate } from '../engine/season'
 import { FortuneInfo } from './Tutorial'
+import { ChangeLog } from './ChangeLog'
 import { dismissSteals, pendingSteals, syncLedger, type StolenRecord } from '../lib/records'
 import { loadGhost, type Ghost } from '../state/ghost'
 import { currentHandicap, formatHandicap } from '../state/stats'
@@ -48,6 +49,7 @@ export function HomeScreen(props: {
   const [steals, setSteals] = useState(() => pendingSteals())
   /** the Fortune callout's ⓘ opens How to Play's Fortunes page on its own */
   const [fortuneInfo, setFortuneInfo] = useState(false)
+  const [changeLog, setChangeLog] = useState(false)
   /** an engine-changing deploy landed after this tab loaded its bundle — a
    * round played now couldn't post, so say "reload" before the first stroke */
   const [stale, setStale] = useState(false)
@@ -119,9 +121,6 @@ export function HomeScreen(props: {
       <header className="masthead">
         <div className="masthead-top">
           <div className="kicker">Daily golf challenge · No. {setup.puzzleNumber}</div>
-          <button className="how-to-play" onClick={props.onHowToPlay}>
-            How to play
-          </button>
         </div>
         <h1>
           Dog<em>leg</em>
@@ -198,7 +197,7 @@ export function HomeScreen(props: {
         </div>
       )}
 
-      <p className="cta-tease">Can you break par today?</p>
+      <p className="cta-tease">Can you beat the odds today?</p>
 
       {props.playedToday ? (
         // today's round is in the books — this CTA wears the earned notch too
@@ -346,6 +345,18 @@ export function HomeScreen(props: {
       )}
       <HandicapChip onTap={props.onStats} />
       <AccountPanel onHistorySynced={props.onHistorySynced} />
+      {/* the quiet stuff lives at the foot of the screen: the rules, and the
+          receipt showing what has changed since launch */}
+      <div className="teebox-footer">
+        <button className="footer-link" onClick={props.onHowToPlay}>
+          How to play
+        </button>
+        <span aria-hidden>·</span>
+        <button className="footer-link" onClick={() => setChangeLog(true)}>
+          Change log
+        </button>
+      </div>
+      {changeLog && <ChangeLog onClose={() => setChangeLog(false)} />}
     </div>
   )
 }

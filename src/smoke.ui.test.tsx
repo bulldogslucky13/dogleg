@@ -146,6 +146,28 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
     expect(screen.getByText('Clubhouse')).toBeTruthy()
   })
 
+  it('the Teebox footer opens the change log, whose odds count matches its entries', async () => {
+    localStorage.setItem('dogleg:tutorial:v1', 'done')
+    const { CHANGELOG } = await import('./lib/changelog')
+    render(<App />)
+    // it must not greet anyone unasked
+    expect(screen.queryByText('Every update, in the open')).toBeNull()
+    fireEvent.click(screen.getByText('Change log'))
+    expect(screen.getByText('Every update, in the open')).toBeTruthy()
+    // the intro's counts are derived from the list, so they can't drift from it
+    const odds = CHANGELOG.filter((c) => c.kind === 'odds').length
+    expect(
+      screen.getByText(
+        new RegExp(`${CHANGELOG.length} updates since DogLeg opened.*The ${odds} marked`),
+      ),
+    ).toBeTruthy()
+    // every entry is dated and titled — the log is the record, so no blanks
+    expect(screen.getAllByRole('listitem').length).toBe(CHANGELOG.length)
+    for (const entry of CHANGELOG) expect(screen.getByText(entry.title)).toBeTruthy()
+    fireEvent.click(screen.getByText('Got it'))
+    expect(screen.queryByText('Every update, in the open')).toBeNull()
+  })
+
   it("the home Fortune callout opens How to Play's Fortunes page without consuming the tutorial", () => {
     localStorage.setItem('dogleg:tutorial:v1', 'done')
     render(<App />)

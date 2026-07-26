@@ -955,6 +955,13 @@
   padding: 0;
 }
 
+/* A practice round with no record in play emits the container with nothing in
+   it (ScoreBoard's practice branch). On paper that was invisible; as a dark
+   card it rendered as a stray 2px outlined strip between coach and replay. */
+.screen.result .board-block:empty {
+  display: none;
+}
+
 /* sand tower head, like the today's-course slab wears */
 .screen.result .board-block > .kicker {
   background: var(--bg-blocked);

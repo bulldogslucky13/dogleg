@@ -43,8 +43,15 @@
   border-left: var(--keyline-w) solid var(--tracer-400);
   /* tight left corners keep the keyline a crisp broadcast bar, not a curl */
   border-radius: 3px var(--r-bug) var(--r-bug) 3px;
-  text-align: left;
-  padding: 11px 12px 10px;
+  text-align: center;
+  padding: 11px 8px 10px;
+}
+
+/* the label holds one line under a centered numeral */
+:is(.screen.home, .screen.rounds) .stat span {
+  white-space: nowrap;
+  font-size: 0.58rem;
+  letter-spacing: 0.1em;
 }
 
 :is(.screen.home, .screen.rounds) .stat:nth-child(2) {
@@ -66,17 +73,29 @@
   color: var(--text-low);
 }
 
-/* primary CTA: color-blocked flag slab with the corner notch */
+/* primary CTA: color-blocked flag slab (no notch — notches are earned) */
 :is(.screen.home, .screen.rounds) .cta {
   background: linear-gradient(180deg, var(--flag-400), var(--flag-500));
   color: var(--action-on-primary);
-  clip-path: var(--clip-notch);
-  border-radius: 0;
+  border-radius: var(--r-bug);
   font-family: var(--font-display);
   font-variation-settings: 'wdth' 88;
   font-weight: 800;
   letter-spacing: 0.05em;
   font-size: 1rem;
+}
+
+/* stacked two-level action label: PLAY UNLIMITED / browse courses */
+:is(.screen.home, .screen.rounds) .cta .cta-sub {
+  display: block;
+  font-family: var(--font-ui);
+  font-variation-settings: normal;
+  font-weight: 600;
+  font-size: 0.74rem;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  opacity: 0.75;
+  margin-top: 2px;
 }
 
 :is(.screen.home, .screen.rounds) .cta:active {
@@ -99,6 +118,12 @@
 
 /* ----------------------------------------------------------------- Teebox */
 
+/* "DAILY GOLF CHALLENGE · NO. N" holds one line beside the pill */
+.screen.home .masthead-top .kicker {
+  white-space: nowrap;
+  font-size: 0.64rem;
+}
+
 .screen.home .masthead h1 {
   font-family: var(--font-display);
   font-variation-settings: 'wdth' var(--wdth-score);
@@ -116,14 +141,20 @@
   border-color: var(--edge-strong);
 }
 
-/* today's course: the light lower-third slab — sand block, flag keyline */
+/* today's course: the light lower-third slab — sand block, flag keyline.
+   The corner notch is EARNED: .notched (today's round in the books) punches
+   the corner like a marked paper scorecard; unplayed cards stay square. */
 .screen.home .today-card {
   background: var(--bg-blocked);
   color: var(--text-on-block);
-  clip-path: var(--clip-notch);
-  border-radius: 0;
+  border-radius: var(--r-card);
   box-shadow: inset 4px 0 0 var(--flag-500);
   padding-left: 20px;
+}
+
+.screen.home .today-card.notched {
+  clip-path: var(--clip-notch);
+  border-radius: 0;
 }
 
 .screen.home .today-card .kicker {
@@ -141,10 +172,28 @@
 
 .screen.home .today-card p {
   color: var(--text-on-block-mid);
+  font-size: 0.88rem;
 }
 
 .screen.home .today-card .blurb {
   color: var(--text-on-block-mid);
+  font-size: 0.8rem;
+}
+
+/* caddy's-read chips hold one line: smaller, and scroll if they must */
+.screen.home .today-card .chips {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.screen.home .today-card .chips::-webkit-scrollbar {
+  display: none;
+}
+
+.screen.home .today-card .chip {
+  font-size: 0.7rem;
+  padding: 3px 9px;
 }
 
 .screen.home .today-card .chip.dark {
@@ -182,6 +231,12 @@
   background: var(--bg-card);
   border: none;
   border-radius: var(--r-bug);
+}
+
+/* played courses get their corner punched, scorecard-style */
+.screen.home .course-row.notched {
+  clip-path: polygon(14px 0, 100% 0, 100% 100%, 0 100%, 0 14px);
+  border-radius: 0;
 }
 
 .screen.home .course-row b {
@@ -242,6 +297,54 @@
 .screen.home .stale-banner {
   background: var(--bg-blocked);
   color: var(--text-on-block);
+}
+
+/* tomorrow's forecast: a compact gold-keyline bug instead of a cream card */
+.screen.home .forecast {
+  background: var(--bg-card);
+  border: none;
+  border-left: var(--keyline-w) solid var(--trophy-400);
+  border-radius: 3px var(--r-bug) var(--r-bug) 3px;
+  padding: 8px 12px;
+  gap: 3px;
+}
+
+.screen.home .forecast .kicker {
+  color: var(--trophy-400);
+}
+
+.screen.home .forecast-line {
+  color: var(--text-mid);
+  font-size: 0.8rem;
+  gap: 4px 6px;
+}
+
+.screen.home .forecast-line b {
+  font-family: var(--font-display);
+  font-variation-settings: 'wdth' var(--wdth-tower);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: var(--track-tower);
+  font-size: 0.92rem;
+  color: var(--text-hi);
+}
+
+.screen.home .forecast .chip {
+  background: var(--bg-elevated);
+  border-color: var(--edge-hairline);
+  color: var(--text-mid);
+  font-size: 0.68rem;
+  padding: 2px 8px;
+}
+
+.screen.home .forecast .chips {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.screen.home .forecast .chips::-webkit-scrollbar {
+  display: none;
 }
 
 /* -------------------------------------------------------------- Clubhouse */
@@ -407,8 +510,7 @@
 .tut-card .cta {
   background: linear-gradient(180deg, var(--flag-400), var(--flag-500));
   color: var(--action-on-primary);
-  clip-path: var(--clip-notch);
-  border-radius: 0;
+  border-radius: var(--r-bug);
   font-family: var(--font-display);
   font-variation-settings: 'wdth' 88;
   font-weight: 800;

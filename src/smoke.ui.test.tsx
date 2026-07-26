@@ -342,7 +342,7 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
     logRound(s)
 
     render(<App />)
-    fireEvent.click(screen.getByText(/Clubhouse · my rounds/))
+    fireEvent.click(screen.getByText(/🏆 Clubhouse/))
     fireEvent.click(screen.getByText('Seasons'))
     expect(screen.getByText(/in progress — ends in/)).toBeTruthy()
     expect(screen.getByText(/1 round this season/)).toBeTruthy()
@@ -1060,7 +1060,7 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
     archiveRound(s)
 
     render(<App />)
-    fireEvent.click(screen.getByText(/Clubhouse · my rounds/))
+    fireEvent.click(screen.getByText(/🏆 Clubhouse/))
 
     // the trophy shelf sits on top — empty but visible: the zero IS the goal
     expect(screen.getByText('Lifetime Hole in One')).toBeTruthy()
@@ -1118,7 +1118,7 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
     )
 
     render(<App />)
-    fireEvent.click(screen.getByText(/Clubhouse · my rounds/))
+    fireEvent.click(screen.getByText(/🏆 Clubhouse/))
     // two distinct courses, one row each — never one CR per record-ever
     fireEvent.click(screen.getByText(/Records · 2/))
 
@@ -1159,7 +1159,7 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
     )
 
     render(<App />)
-    fireEvent.click(screen.getByText(/Clubhouse · my rounds/))
+    fireEvent.click(screen.getByText(/🏆 Clubhouse/))
     fireEvent.click(screen.getByText(/Records · 1/))
 
     // the +1 local round doesn't match the -6 held score → no CR, stays a PR
@@ -1194,7 +1194,7 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
     )
 
     render(<App />)
-    fireEvent.click(screen.getByText(/Clubhouse · my rounds/))
+    fireEvent.click(screen.getByText(/🏆 Clubhouse/))
     fireEvent.click(screen.getByText(/Records · 1/))
 
     // the held record survives — one CR row at -3, the unconfirmed -5 doesn't
@@ -1224,7 +1224,7 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
     logRound(s)
 
     render(<App />)
-    fireEvent.click(screen.getByText(/Clubhouse · my rounds/))
+    fireEvent.click(screen.getByText(/🏆 Clubhouse/))
     fireEvent.click(screen.getByText(/Lifetime rounds played/))
 
     // one round in the book: no handicap yet, countdown says how far to go
@@ -1262,7 +1262,7 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
     )
 
     render(<App />)
-    fireEvent.click(screen.getByText(/Clubhouse · my rounds/))
+    fireEvent.click(screen.getByText(/🏆 Clubhouse/))
     // the ace trophy counted it from stored results alone
     const aceTrophy = screen.getByText('Lifetime Hole in One').closest('button')!
     expect(within(aceTrophy).getByText('1')).toBeTruthy()

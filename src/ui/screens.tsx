@@ -109,11 +109,13 @@ export function HomeScreen(props: {
   // daily or practice alike. Every start path funnels into the remedy: the
   // page reloads onto the current bundle and the player tees off from there.
   const startPractice = stale ? () => window.location.reload() : props.onPractice
+  // courses you've completed get their scorecard corner punched (the notch)
+  const playedSlugs = new Set(loadArchive().map((r) => r.courseSlug))
   return (
     <div className="screen home">
       <header className="masthead">
         <div className="masthead-top">
-          <div className="kicker">Daily challenge · No. {setup.puzzleNumber}</div>
+          <div className="kicker">Daily golf challenge · No. {setup.puzzleNumber}</div>
           <button className="how-to-play" onClick={props.onHowToPlay}>
             How to play
           </button>
@@ -121,7 +123,7 @@ export function HomeScreen(props: {
         <h1>
           Dog<em>leg</em>
         </h1>
-        <p className="tagline">One round. 18 holes. ~2 minutes.</p>
+        <p className="tagline">18 holes. Play the odds. Beat the course.</p>
       </header>
 
       {stale && (
@@ -142,7 +144,9 @@ export function HomeScreen(props: {
         />
       )}
 
-      <div className="today-card">
+      {/* the corner notch is earned: it punches through once today's card is
+          in the books, like a marked-off paper scorecard */}
+      <div className={`today-card${props.playedToday ? ' notched' : ''}`}>
         <div className="kicker">Today's course</div>
         <h2>{setup.course.name}</h2>
         <p>
@@ -230,7 +234,8 @@ export function HomeScreen(props: {
       {props.playedToday && <ForecastCard today={props.playedToday} />}
 
       <button className="cta ghost" onClick={() => setShowCourses((v) => !v)}>
-        Play unlimited · Browse courses
+        Play unlimited
+        <span className="cta-sub">Browse courses</span>
       </button>
       {showCourses && (
         <div className="course-list">
@@ -266,7 +271,11 @@ export function HomeScreen(props: {
               const sr = seasonRecs?.get(c.slug)
               const at = courseRecs?.get(c.slug)
               return (
-                <button key={c.slug} className="course-row" onClick={() => startPractice(c.slug)}>
+                <button
+                  key={c.slug}
+                  className={`course-row${playedSlugs.has(c.slug) ? ' notched' : ''}`}
+                  onClick={() => startPractice(c.slug)}
+                >
                   <b>{c.name}</b>
                   <span>
                     {c.location} · Play Rating {playRatingFor(c.slug)}/10
@@ -294,7 +303,11 @@ export function HomeScreen(props: {
               const sr = seasonRecs?.get(c.slug)
               const at = courseRecs?.get(c.slug)
               return (
-                <button key={c.slug} className="course-row" onClick={() => startPractice(c.slug)}>
+                <button
+                  key={c.slug}
+                  className={`course-row${playedSlugs.has(c.slug) ? ' notched' : ''}`}
+                  onClick={() => startPractice(c.slug)}
+                >
                   <b>{c.name}</b>
                   <span>
                     {c.location} · {c.holes.length} holes · Play Rating {playRatingFor(c.slug)}/10
@@ -322,7 +335,8 @@ export function HomeScreen(props: {
       )}
       {loadArchive().length > 0 && (
         <button className="cta ghost" onClick={props.onMyRounds}>
-          🏆 Clubhouse · my rounds
+          🏆 Clubhouse
+          <span className="cta-sub">My rounds</span>
         </button>
       )}
       <HandicapChip onTap={props.onStats} />

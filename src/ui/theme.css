@@ -39,13 +39,13 @@
   --flag-600: #b93a26;
 
   /* Trophy — records, champions, season podiums */
-  --trophy-300: #f0cf5e;
-  --trophy-400: #e2b93b;
-  --trophy-500: #c49a20;
+  --trophy-300: #ffd94e;
+  --trophy-400: #f6c221;
+  --trophy-500: #d8a410;
 
   /* Tracer — the shot-tracer / stat-overlay blue, used sparingly for info */
-  --tracer-300: #7fd4ef;
-  --tracer-400: #55bfe2;
+  --tracer-300: #7ce0ff;
+  --tracer-400: #38c6f4;
 
   /* --------------------------------------------------------------- roles */
 
@@ -114,8 +114,10 @@
   --r-card: 14px;
   --r-bug: 10px;
   --r-pill: 999px;
-  /* The signature cut: one clipped corner, like a broadcast lower-third slab */
-  --notch: 12px;
+  /* The signature cut: one clipped corner. EARNED, not decorative — it only
+     appears on a course card once that course has been played, like a punch
+     through a paper scorecard (Jackson's rule, 2026-07-25). */
+  --notch: 18px;
   --clip-notch: polygon(var(--notch) 0, 100% 0, 100% 100%, 0 100%, 0 var(--notch));
   /* The signature lean: broadcast graphics drive forward */
   --lean: -6deg;
@@ -193,7 +195,7 @@
 .dl-bug.gold { border-left-color: var(--trophy-400); }
 .dl-bug.green { border-left-color: var(--fairway-300); }
 
-/* Primary CTA: color-blocked, notched, leaning forward */
+/* Primary CTA: color-blocked slab (notches are earned — see --notch note) */
 .dl-cta {
   font-family: var(--font-display);
   font-variation-settings: 'wdth' 88;
@@ -203,7 +205,7 @@
   font-size: 1.05rem;
   color: var(--action-on-primary);
   background: linear-gradient(180deg, var(--flag-400), var(--flag-500));
-  clip-path: var(--clip-notch);
+  border-radius: var(--r-bug);
   padding: 15px 22px;
   width: 100%;
   display: flex;

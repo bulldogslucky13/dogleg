@@ -152,6 +152,29 @@ describe('odds invariants', () => {
     }
   })
 
+  it('a safe lay-up always actually advances the ball', () => {
+    // Regression: the stay-short-of-a-crossing rule used to pull the lay-up
+    // window behind ANY qualifying cross hazard without checking the result
+    // still went forward. A crossing sitting just ahead of the ball collapsed
+    // the shot into a nudge — 13 yd on whistling-straits:2, and -5 yd
+    // (backwards!) on harbour-town:15. Sweep every plausible lay-up position
+    // on every par 5, not just one drive: the failure only appears when the
+    // ball happens to stop just behind a crossing.
+    const cond: Conditions = { wind: 14, greens: 'Fast', difficulty: 9 }
+    for (const c of COURSES) {
+      for (const spec of c.holes) {
+        if (spec.par !== 5) continue
+        const layout = buildLayout(c.slug, spec)
+        for (let pos = Math.round(layout.length * 0.3); pos <= Math.round(layout.length * 0.62); pos += 5) {
+          const ball = { pos, lie: 'fairway', side: 'center' } as const
+          const [from, to] = longOdds(layout, cond, ball, 'safe', 'layup').window
+          const advance = (from + to) / 2 - pos
+          expect(advance, `${c.slug}:${spec.number} safe lay-up from ${pos}`).toBeGreaterThanOrEqual(40)
+        }
+      }
+    }
+  })
+
   it('lag putting caps three-putt risk, charge does not', () => {
     const fast: Conditions = { wind: 10, greens: 'Fast', difficulty: 8 }
     const lag = puttOdds(fast, 55, 'safe')

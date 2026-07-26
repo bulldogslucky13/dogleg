@@ -184,7 +184,7 @@ and it's a documented, bounded approximation rather than a bug.
 | budget | once the round's 8 aggressive plays are spent, no later budgeted `bestChoice` is `'aggressive'` |
 | drift guard | step-one odds recomputed from the reconstructed before-state match `faced.odds` bucket-by-bucket to 10 decimal places — this is effectively exact (same pure functions, same inputs), so no "loosen honestly" was needed here in practice |
 | copy ban | `gradeCopy`'s three strings never match `/dice/i`, across the full cross-product of luck/decision/destiny buckets; headline `+`/`-`/`E` formatting |
-| MC calibration | greedy-by-Q (self-consistent, budget-rationed policy, N=200): `\|mean(actualToPar − expectedBestToPar)\|` < 0.75 and per-shot `decisionLoss ≈ 0`; all-normal (N=200): `\|mean(luck)\|` < 0.6 |
+| MC calibration | greedy-by-Q (self-consistent, budget-rationed policy, N=200): `\|mean(actualToPar − expectedBestToPar)\|` < 0.80 and per-shot `decisionLoss ≈ 0`; all-normal (N=200): `\|mean(luck)\|` < 0.6 |
 
 The calibration bracket is the one that pushed the model, not just the test:
 the first working version passed everything except greedy-by-Q, biased
@@ -227,10 +227,39 @@ and the evidence says the model is fine and the *policy* is what pays:
   line is best by a hair rather than by a mile.
 
 So: not a defect to chase, and not a bucket that quadrature would fix. If a
-future change pushes this past 0.75, re-run the two checks above (live MC
-against `Q`, and the per-hole table) before touching the number again — a
+future change pushes this past the bracket, re-run the two checks above (live
+MC against `Q`, and the per-hole table) before touching the number again — a
 bracket that moves because the *model* drifted is a different and much worse
 finding than one that moves because the library gained a hard hole.
+
+The bracket moved 0.75 → 0.80 the second time, when **Whistling Straits gained
+real geometry**. Both checks were run first and both cleared the model — but
+the interesting part is *why* it moved, which was neither of the two cases
+named above:
+
+- No Whistling Straits hole is an outlier. Its worst, `whistling-straits:5`,
+  sits at 0.392 → 0.267, well behind `tpc-sawgrass:11` (0.518), `:10` (0.511)
+  and `pebble-beach:18` (0.457). Per-course it lands at **+0.179**, the
+  third-*lowest* of the calibration's ten courses.
+- The continuation math is exact on it: live MC vs predicted `Q` agrees to
+  ≤0.021 on holes 1, 9 and 17. Hole 5 (par 5) shows 0.119, but the *shipped*
+  `harbour-town:5` shows 0.135 on the same check — so that gap is the par-5
+  rationing artifact the library already carries, not something the import
+  introduced.
+- The real cause: the **procedural** course was the outlier. It scored
+  **−0.121**, because invented geometry (a generic dogleg-and-sand layout with
+  no 7790-yard teeth) systematically flattered the greedy policy and dragged
+  the overall mean *down*. Real geometry simply removed that discount. The
+  +0.300 swing on a tenth of the rounds is the entire +0.030 move
+  (0.7347 → 0.7646).
+
+The lesson for next time: importing a course in the calibration's first ten
+(`COURSES.slice(0, 10)`, the set `practiceSeed` draws from) can push this
+bracket up **without anything being wrong**, because the baseline it replaces
+is not neutral — procedural geometry is systematically easier for a greedy
+policy to exploit than the real thing. Expect another nudge as the remaining
+procedural courses in that window are imported, and check the per-course table
+for a negative-to-positive swing before assuming drift.
 
 ## 7. Voice rules
 

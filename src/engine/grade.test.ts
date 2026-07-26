@@ -404,11 +404,19 @@ describe('gradeRound: calibration (Monte Carlo)', () => {
     const meanLoss = sumLoss / shotCount
     // eslint-disable-next-line no-console
     console.log('[grade calibration] greedy-by-Q:', JSON.stringify({ meanDiff, meanLoss, shotCount }))
-    // 0.75, not 0.7, since Cypress 16 became a bail-out par 3 — the model was
-    // verified exact there (live MC matches Q to ≤0.003) and the cost is the
-    // documented budget-rationing, not drift. See docs/GRADING.md §6 before
-    // moving this again.
-    expect(Math.abs(meanDiff)).toBeLessThan(0.75)
+    // 0.80, not 0.75, since Whistling Straits gained real geometry. Both §6
+    // checks were run first and both clear the model: no Whistling hole is an
+    // outlier (worst is :5 at 0.267, behind tpc-sawgrass:11's 0.518), and live
+    // MC matches Q to ≤0.021 on 1/9/17 — :5's 0.119 is the par-5 rationing
+    // artifact the shipped harbour-town:5 already shows *larger* (0.135).
+    // The move is not "the library gained a hard hole" but the opposite: the
+    // PROCEDURAL course was the outlier, scoring -0.121 because its invented
+    // geometry flattered the greedy policy. Real geometry puts it at +0.179 —
+    // unremarkable, third-lowest of the ten — and that +0.300 on a tenth of
+    // the rounds is the entire +0.030 move (0.7347 → 0.7646). Expect this to
+    // happen again as more of the calibration's first ten courses are
+    // imported. See docs/GRADING.md §6 before moving this again.
+    expect(Math.abs(meanDiff)).toBeLessThan(0.8)
     expect(meanLoss).toBeLessThan(0.1)
   }, 30000)
 

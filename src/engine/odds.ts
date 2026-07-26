@@ -95,6 +95,11 @@ const KIND_SEVERITY: Record<HazardZone['kind'], number> = {
 /** How much a choice flirts with hazards. Safe actively aims away. */
 const CHALLENGE: Record<Choice, number> = { safe: 0.3, normal: 1.0, aggressive: 1.55 }
 
+/** The shortest advance that still counts as a lay-up rather than a nudge.
+ * Gates the safe lay-up's stay-short-of-the-crossing rule below: a crossing so
+ * close that stopping behind it would not clear this is carried instead. */
+const MIN_LAYUP_ADVANCE = 40
+
 /**
  * Deep rough / gorse / a ravine in an APPROACH's miss window.
  *
@@ -201,12 +206,31 @@ export function longOdds(
     } else {
       const target = layout.length - (choice === 'safe' ? 100 : 78)
       window = [target - (choice === 'safe' ? 14 : 20), target + (choice === 'safe' ? 14 : 20)]
-      // Safe layups automatically stay short of cross hazards in the layup zone.
+      // Safe layups automatically stay short of cross hazards in the layup
+      // zone — but only where laying up short of one is a shot worth playing.
+      //
+      // This used to pull the window behind ANY qualifying crossing without
+      // checking the result still went forward, so a hazard sitting just ahead
+      // of the ball collapsed the lay-up into a nudge — 13 yd on
+      // whistling-straits:2 (cross sand 34 yd ahead, leaving 321 to the pin
+      // while `normal` advanced 256) and an outright -5 yd on
+      // harbour-town:15. It also reassigned `window` mid-scan, so the `reach`
+      // bound shrank as it went and the loop silently latched onto the NEAREST
+      // qualifying crossing rather than the furthest.
+      //
+      // A crossing that close is one you carry, not one you lay up behind. So
+      // scan the crossings in order and stop short of the first that still
+      // leaves a real advance; nearer ones are carried, and if none qualify
+      // the default lay-up target stands.
       if (choice === 'safe') {
-        for (const z of layout.zones) {
-          if (z.side === 'cross' && z.to > ball.pos + 40 && z.from < window[1] + 10 && z.to < layout.length - 40) {
-            window = [z.from - 32, z.from - 10]
-          }
+        const reach = window[1] + 10
+        for (const z of [...layout.zones].sort((a, b) => a.from - b.from)) {
+          if (z.side !== 'cross' || z.to <= ball.pos + 40) continue
+          if (z.from >= reach || z.to >= layout.length - 40) continue
+          const short: [number, number] = [z.from - 32, z.from - 10]
+          if ((short[0] + short[1]) / 2 < ball.pos + MIN_LAYUP_ADVANCE) continue
+          window = short
+          break
         }
       }
     }

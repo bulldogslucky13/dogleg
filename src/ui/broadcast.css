@@ -618,6 +618,25 @@
   color: var(--text-on-block);
 }
 
+/* A round's to-par. The paper theme paints an under-par score in a dark green
+   (#2e6329) that all but vanishes on turf — which is why beating par read as
+   the quietest thing on the page. On dark it takes the bright fairway green
+   instead, and a tint behind it, so the good rounds are what catches the eye. */
+.screen.rounds .round-score {
+  font-family: var(--font-display);
+  font-variation-settings: 'wdth' var(--wdth-score);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-mid);
+}
+
+.screen.rounds .round-score.good {
+  color: var(--success);
+  background: rgba(124, 195, 110, 0.14);
+  border-radius: var(--r-pill);
+  padding: 2px 8px;
+}
+
 .screen.rounds .stats-headline b {
   font-family: var(--font-display);
   font-variation-settings: 'wdth' var(--wdth-score);

@@ -2401,31 +2401,57 @@ button {
   font-weight: 800;
 }
 
-/* Under par gets the ring golfers actually draw round a birdie on a card —
-   the same mark the in-round strip uses (○ under · □ over). Colour alone was
-   doing all the work and disappearing into the sheet; a drawn mark reads at a
-   glance and survives being printed, screenshotted or colour-blind. */
-.sc-row.under .sc-strokes {
-  color: #1c5620;
-  font-weight: 800;
+/* Scorekeeping marks, drawn the way a golfer marks a card: ○ under par, □
+   bogey, double box for a double, triple box for a triple. Drawn rather than
+   only coloured, so they read at a glance and survive printing, screenshots
+   and colour-blindness.
+   EVERY row is a fixed height regardless of its mark. Marks used to grow their
+   row, and because the two nines birdie on different holes the columns drifted
+   out of step — 1 no longer level with 10. The nested boxes are box-shadows
+   for the same reason: extra rings cost no layout. */
+.sc-nine .sc-row:not(.sc-head) {
+  min-height: 34px;
+}
+
+.sc-row.under .sc-strokes,
+.sc-row.over .sc-strokes,
+.sc-row.over2 .sc-strokes,
+.sc-row.over3 .sc-strokes {
   justify-self: center;
   display: inline-grid;
   place-items: center;
-  min-width: 1.75em;
-  height: 1.75em;
-  border: 2px solid currentColor;
-  border-radius: 50%;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 3px;
+  font-size: 0.78rem;
+  font-weight: 800;
   line-height: 1;
+  border: 2px solid currentColor;
 }
 
-.sc-row.over .sc-strokes {
-  color: #9a6a12;
-  font-weight: 700;
+.sc-row.under .sc-strokes {
+  color: #1c5620;
+  border-radius: 50%;
+}
+
+/* bogey or worse runs red, and gains a box per stroke dropped */
+.sc-row.over .sc-strokes,
+.sc-row.over2 .sc-strokes,
+.sc-row.over3 .sc-strokes {
+  color: #b3271b;
+  border-radius: 2px;
 }
 
 .sc-row.over2 .sc-strokes {
-  color: var(--bad);
-  font-weight: 800;
+  box-shadow: 0 0 0 1.5px var(--paper), 0 0 0 3px currentColor;
+}
+
+.sc-row.over3 .sc-strokes {
+  box-shadow:
+    0 0 0 1.5px var(--paper),
+    0 0 0 3px currentColor,
+    0 0 0 4.5px var(--paper),
+    0 0 0 6px currentColor;
 }
 
 .sc-row.moment {

@@ -23,11 +23,15 @@ export function RoundScorecard(props: { round: LoggedRound; onReplay?: () => voi
   // be rebuilt from result + par); older result-only rounds fall back.
   const strokesAt = (hole: number, r: HoleResult) => round.strokesByHole?.[hole] ?? holeStrokes(r, pars[hole])
 
+  // Scorekeeping marks, as a golfer would draw them: ○ under par, □ bogey,
+  // double box for a double, triple box for a triple. Double and triple used
+  // to share one class, so they read identically on the card — they don't now.
   const rowClass = (r: HoleResult, strokes: number) => {
     if (strokes === 1 || r === 'albatross') return 'sc-row moment'
     if (r === 'eagle' || r === 'birdie') return 'sc-row under'
     if (r === 'bogey') return 'sc-row over'
-    if (r === 'double' || r === 'triple') return 'sc-row over2'
+    if (r === 'double') return 'sc-row over2'
+    if (r === 'triple') return 'sc-row over3'
     return 'sc-row'
   }
 

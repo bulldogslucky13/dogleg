@@ -81,10 +81,17 @@
   --logo-cup: var(--turf-950);
   --logo-cup-rim: #2a5f33;
 
-  /* Score semantics (broadcast convention: under par runs RED) */
-  --score-under: var(--flag-400);
+  /* Score semantics. The style tile proposed the TV convention (under par runs
+     red), but the scorecard settled it the other way: it marks under par with a
+     green circle and bogey-or-worse with a red box, which is how a golfer marks
+     a paper card. Red-for-good would then collide head-on with red-for-bogey a
+     screen away, so these tokens follow the card, not the telecast: green reads
+     good, red reads bad. Note --score-over is deliberately NOT applied to round
+     TOTALS — a red +4 on your own round rubs it in; over-par totals stay muted
+     and red is kept for per-hole marks. */
+  --score-under: var(--fairway-300);
   --score-even: var(--sand-100);
-  --score-over: rgba(248, 243, 228, 0.6);
+  --score-over: var(--flag-400);
   --record-gold: var(--trophy-400);
   --success: var(--fairway-300);
 

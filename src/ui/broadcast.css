@@ -613,9 +613,20 @@
   color: var(--text-low);
 }
 
+/* The two badges are ranked by how much gold they're allowed to wear: a
+   personal best gets a gold EDGE (your own wall), a course record gets the
+   whole bubble filled (everybody's wall). Gold is the theme's records-only
+   signal, so this reads as a promotion rather than two unrelated colours. */
+.screen.rounds .round-badge.pr {
+  background: transparent;
+  border: 1.5px solid var(--trophy-400);
+  color: var(--trophy-300);
+}
+
 .screen.rounds .round-badge.cr {
   background: var(--trophy-400);
-  color: var(--text-on-block);
+  border: 1.5px solid var(--trophy-400);
+  color: var(--turf-900);
 }
 
 /* A round's to-par. The paper theme paints an under-par score in a dark green
@@ -630,11 +641,16 @@
   color: var(--text-mid);
 }
 
+/* Under par is the number people came to see, and green text on a green card
+   was legible (6.7:1) but tonally invisible — it read as more background. So it
+   gets COLOUR-BLOCKED instead: solid fairway green, dark ink on top. Same trick
+   as the lower-third slabs, and it pops without going red, which would collide
+   with the scorecard's red bogey boxes. */
 .screen.rounds .round-score.good {
-  color: var(--success);
-  background: rgba(124, 195, 110, 0.14);
+  color: var(--turf-900);
+  background: var(--score-under);
   border-radius: var(--r-pill);
-  padding: 2px 8px;
+  padding: 2px 9px;
 }
 
 .screen.rounds .stats-headline b {

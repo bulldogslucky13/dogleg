@@ -882,6 +882,25 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
     expect(screen.getByText(CHARACTERS[1].name)).toBeTruthy()
   })
 
+  it('the score chip opens the full round card; modern carries no inline strip, classic still does', () => {
+    render(<App />)
+    fireEvent.click(screen.getByText('Tee off'))
+    fireEvent.click(screen.getByText(CHARACTERS[0].name))
+    // modern layout: the always-on strip is gone (its room went to the map)
+    expect(document.querySelector('.scorecard')).toBeNull()
+    // the header score chip is the way in — full 18 in a sheet
+    fireEvent.click(screen.getByRole('button', { name: 'See your full round card' }))
+    expect(screen.getByText(/Round card/)).toBeTruthy()
+    expect(document.querySelector('.roundcard-sheet .classic-scorecard')).toBeTruthy()
+    // all 18 hole cells render (unplayed cells show their hole numbers)
+    expect(document.querySelectorAll('.roundcard-sheet .csc-cell').length).toBe(18)
+    fireEvent.click(screen.getByText('Back to the hole'))
+    expect(document.querySelector('.roundcard-sheet')).toBeNull()
+    // classic view keeps its inline card (the toggle shows the CURRENT view)
+    fireEvent.click(screen.getByText(/Modern view/))
+    expect(document.querySelector('.panel .classic-scorecard')).toBeTruthy()
+  })
+
   it('re-opening "See today\'s card" after the round left memory renders without crashing', async () => {
     // played today (history entry exists) but the full round is no longer in
     // the single round slot — the exact state that used to blank the whole

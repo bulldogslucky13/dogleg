@@ -371,12 +371,29 @@ button {
   align-self: stretch;
   min-height: 0;
   max-height: calc(100dvh - max(10px, env(safe-area-inset-top)) - max(18px, env(safe-area-inset-bottom)));
+  /* Rescue hatch for the CLASSIC layout on short phones: its stacked choice
+     cards + inline round card can exceed the viewport even with the map at
+     its 140px floor, and with overflow visible the card's tail simply ran off
+     the bottom of the screen. auto = no scrollbar when everything fits (the
+     modern layout always does — its map flexes), a scroll instead of clipped
+     UI when it doesn't. */
+  overflow-y: auto;
 }
 
+/* grid, not space-between: "‹ Teebox" and "⇄ Modern view" are different
+   widths, so flex centring pushed the character chip visibly off-centre */
 .top-row {
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
   align-items: center;
+}
+
+.top-row > :first-child {
+  justify-self: start;
+}
+
+.top-row > :last-child {
+  justify-self: end;
 }
 
 .home-link {
@@ -714,6 +731,17 @@ button {
      internally instead of pushing the map and choices off-screen */
   min-height: 0;
   overflow-y: auto;
+}
+
+/* Classic is taller than short phones (three stacked choice cards + the
+   inline round card), and the internal panel scroll CLIPPED the card's tail
+   with no visible affordance — it read as UI running off the screen. In
+   classic the panel keeps its full height and the screen itself scrolls
+   (.screen.play is overflow-y auto); modern keeps the internal-scroll
+   behaviour, which its flexing map means it almost never needs. */
+.panel.classic-flow {
+  min-height: max-content;
+  overflow-y: visible;
 }
 
 .stage-label {
@@ -1826,7 +1854,8 @@ button {
 .ghost-chip-row {
   display: flex;
   flex-wrap: wrap;
-  justify-content: flex-end;
+  /* centred: right-aligned chips left a dead margin down the left side */
+  justify-content: center;
   gap: 5px;
   margin-top: -6px;
 }

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import type { Choice, CourseSpec, HoleScore, OddsSummary, Stage } from '../engine/types'
 import type { HoleInPlay } from '../engine/resolve'
 import { LOOK_LABEL, madePuttLook, oddsFor, pinChip, summarize } from '../engine/resolve'
@@ -472,56 +473,64 @@ export function OddsRecap(props: { score: HoleScore; par: number; bailout?: bool
 // Scorecard
 // ---------------------------------------------------------------------------
 
-export function Scorecard(props: { course: CourseSpec; scores: (HoleScore | null)[]; currentHole: number }) {
-  const { course, scores, currentHole } = props
-  const offset = currentHole < 9 ? 0 : 9
-  const nine = course.holes.slice(offset, offset + 9)
-  const left = course.holes.length - scores.filter(Boolean).length
-  const row = (label: string, vals: (string | number)[], scoreRow = false) => (
-    <div className={`sc-line${scoreRow ? ' sc-scores' : ''}`}>
-      <span className="sc-label">{label}</span>
-      {vals.map((v, i) => (
-        <span key={i} className={offset + i === currentHole ? 'current' : ''}>
-          {v}
-        </span>
-      ))}
-    </div>
-  )
-  // single-row strip shown on small screens instead of the full table, so the
-  // vertical space goes to the course map. Standard golf marks: ○ under par,
-  // □ over, double box for double bogey or worse — par stays unmarked.
-  const stripCell = (i: number) => {
-    const s = scores[offset + i]
-    let cls = 'scs'
-    if (offset + i === currentHole) cls += ' current'
-    if (s) {
-      if (s.result === 'albatross' || s.result === 'eagle' || s.result === 'birdie') cls += ' under'
-      else if (s.result === 'bogey') cls += ' over'
-      else if (s.result !== 'par') cls += ' over2'
-    } else cls += ' todo'
-    return (
-      <span key={i} className={cls}>
-        {s ? s.strokes : nine[i].number}
-      </span>
-    )
-  }
-  return (
-    <div className="scorecard">
-      <div className="sc-head">
-        <span>Round card{course.holes.length > 9 ? ` · ${offset === 0 ? 'Front nine' : 'Back nine'}` : ''}</span>
-        <b>{left === 0 ? 'Round complete' : `${left} hole${left === 1 ? '' : 's'} left`}</b>
+/**
+ * The full-18 round card, opened by tapping the score chip in the play
+ * header. Replaces the always-on strip the modern layout used to carry —
+ * that room went to the map. Renders the same ClassicScorecard the classic
+ * view keeps inline, so the two views can't disagree about the card.
+ * Portalled to body like every dialog opened from a themed screen.
+ */
+export function RoundCardSheet(props: {
+  course: CourseSpec
+  scores: (HoleScore | null)[]
+  currentHole: number
+  toPar: number
+  onClose: () => void
+}) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') props.onClose()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [props])
+
+  const played = props.scores.filter(Boolean).length
+  const left = props.course.holes.length - played
+  return createPortal(
+    <div
+      className="tut-backdrop"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Your round card"
+      onClick={props.onClose}
+    >
+      <div className="tut-card roundcard-sheet" onClick={(e) => e.stopPropagation()}>
+        <button className="tut-skip" onClick={props.onClose} aria-label="Close">
+          Close
+        </button>
+        <div className="kicker">Round card</div>
+        <h2 className="tut-title">
+          {toParLabel(props.toPar)} to par · {left === 0 ? 'round complete' : `${left} hole${left === 1 ? '' : 's'} left`}
+        </h2>
+        <ClassicScorecard course={props.course} scores={props.scores} currentHole={props.currentHole} />
+        <div className="tut-nav">
+          <span />
+          <button className="cta" onClick={props.onClose}>
+            Back to the hole
+          </button>
+        </div>
       </div>
-      {row('Hole', nine.map((h) => h.number))}
-      {row('Yds', nine.map((h) => h.yards))}
-      {row('Par', nine.map((h) => h.par))}
-      {row('SI', nine.map((h) => h.strokeIndex))}
-      {row('Score', nine.map((_h, i) => (scores[offset + i] ? scores[offset + i]!.strokes : '–')), true)}
-      <div className="sc-strip">{nine.map((_h, i) => stripCell(i))}</div>
-    </div>
+    </div>,
+    document.body,
   )
 }
 
-/** Classic scorecard: 18 squares, ○ under par · □ over par, like the original. */
+/* The modern in-round Scorecard strip lived here. It was removed when the
+   full round card moved behind the header score chip (RoundCardSheet) and
+   its vertical room went to the map. Its CSS (.scorecard/.sc-line/.scs)
+   still styles nothing and can be swept in a follow-up. */
+
 export function ClassicScorecard(props: { course: CourseSpec; scores: (HoleScore | null)[]; currentHole: number }) {
   const { course, scores, currentHole } = props
   const cell = (i: number) => {

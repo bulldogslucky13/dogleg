@@ -37,7 +37,7 @@ import { ensureIdentity, loadIdentity, loadPlayer } from './lib/leaderboard'
 import { CharacterAvatar } from './ui/Avatars'
 import { GreenView, HoleMap, useMapSize } from './ui/HoleMap'
 import { SideMap } from './ui/SideMap'
-import { CaddyThoughts, ChoiceCards, ClassicScorecard, HazardChips, HoleComplete, Scorecard, StatusBanner, TierBanner } from './ui/panels'
+import { CaddyThoughts, ChoiceCards, ClassicScorecard, HazardChips, HoleComplete, RoundCardSheet, StatusBanner, TierBanner } from './ui/panels'
 import { prefersReducedMotion } from './ui/motion'
 import type { MomentKind } from './engine/fortune'
 import { MomentSplash } from './ui/MomentSplash'
@@ -129,6 +129,8 @@ export default function App() {
   const animTimer = useRef<number | null>(null)
   const splashTimer = useRef<number | null>(null)
   const [mapRef, mapSize] = useMapSize()
+  /** the full-18 round card, opened by tapping the header score chip */
+  const [showCard, setShowCard] = useState(false)
 
   useEffect(() => {
     saveRound(round)
@@ -684,10 +686,27 @@ export default function App() {
           </div>
         </div>
         <div className="hole-right">
-          <div className={`topar ${toPar < 0 ? 'good' : toPar > 0 ? 'bad' : ''}`}>{toParLabel(toPar)} to par</div>
+          {/* the score chip IS the round card now — tap it for the full 18.
+              The modern layout no longer carries the always-on strip. */}
+          <button
+            className={`topar ${toPar < 0 ? 'good' : toPar > 0 ? 'bad' : ''}`}
+            onClick={() => setShowCard(true)}
+            aria-label="See your full round card"
+          >
+            {toParLabel(toPar)} to par
+          </button>
           <div className="yards">{hole.layout.length} yards</div>
         </div>
       </header>
+      {showCard && (
+        <RoundCardSheet
+          course={course}
+          scores={round.scores}
+          currentHole={round.currentHole}
+          toPar={toPar}
+          onClose={() => setShowCard(false)}
+        />
+      )}
       {/* Ghost/record chips get their own row rather than living inside
           .hole-right: that block refuses to shrink (flex-shrink: 0), so a
           230px chip inside it squeezed the par/course text to ~11px — "Par 4 ·
@@ -776,7 +795,7 @@ export default function App() {
         )}
       </div>
 
-      <div className="panel">
+      <div className={`panel${classic ? ' classic-flow' : ''}`}>
         {holeDone ? (
           <HoleComplete
             score={hole.score!}
@@ -801,11 +820,9 @@ export default function App() {
             />
           </>
         )}
-        {classic ? (
-          <ClassicScorecard course={course} scores={round.scores} currentHole={round.currentHole} />
-        ) : (
-          <Scorecard course={course} scores={round.scores} currentHole={round.currentHole} />
-        )}
+        {/* classic keeps its inline card; modern gave the strip's room to the
+            map — the full card lives behind the score chip instead */}
+        {classic && <ClassicScorecard course={course} scores={round.scores} currentHole={round.currentHole} />}
       </div>
     </div>
   )

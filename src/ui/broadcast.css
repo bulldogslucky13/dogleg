@@ -820,6 +820,16 @@
   color: var(--text-mid);
 }
 
+/* ------------------------------------------- the in-round round card sheet */
+
+/* The card itself stays paper (it IS the scorecard) — it gets a paper slab to
+   sit on so its ink stays readable inside the dark sheet. */
+.tut-card.roundcard-sheet .classic-scorecard {
+  background: var(--sand-100);
+  border-radius: var(--r-bug);
+  padding: 12px 12px 10px;
+}
+
 /* --------------------------- paper game screens: brand accents ONLY */
 
 /* The pick and play screens deliberately KEEP the light paper look — they are

@@ -571,6 +571,7 @@
 /* dark-card version of the sync banner (it is cream on the paper theme) */
 .screen.rounds .sync-cta,
 .screen.home .sync-cta,
+.screen.result .sync-cta,
 .tut-card .sync-cta {
   background: var(--bg-card);
   border-color: var(--edge-strong);
@@ -579,6 +580,7 @@
 
 .screen.rounds .sync-cta em,
 .screen.home .sync-cta em,
+.screen.result .sync-cta em,
 .tut-card .sync-cta em {
   color: var(--tracer-400);
 }
@@ -1045,6 +1047,7 @@
 
 .screen.result .board-block .name-form,
 .screen.result .board-block .fine,
+.screen.result .board-block .sync-cta,
 .screen.result .board-block .cta {
   margin: 6px 14px 10px;
 }

@@ -245,6 +245,7 @@ export function ScoreBoard(props: { round: RoundState }) {
               <SyncCta
                 copy={`That round beats ${standing.player_name}'s course record — claim a clubhouse name to take it and defend it.`}
                 trigger="record-claim"
+                action="Claim"
                 onTap={() => nameInputRef.current?.focus()}
               />
             ) : (

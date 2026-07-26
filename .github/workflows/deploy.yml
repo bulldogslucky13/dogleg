@@ -74,6 +74,28 @@ jobs:
               echo "::error::SUPABASE_ACCESS_TOKEN is not a personal access token (expected to start with sbp_). Regenerate at https://supabase.com/dashboard/account/tokens and check for stray whitespace."
               exit 1 ;;
           esac
+      # Schema rides the same automation as the functions, and for the same
+      # reason: a manual step at merge time is exactly what gets missed (the
+      # season_records delta from #53 sat unapplied for two days). The file is
+      # applied in full on every deploy — safe because every statement in it is
+      # idempotent (guarded creates, or-replace, drop-then-recreate policies);
+      # keep it that way. Runs BEFORE the function deploy so a function never
+      # ships ahead of a table it writes to. Uses the management API's query
+      # endpoint (the CLI has no non-interactive way to run a SQL file with
+      # just an access token); the User-Agent header matters — the API's edge
+      # rejects unrecognized agents with a 403.
+      - name: Apply database schema
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          PROJECT_REF: ${{ vars.SUPABASE_PROJECT_REF }}
+        run: |
+          jq -n --rawfile sql supabase/schema.sql '{query: $sql}' \
+            | curl -sS --fail-with-body -X POST \
+                "https://api.supabase.com/v1/projects/$PROJECT_REF/database/query" \
+                -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+                -H "Content-Type: application/json" \
+                -H "User-Agent: supabase-cli/2.30.4" \
+                --data @-
       - uses: supabase/setup-cli@v1
         with:
           version: latest

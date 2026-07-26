@@ -1,10 +1,16 @@
 # Supabase project config. Only the pieces this repo actually depends on are
 # declared here — everything else takes CLI defaults.
 #
-# Note that the Auth settings (site_url, redirect allow-list) are managed in
-# the dashboard, not here: this file governs local `supabase start/serve` and
+# Note that the Auth settings (site_url, redirect allow-list, SMTP) are managed
+# in the dashboard, not here: this file governs local `supabase start/serve` and
 # function deploys, and pushing auth config from it would need an explicit
 # `supabase config push`. See CLAUDE.md.
+#
+# The one exception is the Auth email templates, which are no longer
+# dashboard-only: they are generated into supabase/templates/ from
+# supabase/functions/_shared/auth-emails.ts and pushed by
+# `pnpm push:email-templates`. Edit them there, not in the dashboard, or the
+# next push will overwrite you.
 
 project_id = "cphmpypnvopoylwxsrlk"
 

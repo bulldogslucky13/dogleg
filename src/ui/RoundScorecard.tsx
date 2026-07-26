@@ -1,3 +1,4 @@
+import { createPortal } from 'react-dom'
 import { characterById } from '../engine/characters'
 import { courseBySlug } from '../engine/courses'
 import { toParLabel } from '../engine/daily'
@@ -60,7 +61,13 @@ export function RoundScorecard(props: { round: LoggedRound; onReplay?: () => voi
     </div>
   )
 
-  return (
+  // Portalled to the body. This sheet is PAPER, and it opens from the
+  // Clubhouse, which is dark — nested inside it the sheet inherited that
+  // screen's cream ink onto its own cream stock and every unstyled thing on it
+  // (hole numbers, pars, Out/In, the course name, the replay button) went
+  // invisible. Out here it inherits the document's dark ink again, which is
+  // what a paper scorecard wants, and no screen's theme can reach into it.
+  return createPortal(
     <div className="scorecard-backdrop" role="dialog" aria-label="Scorecard" onClick={props.onClose}>
       <div className="scorecard-sheet" onClick={(e) => e.stopPropagation()}>
         <div className="kicker">
@@ -93,7 +100,8 @@ export function RoundScorecard(props: { round: LoggedRound; onReplay?: () => voi
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }
 

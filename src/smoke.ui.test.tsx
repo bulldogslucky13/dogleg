@@ -382,6 +382,37 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
     expect(screen.queryByText(/Season record open/)).toBeNull()
   })
 
+  it('the Clubhouse scorecard opens on paper, outside the dark screen', async () => {
+    const { newRound, applyChoice, advanceHole, archiveRound } = await import('./state/store')
+    const { logRound } = await import('./state/stats')
+    const { practiceSetup } = await import('./engine/daily')
+    let s = newRound(practiceSetup('pebble-beach', 'smokescorecard'), 'practice', 'dart')
+    let guard = 0
+    while (!s.complete && guard++ < 500) {
+      if (s.hole?.stage === 'done') {
+        s = advanceHole(s)
+        continue
+      }
+      const next = applyChoice(s, 'normal')
+      s = next === s ? applyChoice(s, 'safe') : next
+    }
+    archiveRound(s)
+    logRound(s)
+
+    render(<App />)
+    fireEvent.click(screen.getByText(/🏆 Clubhouse/))
+    fireEvent.click(screen.getAllByText('Scorecard')[0])
+    const sheet = screen.getByRole('dialog', { name: 'Scorecard' })
+    // The sheet is paper. Nested in the (dark) Clubhouse it inherited cream ink
+    // onto cream stock and everything unstyled on it vanished, so it must live
+    // outside that screen — the same rule the Play Rating dialog follows.
+    expect(sheet.parentElement).toBe(document.body)
+    expect(sheet.closest('.screen.rounds')).toBeNull()
+    // and the card's own furniture is present, not just the coloured scores
+    expect(sheet.querySelector('.sc-row.sc-foot')).toBeTruthy()
+    expect(screen.getByText('Out')).toBeTruthy()
+  })
+
   it('the Clubhouse has a Seasons tab with the in-progress season and archive framing', async () => {
     const { newRound, applyChoice, advanceHole, archiveRound } = await import('./state/store')
     const { logRound } = await import('./state/stats')

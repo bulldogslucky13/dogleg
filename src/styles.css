@@ -2352,7 +2352,11 @@ button {
 }
 
 .sc-total.good {
-  color: #2e6329;
+  color: #1c5620;
+  font-weight: 800;
+  background: rgba(79, 154, 82, 0.16);
+  border-radius: 999px;
+  padding: 3px 10px;
 }
 
 .sc-nines {
@@ -2397,9 +2401,21 @@ button {
   font-weight: 800;
 }
 
+/* Under par gets the ring golfers actually draw round a birdie on a card —
+   the same mark the in-round strip uses (○ under · □ over). Colour alone was
+   doing all the work and disappearing into the sheet; a drawn mark reads at a
+   glance and survives being printed, screenshotted or colour-blind. */
 .sc-row.under .sc-strokes {
-  color: #2e6329;
+  color: #1c5620;
   font-weight: 800;
+  justify-self: center;
+  display: inline-grid;
+  place-items: center;
+  min-width: 1.75em;
+  height: 1.75em;
+  border: 2px solid currentColor;
+  border-radius: 50%;
+  line-height: 1;
 }
 
 .sc-row.over .sc-strokes {

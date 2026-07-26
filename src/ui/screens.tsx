@@ -12,6 +12,7 @@ import { fetchCourseRecords, fetchSeasonRecords, loadPlayer, type CourseRecord }
 import { seasonCountdown, seasonForDate } from '../engine/season'
 import { FortuneInfo } from './Tutorial'
 import { ChangeLog } from './ChangeLog'
+import { Wordmark } from './Wordmark'
 import { dismissSteals, pendingSteals, syncLedger, type StolenRecord } from '../lib/records'
 import { loadGhost, type Ghost } from '../state/ghost'
 import { currentHandicap, formatHandicap } from '../state/stats'
@@ -122,8 +123,8 @@ export function HomeScreen(props: {
         <div className="masthead-top">
           <div className="kicker">Daily golf challenge · No. {setup.puzzleNumber}</div>
         </div>
-        <h1>
-          Dog<em>leg</em>
+        <h1 className="wordmark">
+          <Wordmark />
         </h1>
         <p className="tagline">18 holes. Play the odds. Beat the course.</p>
       </header>

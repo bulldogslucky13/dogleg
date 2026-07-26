@@ -133,16 +133,19 @@
   font-size: 0.64rem;
 }
 
-.screen.home .masthead h1 {
-  font-family: var(--font-display);
-  font-variation-settings: 'wdth' var(--wdth-score);
-  font-weight: 800;
-  letter-spacing: 0;
+/* the wordmark: an SVG lockup now, so the h1 just sizes it. Ink is
+   currentColor, so it picks up the screen's text colour; the pennant and cup
+   keep the artwork's own red and green. */
+.screen.home .masthead h1.wordmark {
+  margin: 2px 0 0;
+  line-height: 0;
   color: var(--text-hi);
 }
 
-.screen.home .masthead h1 em {
-  color: var(--flag-400);
+.screen.home .masthead h1.wordmark svg {
+  display: block;
+  width: min(100%, 268px);
+  height: auto;
 }
 
 .screen.home .how-to-play {

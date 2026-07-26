@@ -117,7 +117,7 @@
   /* The signature cut: one clipped corner. EARNED, not decorative — it only
      appears on a course card once that course has been played, like a punch
      through a paper scorecard (Jackson's rule, 2026-07-25). */
-  --notch: 18px;
+  --notch: 24px;
   --clip-notch: polygon(var(--notch) 0, 100% 0, 100% 100%, 0 100%, 0 var(--notch));
   /* The signature lean: broadcast graphics drive forward */
   --lean: -6deg;

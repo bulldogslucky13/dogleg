@@ -197,7 +197,8 @@ export function HomeScreen(props: {
       <p className="cta-tease">Can you break par today?</p>
 
       {props.playedToday ? (
-        <button className="cta" onClick={props.onShowResult}>
+        // today's round is in the books — this CTA wears the earned notch too
+        <button className="cta notched" onClick={props.onShowResult}>
           See today's card · {toParLabel(props.playedToday.toPar)}
         </button>
       ) : props.activeRound?.mode === 'daily' ? (
@@ -567,8 +568,8 @@ function StreakNote() {
   // don't move the odds (anti-cheat), so the copy says so.
   return (
     <p className="fine streak-note">
-      The golf gods reward the faithful — post your daily cards under a clubhouse name, and the longer your streak,
-      the better your odds of striking a Fortune.
+      <em className="streak-note-head">The golf gods reward the faithful</em>
+      Dailies under a clubhouse name boost Fortune odds.
     </p>
   )
 }

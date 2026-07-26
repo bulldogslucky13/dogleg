@@ -91,24 +91,33 @@
   font-family: var(--font-ui);
   font-variation-settings: normal;
   font-weight: 600;
-  font-size: 0.74rem;
+  font-size: 0.68rem;
   letter-spacing: 0.02em;
   text-transform: none;
-  opacity: 0.75;
-  margin-top: 2px;
+  opacity: 0.7;
+  margin-top: 1px;
 }
 
 :is(.screen.home, .screen.rounds) .cta:active {
   filter: brightness(0.92);
 }
 
-/* secondary actions: hairline outline, no slab */
+/* the played daily wears the earned notch on its CTA too */
+:is(.screen.home, .screen.rounds) .cta.notched {
+  clip-path: var(--clip-notch);
+  border-radius: 0;
+}
+
+/* secondary actions: hairline outline, no slab — compact, they're wayfinding
+   rather than the headline act */
 :is(.screen.home, .screen.rounds) .cta.ghost {
   background: transparent;
   clip-path: none;
   border-radius: var(--r-bug);
   border: 1.5px solid var(--edge-strong);
   color: var(--text-hi);
+  padding: 9px 14px;
+  font-size: 0.86rem;
 }
 
 :is(.screen.home, .screen.rounds) :focus-visible {
@@ -235,7 +244,7 @@
 
 /* played courses get their corner punched, scorecard-style */
 .screen.home .course-row.notched {
-  clip-path: polygon(14px 0, 100% 0, 100% 100%, 0 100%, 0 14px);
+  clip-path: polygon(18px 0, 100% 0, 100% 100%, 0 100%, 0 18px);
   border-radius: 0;
 }
 
@@ -337,14 +346,41 @@
   padding: 2px 8px;
 }
 
+/* chips wrap rather than clip — nothing runs off-screen */
 .screen.home .forecast .chips {
-  flex-wrap: nowrap;
-  overflow-x: auto;
-  scrollbar-width: none;
+  flex-wrap: wrap;
 }
 
-.screen.home .forecast .chips::-webkit-scrollbar {
-  display: none;
+/* base for the note's headline wherever StreakNote renders (result screen
+   included, which otherwise keeps the paper look) */
+.streak-note .streak-note-head {
+  display: block;
+  font-style: normal;
+  font-weight: 700;
+}
+
+/* fortunes note: a gold callout that earns its spot — two lines, no whisper */
+.screen.home .streak-note {
+  font-style: normal;
+  text-align: left;
+  background: var(--bg-card);
+  border-left: var(--keyline-w) solid var(--trophy-400);
+  border-radius: 3px var(--r-bug) var(--r-bug) 3px;
+  padding: 8px 12px;
+  font-size: 0.74rem;
+  color: var(--text-mid);
+  margin-top: 0;
+}
+
+.screen.home .streak-note .streak-note-head {
+  display: block;
+  font-style: normal;
+  font-weight: 700;
+  font-size: 0.64rem;
+  letter-spacing: var(--track-kicker);
+  text-transform: uppercase;
+  color: var(--trophy-400);
+  margin-bottom: 2px;
 }
 
 /* -------------------------------------------------------------- Clubhouse */

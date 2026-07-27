@@ -551,7 +551,11 @@ async function main() {
   const CENTER_YD = 10 // |offset| within this counts as "on the line" → crossing
 
   // pre-project every hazard ring once, keep only rings near the corridor
-  type Ring = { kind: ZoneKind | 'green'; ring: Vec[]; id: number }
+  // Carry the element TYPE, not just the id: OSM way and relation ids are
+  // separate namespaces, so reporting a multipolygon hazard as way/<id> sends
+  // a reviewer to an unrelated object or a 404 — and `--profile` output is
+  // read as evidence during the freeze.
+  type Ring = { kind: ZoneKind | 'green'; ring: Vec[]; id: number; type: OsmElement['type'] }
   const rings: Ring[] = []
   for (const e of els) {
     if (e === holeWay) continue
@@ -570,7 +574,7 @@ async function main() {
         const al = toYards(along)
         if (al > -25 && al < length + 25) nearestEdge = Math.min(nearestEdge, toYards(Math.abs(lateral)))
       }
-      if (nearestEdge < 48) rings.push({ kind: k, ring, id: e.id })
+      if (nearestEdge < 48) rings.push({ kind: k, ring, id: e.id, type: e.type })
     }
   }
 
@@ -878,7 +882,7 @@ async function main() {
       const all = [...m.values()].flat()
       const nStraddle = alongs.filter((a) => straddles(m.get(a)!)).length
       console.log(
-        `  ${r.kind.padEnd(7)} way/${String(r.id).padEnd(11)} along ${String(alongs[0]).padStart(4)}-${String(alongs[alongs.length - 1]).padEnd(4)}` +
+        `  ${r.kind.padEnd(7)} ${`${r.type}/${r.id}`.padEnd(20)} along ${String(alongs[0]).padStart(4)}-${String(alongs[alongs.length - 1]).padEnd(4)}` +
           `  lateral ${String(Math.min(...all)).padStart(4)}..${String(Math.max(...all)).padEnd(4)}` +
           `  straddles the line at ${nStraddle} of ${alongs.length} samples`,
       )
@@ -907,7 +911,7 @@ async function main() {
       let best: { label: string; spans: number[]; } | null = null
       const sources: { label: string; hits: Map<number, number[]> }[] = hazardRings
         .filter((r) => r.kind === z.kind)
-        .map((r) => ({ label: `way/${r.id}`, hits: ringHits.get(r)! }))
+        .map((r) => ({ label: `${r.type}/${r.id}`, hits: ringHits.get(r)! }))
       if (z.kind === 'ocean' && oceanHits.size) sources.push({ label: 'coastline', hits: oceanHits })
       for (const s of sources) {
         const inSpan = [...s.hits.keys()].filter((a) => a >= z.from && a < z.to)

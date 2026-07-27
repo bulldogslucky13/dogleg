@@ -371,12 +371,29 @@ button {
   align-self: stretch;
   min-height: 0;
   max-height: calc(100dvh - max(10px, env(safe-area-inset-top)) - max(18px, env(safe-area-inset-bottom)));
+  /* Rescue hatch for the CLASSIC layout on short phones: its stacked choice
+     cards + inline round card can exceed the viewport even with the map at
+     its 140px floor, and with overflow visible the card's tail simply ran off
+     the bottom of the screen. auto = no scrollbar when everything fits (the
+     modern layout always does — its map flexes), a scroll instead of clipped
+     UI when it doesn't. */
+  overflow-y: auto;
 }
 
+/* grid, not space-between: "‹ Teebox" and "⇄ Modern view" are different
+   widths, so flex centring pushed the character chip visibly off-centre */
 .top-row {
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
   align-items: center;
+}
+
+.top-row > :first-child {
+  justify-self: start;
+}
+
+.top-row > :last-child {
+  justify-self: end;
 }
 
 .home-link {
@@ -448,13 +465,24 @@ button {
 }
 
 .topar {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   background: var(--cream-dim);
   border: 1px solid var(--line);
   border-radius: 999px;
   padding: 4px 11px;
   font-size: 0.8rem;
   font-weight: 800;
+}
+
+/* the expand arrows: the chip opens the full round card on tap. Same quiet
+   weight as the ⓘ info marks on the teebox chips. */
+.topar-expand {
+  width: 12px;
+  height: 12px;
+  flex: none;
+  opacity: 0.6;
 }
 
 .topar.good {
@@ -714,6 +742,17 @@ button {
      internally instead of pushing the map and choices off-screen */
   min-height: 0;
   overflow-y: auto;
+}
+
+/* Classic is taller than short phones (three stacked choice cards + the
+   inline round card), and the internal panel scroll CLIPPED the card's tail
+   with no visible affordance — it read as UI running off the screen. In
+   classic the panel keeps its full height and the screen itself scrolls
+   (.screen.play is overflow-y auto); modern keeps the internal-scroll
+   behaviour, which its flexing map means it almost never needs. */
+.panel.classic-flow {
+  min-height: max-content;
+  overflow-y: visible;
 }
 
 .stage-label {
@@ -1826,7 +1865,8 @@ button {
 .ghost-chip-row {
   display: flex;
   flex-wrap: wrap;
-  justify-content: flex-end;
+  /* centred: right-aligned chips left a dead margin down the left side */
+  justify-content: center;
   gap: 5px;
   margin-top: -6px;
 }
@@ -3520,6 +3560,30 @@ button {
   .screen.play .panel {
     grid-column: 2;
     grid-row: 3;
+  }
+
+  /* Ghost/record chips carry no placement of their own: rows 1-2 are taken
+     full-width by the header and row 3's two cells are pinned by the map and
+     panel, so auto-placement dropped them into an implicit row BELOW the play
+     area and into column 1 alone — a ghost round rendered its pace target
+     under the map at roughly half width. Pin them full-width above it.
+
+     The extra track is added only on rounds that HAVE a chip, because this
+     grid inherits .screen's 10px row-gap (the media query overrides
+     column-gap alone). An always-present empty track would still be charged
+     that gap and would push the map down on every ordinary round. */
+  .screen.play:has(.ghost-chip-row) {
+    grid-template-rows: auto auto auto minmax(0, 1fr);
+  }
+
+  .screen.play .ghost-chip-row {
+    grid-column: 1 / -1;
+    grid-row: 3;
+  }
+
+  .screen.play:has(.ghost-chip-row) .map-wrap,
+  .screen.play:has(.ghost-chip-row) .panel {
+    grid-row: 4;
   }
 }
 

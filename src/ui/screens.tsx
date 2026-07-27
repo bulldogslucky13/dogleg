@@ -753,7 +753,12 @@ export function ResultScreen(props: {
     }
   }
   return (
-    <div className="screen result">
+    // `daily` gates the earned notch: a signed daily is locked until tomorrow,
+    // a practice round can always be replayed — no notch for the replayable
+    <div className={`screen result${props.practice ? '' : ' daily'}`}>
+      {/* small mark up top: the hero score + board is the screenshot people
+          take, and the screenshot should carry the brand */}
+      <Wordmark className="result-wordmark" />
       <div className="kicker">
         {props.practice ? 'Practice round' : `Daily No. ${props.setup.puzzleNumber}`} · {props.setup.course.name}
       </div>
@@ -784,14 +789,19 @@ export function ResultScreen(props: {
           👻 Matched {ghostCloseNoun(props.ghostClose)} to the stroke — ties don't take it. One better.
         </p>
       )}
-      <div className="emoji-grid">
-        <div>{results.slice(0, 9).map((r, i) => (
-          <span key={i}>{RESULT_SQUARE[r]}</span>
-        ))}</div>
-        <div>{results.slice(9).map((r, i) => (
-          <span key={i}>{RESULT_SQUARE[r]}</span>
-        ))}</div>
-      </div>
+      {/* practice only: the square rows ARE the recap there. On the daily the
+          share card carries the same squares right above the board — showing
+          the block twice was one scorecard too many. */}
+      {props.practice && (
+        <div className="emoji-grid">
+          <div>{results.slice(0, 9).map((r, i) => (
+            <span key={i}>{RESULT_SQUARE[r]}</span>
+          ))}</div>
+          <div>{results.slice(9).map((r, i) => (
+            <span key={i}>{RESULT_SQUARE[r]}</span>
+          ))}</div>
+        </div>
+      )}
       {props.recap && (
         <div className="recap-tiles">
           {props.recap.best && (
@@ -840,7 +850,13 @@ export function ResultScreen(props: {
       )}
       {props.grade && (
         <div className="coach-panel">
-          <div className="kicker">The Swing Coach's Report</div>
+          <div className="coach-head">
+            <div className="kicker">The Swing Coach's Report</div>
+            {/* the difficulty pill, again — primarily for readers who are mad
+                about their score: tap it and see what the course does to a
+                competent golfer */}
+            <PlayRatingChip slug={props.setup.course.slug} />
+          </div>
           <p className="verdict">{gradeCopy(props.grade).headline}</p>
           <div className="recap-tiles coach-tiles">
             <div className="stat">
@@ -854,6 +870,23 @@ export function ResultScreen(props: {
           </div>
           <p className="fine coach-line">{gradeCopy(props.grade).decisionLine}</p>
           <p className="fine coach-line">{gradeCopy(props.grade).luckLine}</p>
+        </div>
+      )}
+      {/* the share card sits ABOVE the board: brag first, standings second */}
+      {!props.practice && (
+        <div className="share-block">
+          <div className="kicker">Your share card</div>
+          <pre className="share-preview">{text}</pre>
+          <div className="share-actions">
+            <button className="cta ghost" onClick={copy}>
+              {copied ? 'Copied ✓' : 'Copy'}
+            </button>
+            {canNativeShare && (
+              <button className="cta" onClick={share}>
+                Share
+              </button>
+            )}
+          </div>
         </div>
       )}
       {props.boardRound ? (
@@ -883,20 +916,6 @@ export function ResultScreen(props: {
           </div>
           <StreakNote />
         </>
-      )}
-      {!props.practice && (
-        <div className="share-block">
-          <div className="kicker">Your share card</div>
-          <pre className="share-preview">{text}</pre>
-          {canNativeShare && (
-            <button className="cta" onClick={share}>
-              Share your card
-            </button>
-          )}
-          <button className={`cta${canNativeShare ? ' ghost' : ''}`} onClick={copy}>
-            {copied ? 'Copied — paste it in the chat ✓' : 'Copy for the group chat'}
-          </button>
-        </div>
       )}
       {replayUrl && (
         <button

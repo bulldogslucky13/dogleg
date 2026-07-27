@@ -476,12 +476,17 @@ export function RoundsScreen(props: {
  * The account-sync nudge. Copy and trigger context are props so future
  * event-driven prompts (say, the moment a player becomes handicap-eligible)
  * reuse this component with different words — no rework, just a new call.
+ *
+ * `action` labels the affordance and defaults to the sync flow. Override it
+ * whenever onTap does NOT open account sync — the record-claim nudge points at
+ * the clubhouse-name field, and a button reading "Sync" there promises an email
+ * magic link it never sends. Claiming a record needs a name, not an account.
  */
-export function SyncCta(props: { copy: string; onTap: () => void; trigger: string }) {
+export function SyncCta(props: { copy: string; onTap: () => void; trigger: string; action?: string }) {
   return (
     <button className="sync-cta" data-trigger={props.trigger} onClick={props.onTap}>
       <b>{props.copy}</b>
-      <em>Sync ›</em>
+      <em>{props.action ?? 'Sync'} ›</em>
     </button>
   )
 }

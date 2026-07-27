@@ -5,17 +5,20 @@
 
      .screen.home        Teebox (main menu)
      .screen.rounds      Clubhouse (stats / records / seasons)
+     .screen.result      the wrap screen (daily and unlimited round ends)
      .tut-card           How to Play + season splash (rides the same card)
 
-   The in-round play screen (.screen.play), pick, result, and replay keep the
-   classic paper look untouched — this pass is menus/opening screens per the
-   re-skin scope. All values come from ui/theme.css tokens; tweak there.
+   The PLAY surfaces (.screen.play, pick, replay) keep the light paper look on
+   purpose — game-mechanic screens don't get repainted under players. The rule
+   of thumb: paper is where you play, broadcast is where you look at what you
+   played. All values come from ui/theme.css tokens; tweak there.
    ========================================================================= */
 
 /* ------------------------------------------------------------ shared base */
 
 .screen.home,
-.screen.rounds {
+.screen.rounds,
+.screen.result {
   background: linear-gradient(180deg, var(--turf-800) 0%, var(--turf-900) 60%);
   color: var(--text-hi);
   border: 1px solid var(--edge-hairline);
@@ -23,21 +26,21 @@
   font-family: var(--font-ui);
 }
 
-:is(.screen.home, .screen.rounds) .kicker {
+:is(.screen.home, .screen.rounds, .screen.result) .kicker {
   color: var(--text-low);
   letter-spacing: var(--track-kicker);
 }
 
-:is(.screen.home, .screen.rounds) .tagline {
+:is(.screen.home, .screen.rounds, .screen.result) .tagline {
   color: var(--text-mid);
 }
 
-:is(.screen.home, .screen.rounds) .fine {
+:is(.screen.home, .screen.rounds, .screen.result) .fine {
   color: var(--text-low);
 }
 
 /* stat tiles become broadcast "bugs": keyline + big display numeral */
-:is(.screen.home, .screen.rounds) .stat {
+:is(.screen.home, .screen.rounds, .screen.result) .stat {
   background: var(--bg-card);
   border: none;
   border-left: var(--keyline-w) solid var(--tracer-400);
@@ -48,33 +51,33 @@
 }
 
 /* the label holds one line under a centered numeral */
-:is(.screen.home, .screen.rounds) .stat span {
+:is(.screen.home, .screen.rounds, .screen.result) .stat span {
   white-space: nowrap;
   font-size: 0.58rem;
   letter-spacing: 0.1em;
 }
 
-:is(.screen.home, .screen.rounds) .stat:nth-child(2) {
+:is(.screen.home, .screen.rounds, .screen.result) .stat:nth-child(2) {
   border-left-color: var(--flag-500);
 }
 
-:is(.screen.home, .screen.rounds) .stat:nth-child(3) {
+:is(.screen.home, .screen.rounds, .screen.result) .stat:nth-child(3) {
   border-left-color: var(--trophy-400);
 }
 
-:is(.screen.home, .screen.rounds) .stat b {
+:is(.screen.home, .screen.rounds, .screen.result) .stat b {
   font-family: var(--font-display);
   font-variation-settings: 'wdth' var(--wdth-score);
   font-weight: 800;
   font-variant-numeric: tabular-nums;
 }
 
-:is(.screen.home, .screen.rounds) .stat span {
+:is(.screen.home, .screen.rounds, .screen.result) .stat span {
   color: var(--text-low);
 }
 
 /* primary CTA: color-blocked flag slab (no notch — notches are earned) */
-:is(.screen.home, .screen.rounds) .cta {
+:is(.screen.home, .screen.rounds, .screen.result) .cta {
   background: linear-gradient(180deg, var(--flag-400), var(--flag-500));
   color: var(--action-on-primary);
   border-radius: var(--r-bug);
@@ -86,7 +89,7 @@
 }
 
 /* stacked two-level action label: PLAY UNLIMITED / browse courses */
-:is(.screen.home, .screen.rounds) .cta .cta-sub {
+:is(.screen.home, .screen.rounds, .screen.result) .cta .cta-sub {
   display: block;
   font-family: var(--font-ui);
   font-variation-settings: normal;
@@ -98,7 +101,7 @@
   margin-top: 1px;
 }
 
-:is(.screen.home, .screen.rounds) .cta:active {
+:is(.screen.home, .screen.rounds, .screen.result) .cta:active {
   filter: brightness(0.92);
 }
 
@@ -106,14 +109,14 @@
    object. The card's 24px cut is 12% of its height; on this ~50px button the
    identical cut is 48%, which reads as a different, much bigger tool rather
    than the same punch. Same 45° angle, smaller bite. */
-:is(.screen.home, .screen.rounds) .cta.notched {
+:is(.screen.home, .screen.rounds, .screen.result) .cta.notched {
   clip-path: polygon(15px 0, 100% 0, 100% 100%, 0 100%, 0 15px);
   border-radius: 0;
 }
 
 /* secondary actions: hairline outline, no slab — compact, they're wayfinding
    rather than the headline act */
-:is(.screen.home, .screen.rounds) .cta.ghost {
+:is(.screen.home, .screen.rounds, .screen.result) .cta.ghost {
   background: transparent;
   clip-path: none;
   border-radius: var(--r-bug);
@@ -123,7 +126,7 @@
   font-size: 0.86rem;
 }
 
-:is(.screen.home, .screen.rounds) :focus-visible {
+:is(.screen.home, .screen.rounds, .screen.result) :focus-visible {
   outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
 }
@@ -531,7 +534,7 @@
 
 /* -------------------------------------------------------------- Clubhouse */
 
-:is(.screen.home, .screen.rounds) .home-link {
+:is(.screen.home, .screen.rounds, .screen.result) .home-link {
   color: var(--text-mid);
 }
 
@@ -568,6 +571,7 @@
 /* dark-card version of the sync banner (it is cream on the paper theme) */
 .screen.rounds .sync-cta,
 .screen.home .sync-cta,
+.screen.result .sync-cta,
 .tut-card .sync-cta {
   background: var(--bg-card);
   border-color: var(--edge-strong);
@@ -576,6 +580,7 @@
 
 .screen.rounds .sync-cta em,
 .screen.home .sync-cta em,
+.screen.result .sync-cta em,
 .tut-card .sync-cta em {
   color: var(--tracer-400);
 }
@@ -818,6 +823,304 @@
   font-size: 0.78rem;
   line-height: 1.45;
   color: var(--text-mid);
+}
+
+/* ------------------------------------------- the in-round round card sheet */
+
+/* The card itself stays paper (it IS the scorecard) — it gets a paper slab to
+   sit on so its ink stays readable inside the dark sheet.
+
+   The slab must also restate the ink. .tut-card sets cream --text-hi as the
+   inherited colour, and the cells that DON'T carry a score modifier (an
+   ordinary par) never set a colour of their own — so par numerals inherited
+   cream onto cream paper at 1.03:1 and vanished, while birdies/bogeys/unplayed
+   survived on their explicit colours. Setting it here rather than on .csc-cell
+   covers every unstyled descendant of the slab, not just the cells. */
+.tut-card.roundcard-sheet .classic-scorecard {
+  background: var(--sand-100);
+  color: var(--ink);
+  border-radius: var(--r-bug);
+  padding: 12px 12px 10px;
+}
+
+/* ------------------------------------------------ the wrap screen ---------
+   Same broadcast system as the Teebox, deliberately different composition:
+   home's hero is the wordmark (pre-game show), here the hero is the SCORE
+   (post-round graphic). Covers both round ends — daily and unlimited. */
+
+/* a shade or two lighter than the Teebox/Clubhouse turf — same family, but
+   you can tell the wrap screen from the menus at a glance */
+.screen.result {
+  background: linear-gradient(180deg, var(--turf-700) 0%, var(--turf-800) 70%);
+}
+
+/* the small mark up top: screenshots of the hero score should carry the brand */
+.screen.result .result-wordmark {
+  display: block;
+  width: 88px;
+  height: auto;
+  margin: 0 auto -4px;
+  color: var(--text-hi);
+}
+
+.screen.result > .kicker {
+  text-align: center;
+  font-size: 0.66rem;
+}
+
+/* The number of the day: expanded display numerals. Sand by default, green
+   when par is broken — NOT red when over: losing to the course is the common
+   case by design, and a giant red number on your own round rubs it in (the
+   same reasoning as the Clubhouse totals; see the token note in theme.css). */
+.screen.result .final {
+  font-family: var(--font-display);
+  font-variation-settings: 'wdth' var(--wdth-score);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  font-size: clamp(4rem, 22vw, 5.2rem);
+  line-height: 0.95;
+  text-align: center;
+  color: var(--text-hi);
+  margin: 2px 0 0;
+}
+
+.screen.result .final.good {
+  color: var(--score-under);
+}
+
+.screen.result .verdict {
+  text-align: center;
+  font-weight: 600;
+  font-size: 1.02rem;
+  color: var(--text-hi);
+}
+
+.screen.result .ghost-close {
+  text-align: center;
+  color: var(--text-mid);
+}
+
+/* sand-blocked, like the lower thirds — the dark-on-dark version was mud */
+.screen.result .char-chip.result-chip {
+  align-self: center;
+  background: var(--bg-blocked);
+  border: none;
+  color: var(--text-on-block);
+}
+
+/* the wordle-square brag rows, centred as one block */
+.screen.result .emoji-grid {
+  align-self: center;
+  background: var(--bg-card);
+  border-radius: var(--r-bug);
+  padding: 8px 12px;
+}
+
+/* the swing coach: analytics voice, tracer keyline like the stat bugs */
+.screen.result .coach-panel {
+  background: var(--bg-card);
+  border: none;
+  border-left: var(--keyline-w) solid var(--tracer-400);
+  border-radius: 3px var(--r-bug) var(--r-bug) 3px;
+}
+
+.screen.result .coach-panel .kicker {
+  color: var(--tracer-400);
+}
+
+/* coach header row: report title left, the difficulty pill right */
+.screen.result .coach-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.screen.result .coach-head .rating-chip {
+  background: var(--bg-elevated);
+  border-color: var(--edge-strong);
+  color: var(--text-mid);
+  white-space: nowrap;
+}
+
+.screen.result .coach-panel .verdict {
+  text-align: left;
+  font-size: 0.95rem;
+}
+
+/* coach tiles sit INSIDE an already-keylined card — no keyline on a keyline */
+.screen.result .coach-panel .stat {
+  background: var(--bg-elevated);
+  border-left: none;
+  border-radius: var(--r-bug);
+}
+
+/* ---- the daily board: the leaderboard tower from the style tile ---- */
+
+.screen.result .board-block {
+  background: var(--bg-panel);
+  border: 1px solid var(--edge-hairline);
+  border-radius: var(--r-card);
+  overflow: hidden;
+  padding: 0;
+}
+
+/* A practice round with no record in play emits the container with nothing in
+   it (ScoreBoard's practice branch). On paper that was invisible; as a dark
+   card it rendered as a stray 2px outlined strip between coach and replay. */
+.screen.result .board-block:empty {
+  display: none;
+}
+
+/* sand tower head, like the today's-course slab wears */
+.screen.result .board-block > .kicker {
+  background: var(--bg-blocked);
+  color: var(--text-on-block-mid);
+  padding: 8px 14px;
+  font-size: 0.66rem;
+}
+
+.screen.result .board-list {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 4px;
+}
+
+.screen.result .board-list li {
+  display: grid;
+  grid-template-columns: 30px 1fr auto;
+  align-items: center;
+  gap: 9px;
+  padding: 7px 14px 7px 10px;
+}
+
+.screen.result .board-list li + li {
+  border-top: 1px solid var(--edge-hairline);
+}
+
+.screen.result .board-list li.me {
+  background: var(--bg-card);
+  box-shadow: inset 3px 0 0 var(--tracer-400);
+}
+
+.screen.result .board-pos {
+  font-family: var(--font-display);
+  font-variation-settings: 'wdth' var(--wdth-score);
+  font-weight: 800;
+  font-size: 0.82rem;
+  text-align: center;
+  background: var(--bg-elevated);
+  border-radius: 6px;
+  padding: 3px 0;
+  color: var(--text-mid);
+}
+
+/* Podium metal for RANKS 1-3 (ranks, not rows: ties share a medal — two
+   players on -3 are both rank 1, both gold). Silver and bronze are one-off
+   literals like the podium's medal emoji; everyone else keeps plain turf.
+
+   Ranks are competition-numbered, so a tie EATS the metal it consumed: two
+   golds are followed by bronze with no silver, and a three-way tie for first
+   pushes the next player off the podium entirely. That is the intended
+   reading — it is how a golf leaderboard numbers a tie. */
+.screen.result .board-pos.medal-1 {
+  background: var(--trophy-400);
+  color: var(--text-on-block);
+}
+
+.screen.result .board-pos.medal-2 {
+  background: #c3cad2;
+  color: var(--text-on-block);
+}
+
+.screen.result .board-pos.medal-3 {
+  background: #c98a52;
+  color: var(--text-on-block);
+}
+
+.screen.result .board-name {
+  font-family: var(--font-display);
+  font-variation-settings: 'wdth' var(--wdth-tower);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: var(--track-tower);
+  font-size: 0.95rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.screen.result .board-score {
+  font-family: var(--font-display);
+  font-variation-settings: 'wdth' var(--wdth-score);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  font-size: 1.02rem;
+}
+
+.screen.result .board-block .name-form,
+.screen.result .board-block .fine,
+.screen.result .board-block .sync-cta,
+.screen.result .board-block .cta {
+  margin: 6px 14px 10px;
+}
+
+.screen.result .record-banner {
+  color: var(--trophy-300);
+  padding: 6px 14px;
+  font-weight: 700;
+}
+
+.screen.result .name-form input {
+  background: var(--bg-card);
+  border: 1.5px solid var(--edge-strong);
+  color: var(--text-hi);
+}
+
+.screen.result .name-form input:focus {
+  border-color: var(--focus-ring);
+}
+
+.screen.result .name-form input::placeholder {
+  color: var(--text-low);
+}
+
+/* board CTAs are inline utilities, not headline slabs */
+.screen.result .cta.slim {
+  padding: 7px 12px;
+  font-size: 0.72rem;
+  clip-path: none;
+  border-radius: var(--r-bug);
+}
+
+/* ---- share block: the text card stays literal paper ---- */
+
+.screen.result .share-preview {
+  background: var(--sand-100);
+  color: var(--ink);
+  border: none;
+  border-radius: var(--r-bug);
+}
+
+/* Copy + Share side by side: Copy quiet, Share the headline (it opens the
+   real iOS/Android share sheet — canNativeShare gates it, so desktop just
+   gets Copy at full width) */
+.screen.result .share-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.screen.result .share-actions .cta {
+  flex: 1;
+}
+
+/* The notch is EARNED-AND-LOCKED, not just earned: a signed daily can't be
+   replayed until tomorrow, so its primary actions wear the punched corner. A
+   practice round can always be played again — "Play another practice round"
+   stays a whole card. (.daily is set by ResultScreen for non-practice.) */
+.screen.result.daily .cta:not(.ghost):not(.slim) {
+  clip-path: polygon(15px 0, 100% 0, 100% 100%, 0 100%, 0 15px);
+  border-radius: 0;
 }
 
 /* --------------------------- paper game screens: brand accents ONLY */

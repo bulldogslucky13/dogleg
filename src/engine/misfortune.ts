@@ -112,7 +112,6 @@ export function misfortuneLines(mode: 'daily' | 'practice' = 'daily'): readonly 
     'Your ball found water that is not on the map.',
     `One in ${n}. You absolute unicorn.`,
     'This is why scorecards are written in pencil.',
-    'Grief has five stages. The group chat is all of them.',
     'Somewhere a butterfly flapped its wings. Anyway, that’s an 8.',
     'Take the 8. Tell no one. (Share button below.)',
     'New personal worst on that hole. Cherish it.',

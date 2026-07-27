@@ -844,6 +844,10 @@
   color: var(--tracer-400);
 }
 
+.tut-card.changelog .changelog-tag.design {
+  color: var(--trophy-400);
+}
+
 .tut-card.changelog .changelog-tag.fix {
   color: var(--text-low);
 }

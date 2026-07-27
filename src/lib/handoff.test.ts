@@ -1,0 +1,292 @@
+// @vitest-environment jsdom
+/**
+ * The cross-origin handoff (see handoff.ts). These tests pin the WIRE FORMAT
+ * as much as the merge rules: the packing half lives in handoff/index.html, on
+ * a different domain, hand-written, with no way to share a bundle with this
+ * one. If the format drifts, every player still holding an old bookmark
+ * silently arrives as a stranger — so the format is asserted literally here,
+ * not just round-tripped.
+ */
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+// the real file, verbatim — ?raw so this stays a browser-typed test with no
+// node builtins (tsconfig.app.json carries no node types)
+import handoffHtml from '../../handoff/index.html?raw'
+import { SITE_URL } from '../engine/daily'
+import { importHandoff, packHandoff, runHandoff, unpackHandoff } from './handoff'
+
+class MemoryStorage implements Storage {
+  private map = new Map<string, string>()
+  get length(): number {
+    return this.map.size
+  }
+  key(i: number): string | null {
+    return [...this.map.keys()][i] ?? null
+  }
+  getItem(k: string): string | null {
+    return this.map.get(k) ?? null
+  }
+  setItem(k: string, v: string): void {
+    this.map.set(k, v)
+  }
+  removeItem(k: string): void {
+    this.map.delete(k)
+  }
+  clear(): void {
+    this.map.clear()
+  }
+  [name: string]: unknown
+}
+
+const NAMED = { id: 'p-old', secret: 's-old', name: 'Bogey Merchant' }
+const ANON = { id: 'p-new', secret: 's-new', name: null }
+
+function seeded(entries: Record<string, unknown>): MemoryStorage {
+  const s = new MemoryStorage()
+  for (const [k, v] of Object.entries(entries)) {
+    s.setItem(k, typeof v === 'string' ? v : JSON.stringify(v))
+  }
+  return s
+}
+
+const OLD_DEVICE = {
+  'dogleg:player:v1': NAMED,
+  'dogleg:history:v1': [
+    { dateKey: '2026-07-20', toPar: 2 },
+    { dateKey: '2026-07-21', toPar: -1 },
+  ],
+  'dogleg:archive:v1': [{ seed: 'seed-a', playedAt: 200 }],
+  'dogleg:lifetime:v1': '42',
+  'dogleg:fortune:v1': { p: { ace: 3, aceK: 1, alb: 0, albK: 0 } },
+  'dogleg:uimode': 'classic',
+}
+
+describe('wire format', () => {
+  it('round-trips every dogleg: key and ignores everything else', async () => {
+    const store = seeded({ ...OLD_DEVICE, 'other-app:token': 'not ours' })
+    const unpacked = await unpackHandoff(await packHandoff(store))
+    expect(unpacked?.v).toBe(1)
+    expect(Object.keys(unpacked!.keys).sort()).toEqual(Object.keys(OLD_DEVICE).sort())
+    expect(unpacked!.keys['dogleg:lifetime:v1']).toBe('42')
+  })
+
+  it('is gzip + base64url, marked z., when CompressionStream exists', async () => {
+    expect(typeof CompressionStream).toBe('function')
+    const payload = await packHandoff(seeded(OLD_DEVICE))
+    expect(payload.startsWith('z.')).toBe(true)
+    // URL-safe: no +, /, = or anything else that needs escaping in a fragment
+    expect(payload.slice(2)).toMatch(/^[A-Za-z0-9_-]+$/)
+  })
+
+  it('falls back to an uncompressed p. payload, and still reads back', async () => {
+    const CS = globalThis.CompressionStream
+    // @ts-expect-error — simulating a browser without the Compression Streams API
+    delete globalThis.CompressionStream
+    try {
+      const payload = await packHandoff(seeded(OLD_DEVICE))
+      expect(payload.startsWith('p.')).toBe(true)
+      const unpacked = await unpackHandoff(payload)
+      expect(unpacked!.keys['dogleg:player:v1']).toBe(JSON.stringify(NAMED))
+    } finally {
+      globalThis.CompressionStream = CS
+    }
+  })
+
+  it('gzip keeps a fat archive inside a sane URL length', async () => {
+    // the archive is pruned (10 recent + PRs + trophies), so ~80 rounds is a
+    // heavy player who has been everywhere — it must not produce a URL that
+    // mobile browsers will truncate
+    const rounds = Array.from({ length: 80 }, (_, i) => ({
+      seed: `daily:2026-05-${i}:p-old`,
+      mode: 'daily',
+      courseSlug: 'pebble-beach',
+      dateKey: `2026-05-${i}`,
+      toPar: 3,
+      strokes: 75,
+      results: Array.from({ length: 18 }, () => 'par'),
+      decisions: Array.from({ length: 18 }, () => ['normal', 'normal', 'safe', 'normal']),
+      playedAt: 1_700_000_000 + i,
+    }))
+    const payload = await packHandoff(seeded({ ...OLD_DEVICE, 'dogleg:archive:v1': rounds }))
+    expect(payload.length).toBeLessThan(20_000)
+    const back = await unpackHandoff(payload)
+    expect(JSON.parse(back!.keys['dogleg:archive:v1'])).toHaveLength(80)
+  })
+
+  it.each([['', 'empty'], ['z.!!!!', 'corrupt body'], ['x.abcd', 'unknown codec'], ['z.', 'truncated to nothing']])(
+    'refuses a payload that is %s (%s)',
+    async (payload) => {
+      expect(await unpackHandoff(payload)).toBeNull()
+    },
+  )
+})
+
+describe('importing onto a fresh origin', () => {
+  it('carries the identity, history, archive and counters across', async () => {
+    const target = new MemoryStorage()
+    const outcome = await importHandoff(await packHandoff(seeded(OLD_DEVICE)), target)
+    expect(outcome).toBe('imported')
+    expect(JSON.parse(target.getItem('dogleg:player:v1')!)).toEqual(NAMED)
+    expect(JSON.parse(target.getItem('dogleg:history:v1')!)).toHaveLength(2)
+    expect(target.getItem('dogleg:lifetime:v1')).toBe('42')
+    expect(target.getItem('dogleg:uimode')).toBe('classic')
+  })
+
+  it('replaces a freshly minted anonymous identity — it has no posted rounds to strand', async () => {
+    const target = seeded({ 'dogleg:player:v1': ANON })
+    expect(await importHandoff(await packHandoff(seeded(OLD_DEVICE)), target)).toBe('imported')
+    expect(JSON.parse(target.getItem('dogleg:player:v1')!)).toEqual(NAMED)
+  })
+
+  it('reports invalid rather than half-importing a corrupt payload', async () => {
+    const target = seeded({ 'dogleg:player:v1': ANON })
+    expect(await importHandoff('z.notreallygzip', target)).toBe('invalid')
+    expect(JSON.parse(target.getItem('dogleg:player:v1')!)).toEqual(ANON)
+  })
+})
+
+describe('importing onto a device that has already been played on', () => {
+  it('refuses when this device holds a different NAMED clubhouse, changing nothing', async () => {
+    const mine = { id: 'p-mine', secret: 's-mine', name: 'Sandy Lyle' }
+    const target = seeded({ 'dogleg:player:v1': mine, 'dogleg:history:v1': [{ dateKey: '2026-07-26', toPar: 0 }] })
+    expect(await importHandoff(await packHandoff(seeded(OLD_DEVICE)), target)).toBe('conflict')
+    expect(JSON.parse(target.getItem('dogleg:player:v1')!)).toEqual(mine)
+    expect(JSON.parse(target.getItem('dogleg:history:v1')!)).toHaveLength(1)
+  })
+
+  it('proceeds when the same named player arrives back (a second old bookmark)', async () => {
+    const target = seeded({ 'dogleg:player:v1': NAMED })
+    expect(await importHandoff(await packHandoff(seeded(OLD_DEVICE)), target)).toBe('imported')
+  })
+
+  it('unions history by day, local winning ties', async () => {
+    const target = seeded({
+      'dogleg:player:v1': ANON,
+      'dogleg:history:v1': [
+        { dateKey: '2026-07-21', toPar: 99 },
+        { dateKey: '2026-07-26', toPar: 0 },
+      ],
+    })
+    await importHandoff(await packHandoff(seeded(OLD_DEVICE)), target)
+    const merged = JSON.parse(target.getItem('dogleg:history:v1')!) as { dateKey: string; toPar: number }[]
+    expect(merged.map((e) => e.dateKey)).toEqual(['2026-07-20', '2026-07-21', '2026-07-26'])
+    expect(merged.find((e) => e.dateKey === '2026-07-21')!.toPar).toBe(99)
+  })
+
+  it('unions the archive by seed and keeps it newest-first', async () => {
+    const target = seeded({
+      'dogleg:player:v1': ANON,
+      'dogleg:archive:v1': [
+        { seed: 'seed-a', playedAt: 1 },
+        { seed: 'seed-b', playedAt: 300 },
+      ],
+    })
+    await importHandoff(await packHandoff(seeded(OLD_DEVICE)), target)
+    const merged = JSON.parse(target.getItem('dogleg:archive:v1')!) as { seed: string; playedAt: number }[]
+    expect(merged.map((r) => r.seed)).toEqual(['seed-b', 'seed-a'])
+    expect(merged.find((r) => r.seed === 'seed-a')!.playedAt).toBe(1)
+  })
+
+  it('takes the higher of each fortune counter and the higher lifetime count', async () => {
+    const target = seeded({
+      'dogleg:player:v1': ANON,
+      'dogleg:fortune:v1': { p: { ace: 1, aceK: 5, alb: 2, albK: 0 } },
+      'dogleg:lifetime:v1': '7',
+    })
+    await importHandoff(await packHandoff(seeded(OLD_DEVICE)), target)
+    expect(JSON.parse(target.getItem('dogleg:fortune:v1')!).p).toEqual({ ace: 3, aceK: 5, alb: 2, albK: 0 })
+    expect(target.getItem('dogleg:lifetime:v1')).toBe('42')
+  })
+
+  it('never overwrites an in-progress round', async () => {
+    const live = JSON.stringify({ hole: 4, complete: false })
+    const target = seeded({ 'dogleg:player:v1': ANON, 'dogleg:round:v1': live })
+    await importHandoff(await packHandoff(seeded({ ...OLD_DEVICE, 'dogleg:round:v1': { hole: 17 } })), target)
+    expect(target.getItem('dogleg:round:v1')).toBe(live)
+  })
+})
+
+describe("the old domain's packing half (handoff/index.html)", () => {
+  // The file that will actually run on the old domain is standalone, hand-
+  // written, and deployed somewhere this bundle never reaches — the exact
+  // conditions under which two halves of a format quietly drift apart. So the
+  // real script is pulled out of the real file and run against the real
+  // unpacker. If someone edits either side, this fails.
+  const html = handoffHtml
+  const script = /<script>([\s\S]*?)<\/script>/.exec(html)?.[1]
+
+  /** Run the page's IIFE with its globals injected, so nothing is stubbed
+   *  globally and the script itself is unmodified. */
+  function runPage(store: Storage): Promise<string> {
+    return new Promise((resolve, reject) => {
+      if (!script) return reject(new Error('no <script> found in handoff/index.html'))
+      const el = () => ({ setAttribute: () => {}, textContent: '' })
+      const doc = { getElementById: el }
+      const loc = { replace: (url: string) => resolve(url) }
+      // the page's own 4s "go anyway" safety net must not fire the promise
+      const noTimer = () => 0
+      new Function('document', 'location', 'localStorage', 'setTimeout', script)(doc, loc, store, noTimer)
+    })
+  }
+
+  it('produces a URL this app can unpack, carrying every key', async () => {
+    const url = await runPage(seeded({ ...OLD_DEVICE, 'other-app:token': 'not ours' }))
+    expect(url.startsWith('https://playdogleg.com/#handoff=')).toBe(true)
+    const unpacked = await unpackHandoff(url.split('#handoff=')[1])
+    expect(Object.keys(unpacked!.keys).sort()).toEqual(Object.keys(OLD_DEVICE).sort())
+    expect(unpacked!.keys['dogleg:player:v1']).toBe(JSON.stringify(NAMED))
+  })
+
+  it('imports cleanly into a fresh origin, end to end', async () => {
+    const url = await runPage(seeded(OLD_DEVICE))
+    const target = new MemoryStorage()
+    expect(await importHandoff(url.split('#handoff=')[1], target)).toBe('imported')
+    expect(JSON.parse(target.getItem('dogleg:player:v1')!)).toEqual(NAMED)
+    expect(target.getItem('dogleg:lifetime:v1')).toBe('42')
+  })
+
+  it('sends a never-played visitor straight on, with no empty payload', async () => {
+    expect(await runPage(new MemoryStorage())).toBe('https://playdogleg.com/')
+  })
+
+  it('points at the domain this app is actually served from', () => {
+    // a typo here strands everyone holding an old bookmark
+    expect(html).toContain('https://playdogleg.com/')
+    expect(`https://${SITE_URL}/`).toBe('https://playdogleg.com/')
+  })
+})
+
+describe('the boot path', () => {
+  beforeEach(() => {
+    localStorage.clear()
+    window.location.hash = ''
+  })
+  afterEach(() => {
+    window.location.hash = ''
+  })
+
+  it('imports from #handoff= and strips the fragment so it cannot be re-shared or replayed', async () => {
+    const payload = await packHandoff(seeded(OLD_DEVICE))
+    window.location.hash = `#handoff=${payload}`
+    expect(await runHandoff()).toBe('imported')
+    expect(JSON.parse(localStorage.getItem('dogleg:player:v1')!)).toEqual(NAMED)
+    expect(window.location.hash).toBe('')
+  })
+
+  it('leaves an unrelated fragment (a #watch= replay link) alone', async () => {
+    window.location.hash = '#watch=abc123'
+    expect(await runHandoff()).toBeNull()
+    expect(window.location.hash).toBe('#watch=abc123')
+  })
+
+  it('strips only the handoff when it rides alongside another fragment key', async () => {
+    const payload = await packHandoff(seeded(OLD_DEVICE))
+    window.location.hash = `#watch=abc123&handoff=${payload}`
+    expect(await runHandoff()).toBe('imported')
+    expect(window.location.hash).toBe('#watch=abc123')
+  })
+
+  it('does nothing at all on an ordinary load', async () => {
+    expect(await runHandoff()).toBeNull()
+    expect(localStorage.length).toBe(0)
+  })
+})

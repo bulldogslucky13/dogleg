@@ -49,7 +49,7 @@ export const CHANGELOG: ChangeEntry[] = [
     date: '2026-07-27',
     kind: 'feature',
     title: 'A new address: playdogleg.com',
-    note: 'The game moved to playdogleg.com — shorter, and easier to pass on. Share text and replay links point there from now on. Your clubhouse lives on this device, so if you linked an email, sign in once at the new address to bring your name and streak across.',
+    note: 'The game moved to playdogleg.com — shorter, and easier to pass on. Share text and replay links point there from now on. An old bookmark still works and brings your clubhouse with it: your name, streak, records and saved rounds all come across on the first visit.',
   },
   {
     date: '2026-07-25',

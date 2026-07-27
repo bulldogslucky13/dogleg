@@ -895,10 +895,16 @@ async function main() {
     // short crossing unprovable and so reported it as an artifact whatever the
     // geometry said. Ask instead for the strongest evidence the zone COULD
     // carry: three samples where there's room, all of them where there isn't.
-    const needed = (samples: number) => Math.max(1, Math.min(3, samples))
+    // …and it is the ZONE's capacity that sets the bar, not the ring's. Scaling
+    // it to how many samples the ring itself happens to occupy inverts the
+    // test: a polygon appearing at ONE sample of a 100-yd zone would need one
+    // straddle to approve the whole thing, while the other 99 yd could be pure
+    // flanking — the artifact this is built to catch.
     for (const z of zones.filter((z) => z.side === 'cross')) {
+      const zoneSamples = Math.max(1, Math.round((z.to - z.from) / STEP_YD))
+      const need = Math.max(1, Math.min(3, zoneSamples))
       const culprits: string[] = []
-      let real: string | null = null
+      let best: { label: string; spans: number[]; } | null = null
       const sources: { label: string; hits: Map<number, number[]> }[] = hazardRings
         .filter((r) => r.kind === z.kind)
         .map((r) => ({ label: `way/${r.id}`, hits: ringHits.get(r)! }))
@@ -907,19 +913,44 @@ async function main() {
         const inSpan = [...s.hits.keys()].filter((a) => a >= z.from && a < z.to)
         if (!inSpan.length) continue
         const offs = inSpan.flatMap((a) => s.hits.get(a)!)
-        const spanning = inSpan.filter((a) => straddles(s.hits.get(a)!)).length
-        if (spanning >= needed(inSpan.length))
-          real = `${s.label} spans the line at ${spanning} of ${inSpan.length} samples`
+        const spans = inSpan.filter((a) => straddles(s.hits.get(a)!)).sort((a, b) => a - b)
+        if (spans.length >= need && spans.length > (best?.spans.length ?? 0)) best = { label: s.label, spans }
         culprits.push(
-          `${s.label} (${Math.min(...offs)}..${Math.max(...offs)}${spanning ? `, spans ${spanning}/${inSpan.length}` : ''})`,
+          `${s.label} (${Math.min(...offs)}..${Math.max(...offs)}${spans.length ? `, spans ${spans.length}/${zoneSamples}` : ''})`,
         )
       }
+      // No single polygon spanning is NOT the same as nothing spanning. The
+      // `side` rule only calls a band `cross` where the hazard is laterally
+      // continuous, and OSM often draws one hazard as several touching
+      // polygons — so check the union before crying artifact, or the tool
+      // condemns real crossings (whistling-straits:18 is drawn as five).
+      const unionHits = new Map<number, number[]>()
+      for (const s of sources)
+        for (const [a, offs] of s.hits) unionHits.set(a, [...(unionHits.get(a) ?? []), ...offs])
+      const unionSpans = [...unionHits.keys()]
+        .filter((a) => a >= z.from && a < z.to && straddles([...new Set(unionHits.get(a)!)].sort((x, y) => x - y)))
+        .sort((a, b) => a - b)
       const greenStart = isFinite(greenLo) ? greenLo : length - greenDepth
       const intoGreen = z.to > greenStart ? '  INTO THE GREEN' : ''
       const none = z.kind === 'ocean' && !coast.length ? 'no coastline in the corridor' : 'none'
+      let verdict: string
+      if (!best && unionSpans.length >= need) {
+        verdict =
+          `TOUCHING POLYGONS — no single one spans, but together they cross continuously at ` +
+          `${unionSpans[0]}-${unionSpans[unionSpans.length - 1] + STEP_YD} ` +
+          `(${unionSpans.length} of ${zoneSamples} zone samples): ${culprits.join(' + ')}`
+      } else if (!best) {
+        verdict = `ARTIFACT (nothing spans the line) — ${culprits.join(' + ') || none}`
+      } else {
+        const lo = best.spans[0]
+        const hi = best.spans[best.spans.length - 1] + STEP_YD
+        const where = `${best.label} spans ${lo}-${hi} (${best.spans.length} of ${zoneSamples} zone samples)`
+        // A long zone carried by a short genuine crossing is the halfway case:
+        // something really is across the line, but most of this zone isn't it.
+        verdict = best.spans.length * 2 >= zoneSamples ? `REAL CARRY — ${where}` : `PARTIAL — ${where}; the rest is flanking`
+      }
       console.log(
-        `  ${z.id.padEnd(4)} ${z.kind.padEnd(7)} ${String(z.from).padStart(4)}-${String(z.to).padEnd(4)}` +
-          `  ${real ? `REAL CARRY — ${real}` : `ARTIFACT (nothing spans the line) — ${culprits.join(' + ') || none}`}${intoGreen}`,
+        `  ${z.id.padEnd(4)} ${z.kind.padEnd(7)} ${String(z.from).padStart(4)}-${String(z.to).padEnd(4)}  ${verdict}${intoGreen}`,
       )
     }
     return

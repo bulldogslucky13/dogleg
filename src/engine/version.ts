@@ -53,4 +53,14 @@
 // shifted to the club's GOLD card). Pure geometry: the shipped tuple already
 // matched the card on par and stroke index for all 18, so nothing in the odds
 // inputs moved — but the layout a seed replays into does, on every hole.
-export const ENGINE_VERSION = 9
+// v10 = Seminole real geometry (OSM way 125329140, every hole shifted to the
+// club's GOLD card). Pure geometry like Potomac — the shipped tuple already
+// matched the card on par and stroke index for all 18 — but the layout a seed
+// replays into moves on every hole. v10 also carries an importer `side` fix
+// that changes what future imports produce: a band is only a `cross` where the
+// hazard is laterally CONTINUOUS across the playing line, so sand flanking
+// both sides of a clean fairway no longer reads as a carry you can drive
+// between. That reshapes only newly imported geometry (committed courses are
+// static data and untouched), but Seminole is the first course to ship from
+// it, so the two go out together.
+export const ENGINE_VERSION = 10

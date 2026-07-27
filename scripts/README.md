@@ -14,7 +14,15 @@ geometry with the real thing for marquee holes (Sawgrass 17, Amen Corner, …).
 pnpm import:osm sawgrass 17            # zone report
 pnpm import:osm sawgrass 17 --compare  # OSM vs the layout we ship today
 pnpm import:osm augusta 12 --json      # machine-readable layout
+pnpm import:osm seminole 4 --profile   # per-polygon lateral profiles + a
+                                       # verdict on every `cross` zone
 ```
+
+`--profile` is the triage tool for the artifact modes below: for each polygon
+that reaches the corridor it prints the along-span, the lateral range, and how
+often that polygon ALONE lies across the playing line, then rules each `cross`
+zone REAL CARRY (one polygon spans the line) or ARTIFACT (several polygons on
+different flanks). Reach for it before hand-fixing anything.
 
 Slugs live in `COURSE_GEO` at the top of the script — that map is the source
 of truth for what's importable. Each entry needs the course center, the exact
@@ -53,6 +61,16 @@ find the polygon name for a new course, query Overpass for
   artifact. One hand-fix (17's lake, below). Also the case for pulling the card
   *before* trusting the tuple: the shipped ~7497 setup was replaced by the
   club's 7790 BLACK card, moving 16 of 18 yardages and 16 of 18 stroke indices.
+- **Seminole (all 18)** — 178 mapped bunkers, and the course that paid for the
+  `side` rule above. Its shipped tuple already matched the club's GOLD card on
+  par *and* stroke index for all 18, so it was pure geometry. Two things worth
+  copying. First, the per-hole shifts are wildly uneven (+78, +73, +42, +40,
+  +40 on five holes, -5..+3 on nine) because OSM drew each centreline from
+  whichever of the ~3 pads per hole the mapper picked — so verify the tee/green
+  endpoints per hole rather than assuming one constant fits the course.
+  Second, `--profile` (below) was written here: it prints each contributing
+  polygon's along-span and lateral range and rules on every `cross` zone, which
+  is what separated the three mis-tagged scrub ways from 175 real bunkers.
 - **TPC Potomac at Avenel Farm (all 18)** — the rare course whose shipped tuple
   already matched the card on par *and* stroke index for all 18, so the import
   was pure geometry. Notable for two things. First, the phantom-cross mode at
@@ -87,6 +105,28 @@ find the polygon name for a new course, query Overpass for
     both sides. Red flag: a `cross` zone overlapping `fairwayFrom`
     (`harbour-town:18`), or "water off the tee" no real player faces
     (`tpc-sawgrass:2`).
+    The *both sides* half of this is now fixed at the source (Seminole, where
+    it hit 17 of 18 holes): a band only earns `cross` where the hazard is
+    laterally CONTINUOUS across the playing line, so sand flanking a clean
+    fairway stays two flanking zones. What survives is the single-hazard case
+    — one polygon the coarse centreline genuinely clips. **The check that
+    separates a real carry from a clipped corner is whether the hole has
+    MAPPED FAIRWAY beside the hazard**: `seminole:11` imports a 98-yd water
+    `cross` that looks exactly like `seminole:2`'s genuine one, but the
+    `golf=fairway` polygons run up the left of the lake for every yard of it,
+    so it is a lateral hazard the hole plays around. Hole 2 has no fairway in
+    the corridor at all until past the water, and is a real forced carry.
+  - *Mis-tagged surfaces*: OSM sometimes tags a course's native sandy SCRUB as
+    `golf=bunker`. Seminole had three such ways (6.1/5.4/3.0 acres against a
+    0.034-acre median, each straddling 5-6 corridors), which rasterised as
+    full-width carries on 11 holes. Tell them apart by size against the
+    course's own median, by how many corridors one polygon touches, and at
+    zoom 20 by texture — real bunkers are smooth uniform sand with crisp
+    edges, scrub is sand carpeted in vegetation clumps, and the mapper usually
+    draws the real bunkers as SEPARATE polygons sitting inside the scrub. Drop
+    them with `osmIgnore` in `COURSE_GEO`, with the evidence in the comment.
+    Do not drop a merely LARGE bunker: Seminole's way/697261262 is 1.34 acres
+    and is genuine.
   - *Broken lateral hazards*: a continuous lake/marsh shows gaps where the
     fairway widens past the 50-yd sample corridor. If imagery shows unbroken
     water, span it continuously — the gap rewards aggressive lines for the

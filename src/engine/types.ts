@@ -72,6 +72,24 @@ export interface CourseSpec {
   /** what this course calls its penal rough, for chips and recap copy
    * ('gorse', 'hay', 'fescue'). Cosmetic — never read by the odds. */
   roughLabel?: string
+  /**
+   * What a bad UNMAPPED lie is called here — 'scrub', 'fescue', 'pine straw'.
+   *
+   * The odds carry a junk floor: where a shot's landing window reaches no
+   * mapped hazard at all, the trouble slice still has to go somewhere, because
+   * a wild swing finds something even on ground nobody drew a polygon for
+   * (`longOdds`, odds.ts). That slice lands in the `trees` bucket and resolves
+   * to a `trees` lie — fine on a parkland course, a lie on a treeless one,
+   * where the game announced "In the trees" and the map had no grove to draw
+   * the ball in, so it painted it on the fairway instead.
+   *
+   * A course with NO trees/deeprough zones anywhere must therefore say what
+   * its junk is; `rough.test.ts` enforces that. Deliberately NOT `roughLabel`,
+   * which is coupled to the `rough` severity dial (labelling a course would
+   * force tagging it, and tagging IS odds-affecting). This one is pure copy —
+   * never read by the odds, never in replay, so it needs no version bump.
+   */
+  junkLabel?: string
   blurb: string
   holes: HoleSpec[]
   /** true = a par-3 short course: unlimited play only, never in the daily
@@ -186,6 +204,11 @@ export interface HoleLayout {
   rough?: Rough
   /** the course's name for its rough ('gorse'), for chips/recap copy only. */
   roughLabel?: string
+  /** what an unmapped bad lie is called on this hole — resolved by
+   * `buildLayout` from the hole's own zones and the course's `junkLabel`, so
+   * the copy never has to look either up. See `CourseSpec.junkLabel`. Copy
+   * only, never read by the odds. */
+  junkLabel?: string
 }
 
 // ---------- Ball / stage state ----------

@@ -94,7 +94,7 @@ export const PLAY_INDEX: Record<string, number> = {
   'whistling-straits': 2.233,
   'tpc-potomac': 2.156,
   'gullwing-point': 0.728,
-  'seminole': 2.120,
+  'seminole': 1.938,
   'birchwood-national': -0.637,
   'torrey-pines-south': 2.504,
   'pacific-dunes': 1.589,

@@ -143,7 +143,16 @@ export function SideMap(props: { layout: HoleLayout; ball: BallState }) {
 
       {/* lie flavor under the ball */}
       {ball.lie === 'sand' && <ellipse cx={ballX} cy={by + 1} rx={12} ry={4.5} fill="#e3cd96" stroke="#cdb478" strokeWidth={1} />}
-      {ball.lie === 'trees' && <circle cx={ballX - 10} cy={by - 12} r={7} fill="#375c3e" />}
+      {/* The `trees` lie doubles as the odds' junk floor, so it lands on courses
+          with no trees at all (see CourseSpec.junkLabel). Draw a canopy only
+          where the hole really has one; elsewhere a low scrubby tuft, so classic
+          view doesn't sit the ball under a tree while the caption says gorse. */}
+      {ball.lie === 'trees' &&
+        (layout.junkLabel === 'trees' ? (
+          <circle cx={ballX - 10} cy={by - 12} r={7} fill="#375c3e" />
+        ) : (
+          <ellipse cx={ballX} cy={by} rx={12} ry={5} fill="#4a5c34" stroke="#3a4a29" strokeWidth={1} />
+        ))}
       {ball.lie === 'rough' && <ellipse cx={ballX} cy={by} rx={10} ry={3.5} fill="#6d8a4e" />}
 
       {/* ball */}

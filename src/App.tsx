@@ -850,6 +850,7 @@ export default function App() {
             castLines={cast ? castLinesForHole(cast, round.currentHole, Boolean(hole.layout.bailout)) : undefined}
             clubhouseTally={clubhouseTally ?? undefined}
             bailout={Boolean(hole.layout.bailout)}
+            junkLabel={hole.layout.junkLabel}
           />
         ) : (
           <>

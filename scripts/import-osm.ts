@@ -90,6 +90,12 @@ type CourseGeo = {
    * corridor. Water keeps the looser rule — shared lakes genuinely border
    * several holes at once. */
   packed?: boolean
+  /** OSM way/relation ids to drop because the tag is simply WRONG for this
+   * course — not a judgment call about whether a real hazard is in play, but a
+   * feature that is not the thing its tag says. Every id needs a comment
+   * saying what it actually is and how that was established from imagery,
+   * because this is the one hook that lets an import ignore real OSM data. */
+  osmIgnore?: number[]
 }
 
 const COURSE_GEO: Record<string, CourseGeo> = {
@@ -141,6 +147,36 @@ const COURSE_GEO: Record<string, CourseGeo> = {
   // Note: OSM tags hole 15 par=5; the club's GOLD card says par 4 (490 yd,
   // HCP 4) and the card wins — OSM is ground truth for shape only.
   potomac: { name: 'TPC Potomac at Avenel Farm', center: [38.9947, -77.1992], radius: 1600, osmName: '^TPC Potomac at Avanel Farm$', engineSlug: 'tpc-potomac' },
+  // Seminole is way 125329140, a single clean polygon (835 x 922 m, 622 m
+  // half-diagonal) holding exactly 18 golf=hole ways with plain ref=N and no
+  // names, so no osmHolePrefix. Anchored because "Seminole Golf Club" also
+  // names courses in Tallahassee and elsewhere, and because Lost Tree Club
+  // (rel 2694786) sits 1.8 km south with its own ref=N holes. Radius 1200
+  // covers the polygon and the Atlantic beyond the dune ridge while stopping
+  // short of Lost Tree's and Frenchman's Creek's water. Mapping is unusually
+  // complete for a private club: 178 bunkers (the club's own count is ~180),
+  // 24 greens, 18 pins.
+  // The three ignored ways are tagged `golf=bunker` + `natural=sand` but are
+  // Seminole's native sandy SCRUB, not bunkers: 6.1, 5.4 and 3.0 acres against
+  // a 0.034-acre median, 400 m long, each straddling 5-6 hole corridors at
+  // once. At zoom 20 the difference is unmistakable — the 175 real bunkers are
+  // smooth uniform sand with crisp edges, while these are pale sand carpeted
+  // in scattered vegetation clumps, and their boundaries trace AROUND the
+  // fairways, greens and bunkers they enclose (hence ~28% bbox fill). Left in,
+  // they rasterise as full-width `cross` carries on 11 holes — a 398-yd one on
+  // hole 4 — because the corridor rake hits scrub on both flanks of a clean
+  // fairway, and `side` collapses to 'cross' either way. Dropping them is the
+  // tag being wrong, not a call about whether the scrub is in play; it flanks
+  // the holes everywhere rather than sitting in patches, which is what the
+  // `Rough` dial in types.ts is for, not hazard zones.
+  seminole: {
+    name: 'Seminole Golf Club',
+    center: [26.863, -80.0512],
+    radius: 1200,
+    osmName: '^Seminole Golf Club$',
+    engineSlug: 'seminole',
+    osmIgnore: [697252551, 697255070, 697249629],
+  },
 }
 
 // ---------- Overpass ----------
@@ -515,10 +551,15 @@ async function main() {
   const CENTER_YD = 10 // |offset| within this counts as "on the line" → crossing
 
   // pre-project every hazard ring once, keep only rings near the corridor
-  type Ring = { kind: ZoneKind | 'green'; ring: Vec[] }
+  // Carry the element TYPE, not just the id: OSM way and relation ids are
+  // separate namespaces, so reporting a multipolygon hazard as way/<id> sends
+  // a reviewer to an unrelated object or a 404 — and `--profile` output is
+  // read as evidence during the freeze.
+  type Ring = { kind: ZoneKind | 'green'; ring: Vec[]; id: number; type: OsmElement['type'] }
   const rings: Ring[] = []
   for (const e of els) {
     if (e === holeWay) continue
+    if (geo.osmIgnore?.includes(e.id)) continue // mis-tagged for this course — see COURSE_GEO
     const k = classify(e.tags ?? {})
     if (!k || k === 'tee' || k === 'fairway' || k === 'hole') continue
     for (const loop of elementRings(e)) {
@@ -533,7 +574,7 @@ async function main() {
         const al = toYards(along)
         if (al > -25 && al < length + 25) nearestEdge = Math.min(nearestEdge, toYards(Math.abs(lateral)))
       }
-      if (nearestEdge < 48) rings.push({ kind: k, ring })
+      if (nearestEdge < 48) rings.push({ kind: k, ring, id: e.id, type: e.type })
     }
   }
 
@@ -594,16 +635,20 @@ async function main() {
   }
 
   // ---------- ocean (rasterised half-plane) + green (centre-line) ----------
-  type Hit = { left: boolean; right: boolean; center: boolean }
-  const seriesByKind = new Map<ZoneKind, Map<number, Hit>>() // ocean only now
+  // Keep the raw set of lateral offsets hit at each along, NOT a left/right/centre
+  // summary. A summary cannot tell "one hazard lying across the line" from "two
+  // hazards flanking a clean fairway" — both set left+right — and calling the
+  // second one a `cross` invents a carry the player just drives between. Ross
+  // courses bunker both flanks at the same distance constantly (Seminole threw
+  // 40 of these, including a 398-yd "carry" on hole 4), which is why the
+  // artifact-mode catalog in scripts/README.md leads with phantom crosses.
+  const seriesByKind = new Map<ZoneKind, Map<number, Set<number>>>()
   const record = (kind: ZoneKind, a: number, off: number) => {
     let byAlong = seriesByKind.get(kind)
     if (!byAlong) seriesByKind.set(kind, (byAlong = new Map()))
-    const hit = byAlong.get(a) ?? { left: false, right: false, center: false }
-    if (Math.abs(off) <= CENTER_YD) hit.center = true
-    if (off > 0) hit.left = true
-    else if (off < 0) hit.right = true
-    byAlong.set(a, hit)
+    let offs = byAlong.get(a)
+    if (!offs) byAlong.set(a, (offs = new Set()))
+    offs.add(off)
   }
   const coastReach = toMeters(CORRIDOR_YD + 120)
 
@@ -642,9 +687,9 @@ async function main() {
   if (coast.length && oceanHits) {
     let leftN = 0
     let rightN = 0
-    for (const h of oceanHits.values()) {
-      if (h.left) leftN++
-      if (h.right) rightN++
+    for (const offs of oceanHits.values()) {
+      if ([...offs].some((o) => o > 0)) leftN++
+      if ([...offs].some((o) => o < 0)) rightN++
     }
     const s = rightN >= leftN ? -1 : 1 // -1 ⇒ ocean on the right (off<0)
     // A green that juts into the sea (Pebble 7) has ocean CLOSE on the far side
@@ -742,13 +787,32 @@ async function main() {
   }
 
   // ---------- collapse per-along hits into zones (ocean + hazards) ----------
+  // A hazard is a CROSSING only where its sand/water is laterally CONTINUOUS
+  // across the playing line — you cannot carry something with a gap you can
+  // drive through. So split each along's hit offsets into contiguous runs (one
+  // rake step apart) and give each run its own side; a run only earns `cross`
+  // if it reaches both flanks AND covers the centre band. Two flanking hazards
+  // therefore stay two flanking zones, however close together they sit, while a
+  // genuine carry still reads as one cross even when OSM drew it as several
+  // touching polygons.
   type Raw = { kind: ZoneKind; from: number; to: number; side: string }
   const raws: Raw[] = []
   for (const [kind, byAlong] of seriesByKind) {
     for (const a of [...byAlong.keys()].sort((x, y) => x - y)) {
-      const h = byAlong.get(a)!
-      const side = h.center && h.left && h.right ? 'cross' : h.left && !h.right ? 'left' : h.right && !h.left ? 'right' : 'cross'
-      raws.push({ kind, from: a, to: a + STEP_YD, side })
+      const offs = [...byAlong.get(a)!].sort((x, y) => x - y)
+      let run: number[] = []
+      const flush = () => {
+        if (!run.length) return
+        const spansLine = run.some((o) => o > 0) && run.some((o) => o < 0) && run.some((o) => Math.abs(o) <= CENTER_YD)
+        const side = spansLine ? 'cross' : run[0] > 0 ? 'left' : run[run.length - 1] < 0 ? 'right' : 'cross'
+        raws.push({ kind, from: a, to: a + STEP_YD, side })
+        run = []
+      }
+      for (const o of offs) {
+        if (run.length && o - run[run.length - 1] > RAKE_YD) flush()
+        run.push(o)
+      }
+      flush()
     }
   }
 
@@ -763,6 +827,138 @@ async function main() {
     // drop sub-4yd slivers (rake/projection noise); keep real carries
     .filter((r) => r.to - r.from >= 4)
   const zones = merged.map((r, i) => ({ id: `z${i + 1}`, kind: r.kind, from: r.from, to: Math.min(length, r.to), side: r.side }))
+
+  // ---------- --profile: per-ring lateral profiles, and a verdict per `cross` ----------
+  // The decisive question for every `cross` band is whether ONE polygon actually
+  // spans the playing line, or whether two flanking hazards merely hit the rake
+  // on both sides of a clean centre — `side` collapses to 'cross' either way
+  // (see the ternary above), and only the first is a carry anyone plays.
+  // Courses bunkered down both flanks (Seminole) produce the second in bulk.
+  if (flags.includes('--profile')) {
+    const hazardRings = ownedRings.filter((r) => r.kind !== 'green')
+    // per-ring hit map: along → set of lateral offsets this ring alone covers
+    const ringHits = new Map<Ring, Map<number, number[]>>()
+    for (const r of hazardRings) {
+      const m = new Map<number, number[]>()
+      for (let a = 0; a <= length; a += STEP_YD) {
+        const base = pointAtArc(center, cum, toMeters(a)).p
+        const dir = smoothDirAt(a)
+        const nrm: Vec = [-dir[1], dir[0]]
+        const offs: number[] = []
+        for (let off = -CORRIDOR_YD; off <= CORRIDOR_YD; off += RAKE_YD) {
+          const q: Vec = [base[0] + nrm[0] * toMeters(off), base[1] + nrm[1] * toMeters(off)]
+          if (pointInRing(r.ring, q)) offs.push(off)
+        }
+        if (offs.length) m.set(a, offs)
+      }
+      ringHits.set(r, m)
+    }
+    // The sea is a half-plane, not a polygon, so it is nowhere in `rings` — an
+    // `ocean` cross has no ring to find and would report as an artifact with no
+    // culprits at all, which is exactly backwards on the carries most worth
+    // checking (Cypress 15-17, Pebble 8). Sample it the way the importer does,
+    // off the coastline, so ocean crossings get the same straddle evidence.
+    const oceanHits = new Map<number, number[]>()
+    if (coast.length) {
+      for (let a = 0; a <= length; a += STEP_YD) {
+        const { p, dir } = pointAtArc(center, cum, toMeters(a))
+        const nrm: Vec = [-dir[1], dir[0]]
+        const offs: number[] = []
+        for (let off = -CORRIDOR_YD; off <= CORRIDOR_YD; off += RAKE_YD) {
+          const q: Vec = [p[0] + nrm[0] * toMeters(off), p[1] + nrm[1] * toMeters(off)]
+          if (seaSide(coast, q, coastReach) === true) offs.push(off)
+        }
+        if (offs.length) oceanHits.set(a, offs)
+      }
+    }
+    console.error('')
+    console.log(`# ${geo.name} — hole ${holeNo}  (ring profiles)`)
+    const straddles = (offs: number[]) =>
+      offs.some((o) => Math.abs(o) <= CENTER_YD) && offs.some((o) => o > 0) && offs.some((o) => o < 0)
+    for (const r of hazardRings) {
+      const m = ringHits.get(r)!
+      if (!m.size) continue
+      const alongs = [...m.keys()].sort((a, b) => a - b)
+      const all = [...m.values()].flat()
+      const nStraddle = alongs.filter((a) => straddles(m.get(a)!)).length
+      console.log(
+        `  ${r.kind.padEnd(7)} ${`${r.type}/${r.id}`.padEnd(20)} along ${String(alongs[0]).padStart(4)}-${String(alongs[alongs.length - 1]).padEnd(4)}` +
+          `  lateral ${String(Math.min(...all)).padStart(4)}..${String(Math.max(...all)).padEnd(4)}` +
+          `  straddles the line at ${nStraddle} of ${alongs.length} samples`,
+      )
+    }
+    console.log('\n  verdict per `cross` zone:')
+    console.log(
+      '  (REAL CARRY = one hazard lies across the line. That is necessary, not sufficient —\n' +
+        '   check for mapped `golf=fairway` alongside it before believing a forced carry:\n' +
+        "   seminole:11's lake spans 49 of 49 samples and is still a lateral, because the\n" +
+        '   fairway runs up its left for every yard of it.)',
+    )
+    // A zone only has as many samples as its length allows (STEP_YD apart), and
+    // merged zones can be 4 yd — two samples. Demanding a flat 3 made every
+    // short crossing unprovable and so reported it as an artifact whatever the
+    // geometry said. Ask instead for the strongest evidence the zone COULD
+    // carry: three samples where there's room, all of them where there isn't.
+    // …and it is the ZONE's capacity that sets the bar, not the ring's. Scaling
+    // it to how many samples the ring itself happens to occupy inverts the
+    // test: a polygon appearing at ONE sample of a 100-yd zone would need one
+    // straddle to approve the whole thing, while the other 99 yd could be pure
+    // flanking — the artifact this is built to catch.
+    for (const z of zones.filter((z) => z.side === 'cross')) {
+      const zoneSamples = Math.max(1, Math.round((z.to - z.from) / STEP_YD))
+      const need = Math.max(1, Math.min(3, zoneSamples))
+      const culprits: string[] = []
+      let best: { label: string; spans: number[]; } | null = null
+      const sources: { label: string; hits: Map<number, number[]> }[] = hazardRings
+        .filter((r) => r.kind === z.kind)
+        .map((r) => ({ label: `${r.type}/${r.id}`, hits: ringHits.get(r)! }))
+      if (z.kind === 'ocean' && oceanHits.size) sources.push({ label: 'coastline', hits: oceanHits })
+      for (const s of sources) {
+        const inSpan = [...s.hits.keys()].filter((a) => a >= z.from && a < z.to)
+        if (!inSpan.length) continue
+        const offs = inSpan.flatMap((a) => s.hits.get(a)!)
+        const spans = inSpan.filter((a) => straddles(s.hits.get(a)!)).sort((a, b) => a - b)
+        if (spans.length >= need && spans.length > (best?.spans.length ?? 0)) best = { label: s.label, spans }
+        culprits.push(
+          `${s.label} (${Math.min(...offs)}..${Math.max(...offs)}${spans.length ? `, spans ${spans.length}/${zoneSamples}` : ''})`,
+        )
+      }
+      // No single polygon spanning is NOT the same as nothing spanning. The
+      // `side` rule only calls a band `cross` where the hazard is laterally
+      // continuous, and OSM often draws one hazard as several touching
+      // polygons — so check the union before crying artifact, or the tool
+      // condemns real crossings (whistling-straits:18 is drawn as five).
+      const unionHits = new Map<number, number[]>()
+      for (const s of sources)
+        for (const [a, offs] of s.hits) unionHits.set(a, [...(unionHits.get(a) ?? []), ...offs])
+      const unionSpans = [...unionHits.keys()]
+        .filter((a) => a >= z.from && a < z.to && straddles([...new Set(unionHits.get(a)!)].sort((x, y) => x - y)))
+        .sort((a, b) => a - b)
+      const greenStart = isFinite(greenLo) ? greenLo : length - greenDepth
+      const intoGreen = z.to > greenStart ? '  INTO THE GREEN' : ''
+      const none = z.kind === 'ocean' && !coast.length ? 'no coastline in the corridor' : 'none'
+      let verdict: string
+      if (!best && unionSpans.length >= need) {
+        verdict =
+          `TOUCHING POLYGONS — no single one spans, but together they cross continuously at ` +
+          `${unionSpans[0]}-${unionSpans[unionSpans.length - 1] + STEP_YD} ` +
+          `(${unionSpans.length} of ${zoneSamples} zone samples): ${culprits.join(' + ')}`
+      } else if (!best) {
+        verdict = `ARTIFACT (nothing spans the line) — ${culprits.join(' + ') || none}`
+      } else {
+        const lo = best.spans[0]
+        const hi = best.spans[best.spans.length - 1] + STEP_YD
+        const where = `${best.label} spans ${lo}-${hi} (${best.spans.length} of ${zoneSamples} zone samples)`
+        // A long zone carried by a short genuine crossing is the halfway case:
+        // something really is across the line, but most of this zone isn't it.
+        verdict = best.spans.length * 2 >= zoneSamples ? `REAL CARRY — ${where}` : `PARTIAL — ${where}; the rest is flanking`
+      }
+      console.log(
+        `  ${z.id.padEnd(4)} ${z.kind.padEnd(7)} ${String(z.from).padStart(4)}-${String(z.to).padEnd(4)}  ${verdict}${intoGreen}`,
+      )
+    }
+    return
+  }
 
   const bend = bendProfile(center, cum)
   const bendMax = bend.reduce((m, v) => (Math.abs(v) > Math.abs(m) ? v : m), 0)

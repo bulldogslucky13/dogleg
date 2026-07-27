@@ -87,8 +87,53 @@ Cross-device sync is optional email magic links (Supabase Auth): the
 `link-account` function ties `auth.users` to a player row (`players.user_id`);
 `src/lib/auth.ts` + `src/ui/AccountPanel.tsx` handle send/reconcile/adopt.
 Auth redirect URLs are configured for the prod domain and localhost:5173.
-Caveat: the project uses Supabase's built-in mailer (a few emails/hour on the
-free tier) — plug custom SMTP into the dashboard if sign-in volume grows.
+Mail goes out through Resend — the edge function POSTs its API directly, and
+Supabase Auth is pointed at `smtp.resend.com` (sender `DogLeg Team
+<team@dogleg.cameronbristol.xyz>`, configured in the dashboard).
+
+**Every email we send renders through one chassis**, `supabase/functions/
+_shared/email-chassis.ts` — the broadcast card, with theme.css's tokens
+resolved to literals (mail has no custom properties, and Outlook's Word engine
+drops `rgba()`, so the translucent tiers are pre-composited; `emails.test.ts`
+guards both). There are three, and only three:
+
+- **record stolen** — `submit-round/email.ts`, sent via the Resend API
+- **magic link** and **confirm signup** — `_shared/auth-emails.ts`
+
+The auth pair used to live *only* in the Supabase dashboard, which is how they
+silently missed a rebrand. They are now generated to `supabase/templates/*.html`
+(`pnpm gen:email-templates`, reviewable in the diff, pinned by a test).
+
+**Pushing them is automated**, like the schema and the functions: the
+`email-templates` job in `.github/workflows/deploy.yml` runs
+`pnpm push:email-templates` on every push to `main`. A PR that changes email
+copy just edits `_shared/auth-emails.ts` and commits the regenerated HTML — no
+manual step at merge. Two things make that safe: the push diffs against live
+config and no-ops when nothing moved, and CI runs `gen:email-templates --check`
+first, so it refuses to push anything that disagrees with the reviewed files.
+
+That job runs **after** the site deploy — deliberately the opposite of the
+functions job, which goes first so the referee is never older than the clients
+submitting to it. Emails point the other way: the masthead is an `<img>` served
+from the site, so a template must never ship ahead of the asset it references.
+
+To preview a change before it merges:
+
+```sh
+export SUPABASE_ACCESS_TOKEN=...        # supabase.com/dashboard/account/tokens
+pnpm gen:email-templates && pnpm push:email-templates --dry-run
+```
+
+The other eleven auth templates in the project are Supabase stock and
+deliberately untouched: `src/lib/auth.ts` only ever calls `signInWithOtp`, so
+DogLeg has no password reset, phone, MFA, OAuth-identity or invite flow to
+brand.
+
+The masthead is a hosted PNG (`public/brand/`, regenerate with `pnpm
+gen:email-wordmark`) because Gmail strips inline SVG — it is rasterised from
+`src/ui/Wordmark.tsx` itself, so the logo has one source of truth. It carries
+no information the alt text doesn't, since Gmail blocks remote images on first
+open. Look at all three at `/_emails.html` in dev, images on **and** off.
 
 ## Commands
 

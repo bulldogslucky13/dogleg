@@ -351,7 +351,7 @@ export function playShot(h: HoleInPlay, choice: Choice, rng: Rng, destiny?: 'ace
       const advantage = h.stage === 'tee' ? (longAdvantage(h.layout, h.cond, preBall, choice, h.character, bucket) ?? undefined) : undefined
       h.shots.push({ stage: h.stage, choice, outcome: bucket, penalty, faced, after, advantage, strokesAfter: h.strokes })
       h.stage = spec.par === 5 && h.stage === 'tee' ? 'second' : 'approach'
-      h.status = teeStatus(bucket, penalty)
+      h.status = teeStatus(bucket, penalty, h.layout.junkLabel)
       return h
     }
 
@@ -460,7 +460,7 @@ function pickZone(shares: ZoneShare[], bucket: string, rng: Rng): HazardZone | n
   return list[list.length - 1].zone
 }
 
-function teeStatus(bucket: string, penalty: boolean): HoleInPlay['status'] {
+function teeStatus(bucket: string, penalty: boolean, junkLabel = 'trees'): HoleInPlay['status'] {
   if (penalty) return { tone: 'bad', title: 'In the water', note: 'One-stroke penalty — playing from the drop.' }
   switch (bucket) {
     case 'dialed':
@@ -472,7 +472,15 @@ function teeStatus(bucket: string, penalty: boolean): HoleInPlay['status'] {
     case 'sand':
       return { tone: 'bad', title: 'In the bunker', note: 'Digging in — advance it smart.' }
     default:
-      return { tone: 'bad', title: 'In the trees', note: 'Scrambling — punch out or gamble?' }
+      // The `trees` bucket is also where the odds' junk floor lands, so on a
+      // course with no trees this has to say what IS out there — Seminole's
+      // scrub, Portrush's gorse. `junkLabel` is resolved onto the layout by
+      // buildLayout; you can only punch out of something with branches.
+      return {
+        tone: 'bad',
+        title: `In the ${junkLabel}`,
+        note: junkLabel === 'trees' ? 'Scrambling — punch out or gamble?' : 'Scrambling — hack it out or gamble?',
+      }
   }
 }
 

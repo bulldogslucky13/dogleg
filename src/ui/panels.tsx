@@ -425,8 +425,14 @@ const BUCKET_COPY: Record<string, string> = {
   across: 'across the green',
 }
 
-export function OddsRecap(props: { score: HoleScore; par: number; bailout?: boolean }) {
+export function OddsRecap(props: { score: HoleScore; par: number; bailout?: boolean; junkLabel?: string }) {
   const lieBefore = (i: number): string => (i > 0 ? props.score.shots[i - 1].after.lie : 'tee')
+  // `trees` doubles as the odds' junk floor, so a treeless course names its own
+  // (see CourseSpec.junkLabel) rather than reporting a grove that isn't there.
+  const bucketCopy = (b: string) =>
+    b === 'trees' && props.junkLabel && props.junkLabel !== 'trees'
+      ? `in the ${props.junkLabel}`
+      : (BUCKET_COPY[b] ?? b)
   return (
     <div className="recap">
       <h4>The odds you faced · every decision</h4>
@@ -437,7 +443,7 @@ export function OddsRecap(props: { score: HoleScore; par: number; bailout?: bool
             {choiceCopy(shot.stage as Exclude<Stage, 'done'>, lieBefore(i), shot.choice, props.bailout).label.toLowerCase()}, finished{' '}
             {shot.outcome === 'makeable' && shot.strokesAfter != null
               ? LOOK_LABEL[madePuttLook(shot.strokesAfter, props.par)].phrase
-              : (BUCKET_COPY[shot.outcome] ?? shot.outcome)}
+              : bucketCopy(shot.outcome)}
             {shot.penalty ? ' (+1 penalty)' : ''}
           </div>
           {shot.advantage && (
@@ -579,6 +585,9 @@ export function HoleComplete(props: {
    * down to the recap so its `second`-stage entry reads BAILOUT_COPY instead
    * of falling back to the ordinary par-5-second-shot copy. */
   bailout?: boolean
+  /** what this hole calls an unmapped bad lie (`HoleLayout.junkLabel`), so the
+   * recap doesn't report trees on a course that has none. Copy only. */
+  junkLabel?: string
 }) {
   const { score } = props
   const [clubhouseOpen, setClubhouseOpen] = useState(false)
@@ -599,7 +608,7 @@ export function HoleComplete(props: {
       )}
       <details className="hc-odds">
         <summary>See the odds you faced</summary>
-        <OddsRecap score={score} par={props.par} bailout={props.bailout} />
+        <OddsRecap score={score} par={props.par} bailout={props.bailout} junkLabel={props.junkLabel} />
       </details>
       <button className="cta" onClick={props.onNext}>
         {props.last ? 'Sign the card' : 'Next hole'}

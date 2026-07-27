@@ -77,6 +77,12 @@ export const CHANGELOG: ChangeEntry[] = [
   {
     date: '2026-07-27',
     kind: 'feature',
+    title: 'Find your next record',
+    note: 'Unlimited play\u2019s course list learned to hunt: filter by difficulty, by what you\u2019ve played, by open or beatable records \u2014 season or all-time, your pick \u2014 star your target courses, and sort the whole board by what\u2019s winnable. Forty-nine courses, one shortlist.',
+  },
+  {
+    date: '2026-07-27',
+    kind: 'feature',
     title: 'Achievements',
     note: 'The Clubhouse grows an Awards tab: named ranks for every pursuit \u2014 birdies, streaks, records, rounds \u2014 plus one-off badges, a few of them hidden until you stumble into them. Your whole history counts from day one: anything you\u2019d already earned is waiting on the shelf.',
   },

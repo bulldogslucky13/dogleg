@@ -121,6 +121,26 @@ const COURSE_GEO: Record<string, CourseGeo> = {
   // Radius reaches past the ~700 m polygon for the Pacific coastline that
   // makes 15/16/17.
   cypress: { name: 'Cypress Point', center: [36.5788, -121.9677], radius: 1600, osmName: '^Cypress Point Golf Course$', engineSlug: 'cypress-point' },
+  // Whistling Straits shares its resort with the Irish course, but way
+  // 205111637 ("Whistling Straits") wraps ONLY the Straits — exactly 18 hole
+  // ways sit inside it, all named "Straits Course Hole N" — so map_to_area
+  // pins it and no osmHolePrefix is needed. Do NOT add one: hole 1 is
+  // misspelled "Straights Course Hole 1" in OSM, so a /Straits/ prefix would
+  // silently drop the opener. Radius spans the ~2.9 km lakefront strip so
+  // Lake Michigan reaches every hole; the lake is natural=water here (not
+  // coastline, unlike Pebble/Portrush), so it imports as `water` — see the
+  // geometry.ts block note for the relabel decision.
+  whistling: { name: 'Whistling Straits — Straits', center: [43.8499, -87.7346], radius: 2500, osmName: '^Whistling Straits$', engineSlug: 'whistling-straits' },
+  // TPC Potomac is relation 357652 (wikidata Q7671115). **OSM misspells the
+  // name "Avanel Farm"** — the regex has to match the typo, not the club's
+  // spelling, or the area lookup finds nothing. Anchored so it can't drift
+  // onto Falls Road GC, the one other golf_course inside the radius. All 18
+  // centrelines are mapped with plain ref=N and no names, so no
+  // osmHolePrefix. Radius 1600 covers the 1721 x 2138 m polygon (1372 m
+  // half-diagonal) and the creek/ponds just outside it.
+  // Note: OSM tags hole 15 par=5; the club's GOLD card says par 4 (490 yd,
+  // HCP 4) and the card wins — OSM is ground truth for shape only.
+  potomac: { name: 'TPC Potomac at Avenel Farm', center: [38.9947, -77.1992], radius: 1600, osmName: '^TPC Potomac at Avanel Farm$', engineSlug: 'tpc-potomac' },
 }
 
 // ---------- Overpass ----------

@@ -546,14 +546,15 @@
   letter-spacing: var(--track-tower);
 }
 
-/* three tabs share one row instead of stranding SEASONS on its own line */
+/* four tabs now — a 2×2 grid, since one row stopped fitting at phone width
+   when Awards joined (Jackson: two rows is fine) */
 .screen.rounds .locker-tabs {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
   gap: 8px;
 }
 
 .screen.rounds .locker-tab {
-  flex: 1;
   white-space: nowrap;
 }
 
@@ -1296,27 +1297,60 @@
   text-align: center;
 }
 
-/* ---- the unlock toast: a nod from the booth, never a modal ---- */
+/* ---- the unlock rail: a nod from the booth, never a modal ----
+   One card per unlock on a snap-scroll rail. Auto-advances until touched;
+   after that the player browses at their own pace and the ✕ dismisses. */
 
-.ach-toast {
+.ach-rail-wrap {
   position: fixed;
   left: 50%;
   bottom: max(18px, env(safe-area-inset-bottom));
   transform: translateX(-50%);
   z-index: 60;
   width: min(92vw, 360px);
+  animation: ach-toast-in 240ms ease-out;
+}
+
+.ach-rail {
+  display: flex;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  border-radius: 3px var(--r-card) var(--r-card) 3px;
+  box-shadow: var(--shadow-pop);
+}
+
+.ach-rail::-webkit-scrollbar {
+  display: none;
+}
+
+.ach-rail-close {
+  position: absolute;
+  top: -10px;
+  right: -8px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--bg-elevated);
+  border: 1px solid var(--edge-strong);
+  color: var(--text-mid);
+  font-size: 0.72rem;
+  line-height: 1;
+}
+
+.ach-toast {
+  flex: 0 0 100%;
+  scroll-snap-align: center;
+  position: relative;
   text-align: left;
   background: var(--bg-panel);
   border: 1px solid rgba(226, 185, 59, 0.5);
   border-left: 4px solid var(--trophy-400);
-  border-radius: 3px var(--r-card) var(--r-card) 3px;
-  box-shadow: var(--shadow-pop);
   color: var(--text-hi);
-  padding: 10px 14px 11px;
+  padding: 10px 34px 11px 14px;
   display: flex;
   flex-direction: column;
   gap: 2px;
-  animation: ach-toast-in 240ms ease-out;
 }
 
 .ach-toast-kicker {
@@ -1363,9 +1397,70 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .ach-toast {
+  .ach-rail-wrap {
     animation: none;
   }
+  .ach-rail {
+    scroll-behavior: auto;
+  }
+}
+
+/* ---- the wrap screen's earned-this-round card: door to the trophy room ---- */
+
+.screen.result .ach-earned {
+  text-align: left;
+  background: var(--bg-card);
+  border: none;
+  border-left: var(--keyline-w) solid var(--trophy-400);
+  border-radius: 3px var(--r-bug) var(--r-bug) 3px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: var(--text-hi);
+  cursor: pointer;
+}
+
+.screen.result .ach-earned .kicker {
+  color: var(--trophy-300);
+}
+
+.screen.result .ach-earned-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.screen.result .ach-earned-row b {
+  font-family: var(--font-display);
+  font-variation-settings: 'wdth' var(--wdth-tower);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: var(--track-tower);
+  font-size: 0.95rem;
+  white-space: nowrap;
+}
+
+.screen.result .ach-earned-detail {
+  font-size: 0.7rem;
+  color: var(--text-low);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.screen.result .ach-earned-link {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-mid);
+  align-self: flex-end;
+}
+
+.screen.result .ach-earned:active {
+  background: var(--bg-elevated);
 }
 
 /* --------------------------- paper game screens: brand accents ONLY */

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import {
   computeProgress,
@@ -11,43 +11,69 @@ import {
 import { prefersReducedMotion } from './motion'
 
 /**
- * The unlock moment: a quiet toast stack, bottom of the screen, never a
+ * The unlock moment: a quiet toast rail, bottom of the screen, never a
  * modal — earning a rank should feel like a nod from the booth, not an
- * interruption. Multiple unlocks queue and show one at a time; each waves
- * itself off after a beat, and a tap dismisses early. Repeat completions of
- * repeatable badges arrive as a count bump ("Spotless ×4") on the same
- * treatment.
+ * interruption. Multiple unlocks land as a swipeable snap-scroll rail: it
+ * auto-advances on a timer, but the FIRST touch (swipe, wheel, drag) hands
+ * control to the player — the timer stops, a close button takes over, and
+ * they can browse back and forth as long as they like. Repeat completions
+ * of repeatable badges ride the same treatment as a count bump.
  */
 export function UnlockToasts(props: { unlocks: Unlock[]; onDone: () => void }) {
   const [index, setIndex] = useState(0)
-  const current = props.unlocks[index]
+  const [manual, setManual] = useState(false)
+  const railRef = useRef<HTMLDivElement | null>(null)
 
+  // auto-advance until the player takes the wheel
   useEffect(() => {
-    if (!current) return
+    if (manual) return
     const dwell = prefersReducedMotion() ? 5200 : 3800
     const t = setTimeout(() => {
       if (index + 1 < props.unlocks.length) setIndex(index + 1)
       else props.onDone()
     }, dwell)
     return () => clearTimeout(t)
-  }, [index, current, props])
+  }, [index, manual, props])
 
-  if (!current) return null
+  // keep the rail's scroll position on the current card (auto mode only)
+  useEffect(() => {
+    if (manual) return
+    const rail = railRef.current
+    if (!rail) return
+    // jsdom has no Element.scrollTo — fall back to plain assignment there
+    if (typeof rail.scrollTo === 'function')
+      rail.scrollTo({ left: index * rail.clientWidth, behavior: prefersReducedMotion() ? 'auto' : 'smooth' })
+    else rail.scrollLeft = index * rail.clientWidth
+  }, [index, manual])
+
+  if (!props.unlocks.length) return null
+  const takeover = () => setManual(true)
   return createPortal(
-    <button
-      className="ach-toast"
-      role="status"
-      onClick={() => (index + 1 < props.unlocks.length ? setIndex(index + 1) : props.onDone())}
-    >
-      <span className="ach-toast-kicker">Achievement{current.count ? ` · ×${current.count}` : ' unlocked'}</span>
-      <b className="ach-toast-name">{current.name}</b>
-      <span className="ach-toast-detail">{current.detail}</span>
-      {props.unlocks.length > 1 && (
-        <span className="ach-toast-queue">
-          {index + 1}/{props.unlocks.length}
-        </span>
-      )}
-    </button>,
+    <div className="ach-rail-wrap" role="status">
+      <div
+        className="ach-rail"
+        ref={railRef}
+        onTouchStart={takeover}
+        onWheel={takeover}
+        onPointerDown={takeover}
+      >
+        {props.unlocks.map((u, i) => (
+          <div key={u.id} className="ach-toast">
+            <span className="ach-toast-kicker">Achievement{u.count ? ` · ×${u.count}` : ' unlocked'}</span>
+            <b className="ach-toast-name">{u.name}</b>
+            <span className="ach-toast-detail">{u.detail}</span>
+            {props.unlocks.length > 1 && (
+              <span className="ach-toast-queue">
+                {i + 1}/{props.unlocks.length}
+              </span>
+            )}
+          </div>
+        ))}
+      </div>
+      <button className="ach-rail-close" onClick={props.onDone} aria-label="Dismiss">
+        ✕
+      </button>
+    </div>,
     document.body,
   )
 }

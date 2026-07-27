@@ -61,9 +61,11 @@ export function RoundsScreen(props: {
   initialView?: 'main' | 'stats'
   /** open with the account panel already expanded (How to Play's sync line) */
   initialAccount?: boolean
+  /** deep-link straight onto a tab (the wrap screen's achievements card) */
+  initialTab?: LockerTab
 }) {
   const [view, setView] = useState<LockerView>(props.initialView ?? 'main')
-  const [tab, setTab] = useState<LockerTab>('recent')
+  const [tab, setTab] = useState<LockerTab>(props.initialTab ?? 'recent')
   /** permanent shelf: past seasons where this player ended holding records */
   const [awards, setAwards] = useState<SeasonAward[]>([])
   useEffect(() => {

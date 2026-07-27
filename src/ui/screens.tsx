@@ -12,6 +12,7 @@ import { fetchCourseRecords, fetchSeasonRecords, loadPlayer, type CourseRecord }
 import { seasonCountdown, seasonForDate } from '../engine/season'
 import { FortuneInfo } from './Tutorial'
 import { ChangeLog } from './ChangeLog'
+import type { Unlock } from '../state/achievements'
 import { Wordmark } from './Wordmark'
 import { dismissSteals, pendingSteals, syncLedger, type StolenRecord } from '../lib/records'
 import { loadGhost, type Ghost } from '../state/ghost'
@@ -696,6 +697,10 @@ export function ResultScreen(props: {
   /** the ghost race's quiet close: final margin vs the chased round */
   ghostClose?: { margin: number; kind: 'record' | 'personal'; holder: string | null } | null
   history: HistoryEntry[]
+  /** achievements this round earned — the wrap card renders only when some did */
+  unlocks?: Unlock[]
+  /** deep-link into the Clubhouse Awards tab */
+  onAwards?: () => void
   onHome: () => void
   onPracticeAgain: () => void
 }) {
@@ -871,6 +876,26 @@ export function ResultScreen(props: {
           <p className="fine coach-line">{gradeCopy(props.grade).decisionLine}</p>
           <p className="fine coach-line">{gradeCopy(props.grade).luckLine}</p>
         </div>
+      )}
+      {/* achievements this round earned — durable record of what the toasts
+          announced, and the door to the full trophy room. Absent entirely on
+          a round that earned nothing. */}
+      {props.unlocks && props.unlocks.length > 0 && props.onAwards && (
+        <button className="ach-earned" onClick={props.onAwards}>
+          <span className="kicker">
+            Achievement{props.unlocks.length === 1 ? '' : 's'} earned this round
+          </span>
+          {props.unlocks.map((u) => (
+            <span key={u.id} className="ach-earned-row">
+              <b>
+                {u.name}
+                {u.count ? <em className="ach-count"> ×{u.count}</em> : null}
+              </b>
+              <span className="ach-earned-detail">{u.detail}</span>
+            </span>
+          ))}
+          <span className="ach-earned-link">See all awards ›</span>
+        </button>
       )}
       {/* the share card sits ABOVE the board: brag first, standings second */}
       {!props.practice && (

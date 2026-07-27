@@ -133,8 +133,14 @@ export default function App() {
   const [mapRef, mapSize] = useMapSize()
   /** the full-18 round card, opened by tapping the header score chip */
   const [showCard, setShowCard] = useState(false)
-  /** achievements newly earned by the round that just finished — toast queue */
+  /** achievements newly earned by the round that just finished — feeds both
+   * the toast queue and the wrap screen's earned-this-round card */
   const [unlocks, setUnlocks] = useState<Unlock[]>([])
+  /** deep-link the Clubhouse onto a tab (the wrap's achievements card) */
+  const [lockerTab, setLockerTab] = useState<'recent' | 'awards'>('recent')
+  /** the toast rail dismissed — the wrap card must OUTLIVE the toasts, so the
+   * rail hides via this flag while `unlocks` persists until the wrap is left */
+  const [toastsDone, setToastsDone] = useState(false)
 
   useEffect(() => {
     saveRound(round)
@@ -447,6 +453,7 @@ export default function App() {
       <RoundsScreen
         initialView={lockerView}
         initialAccount={lockerAccount}
+        initialTab={lockerTab}
         onWatch={(p) => {
           setWatching(p)
           setView('watch')
@@ -454,6 +461,7 @@ export default function App() {
         onHistorySynced={handleHistorySynced}
         onBack={() => {
           setLockerAccount(false)
+          setLockerTab('recent')
           setView('home')
         }}
       />
@@ -513,7 +521,7 @@ export default function App() {
     const grade = recapSource ? roundGrade : null
     return (
       <>
-        {unlocks.length > 0 && <UnlockToasts unlocks={unlocks} onDone={() => setUnlocks([])} />}
+        {unlocks.length > 0 && !toastsDone && <UnlockToasts unlocks={unlocks} onDone={() => setToastsDone(true)} />}
         <ResultScreen
           setup={setup}
           results={results}
@@ -529,11 +537,20 @@ export default function App() {
           }
           character={isPractice && round ? round.character : entry?.character}
           history={history}
-          onHome={() => setView('home')}
+          unlocks={unlocks}
+          onAwards={() => {
+            setLockerTab('awards')
+            setView('rounds')
+          }}
+          onHome={() => {
+            setUnlocks([])
+            setView('home')
+          }}
           onPracticeAgain={() => {
             if (round) {
               // rematch on the same course, but pick your player fresh each run
               // (round_started is tracked by the pick screen's onPick)
+              setUnlocks([])
               setPending({ mode: 'practice', setup: practiceSetup(round.courseSlug, `${Date.now()}`) })
               setView('pick')
             }
@@ -625,6 +642,7 @@ export default function App() {
       // read-only pass over the stats the round just moved; anything newly
       // earned toasts over the wrap screen, politely queued
       setUnlocks(reconcileAchievements('live'))
+      setToastsDone(false)
       setResultFor(after.mode)
       setView('result')
     }

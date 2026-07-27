@@ -3561,6 +3561,30 @@ button {
     grid-column: 2;
     grid-row: 3;
   }
+
+  /* Ghost/record chips carry no placement of their own: rows 1-2 are taken
+     full-width by the header and row 3's two cells are pinned by the map and
+     panel, so auto-placement dropped them into an implicit row BELOW the play
+     area and into column 1 alone — a ghost round rendered its pace target
+     under the map at roughly half width. Pin them full-width above it.
+
+     The extra track is added only on rounds that HAVE a chip, because this
+     grid inherits .screen's 10px row-gap (the media query overrides
+     column-gap alone). An always-present empty track would still be charged
+     that gap and would push the map down on every ordinary round. */
+  .screen.play:has(.ghost-chip-row) {
+    grid-template-rows: auto auto auto minmax(0, 1fr);
+  }
+
+  .screen.play .ghost-chip-row {
+    grid-column: 1 / -1;
+    grid-row: 3;
+  }
+
+  .screen.play:has(.ghost-chip-row) .map-wrap,
+  .screen.play:has(.ghost-chip-row) .panel {
+    grid-row: 4;
+  }
 }
 
 @media (max-width: 420px) {

@@ -417,7 +417,10 @@ export const COURSES: CourseSpec[] = [
       [5, 555, 13, 'R', 'sand'],
       [4, 495, 1, 'L', 'sand'],
       [3, 205, 15, 'S', 'sand'],
-      [4, 390, 7, 'S', 'sand', 'The famous sixth — a diagonal wall of sand splits the fairway'],
+      // Copy corrected with the geometry import: nothing splits this fairway.
+      // The sand pinches the RIGHT (the property-line side), and the defense is
+      // a long, narrow green — the one Hogan hit approaches into to get ready.
+      [4, 390, 7, 'S', 'sand', 'Hogan’s favorite approach — sand pinches the right, and the green is a sliver'],
       [4, 430, 3, 'R', 'sand'],
       [3, 225, 9, 'S', 'sand'],
       [5, 545, 11, 'L', 'water'],

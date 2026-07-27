@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { COURSES } from './courses'
 import { buildLayout, reachableZones } from './layout'
-import { longOdds, approachOdds, puttOdds, shortOdds } from './odds'
+import { longOdds, approachOdds, puttOdds, shortOdds, driveWindow } from './odds'
 import { startHole, playShot, oddsFor, type HoleInPlay } from './resolve'
 import { rngFromString } from './rng'
 import type { Choice, Conditions } from './types'
@@ -113,13 +113,39 @@ describe('odds invariants', () => {
       for (const spec of c.holes) {
         if (spec.par === 3) continue
         const layout = buildLayout(c.slug, spec)
+        // This bracket compares the two shots' TROUBLE odds, which only means
+        // something while aggressive is flying at something. On a hole whose
+        // hazards all sit SHORT of the driving zone, the aggressive window
+        // clears them into empty ground and falls back to the junk floor,
+        // while safe lands among them — so the ratio inverts on geometry, not
+        // because the odds have gone soft. Seminole's 6th is the case that
+        // found it: sand flanks 197-251 where a stock safe drive finishes and
+        // 251-312 is completely clean (verified against every bunker polygon
+        // within 80 yd of the centreline, and against imagery).
+        //
+        // Deliberately narrow — it needs the aggressive window to reach
+        // NOTHING while the safe window reaches something, which is 6 holes of
+        // the library (carnoustie 2/9, cypress-point 6, whistling-straits 10,
+        // oakmont 7, seminole 6); five of those clear the ratio anyway. Those
+        // holes still have to keep safe bankable in absolute terms, which is
+        // the property this bracket exists to protect, so they are asserted
+        // against the same cap the brutal-conditions test uses rather than
+        // skipped. Do NOT widen this to "aggressive reaches less than safe" —
+        // that would excuse exactly the phantom-hazard imports the bracket is
+        // meant to catch.
+        const aggWindow = driveWindow('aggressive', 0, layout)
+        const safeWindow = driveWindow('safe', 0, layout)
+        const aggClear =
+          reachableZones(layout, 0, aggWindow[0], aggWindow[1]).length === 0 &&
+          reachableZones(layout, 0, safeWindow[0], safeWindow[1]).length > 0
         for (const cond of CONDS) {
           const ball = { pos: 0, lie: 'tee', side: 'center' } as const
           const safe = longOdds(layout, cond, ball, 'safe', 'tee').odds
           const agg = longOdds(layout, cond, ball, 'aggressive', 'tee').odds
           const badSafe = safe.sand + safe.trees + safe.water
           const badAgg = agg.sand + agg.trees + agg.water
-          expect(badAgg).toBeGreaterThanOrEqual(badSafe * 2.5)
+          if (aggClear) expect(badSafe).toBeLessThanOrEqual(0.045)
+          else expect(badAgg).toBeGreaterThanOrEqual(badSafe * 2.5)
         }
       }
     }

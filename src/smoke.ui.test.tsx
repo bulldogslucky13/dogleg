@@ -146,6 +146,64 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
     expect(screen.getByText('Clubhouse')).toBeTruthy()
   })
 
+  it('the Play Rating explainer opens outside the card it was opened from', () => {
+    localStorage.setItem('dogleg:tutorial:v1', 'done')
+    render(<App />)
+    fireEvent.click(screen.getAllByRole('button', { name: /Play Rating/ })[0])
+    const dialog = screen.getByRole('dialog', { name: /How Play Rating is calculated/i })
+    // It MUST be portalled to the body. The today-card and played course rows
+    // carry a clip-path (the earned notch), and a clip-path ancestor crops even
+    // position:fixed descendants — which cropped this dialog to that card.
+    expect(dialog.parentElement).toBe(document.body)
+    expect(dialog.closest('.today-card')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }))
+    expect(screen.queryByRole('dialog', { name: /How Play Rating/i })).toBeNull()
+  })
+
+  it('the Teebox footer opens the change log, whose odds count matches its entries', async () => {
+    localStorage.setItem('dogleg:tutorial:v1', 'done')
+    const { CHANGELOG } = await import('./lib/changelog')
+    render(<App />)
+    // it must not greet anyone unasked
+    expect(screen.queryByText('Every update, in the open')).toBeNull()
+    fireEvent.click(screen.getByText('Change log'))
+    expect(screen.getByText('Every update, in the open')).toBeTruthy()
+    // the intro's counts are derived from the list, so they can't drift from it
+    const odds = CHANGELOG.filter((c) => c.kind === 'odds').length
+    expect(
+      screen.getByText(
+        new RegExp(`${CHANGELOG.length} updates since DogLeg opened.*The ${odds} marked`),
+      ),
+    ).toBeTruthy()
+    // every entry is dated and titled — the log is the record, so no blanks
+    expect(screen.getAllByRole('listitem').length).toBe(CHANGELOG.length)
+    for (const entry of CHANGELOG) expect(screen.getByText(entry.title)).toBeTruthy()
+    fireEvent.click(screen.getByText('Got it'))
+    expect(screen.queryByText('Every update, in the open')).toBeNull()
+  })
+
+  it("the home Fortune callout opens How to Play's Fortunes page without consuming the tutorial", () => {
+    localStorage.setItem('dogleg:tutorial:v1', 'done')
+    render(<App />)
+    // the callout is tappable on the home screen and wears the ⓘ
+    fireEvent.click(screen.getByRole('button', { name: 'How Fortunes work' }))
+    // it renders the SAME copy as the tutorial's last step — one source of truth
+    expect(screen.getByText('How to play · Fortunes')).toBeTruthy()
+    expect(screen.getByText(/out of pure luck/)).toBeTruthy()
+    // the popup is not the tutorial: no sync line (How to Play keeps the only
+    // mention), and no step navigation
+    expect(screen.queryByText(/Playing on more than one device/)).toBeNull()
+    expect(screen.queryByText('Next')).toBeNull()
+    fireEvent.click(screen.getByText('Got it'))
+    expect(screen.queryByText('How to play · Fortunes')).toBeNull()
+
+    // a first-time player who taps it must STILL get the full walkthrough
+    localStorage.removeItem('dogleg:tutorial:v1')
+    fireEvent.click(screen.getByRole('button', { name: 'How Fortunes work' }))
+    fireEvent.click(screen.getByText('Got it'))
+    expect(localStorage.getItem('dogleg:tutorial:v1')).toBeNull()
+  })
+
   it('the season splash shows once after a rollover, explains the goal, then never again', () => {
     localStorage.removeItem('dogleg:season-ack:v1')
     const first = render(<App />)
@@ -324,6 +382,37 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
     expect(screen.queryByText(/Season record open/)).toBeNull()
   })
 
+  it('the Clubhouse scorecard opens on paper, outside the dark screen', async () => {
+    const { newRound, applyChoice, advanceHole, archiveRound } = await import('./state/store')
+    const { logRound } = await import('./state/stats')
+    const { practiceSetup } = await import('./engine/daily')
+    let s = newRound(practiceSetup('pebble-beach', 'smokescorecard'), 'practice', 'dart')
+    let guard = 0
+    while (!s.complete && guard++ < 500) {
+      if (s.hole?.stage === 'done') {
+        s = advanceHole(s)
+        continue
+      }
+      const next = applyChoice(s, 'normal')
+      s = next === s ? applyChoice(s, 'safe') : next
+    }
+    archiveRound(s)
+    logRound(s)
+
+    render(<App />)
+    fireEvent.click(screen.getByText(/🏆 Clubhouse/))
+    fireEvent.click(screen.getAllByText('Scorecard')[0])
+    const sheet = screen.getByRole('dialog', { name: 'Scorecard' })
+    // The sheet is paper. Nested in the (dark) Clubhouse it inherited cream ink
+    // onto cream stock and everything unstyled on it vanished, so it must live
+    // outside that screen — the same rule the Play Rating dialog follows.
+    expect(sheet.parentElement).toBe(document.body)
+    expect(sheet.closest('.screen.rounds')).toBeNull()
+    // and the card's own furniture is present, not just the coloured scores
+    expect(sheet.querySelector('.sc-row.sc-foot')).toBeTruthy()
+    expect(screen.getByText('Out')).toBeTruthy()
+  })
+
   it('the Clubhouse has a Seasons tab with the in-progress season and archive framing', async () => {
     const { newRound, applyChoice, advanceHole, archiveRound } = await import('./state/store')
     const { logRound } = await import('./state/stats')
@@ -342,7 +431,7 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
     logRound(s)
 
     render(<App />)
-    fireEvent.click(screen.getByText(/Clubhouse · my rounds/))
+    fireEvent.click(screen.getByText(/🏆 Clubhouse/))
     fireEvent.click(screen.getByText('Seasons'))
     expect(screen.getByText(/in progress — ends in/)).toBeTruthy()
     expect(screen.getByText(/1 round this season/)).toBeTruthy()
@@ -1060,7 +1149,7 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
     archiveRound(s)
 
     render(<App />)
-    fireEvent.click(screen.getByText(/Clubhouse · my rounds/))
+    fireEvent.click(screen.getByText(/🏆 Clubhouse/))
 
     // the trophy shelf sits on top — empty but visible: the zero IS the goal
     expect(screen.getByText('Lifetime Hole in One')).toBeTruthy()
@@ -1118,7 +1207,7 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
     )
 
     render(<App />)
-    fireEvent.click(screen.getByText(/Clubhouse · my rounds/))
+    fireEvent.click(screen.getByText(/🏆 Clubhouse/))
     // two distinct courses, one row each — never one CR per record-ever
     fireEvent.click(screen.getByText(/Records · 2/))
 
@@ -1159,7 +1248,7 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
     )
 
     render(<App />)
-    fireEvent.click(screen.getByText(/Clubhouse · my rounds/))
+    fireEvent.click(screen.getByText(/🏆 Clubhouse/))
     fireEvent.click(screen.getByText(/Records · 1/))
 
     // the +1 local round doesn't match the -6 held score → no CR, stays a PR
@@ -1194,7 +1283,7 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
     )
 
     render(<App />)
-    fireEvent.click(screen.getByText(/Clubhouse · my rounds/))
+    fireEvent.click(screen.getByText(/🏆 Clubhouse/))
     fireEvent.click(screen.getByText(/Records · 1/))
 
     // the held record survives — one CR row at -3, the unconfirmed -5 doesn't
@@ -1224,7 +1313,7 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
     logRound(s)
 
     render(<App />)
-    fireEvent.click(screen.getByText(/Clubhouse · my rounds/))
+    fireEvent.click(screen.getByText(/🏆 Clubhouse/))
     fireEvent.click(screen.getByText(/Lifetime rounds played/))
 
     // one round in the book: no handicap yet, countdown says how far to go
@@ -1262,7 +1351,7 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
     )
 
     render(<App />)
-    fireEvent.click(screen.getByText(/Clubhouse · my rounds/))
+    fireEvent.click(screen.getByText(/🏆 Clubhouse/))
     // the ace trophy counted it from stored results alone
     const aceTrophy = screen.getByText('Lifetime Hole in One').closest('button')!
     expect(within(aceTrophy).getByText('1')).toBeTruthy()

@@ -686,6 +686,15 @@ export default function App() {
         <div className="hole-right">
           <div className={`topar ${toPar < 0 ? 'good' : toPar > 0 ? 'bad' : ''}`}>{toParLabel(toPar)} to par</div>
           <div className="yards">{hole.layout.length} yards</div>
+        </div>
+      </header>
+      {/* Ghost/record chips get their own row rather than living inside
+          .hole-right: that block refuses to shrink (flex-shrink: 0), so a
+          230px chip inside it squeezed the par/course text to ~11px — "Par 4 ·
+          SI 8" wrapped and the course name clipped to its first letter on
+          every ghost round. Visually this is where the chips already sat. */}
+      {(ghost || chase) && (
+        <div className="ghost-chip-row">
           {ghost &&
             (() => {
               const pace = paceVs(ghost, round.scores, round.courseSlug)
@@ -705,7 +714,7 @@ export default function App() {
             <div className="chase-chip">🎯 Record {toParLabel(chase.theirToPar)} · {chase.by}</div>
           )}
         </div>
-      </header>
+      )}
 
       <div ref={mapRef} className={`map-wrap${classic && hole.stage !== 'putt' ? ' side' : ''}`}>
         {hole.stage === 'putt' ? (

@@ -1,0 +1,1029 @@
+/* ============================================================================
+   Broadcast re-skin — APPLICATION layer (menus + opening screens only)
+   ----------------------------------------------------------------------------
+   Loaded after styles.css; every rule here is scoped to the menu surfaces:
+
+     .screen.home        Teebox (main menu)
+     .screen.rounds      Clubhouse (stats / records / seasons)
+     .tut-card           How to Play + season splash (rides the same card)
+
+   The in-round play screen (.screen.play), pick, result, and replay keep the
+   classic paper look untouched — this pass is menus/opening screens per the
+   re-skin scope. All values come from ui/theme.css tokens; tweak there.
+   ========================================================================= */
+
+/* ------------------------------------------------------------ shared base */
+
+.screen.home,
+.screen.rounds {
+  background: linear-gradient(180deg, var(--turf-800) 0%, var(--turf-900) 60%);
+  color: var(--text-hi);
+  border: 1px solid var(--edge-hairline);
+  box-shadow: var(--shadow-card);
+  font-family: var(--font-ui);
+}
+
+:is(.screen.home, .screen.rounds) .kicker {
+  color: var(--text-low);
+  letter-spacing: var(--track-kicker);
+}
+
+:is(.screen.home, .screen.rounds) .tagline {
+  color: var(--text-mid);
+}
+
+:is(.screen.home, .screen.rounds) .fine {
+  color: var(--text-low);
+}
+
+/* stat tiles become broadcast "bugs": keyline + big display numeral */
+:is(.screen.home, .screen.rounds) .stat {
+  background: var(--bg-card);
+  border: none;
+  border-left: var(--keyline-w) solid var(--tracer-400);
+  /* tight left corners keep the keyline a crisp broadcast bar, not a curl */
+  border-radius: 3px var(--r-bug) var(--r-bug) 3px;
+  text-align: center;
+  padding: 11px 8px 10px;
+}
+
+/* the label holds one line under a centered numeral */
+:is(.screen.home, .screen.rounds) .stat span {
+  white-space: nowrap;
+  font-size: 0.58rem;
+  letter-spacing: 0.1em;
+}
+
+:is(.screen.home, .screen.rounds) .stat:nth-child(2) {
+  border-left-color: var(--flag-500);
+}
+
+:is(.screen.home, .screen.rounds) .stat:nth-child(3) {
+  border-left-color: var(--trophy-400);
+}
+
+:is(.screen.home, .screen.rounds) .stat b {
+  font-family: var(--font-display);
+  font-variation-settings: 'wdth' var(--wdth-score);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+:is(.screen.home, .screen.rounds) .stat span {
+  color: var(--text-low);
+}
+
+/* primary CTA: color-blocked flag slab (no notch — notches are earned) */
+:is(.screen.home, .screen.rounds) .cta {
+  background: linear-gradient(180deg, var(--flag-400), var(--flag-500));
+  color: var(--action-on-primary);
+  border-radius: var(--r-bug);
+  font-family: var(--font-display);
+  font-variation-settings: 'wdth' 88;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  font-size: 1rem;
+}
+
+/* stacked two-level action label: PLAY UNLIMITED / browse courses */
+:is(.screen.home, .screen.rounds) .cta .cta-sub {
+  display: block;
+  font-family: var(--font-ui);
+  font-variation-settings: normal;
+  font-weight: 600;
+  font-size: 0.68rem;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  opacity: 0.7;
+  margin-top: 1px;
+}
+
+:is(.screen.home, .screen.rounds) .cta:active {
+  filter: brightness(0.92);
+}
+
+/* The played daily wears the earned notch on its CTA too — but scaled to the
+   object. The card's 24px cut is 12% of its height; on this ~50px button the
+   identical cut is 48%, which reads as a different, much bigger tool rather
+   than the same punch. Same 45° angle, smaller bite. */
+:is(.screen.home, .screen.rounds) .cta.notched {
+  clip-path: polygon(15px 0, 100% 0, 100% 100%, 0 100%, 0 15px);
+  border-radius: 0;
+}
+
+/* secondary actions: hairline outline, no slab — compact, they're wayfinding
+   rather than the headline act */
+:is(.screen.home, .screen.rounds) .cta.ghost {
+  background: transparent;
+  clip-path: none;
+  border-radius: var(--r-bug);
+  border: 1.5px solid var(--edge-strong);
+  color: var(--text-hi);
+  padding: 9px 14px;
+  font-size: 0.86rem;
+}
+
+:is(.screen.home, .screen.rounds) :focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* ----------------------------------------------------------------- Teebox */
+
+/* "DAILY GOLF CHALLENGE · NO. N" holds one line beside the pill */
+.screen.home .masthead-top .kicker {
+  white-space: nowrap;
+  font-size: 0.64rem;
+}
+
+/* ---------------------------------------------------------- the lockup ----
+   The kicker and tagline sit in the wordmark's negative space instead of
+   taking rows of their own: either side of the pennant (which has nothing
+   under it but empty sky) and either side of the cup (below the descenders).
+   That buys back two rows of vertical space at the top of the screen.
+
+   Every offset below is the mark's OWN geometry, from the viewBox the
+   generator prints (0 2 289 151.5):
+     pole left 37.44 · pennant tip 90 · cup 182..240
+     pennant centre y 17 · cup centre y 143   (both less the viewBox's y=2)
+   Change --mark-w and the whole composition tracks it. */
+.screen.home .masthead .lockup {
+  --mark-w: 200px;
+  position: relative;
+  width: 100%;
+}
+
+.screen.home .masthead h1.wordmark {
+  margin: 0;
+  line-height: 0;
+  color: var(--text-hi);
+}
+
+.screen.home .masthead h1.wordmark svg {
+  display: block;
+  width: min(100%, var(--mark-w));
+  height: auto;
+}
+
+.screen.home .masthead .lockup > :not(h1) {
+  position: absolute;
+  margin: 0;
+}
+
+/* top row — right of the pennant's tip, at its mid-height (17 → 9.9% of the
+   box), running out past the mark into the screen */
+.screen.home .lockup-kicker {
+  top: 9.9%;
+  transform: translateY(-50%);
+  left: calc(var(--mark-w) * 90 / 289 + 7px);
+  right: 0;
+  font-size: 0.56rem;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--text-low);
+  line-height: 1.15;
+}
+
+/* bottom row — beside the cup, at its mid-height (143 → 93.1% of the box) */
+/* Sized to the largest that keeps BOTH halves on one line in their slots at
+   320px, the binding width. The left slot is capped by the cup's left edge, so
+   the tagline is set in the condensed display face rather than the UI face —
+   that alone buys ~20% more size at the same slot width, and it is the same
+   'tower' width the leaderboards use. Re-measure if the copy or --mark-w
+   changes; in Barlow the ceiling here was 11.5px. */
+.screen.home .lockup-tag,
+.screen.home .lockup-tag-end {
+  top: 93.1%;
+  transform: translateY(-50%);
+  font-family: var(--font-display);
+  font-variation-settings: 'wdth' var(--wdth-tower);
+  font-size: 0.81rem;
+  font-weight: 600;
+  letter-spacing: 0.005em;
+  color: var(--text-mid);
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.screen.home .lockup-tag {
+  left: 0;
+  width: calc(var(--mark-w) * 182 / 289 - 7px);
+  text-align: right;
+}
+
+.screen.home .lockup-tag-end {
+  left: calc(var(--mark-w) * 240 / 289 + 7px);
+  right: 0;
+}
+
+.screen.home .how-to-play {
+  color: var(--text-mid);
+  border-color: var(--edge-strong);
+}
+
+/* today's course: the light lower-third slab — sand block, flag keyline.
+   The corner notch is EARNED: .notched (today's round in the books) punches
+   the corner like a marked paper scorecard; unplayed cards stay square. */
+.screen.home .today-card {
+  background: var(--bg-blocked);
+  color: var(--text-on-block);
+  border-radius: var(--r-card);
+  box-shadow: inset 4px 0 0 var(--flag-500);
+  padding-left: 20px;
+}
+
+.screen.home .today-card.notched {
+  clip-path: var(--clip-notch);
+  border-radius: 0;
+}
+
+/* Edge-punched like a notched-edge card: a row of real holes along the top,
+   one per hole of the round (18). Cut with a mask rather than painted, so the
+   turf behind genuinely shows through them.
+   The mapping is the honest one from the real thing: the holes come with the
+   card, and the corner NOTCH is what gets cut later — so the punches are
+   always there and the notch stays the part you earn by playing. The notch
+   swallowing the first hole is how a real notched-edge card works too.
+   NB anything position:fixed inside this card is clipped by the mask, same as
+   by the clip-path — dialogs in here must be portalled (see PlayRating). */
+.screen.home .today-card {
+  --punch-r: 4px;
+  --punch-y: 7.5px;
+  --punch-count: 18;
+  -webkit-mask-image: radial-gradient(
+    circle var(--punch-r) at 50% var(--punch-y),
+    transparent 82%,
+    #000 100%
+  );
+  mask-image: radial-gradient(
+    circle var(--punch-r) at 50% var(--punch-y),
+    transparent 82%,
+    #000 100%
+  );
+  -webkit-mask-size: calc(100% / var(--punch-count)) 100%;
+  mask-size: calc(100% / var(--punch-count)) 100%;
+  -webkit-mask-repeat: repeat-x;
+  mask-repeat: repeat-x;
+}
+
+.screen.home .today-card .kicker {
+  color: var(--text-on-block-mid);
+}
+
+.screen.home .today-card h2 {
+  font-family: var(--font-display);
+  font-variation-settings: 'wdth' var(--wdth-tower);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: var(--track-tower);
+  font-size: 1.55rem;
+}
+
+.screen.home .today-card p {
+  color: var(--text-on-block-mid);
+  font-size: 0.88rem;
+}
+
+.screen.home .today-card .blurb {
+  color: var(--text-on-block-mid);
+  font-size: 0.8rem;
+}
+
+/* caddy's-read chips hold one line: smaller, and scroll if they must */
+.screen.home .today-card .chips {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.screen.home .today-card .chips::-webkit-scrollbar {
+  display: none;
+}
+
+.screen.home .today-card .chip {
+  font-size: 0.7rem;
+  padding: 3px 9px;
+}
+
+.screen.home .today-card .chip.dark {
+  background: rgba(15, 34, 22, 0.08);
+  border-color: rgba(15, 34, 22, 0.22);
+  color: var(--text-on-block);
+}
+
+.screen.home .today-card .chip.sig {
+  background: rgba(196, 154, 32, 0.14);
+  border-color: rgba(196, 154, 32, 0.6);
+  color: #8a6c12;
+}
+
+.screen.home .cta-tease {
+  color: var(--text-mid);
+}
+
+/* unlimited-play course browser: tower rows */
+.screen.home .course-tabs {
+  border-color: var(--edge-strong);
+}
+
+.screen.home .course-tab {
+  color: var(--text-mid);
+}
+
+.screen.home .course-tab.active {
+  background: var(--bg-blocked);
+  color: var(--text-on-block);
+  font-weight: 700;
+}
+
+.screen.home .course-row {
+  background: var(--bg-card);
+  border: none;
+  border-radius: var(--r-bug);
+}
+
+/* played courses get their corner punched, scorecard-style */
+.screen.home .course-row.notched {
+  clip-path: polygon(18px 0, 100% 0, 100% 100%, 0 100%, 0 18px);
+  border-radius: 0;
+}
+
+.screen.home .course-row b {
+  font-family: var(--font-display);
+  font-variation-settings: 'wdth' var(--wdth-tower);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: var(--track-tower);
+  font-size: 1.02rem;
+}
+
+.screen.home .course-row span {
+  color: var(--text-low);
+}
+
+.screen.home .course-cr {
+  color: var(--text-mid);
+}
+
+.screen.home .course-cr.open {
+  color: var(--success);
+}
+
+.screen.home .season-countdown {
+  border-color: rgba(85, 191, 226, 0.4);
+  color: var(--text-mid);
+}
+
+.screen.home .par3-intro {
+  border-color: var(--edge-strong);
+}
+
+/* character mini-records */
+.screen.home .char-record {
+  border-color: var(--edge-hairline);
+  background: var(--bg-card);
+}
+
+.screen.home .char-record-text span {
+  color: var(--text-low);
+}
+
+/* record-steal rivalry card: already dark — keep it, punch the accents */
+.screen.home .steal-card {
+  background: var(--turf-950);
+  border: 1px solid rgba(226, 185, 59, 0.4);
+}
+
+.screen.home .steal-card .kicker {
+  color: var(--record-gold);
+}
+
+.screen.home .steal-cta {
+  background: linear-gradient(180deg, var(--flag-400), var(--flag-500));
+  color: var(--action-on-primary);
+}
+
+.screen.home .stale-banner {
+  background: var(--bg-blocked);
+  color: var(--text-on-block);
+}
+
+/* tomorrow's forecast: a compact gold-keyline bug instead of a cream card */
+.screen.home .forecast {
+  background: var(--bg-card);
+  border: none;
+  border-left: var(--keyline-w) solid var(--trophy-400);
+  border-radius: 3px var(--r-bug) var(--r-bug) 3px;
+  padding: 8px 12px;
+  gap: 3px;
+}
+
+.screen.home .forecast .kicker {
+  color: var(--trophy-400);
+}
+
+.screen.home .forecast-line {
+  color: var(--text-mid);
+  font-size: 0.8rem;
+  gap: 4px 6px;
+}
+
+.screen.home .forecast-line b {
+  font-family: var(--font-display);
+  font-variation-settings: 'wdth' var(--wdth-tower);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: var(--track-tower);
+  font-size: 0.92rem;
+  color: var(--text-hi);
+}
+
+.screen.home .forecast .chip {
+  background: var(--bg-elevated);
+  border-color: var(--edge-hairline);
+  color: var(--text-mid);
+  font-size: 0.68rem;
+  padding: 2px 8px;
+}
+
+/* chips wrap rather than clip — nothing runs off-screen */
+.screen.home .forecast .chips {
+  flex-wrap: wrap;
+}
+
+/* base for the note's headline wherever StreakNote renders (result screen
+   included, which otherwise keeps the paper look) */
+.streak-note .streak-note-head {
+  display: block;
+  font-style: normal;
+  font-weight: 700;
+}
+
+/* fortunes note: a gold callout that earns its spot — two lines, no whisper.
+   It SPOUTS from the streaks row above it (a tail pointing up at the day-streak
+   bug) so the link between keeping a streak and Fortune odds reads visually,
+   not just in the copy. Tapping it opens How to Play's Fortunes page. */
+.screen.home .streak-note {
+  position: relative;
+  font-style: normal;
+  text-align: left;
+  width: 100%;
+  background: var(--bg-card);
+  border: none;
+  border-left: var(--keyline-w) solid var(--trophy-400);
+  border-radius: 3px var(--r-bug) var(--r-bug) 3px;
+  padding: 9px 34px 9px 12px;
+  font-size: 0.74rem;
+  color: var(--text-mid);
+  /* pulls up against the streaks row so the tail can bridge the gap */
+  margin-top: -6px;
+  display: block;
+}
+
+/* the tail, aimed at the first (day streak) bug */
+.screen.home .streak-note::before {
+  content: '';
+  position: absolute;
+  left: 15%;
+  top: -8px;
+  width: 18px;
+  height: 9px;
+  background: var(--bg-card);
+  clip-path: polygon(50% 0, 100% 100%, 0 100%);
+}
+
+.screen.home .streak-note-info {
+  position: absolute;
+  top: 50%;
+  right: 11px;
+  transform: translateY(-50%);
+  font-size: 0.95rem;
+  color: var(--trophy-400);
+  line-height: 1;
+}
+
+.screen.home button.streak-note {
+  cursor: pointer;
+  transition: background 120ms ease;
+}
+
+.screen.home button.streak-note:active {
+  background: var(--bg-elevated);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .screen.home button.streak-note {
+    transition: none;
+  }
+}
+
+.screen.home .streak-note .streak-note-head {
+  display: block;
+  font-style: normal;
+  font-weight: 700;
+  font-size: 0.64rem;
+  letter-spacing: var(--track-kicker);
+  text-transform: uppercase;
+  color: var(--trophy-400);
+  margin-bottom: 2px;
+}
+
+/* -------------------------------------------------------------- Clubhouse */
+
+:is(.screen.home, .screen.rounds) .home-link {
+  color: var(--text-mid);
+}
+
+.screen.rounds .pick-title {
+  font-family: var(--font-display);
+  font-variation-settings: 'wdth' var(--wdth-tower);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: var(--track-tower);
+}
+
+/* three tabs share one row instead of stranding SEASONS on its own line */
+.screen.rounds .locker-tabs {
+  display: flex;
+  gap: 8px;
+}
+
+.screen.rounds .locker-tab {
+  flex: 1;
+  white-space: nowrap;
+}
+
+.screen.rounds .locker-tab {
+  color: var(--text-mid);
+  border-color: var(--edge-strong);
+}
+
+.screen.rounds .locker-tab.on {
+  background: var(--bg-blocked);
+  border-color: var(--bg-blocked);
+  color: var(--text-on-block);
+}
+
+/* dark-card version of the sync banner (it is cream on the paper theme) */
+.screen.rounds .sync-cta,
+.screen.home .sync-cta,
+.tut-card .sync-cta {
+  background: var(--bg-card);
+  border-color: var(--edge-strong);
+  color: var(--text-hi);
+}
+
+.screen.rounds .sync-cta em,
+.screen.home .sync-cta em,
+.tut-card .sync-cta em {
+  color: var(--tracer-400);
+}
+
+.screen.rounds .stats-headline b {
+  color: var(--text-hi);
+}
+
+.screen.rounds .stats-headline span {
+  color: var(--text-mid);
+}
+
+/* empty trophy shelf: dashed dark card instead of dashed cream */
+.screen.rounds .trophy.empty {
+  background: var(--bg-card);
+  border-color: var(--edge-strong);
+  color: var(--text-low);
+}
+
+.screen.rounds .round-row {
+  background: var(--bg-card);
+  border: none;
+  border-radius: var(--r-bug);
+}
+
+.screen.rounds .round-row-text b {
+  font-family: var(--font-display);
+  font-variation-settings: 'wdth' var(--wdth-tower);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: var(--track-tower);
+}
+
+.screen.rounds .round-row-text span {
+  color: var(--text-low);
+}
+
+/* Names are shortened at the variant dash (see ui/courseName.ts), so they fit —
+   and if a long one still doesn't, it wraps rather than ellipsising. Clipping
+   mid-word ("ROYAL PORTRUS…") read as broken; two tidy lines don't. */
+.screen.rounds .round-row-text b {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+}
+
+/* `.slim` is a SIZE modifier from styles.css (.round-actions .cta.slim). The
+   .cta.ghost rule above matches at identical specificity — :is() counts as its
+   heaviest argument, so both are three classes — and this file loads second, so
+   it had been silently inflating these row buttons to full size. They were
+   taking 120px of a 317px row, more than the course name got. Re-assert the
+   compact metrics rather than fight it with :not(). */
+.screen.rounds .round-actions .cta.slim {
+  padding: 5px 9px;
+  font-size: 0.6rem;
+}
+
+/* The two badges are ranked by how much gold they're allowed to wear: a
+   personal best gets a gold EDGE (your own wall), a course record gets the
+   whole bubble filled (everybody's wall). Gold is the theme's records-only
+   signal, so this reads as a promotion rather than two unrelated colours. */
+.screen.rounds .round-badge.pr {
+  background: transparent;
+  border: 1.5px solid var(--trophy-400);
+  color: var(--trophy-300);
+}
+
+.screen.rounds .round-badge.cr {
+  background: var(--trophy-400);
+  border: 1.5px solid var(--trophy-400);
+  color: var(--turf-900);
+}
+
+/* A round's to-par. The paper theme paints an under-par score in a dark green
+   (#2e6329) that all but vanishes on turf — which is why beating par read as
+   the quietest thing on the page. On dark it takes the bright fairway green
+   instead, and a tint behind it, so the good rounds are what catches the eye. */
+.screen.rounds .round-score {
+  font-family: var(--font-display);
+  font-variation-settings: 'wdth' var(--wdth-score);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-mid);
+}
+
+/* Under par is the number people came to see, and green text on a green card
+   was legible (6.7:1) but tonally invisible — it read as more background. So it
+   gets COLOUR-BLOCKED instead: solid fairway green, dark ink on top. Same trick
+   as the lower-third slabs, and it pops without going red, which would collide
+   with the scorecard's red bogey boxes. */
+.screen.rounds .round-score.good {
+  color: var(--turf-900);
+  background: var(--score-under);
+  border-radius: var(--r-pill);
+  padding: 2px 9px;
+}
+
+.screen.rounds .stats-headline b {
+  font-family: var(--font-display);
+  font-variation-settings: 'wdth' var(--wdth-score);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.screen.rounds .trophy-row {
+  border-color: rgba(226, 185, 59, 0.35);
+  background: var(--bg-card);
+}
+
+.screen.rounds .podium-spot {
+  border-color: var(--edge-strong);
+  background: var(--bg-card);
+}
+
+.screen.rounds .dist-ref {
+  color: var(--text-low);
+}
+
+.screen.rounds .dist-row > span:first-child {
+  color: var(--text-mid);
+}
+
+.screen.rounds .dist-row > b {
+  color: var(--text-hi);
+}
+
+/* ---------------------------------------------------------- Teebox footer */
+
+/* the rules and the receipt: quiet text links under everything else */
+.screen.home .teebox-footer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-2);
+  margin-top: var(--sp-1);
+  color: var(--text-low);
+  font-size: 0.72rem;
+}
+
+.screen.home .footer-link {
+  font-family: var(--font-ui);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-low);
+  padding: 6px 4px;
+}
+
+.screen.home .footer-link:active {
+  color: var(--text-hi);
+}
+
+/* the small print, under the footer links */
+.screen.home .fine-print {
+  margin-top: 2px;
+  font-size: 0.6rem;
+  line-height: 1.5;
+  text-align: center;
+  color: rgba(248, 243, 228, 0.38);
+  text-wrap: pretty;
+}
+
+.screen.home .fine-print a {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* --------------------------------------------------------- the change log */
+
+.tut-card.changelog .changelog-intro {
+  font-size: 0.82rem;
+  line-height: 1.5;
+  color: var(--text-mid);
+}
+
+.tut-card.changelog .changelog-intro b {
+  color: var(--flag-400);
+}
+
+.tut-card.changelog .changelog-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.tut-card.changelog .changelog-entry {
+  background: var(--bg-card);
+  border-left: var(--keyline-w) solid var(--edge-strong);
+  border-radius: 3px var(--r-bug) var(--r-bug) 3px;
+  padding: 9px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* an odds change is the one a player has a right to notice: flag keyline */
+.tut-card.changelog .changelog-entry:has(.changelog-tag.odds) {
+  border-left-color: var(--flag-500);
+}
+
+.tut-card.changelog .changelog-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-size: 0.62rem;
+  letter-spacing: var(--track-kicker);
+  text-transform: uppercase;
+  font-weight: 700;
+  color: var(--text-low);
+}
+
+.tut-card.changelog .changelog-tag.odds {
+  color: var(--flag-400);
+}
+
+.tut-card.changelog .changelog-tag.feature {
+  color: var(--tracer-400);
+}
+
+.tut-card.changelog .changelog-tag.fix {
+  color: var(--text-low);
+}
+
+.tut-card.changelog .changelog-title {
+  font-family: var(--font-display);
+  font-variation-settings: 'wdth' var(--wdth-tower);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: var(--track-tower);
+  font-size: 0.95rem;
+  color: var(--text-hi);
+}
+
+.tut-card.changelog .changelog-note {
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: var(--text-mid);
+}
+
+/* --------------------------- paper game screens: brand accents ONLY */
+
+/* The pick and play screens deliberately KEEP the light paper look — they are
+   game-mechanic surfaces, and players shouldn't find the game repainted under
+   them (Jackson's call; clean-and-simple helps play-rate). What they get from
+   the re-skin is alignment, not a repaint: Barlow body type (styles.css), the
+   shared accent tokens, and the display face on the two headline moments
+   below. Nothing here touches a surface, a layout, or an odds colour. */
+.screen.pick h2 {
+  font-family: var(--font-display);
+  font-variation-settings: 'wdth' 96;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+.screen.play .hole-num {
+  font-family: var(--font-display);
+  font-variation-settings: 'wdth' var(--wdth-score);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ------------------------------------- celebration splash branding */
+
+/* The splashes headed themselves with a text lockup — "⛳ DogLeg · COURSE" —
+   which put an emoji where the logo goes and wrapped the course name onto a
+   second line with one word orphaned. Now the real mark sits above the course
+   name, matching the shared card. These splashes paint their own full-bleed
+   backgrounds (gold, purple, green) rather than sitting on turf, so the mark
+   takes cream ink and its own flag red. */
+.moment-wordmark {
+  display: block;
+  width: min(52%, 190px);
+  height: auto;
+  margin: 0 auto 2px;
+  color: var(--sand-100);
+}
+
+/* the cup would read as a dark blot on the gold and purple moments */
+:is(.moment-backdrop.ace, .moment-backdrop.albatross) .moment-wordmark {
+  --logo-cup: rgba(10, 26, 16, 0.55);
+  --logo-cup-rim: rgba(248, 243, 228, 0.45);
+}
+
+/* ------------------------------------------- the season-launch splash */
+
+/* Paper-era leftovers on a now-dark card. The podium's sub-labels are dark ink
+   at 60% opacity — measured 1.11:1 against the card, i.e. invisible — and every
+   separator in here is var(--line), a DARK hairline, so the holder list had no
+   visible rows at all. Fixed narrowly rather than by redefining --line for the
+   whole scope: that token is shared with chips sitting on the light sand card,
+   where a dark hairline is still the correct answer. */
+.tut-card.season-splash .podium-spot {
+  border-color: var(--edge-strong);
+}
+
+.tut-card.season-splash .podium-spot > span:not(.podium-medal) {
+  color: var(--text-mid);
+}
+
+/* first place keeps gold, but the theme's gold rather than the old one */
+.tut-card.season-splash .podium-spot.place-1 {
+  border-color: rgba(226, 185, 59, 0.7);
+  background: rgba(226, 185, 59, 0.12);
+}
+
+.tut-card.season-splash .season-holder-row {
+  border-bottom-color: var(--edge-hairline);
+}
+
+.tut-card.season-splash .season-holder-row > span {
+  color: var(--text-mid);
+}
+
+/* ------------------------------------------- How to Play + season splash */
+
+.tut-card {
+  background: linear-gradient(180deg, var(--turf-800) 0%, var(--turf-900) 70%);
+  color: var(--text-hi);
+  border: 1px solid var(--edge-hairline);
+  font-family: var(--font-ui);
+}
+
+.tut-card .kicker {
+  color: var(--text-low);
+  letter-spacing: var(--track-kicker);
+}
+
+.tut-card .tut-title {
+  font-family: var(--font-display);
+  font-variation-settings: 'wdth' var(--wdth-tower);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: var(--track-tower);
+}
+
+.tut-card .tut-skip {
+  color: var(--text-low);
+}
+
+.tut-card .tut-body {
+  color: var(--text-mid);
+}
+
+.tut-card .tut-players small {
+  color: var(--text-low);
+}
+
+.tut-card .tut-dots span {
+  background: var(--edge-strong);
+}
+
+.tut-card .tut-dots span.on {
+  background: var(--sand-100);
+}
+
+.tut-card .cta {
+  background: linear-gradient(180deg, var(--flag-400), var(--flag-500));
+  color: var(--action-on-primary);
+  border-radius: var(--r-bug);
+  font-family: var(--font-display);
+  font-variation-settings: 'wdth' 88;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+}
+
+.tut-card .cta.ghost {
+  background: transparent;
+  clip-path: none;
+  border-radius: var(--r-bug);
+  border: 1.5px solid var(--edge-strong);
+  color: var(--text-hi);
+}
+
+.tut-card :focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* The Play Rating explainer rides .tut-card, so the broadcast theme makes it
+   dark — but its own rules in styles.css are written for the paper look and
+   are more specific (.rating-card .tut-body.rating-body), so every one of
+   them has to be answered here or the text stays ink-on-ink. */
+.tut-card.rating-card {
+  color: var(--text-hi);
+}
+
+.tut-card.rating-card .kicker {
+  color: var(--text-low);
+}
+
+.tut-card.rating-card .tut-body.rating-body,
+.tut-card.rating-card .tut-body.rating-body p {
+  color: var(--text-mid);
+}
+
+.tut-card.rating-card .tut-body.rating-body b {
+  color: var(--text-hi);
+}
+
+.tut-card.rating-card .rating-scale {
+  background: var(--bg-card);
+  border-color: var(--edge-hairline);
+}
+
+.tut-card.rating-card .rating-scale-cut {
+  color: var(--text-low);
+}
+
+/* the row you're on: gold, the same signal records use */
+.tut-card.rating-card .rating-scale-row.on {
+  background: rgba(246, 194, 33, 0.16);
+  color: var(--record-gold);
+}
+
+.tut-card.rating-card .rating-foot {
+  color: var(--text-low);
+}
+
+/* ------------------------------------------------ avatars on dark surfaces
+   The golfer avatars are drawn in the paper theme's dark greens — legs, shoes,
+   caps and clubs — so on turf they simply disappear. They are still correct on
+   the pick screen, which stays paper, so the artwork isn't touched: instead
+   each one gets the light blocked tile the rest of the system uses, which is
+   the background it was drawn for. Fixes How to Play's player step and the
+   home screen's per-character rows alike. */
+.tut-card .tut-players .avatar,
+.screen.home .char-record .avatar {
+  background: var(--bg-blocked);
+  border-radius: var(--r-bug);
+  padding: 3px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+}
+
+.tut-card .tut-players > span {
+  gap: 5px;
+}
+
+.tut-card .tut-players em {
+  color: var(--text-hi);
+}
+
+/* season splash podium: gold means records here too */
+.tut-card.season-splash .podium-spot {
+  border-color: var(--edge-strong);
+  background: var(--bg-card);
+}

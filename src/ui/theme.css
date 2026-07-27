@@ -1,0 +1,276 @@
+/* ============================================================================
+   DogLeg design system — "Broadcast" theme tokens
+   ----------------------------------------------------------------------------
+   Every visual decision in the re-skin reads from this file. Tweak a value
+   here and it changes everywhere. Two layers:
+
+     1. PAINTBOX — raw named colors, grounded in the logo artwork
+        (deep forest, fairway greens, flag red, bunker sand).
+     2. ROLES — what the UI actually references (surfaces, text tiers,
+        actions, records). Roles point at paintbox values; retune the
+        paintbox and the whole app follows.
+
+   Type: 'Archivo Variable' is the DISPLAY face — a grotesque with a width
+   axis, so the same family does condensed leaderboard towers (wdth ~72) and
+   the expanded wordmark/scores (wdth ~125). 'Barlow' is the UI/body face.
+   ========================================================================= */
+
+:root {
+  /* ------------------------------------------------------------ paintbox */
+
+  /* Turf — the greens, deep and rich (evening telecast, not near-black) */
+  --turf-950: #0e2114;
+  --turf-900: #142c1c;
+  --turf-800: #1c3a26;
+  --turf-700: #264d33;
+  --turf-600: #336341;
+  --fairway-500: #4f9a52; /* the logo's fairway ribbon */
+  --fairway-300: #7cc36e; /* the logo's green (putting surface) */
+
+  /* Sand — the tans, from bunker to paper (light blocking on dark turf) */
+  --sand-100: #f8f3e4;
+  --sand-200: #efe6cd;
+  --sand-300: #e3d3a8;
+  --sand-500: #c4ac72;
+
+  /* Flag — the logo's flag red, punched up: live moments and primary action */
+  --flag-400: #e85a41;
+  --flag-500: #d94a32;
+  --flag-600: #b93a26;
+
+  /* Trophy — records, champions, season podiums */
+  --trophy-300: #ffd94e;
+  --trophy-400: #f6c221;
+  --trophy-500: #d8a410;
+
+  /* Tracer — the shot-tracer / stat-overlay blue, used sparingly for info */
+  --tracer-300: #7ce0ff;
+  --tracer-400: #38c6f4;
+
+  /* --------------------------------------------------------------- roles */
+
+  /* Surfaces */
+  --bg-page: var(--turf-950);
+  --bg-page-glow: radial-gradient(120% 90% at 50% 0%, var(--turf-800) 0%, var(--turf-950) 72%);
+  --bg-panel: var(--turf-900);
+  --bg-card: var(--turf-800);
+  --bg-elevated: var(--turf-700);
+  --bg-blocked: var(--sand-200);      /* light color-block slabs (lower thirds) */
+  --edge-hairline: rgba(248, 243, 228, 0.09);
+  --edge-strong: rgba(248, 243, 228, 0.18);
+
+  /* Text tiers on dark surfaces */
+  --text-hi: var(--sand-100);
+  --text-mid: rgba(248, 243, 228, 0.72);
+  --text-low: rgba(248, 243, 228, 0.5);
+  /* Text on light (blocked) surfaces */
+  --text-on-block: var(--turf-900);
+  --text-on-block-mid: rgba(15, 34, 22, 0.66);
+
+  /* Actions */
+  --action-primary: var(--flag-500);
+  --action-primary-press: var(--flag-600);
+  --action-on-primary: #ffffff;
+  --focus-ring: var(--tracer-400);
+
+  /* Logo — the wordmark's own colours (src/ui/Wordmark.tsx). Its letters take
+     currentColor; these are the two parts that don't. The pennant flies the
+     same red as the rest of the UI, so the mark and the primary action read as
+     one system. */
+  --logo-flag: var(--flag-500);
+  --logo-cup: var(--turf-950);
+  --logo-cup-rim: #2a5f33;
+
+  /* Score semantics. The style tile proposed the TV convention (under par runs
+     red), but the scorecard settled it the other way: it marks under par with a
+     green circle and bogey-or-worse with a red box, which is how a golfer marks
+     a paper card. Red-for-good would then collide head-on with red-for-bogey a
+     screen away, so these tokens follow the card, not the telecast: green reads
+     good, red reads bad. Note --score-over is deliberately NOT applied to round
+     TOTALS — a red +4 on your own round rubs it in; over-par totals stay muted
+     and red is kept for per-hole marks. */
+  --score-under: var(--fairway-300);
+  --score-even: var(--sand-100);
+  --score-over: var(--flag-400);
+  --record-gold: var(--trophy-400);
+  --success: var(--fairway-300);
+
+  /* ---------------------------------------------------------------- type */
+
+  --font-display: 'Archivo Variable', 'Archivo', 'Arial Narrow', sans-serif;
+  --font-ui: 'Barlow', -apple-system, 'Segoe UI', Roboto, sans-serif;
+
+  /* Display width-axis stops (Archivo Variable wdth 62–125) */
+  --wdth-tower: 76;      /* condensed: leaderboard names, tower labels */
+  --wdth-standard: 100;
+  --wdth-score: 118;     /* expanded: wordmark, hero numerals */
+
+  --type-hero: clamp(2.7rem, 13vw, 3.6rem);
+  --type-h1: 1.9rem;
+  --type-h2: 1.3rem;
+  --type-title: 1.05rem;
+  --type-body: 0.95rem;
+  --type-caption: 0.8rem;
+  --type-kicker: 0.7rem;
+  --track-kicker: 0.16em;
+  --track-tower: 0.02em;
+
+  /* ------------------------------------------------------------- spacing */
+
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 22px;
+  --sp-6: 30px;
+
+  /* ------------------------------------------------------------ geometry */
+
+  --r-card: 14px;
+  --r-bug: 10px;
+  --r-pill: 999px;
+  /* The signature cut: one clipped corner. EARNED, not decorative — it only
+     appears on a course card once that course has been played, like a punch
+     through a paper scorecard (Jackson's rule, 2026-07-25). */
+  --notch: 24px;
+  --clip-notch: polygon(var(--notch) 0, 100% 0, 100% 100%, 0 100%, 0 var(--notch));
+  /* The signature lean: broadcast graphics drive forward */
+  --lean: -6deg;
+  --keyline-w: 3px;
+
+  /* ------------------------------------------------------------ elevation */
+
+  --shadow-card: 0 1px 0 rgba(255, 255, 255, 0.05) inset, 0 14px 38px rgba(0, 0, 0, 0.5);
+  --shadow-pop: 0 18px 50px rgba(0, 0, 0, 0.6);
+}
+
+/* ==================================================================== */
+/* Signature treatments — the reusable looks the screens compose from   */
+/* ==================================================================== */
+
+/* Kicker: the little all-caps eyebrow line above anything important */
+.dl-kicker {
+  font-family: var(--font-ui);
+  font-size: var(--type-kicker);
+  font-weight: 700;
+  letter-spacing: var(--track-kicker);
+  text-transform: uppercase;
+  color: var(--text-low);
+}
+
+/* Tower text: condensed display caps (leaderboard names, tab labels) */
+.dl-tower {
+  font-family: var(--font-display);
+  font-variation-settings: 'wdth' var(--wdth-tower);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: var(--track-tower);
+}
+
+/* Score numerals: expanded display, tabular figures — first-class citizens */
+.dl-score {
+  font-family: var(--font-display);
+  font-variation-settings: 'wdth' var(--wdth-score);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+/* Lower-third: a light blocked slab with the corner notch + flag tick */
+.dl-lowerthird {
+  background: var(--bg-blocked);
+  color: var(--text-on-block);
+  clip-path: var(--clip-notch);
+  padding: 7px 14px 7px 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+.dl-lowerthird::before {
+  content: '';
+  width: 4px;
+  align-self: stretch;
+  background: var(--flag-500);
+  flex: none;
+}
+
+/* Stat bug: compact stat card with a colored keyline (broadcast "bug") */
+.dl-bug {
+  background: var(--bg-card);
+  border-radius: 3px var(--r-bug) var(--r-bug) 3px;
+  border-left: var(--keyline-w) solid var(--tracer-400);
+  box-shadow: var(--shadow-card);
+  padding: 10px 12px 9px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.dl-bug.flag { border-left-color: var(--flag-500); }
+.dl-bug.gold { border-left-color: var(--trophy-400); }
+.dl-bug.green { border-left-color: var(--fairway-300); }
+
+/* Primary CTA: color-blocked slab (notches are earned — see --notch note) */
+.dl-cta {
+  font-family: var(--font-display);
+  font-variation-settings: 'wdth' 88;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-size: 1.05rem;
+  color: var(--action-on-primary);
+  background: linear-gradient(180deg, var(--flag-400), var(--flag-500));
+  border-radius: var(--r-bug);
+  padding: 15px 22px;
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  transition: transform 120ms ease, filter 120ms ease;
+}
+.dl-cta:active { transform: scale(0.98); filter: brightness(0.92); }
+.dl-cta .dl-cta-hint {
+  font-family: var(--font-ui);
+  font-weight: 600;
+  font-size: 0.78rem;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  opacity: 0.85;
+}
+
+/* Secondary: hairline outline on turf */
+.dl-cta-secondary {
+  font-family: var(--font-display);
+  font-variation-settings: 'wdth' 88;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-size: 0.95rem;
+  color: var(--text-hi);
+  background: transparent;
+  border: 1.5px solid var(--edge-strong);
+  border-radius: var(--r-bug);
+  padding: 13px 20px;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  transition: transform 120ms ease, background 120ms ease;
+}
+.dl-cta-secondary:active { transform: scale(0.98); background: var(--bg-elevated); }
+
+/* Focus: visible ring in tracer blue, everywhere */
+.dl-theme :focus-visible,
+:focus-visible.dl-focus-demo {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dl-cta,
+  .dl-cta-secondary {
+    transition: none;
+  }
+}

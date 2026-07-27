@@ -10,6 +10,9 @@ import { backendEnabled } from '../lib/backend'
 import { bundleIsStale, FRESH_TTL_MS } from '../lib/freshness'
 import { fetchCourseRecords, fetchSeasonRecords, loadPlayer, type CourseRecord } from '../lib/leaderboard'
 import { seasonCountdown, seasonForDate } from '../engine/season'
+import { FortuneInfo } from './Tutorial'
+import { ChangeLog } from './ChangeLog'
+import { Wordmark } from './Wordmark'
 import { dismissSteals, pendingSteals, syncLedger, type StolenRecord } from '../lib/records'
 import { loadGhost, type Ghost } from '../state/ghost'
 import { currentHandicap, formatHandicap } from '../state/stats'
@@ -45,6 +48,9 @@ export function HomeScreen(props: {
    * holders under the new season's name */
   const [seasonRecsKey, setSeasonRecsKey] = useState<string | null>(null)
   const [steals, setSteals] = useState(() => pendingSteals())
+  /** the Fortune callout's ⓘ opens How to Play's Fortunes page on its own */
+  const [fortuneInfo, setFortuneInfo] = useState(false)
+  const [changeLog, setChangeLog] = useState(false)
   /** an engine-changing deploy landed after this tab loaded its bundle — a
    * round played now couldn't post, so say "reload" before the first stroke */
   const [stale, setStale] = useState(false)
@@ -109,19 +115,24 @@ export function HomeScreen(props: {
   // daily or practice alike. Every start path funnels into the remedy: the
   // page reloads onto the current bundle and the player tees off from there.
   const startPractice = stale ? () => window.location.reload() : props.onPractice
+  // courses you've completed get their scorecard corner punched (the notch)
+  const playedSlugs = new Set(loadArchive().map((r) => r.courseSlug))
   return (
     <div className="screen home">
+      {/* The masthead is one lockup: the kicker and the tagline sit IN the
+          wordmark's negative space — either side of the pennant up top, either
+          side of the cup below — rather than taking rows of their own. Their
+          positions derive from the mark's own geometry (see .lockup in
+          broadcast.css), so they track it if it resizes. */}
       <header className="masthead">
-        <div className="masthead-top">
-          <div className="kicker">Daily challenge · No. {setup.puzzleNumber}</div>
-          <button className="how-to-play" onClick={props.onHowToPlay}>
-            How to play
-          </button>
+        <div className="lockup">
+          <h1 className="wordmark">
+            <Wordmark />
+          </h1>
+          <span className="lockup-kicker">Daily Golf Challenge · No. {setup.puzzleNumber}</span>
+          <p className="lockup-tag">18 Holes. Play the Odds.</p>
+          <p className="lockup-tag-end">Beat the course.</p>
         </div>
-        <h1>
-          Dog<em>leg</em>
-        </h1>
-        <p className="tagline">One round. 18 holes. ~2 minutes.</p>
       </header>
 
       {stale && (
@@ -142,7 +153,9 @@ export function HomeScreen(props: {
         />
       )}
 
-      <div className="today-card">
+      {/* the corner notch is earned: it punches through once today's card is
+          in the books, like a marked-off paper scorecard */}
+      <div className={`today-card${props.playedToday ? ' notched' : ''}`}>
         <div className="kicker">Today's course</div>
         <h2>{setup.course.name}</h2>
         <p>
@@ -170,7 +183,8 @@ export function HomeScreen(props: {
           <span>Best to par</span>
         </div>
       </div>
-      <StreakNote />
+      <StreakNote onInfo={() => setFortuneInfo(true)} />
+      {fortuneInfo && <FortuneInfo onClose={() => setFortuneInfo(false)} />}
       {records.length > 0 && (
         <div className="char-records">
           {records.map((r) => {
@@ -190,10 +204,11 @@ export function HomeScreen(props: {
         </div>
       )}
 
-      <p className="cta-tease">Can you break par today?</p>
+      <p className="cta-tease">Can you beat the odds today?</p>
 
       {props.playedToday ? (
-        <button className="cta" onClick={props.onShowResult}>
+        // today's round is in the books — this CTA wears the earned notch too
+        <button className="cta notched" onClick={props.onShowResult}>
           See today's card · {toParLabel(props.playedToday.toPar)}
         </button>
       ) : props.activeRound?.mode === 'daily' ? (
@@ -230,7 +245,8 @@ export function HomeScreen(props: {
       {props.playedToday && <ForecastCard today={props.playedToday} />}
 
       <button className="cta ghost" onClick={() => setShowCourses((v) => !v)}>
-        Play unlimited · Browse courses
+        Play unlimited
+        <span className="cta-sub">Browse courses</span>
       </button>
       {showCourses && (
         <div className="course-list">
@@ -266,7 +282,11 @@ export function HomeScreen(props: {
               const sr = seasonRecs?.get(c.slug)
               const at = courseRecs?.get(c.slug)
               return (
-                <button key={c.slug} className="course-row" onClick={() => startPractice(c.slug)}>
+                <button
+                  key={c.slug}
+                  className={`course-row${playedSlugs.has(c.slug) ? ' notched' : ''}`}
+                  onClick={() => startPractice(c.slug)}
+                >
                   <b>{c.name}</b>
                   <span>
                     {c.location} · Play Rating {playRatingFor(c.slug)}/10
@@ -294,7 +314,11 @@ export function HomeScreen(props: {
               const sr = seasonRecs?.get(c.slug)
               const at = courseRecs?.get(c.slug)
               return (
-                <button key={c.slug} className="course-row" onClick={() => startPractice(c.slug)}>
+                <button
+                  key={c.slug}
+                  className={`course-row${playedSlugs.has(c.slug) ? ' notched' : ''}`}
+                  onClick={() => startPractice(c.slug)}
+                >
                   <b>{c.name}</b>
                   <span>
                     {c.location} · {c.holes.length} holes · Play Rating {playRatingFor(c.slug)}/10
@@ -322,11 +346,39 @@ export function HomeScreen(props: {
       )}
       {loadArchive().length > 0 && (
         <button className="cta ghost" onClick={props.onMyRounds}>
-          🏆 Clubhouse · my rounds
+          🏆 Clubhouse
+          <span className="cta-sub">My rounds</span>
         </button>
       )}
       <HandicapChip onTap={props.onStats} />
       <AccountPanel onHistorySynced={props.onHistorySynced} />
+      {/* the quiet stuff lives at the foot of the screen: the rules, and the
+          receipt showing what has changed since launch */}
+      <div className="teebox-footer">
+        <button className="footer-link" onClick={props.onHowToPlay}>
+          How to play
+        </button>
+        <span aria-hidden>·</span>
+        <button className="footer-link" onClick={() => setChangeLog(true)}>
+          Change log
+        </button>
+      </div>
+      {changeLog && <ChangeLog onClose={() => setChangeLog(false)} />}
+      {/* The OpenStreetMap credit is not decoration: the course geography is
+          imported from OSM (scripts/import-osm.ts), whose ODbL licence requires
+          attribution wherever the data ships — which it does, on every
+          real-geometry course. The trademark line disclaims affiliation in the
+          three ways that matter (affiliated / endorsed / sponsored). */}
+      <p className="fine-print">
+        New course every day at midnight Eastern (ET). Course names and trademarks are the property
+        of their respective owners — DogLeg is not affiliated with, endorsed by, or sponsored by any
+        course, club or tournament. Layouts and yardages are stylized for play, built in part from
+        map data ©{' '}
+        <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer noopener">
+          OpenStreetMap contributors
+        </a>{' '}
+        (ODbL). © 2026 DogLeg. All rights reserved.
+      </p>
     </div>
   )
 }
@@ -547,15 +599,29 @@ function GhostStakes(props: { courseSlug: string }) {
 /** The fortune disclosure, wherever the current streak is shown. Flavor
  * only, by design: the mechanic is disclosed, the math stays under the
  * hood — never print the multiplier or the ramp. */
-function StreakNote() {
-  // honest by design: the boost only applies to streaks the referee can
-  // verify — dailies posted under a clubhouse name. Anonymous local streaks
-  // don't move the odds (anti-cheat), so the copy says so.
+/**
+ * The Fortune callout. Honest by design: the boost only applies to streaks the
+ * referee can verify — dailies posted under a clubhouse name. Anonymous local
+ * streaks don't move the odds (anti-cheat), so the copy says so.
+ *
+ * With `onInfo` it becomes tappable and wears an ⓘ, opening the full Fortunes
+ * page; without it (the result screen) it stays a plain note.
+ */
+function StreakNote(props: { onInfo?: () => void }) {
+  const copy = (
+    <>
+      <em className="streak-note-head">The golf gods reward the faithful</em>
+      Dailies under a clubhouse name boost Fortune odds.
+    </>
+  )
+  if (!props.onInfo) return <p className="fine streak-note">{copy}</p>
   return (
-    <p className="fine streak-note">
-      The golf gods reward the faithful — post your daily cards under a clubhouse name, and the longer your streak,
-      the better your odds of striking a Fortune.
-    </p>
+    <button className="fine streak-note" onClick={props.onInfo} aria-label="How Fortunes work">
+      {copy}
+      <span className="streak-note-info" aria-hidden>
+        ⓘ
+      </span>
+    </button>
   )
 }
 

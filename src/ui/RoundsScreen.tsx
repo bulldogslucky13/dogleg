@@ -21,6 +21,7 @@ import { pastSeasons, roundsInSeason, seasonAwards, type SeasonAward } from '../
 import { loadLedger, syncLedger } from '../lib/records'
 import { AccountPanel } from './AccountPanel'
 import { RoundScorecard } from './RoundScorecard'
+import { shortCourseName } from './courseName'
 import { track } from '../lib/analytics'
 
 /**
@@ -165,8 +166,10 @@ export function RoundsScreen(props: {
     <div key={`${r.seed}:${badge ?? ''}:${context ?? ''}`} className="round-row">
       <div className="round-row-text">
         <b>
-          {courseBySlug(r.courseSlug)?.name ?? r.courseSlug}
-          {r.character ? ` ${characterById(r.character)?.emoji ?? ''}` : ''}
+          {shortCourseName(courseBySlug(r.courseSlug)?.name ?? r.courseSlug)}
+          {/* non-breaking space: with the name now allowed to wrap, a plain
+              space let the character emoji orphan onto a line of its own */}
+          {r.character ? ` ${characterById(r.character)?.emoji ?? ''}` : ''}
         </b>
         <span>
           {context ? `${context} · ` : ''}
@@ -449,7 +452,11 @@ export function RoundsScreen(props: {
               {prs.length > 0 && (
                 <section className="rounds-section">
                   <div className="kicker">Personal bests</div>
-                  {prs.map((r) => row(toLogged(r), 'PR'))}
+                  {/* 'PB' on the badge — "personal best", never "personal
+                      record"; Jackson's call, it reads more natural. Internal
+                      identifiers (prs, .round-badge.pr) deliberately keep the
+                      old name for continuity, same as the locker rename. */}
+                  {prs.map((r) => row(toLogged(r), 'PB'))}
                 </section>
               )}
               {records.length + prs.length === 0 && (
@@ -524,7 +531,7 @@ function SeasonsTab(props: { awards: SeasonAward[] }) {
                   {award.courses.map((c) => (
                     <div key={c.courseSlug} className="round-row season-held">
                       <div className="round-row-text">
-                        <b>{courseBySlug(c.courseSlug)?.name ?? c.courseSlug}</b>
+                        <b>{shortCourseName(courseBySlug(c.courseSlug)?.name ?? c.courseSlug)}</b>
                         <span>Ended the season as record holder</span>
                       </div>
                       <em className="round-badge cr">CR</em>

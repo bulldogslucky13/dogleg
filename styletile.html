@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>DogLeg — Broadcast style tile (dev only)</title>
+    <script type="module">
+      import '@fontsource-variable/archivo/wdth.css'
+      import '@fontsource/barlow/400.css'
+      import '@fontsource/barlow/500.css'
+      import '@fontsource/barlow/600.css'
+      import '@fontsource/barlow/700.css'
+      import '/src/ui/theme.css'
+      import '/src/styletile.css'
+    </script>
+  </head>
+  <body class="dl-theme">
+    <main class="tile">
+      <!-- ============ wordmark lockup ============ -->
+      <section>
+        <p class="dl-kicker">Wordmark · opening screen lockup</p>
+        <div class="mast">
+          <div class="mast-live"><span class="live-dot"></span>Daily · Round #7</div>
+          <h1 class="wordmark dl-score">DOG<em>LEG</em></h1>
+          <p class="mast-tag">One course. 18 holes. Every decision shifts the odds.</p>
+        </div>
+      </section>
+
+      <!-- ============ palette ============ -->
+      <section>
+        <p class="dl-kicker">Paintbox · evolved from the logo</p>
+        <div class="swatches">
+          <div class="sw" style="background:var(--turf-950)"><span>turf 950</span><i>page</i></div>
+          <div class="sw" style="background:var(--turf-900)"><span>turf 900</span><i>panel</i></div>
+          <div class="sw" style="background:var(--turf-800)"><span>turf 800</span><i>card</i></div>
+          <div class="sw" style="background:var(--turf-700)"><span>turf 700</span><i>raised</i></div>
+          <div class="sw lt" style="background:var(--sand-100)"><span>sand 100</span><i>text / paper</i></div>
+          <div class="sw lt" style="background:var(--sand-300)"><span>sand 300</span><i>blocking</i></div>
+          <div class="sw" style="background:var(--flag-500)"><span>flag 500</span><i>action · live</i></div>
+          <div class="sw lt" style="background:var(--trophy-400)"><span>trophy 400</span><i>records</i></div>
+          <div class="sw lt" style="background:var(--tracer-400)"><span>tracer 400</span><i>info · focus</i></div>
+          <div class="sw lt" style="background:var(--fairway-300)"><span>fairway 300</span><i>success</i></div>
+        </div>
+      </section>
+
+      <!-- ============ type ============ -->
+      <section>
+        <p class="dl-kicker">Type · Archivo Variable (display) + Barlow (UI)</p>
+        <div class="type-card">
+          <p class="dl-score t-hero">−4</p>
+          <p class="dl-tower t-tower">CARNOUSTIE · CHAMPIONSHIP</p>
+          <p class="t-title">Screen titles use Barlow SemiBold</p>
+          <p class="t-body">Body copy is Barlow — clean and legible at phone sizes, with a little highway-signage warmth so the mascot still feels at home.</p>
+          <p class="dl-kicker">Kickers are eyebrow lines like this one</p>
+        </div>
+      </section>
+
+      <!-- ============ score strip ============ -->
+      <section>
+        <p class="dl-kicker">Score numerals · broadcast convention (under par runs red)</p>
+        <div class="scorestrip">
+          <div class="scorebox"><span class="dl-score sb-num" style="color:var(--score-under)">−3</span><span class="dl-kicker">under</span></div>
+          <div class="scorebox"><span class="dl-score sb-num" style="color:var(--score-even)">E</span><span class="dl-kicker">even</span></div>
+          <div class="scorebox"><span class="dl-score sb-num" style="color:var(--score-over)">+5</span><span class="dl-kicker">over</span></div>
+          <div class="scorebox"><span class="dl-score sb-num" style="color:var(--record-gold)">−7</span><span class="dl-kicker">record</span></div>
+        </div>
+      </section>
+
+      <!-- ============ lower third ============ -->
+      <section>
+        <p class="dl-kicker">Section headers · lower-third slabs</p>
+        <div class="stack">
+          <div class="dl-lowerthird"><span class="dl-tower lt-text">Course records</span></div>
+          <div class="dl-lowerthird"><span class="dl-tower lt-text">Season II · Autumn</span></div>
+        </div>
+      </section>
+
+      <!-- ============ leaderboard tower ============ -->
+      <section>
+        <p class="dl-kicker">Leaderboard tower</p>
+        <div class="tower">
+          <div class="tower-head">
+            <span class="dl-tower">Today's board</span>
+            <span class="dl-kicker" style="color:rgba(15,34,22,.6)">Pebble Beach</span>
+          </div>
+          <div class="trow champ">
+            <span class="trank dl-score">1</span>
+            <span class="tname dl-tower">Scrambler_Sue</span>
+            <span class="tchar">🦴</span>
+            <span class="tscore dl-score" style="color:var(--score-under)">−5</span>
+          </div>
+          <div class="trow">
+            <span class="trank dl-score">2</span>
+            <span class="tname dl-tower">BigDog_Duffer</span>
+            <span class="tchar">🐕</span>
+            <span class="tscore dl-score" style="color:var(--score-under)">−2</span>
+          </div>
+          <div class="trow me">
+            <span class="trank dl-score">3</span>
+            <span class="tname dl-tower">Jackson_C</span>
+            <span class="tchar">⛳</span>
+            <span class="tscore dl-score" style="color:var(--score-even)">E</span>
+          </div>
+          <div class="trow">
+            <span class="trank dl-score">4</span>
+            <span class="tname dl-tower">MulliganMike</span>
+            <span class="tchar">🎯</span>
+            <span class="tscore dl-score" style="color:var(--score-over)">+3</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ stat bugs ============ -->
+      <section>
+        <p class="dl-kicker">Stat bugs · clubhouse stats</p>
+        <div class="bugs">
+          <div class="dl-bug"><span class="dl-kicker">Handicap</span><span class="dl-score bug-num">+2.4</span></div>
+          <div class="dl-bug flag"><span class="dl-kicker">Streak</span><span class="dl-score bug-num">6<small> days</small></span></div>
+          <div class="dl-bug gold"><span class="dl-kicker">Records held</span><span class="dl-score bug-num">3</span></div>
+          <div class="dl-bug green"><span class="dl-kicker">Best round</span><span class="dl-score bug-num">−6</span></div>
+        </div>
+      </section>
+
+      <!-- ============ CTAs ============ -->
+      <section>
+        <p class="dl-kicker">Actions</p>
+        <div class="stack">
+          <button class="dl-cta"><span>Tee off</span><span class="dl-cta-hint">Daily · Carnoustie ›</span></button>
+          <button class="dl-cta-secondary">Play unlimited</button>
+          <div class="row">
+            <button class="dl-cta-secondary">Clubhouse</button>
+            <button class="dl-cta-secondary">How to play</button>
+          </div>
+          <p class="focus-note">Focus state (keyboard users) — tab to see the tracer-blue ring: <button class="dl-cta-secondary dl-focus-demo" style="width:auto;padding:8px 14px;font-size:.8rem">Tab me</button></p>
+        </div>
+      </section>
+
+      <!-- ============ record moment framing ============ -->
+      <section>
+        <p class="dl-kicker">Record / season celebration framing</p>
+        <div class="moment">
+          <p class="dl-kicker" style="color:var(--record-gold);letter-spacing:.22em">Course record</p>
+          <p class="dl-score moment-num">−7</p>
+          <p class="dl-tower moment-holder">Scrambler_Sue · Royal Portrush</p>
+          <div class="moment-rule"></div>
+          <p class="t-body" style="color:var(--text-mid)">Gold is reserved for records and podiums — it never appears on ordinary UI, so when you see it, it means something.</p>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

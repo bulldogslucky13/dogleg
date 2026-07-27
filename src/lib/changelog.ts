@@ -46,6 +46,12 @@ export const CHANGE_KIND_LABEL: Record<ChangeKind, string> = {
 
 export const CHANGELOG: ChangeEntry[] = [
   {
+    date: '2026-07-27',
+    kind: 'feature',
+    title: 'The wrap screen gets the 2.0 treatment',
+    note: 'Finish a round and the new post-round screen leads with your score, your share card, and a proper leaderboard tower \u2014 ties share a place, podium spots wear their medals, and Copy and Share sit side by side. Same numbers, better ceremony.',
+  },
+  {
     date: '2026-07-25',
     kind: 'odds',
     title: 'A par 3 you can bail out on',

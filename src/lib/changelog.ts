@@ -46,6 +46,12 @@ export const CHANGE_KIND_LABEL: Record<ChangeKind, string> = {
 
 export const CHANGELOG: ChangeEntry[] = [
   {
+    date: '2026-07-27',
+    kind: 'fix',
+    title: 'No more trees on treeless courses',
+    note: 'Drive it somewhere nobody mapped and the game used to put you "in the trees" — even on a links with not a tree on it, and it drew your ball sitting on the fairway while it said so. Now each course names its own junk, and the ball is drawn where you actually are.',
+  },
+  {
     date: '2026-07-25',
     kind: 'odds',
     title: 'A par 3 you can bail out on',

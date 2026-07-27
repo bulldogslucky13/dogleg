@@ -89,3 +89,62 @@ describe('course-level rough severity', () => {
     expect(sum).toBeCloseTo(1, 6)
   })
 })
+
+/**
+ * The junk floor's NAME (`CourseSpec.junkLabel`, see types.ts).
+ *
+ * `longOdds` gives every shot a floor of trouble even where its landing window
+ * reaches no mapped hazard — a wild swing finds something on ground nobody drew
+ * a polygon for. That slice lands in the `trees` bucket and resolves to a
+ * `trees` lie. On a parkland course that is a fair fiction. On a course with no
+ * trees mapped ANYWHERE it is a false statement: the game announced "In the
+ * trees", and the map, having no grove to put the ball in, drew it sitting on
+ * the fairway. Whistling Straits shipped like that.
+ *
+ * So: a course with no trees/deeprough zones on any hole has to say what its
+ * junk actually is. This is the same copy/geometry contract the course-import
+ * process enforces on `signature` strings — the difference is that here it is
+ * the ENGINE naming a feature rather than the course tuple, which is exactly
+ * how it went unnoticed.
+ */
+describe('the junk floor names something the course actually has', () => {
+  // Keyed on `trees` ALONE. Counting `deeprough` as trees was the first
+  // version's bug and it hid Carnoustie completely: gorse and hay are the very
+  // things this is meant to name, so letting them satisfy the check answered
+  // "does the course have trees?" with "it has vegetation", which is not the
+  // same question.
+  it('never says "trees" on a hole whose course has none', () => {
+    for (const c of COURSES) {
+      const hasTrees = c.holes.some((spec) => buildLayout(c.slug, spec, COND).zones.some((z) => z.kind === 'trees'))
+      if (hasTrees) continue
+      for (const spec of c.holes) {
+        expect(
+          buildLayout(c.slug, spec, COND).junkLabel,
+          `${c.slug}:${spec.number} would claim trees on a course that has none — set junkLabel`,
+        ).not.toBe('trees')
+      }
+    }
+  })
+
+  it('resolves the label per hole: real trees win, then the course, then deep rough', () => {
+    for (const c of COURSES) {
+      const courseWord = c.junkLabel ?? c.roughLabel
+      for (const spec of c.holes) {
+        const layout = buildLayout(c.slug, spec, COND)
+        const expected = layout.zones.some((z) => z.kind === 'trees')
+          ? 'trees'
+          : (courseWord ?? (layout.zones.some((z) => z.kind === 'deeprough') ? 'deep rough' : layout.junkLabel))
+        expect(layout.junkLabel, `${c.slug}:${spec.number}`).toBe(expected)
+      }
+    }
+    // the course's own word reaches its deep-rough holes — the case that
+    // regressed when any vegetation zone short-circuited to "trees"
+    const portrush = COURSES.find((c) => c.slug === 'royal-portrush-dunluce')!
+    const deepHole = portrush.holes.find((spec) =>
+      buildLayout(portrush.slug, spec, COND).zones.some((z) => z.kind === 'deeprough'),
+    )!
+    expect(buildLayout(portrush.slug, deepHole, COND).junkLabel).toBe('gorse')
+    // unknown slugs (tests use fakes) still get a usable word, never undefined
+    expect(buildLayout('not-a-course', COURSES[0].holes[0], COND).junkLabel).toBe('trees')
+  })
+})

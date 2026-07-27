@@ -176,6 +176,10 @@ export const COURSES: CourseSpec[] = [
     greens: 'Firm',
     wind: 18,
     blurb: 'They call it Car-nasty for a reason — the meanest finish in championship golf.',
+    // A links with no trees mapped anywhere, so the odds' junk floor had
+    // nothing honest to call itself — see CourseSpec.junkLabel. Whins is what
+    // Angus calls the gorse that eats a ball off these fairways.
+    junkLabel: 'whins',
     holes: holes([
       [4, 401, 10, 'S', 'none'],
       [4, 435, 4, 'R', 'sand'],
@@ -309,6 +313,10 @@ export const COURSES: CourseSpec[] = [
     greens: 'Firm',
     wind: 18,
     blurb: 'Pete Dye’s faux-Irish links along Lake Michigan with a thousand bunkers.',
+    // Real geometry gave this course 1383 bunkers and not one tree, so the
+    // odds' junk floor had nothing to name — see CourseSpec.junkLabel. Dye's
+    // dunes are fescue, and that's what you're hacking out of.
+    junkLabel: 'fescue',
     holes: holes([
       // Card = the BLACK tees, the only tee set BlueGolf publishes for the
       // Straits (`whistlingstraitsstra`): par 72, 7790 yd, 77.2/152. Replaces a

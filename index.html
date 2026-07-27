@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no" />
     <meta name="theme-color" content="#12251a" />
-    <meta name="description" content="DogLeg — a daily golf strategy game. One course, 18 holes, every decision shifts the odds." />
+    <meta name="description" content="DogLeg — a daily golf challenge. One course, 18 holes, every decision shifts the odds." />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-title" content="DogLeg" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
@@ -18,23 +18,29 @@
     <!-- Open Graph (iMessage, Slack, Facebook, LinkedIn) -->
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="DogLeg" />
-    <meta property="og:title" content="DogLeg — daily golf strategy" />
-    <meta property="og:description" content="One course. 18 holes. Every decision shifts the odds. A new daily golf strategy game." />
+    <meta property="og:title" content="DogLeg — daily golf challenge" />
+    <meta property="og:description" content="One course. 18 holes. Play the odds and beat the course. A new daily golf challenge." />
     <meta property="og:url" content="https://dogleg.cameronbristol.xyz/" />
-    <meta property="og:image" content="https://dogleg.cameronbristol.xyz/og.png" />
+    <!-- The card is GENERATED from the real logo + theme tokens: `pnpm gen:og-image`
+         (scripts/gen-og-image.ts). Never hand-edit public/og.png — a hand-made one
+         is how this surface sat on retired branding for a week after the rebrand.
+         ?v= is a cache-bust: iMessage, Slack and Facebook key their preview cache on
+         the image URL, so a redrawn card at the same URL keeps serving the old
+         picture. Bump it whenever the card changes. -->
+    <meta property="og:image" content="https://dogleg.cameronbristol.xyz/og.png?v=2" />
     <meta property="og:image:type" content="image/png" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
-    <meta property="og:image:alt" content="DogLeg — daily golf strategy. An illustrated dogleg golf hole bending toward the pin." />
+    <meta property="og:image:alt" content="DogLeg — the wordmark in cream on deep turf green, a red pennant flying from the d's stem and the l doglegging down into the cup. Daily Golf Challenge · 18 Holes. Play the Odds." />
 
     <!-- Twitter / X -->
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="DogLeg — daily golf strategy" />
-    <meta name="twitter:description" content="One course. 18 holes. Every decision shifts the odds. A new daily golf strategy game." />
-    <meta name="twitter:image" content="https://dogleg.cameronbristol.xyz/og.png" />
-    <meta name="twitter:image:alt" content="DogLeg — daily golf strategy" />
+    <meta name="twitter:title" content="DogLeg — daily golf challenge" />
+    <meta name="twitter:description" content="One course. 18 holes. Play the odds and beat the course. A new daily golf challenge." />
+    <meta name="twitter:image" content="https://dogleg.cameronbristol.xyz/og.png?v=2" />
+    <meta name="twitter:image:alt" content="DogLeg — the wordmark in cream on deep turf green, a red pennant flying from the d's stem and the l doglegging down into the cup." />
 
-    <title>DogLeg — daily golf strategy</title>
+    <title>DogLeg — daily golf challenge</title>
   </head>
   <body>
     <div id="root"></div>

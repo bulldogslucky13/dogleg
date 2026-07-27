@@ -189,7 +189,7 @@ export function renderEmail(c: EmailContent): string {
             <img src="${WORDMARK_URL}" width="200" alt="DogLeg"
                  style="display:block;border:0;outline:none;text-decoration:none;width:200px;max-width:200px;height:auto;font-family:${FONT_DISPLAY};font-size:30px;font-weight:700;color:${INK.textHi};" />
             <div style="margin-top:10px;font-family:${FONT_UI};font-size:11px;font-weight:600;letter-spacing:0.16em;text-transform:uppercase;color:${INK.kicker};">
-              Daily golf strategy
+              Daily golf challenge
             </div>
           </td>
         </tr>

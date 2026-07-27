@@ -1,5 +1,6 @@
 import { CHARACTERS } from '../engine/characters'
 import { courseBySlug } from '../engine/courses'
+import { MISFORTUNE_CONFIG } from '../engine/misfortune'
 import type { HoleResult } from '../engine/types'
 import { loadLedger } from '../lib/records'
 import { computeStreaks, loadHistory } from './store'
@@ -324,6 +325,14 @@ export const ONE_OFFS: OneOff[] = [
     repeatable: true,
   },
   {
+    id: 'smited',
+    name: 'Smited',
+    requirement: `Suffer a Mis-fortune — forced to double par, 1 par 4 in ${MISFORTUNE_CONFIG.daily.par4sPerEvent.toLocaleString()}`,
+    hint: 'Pray it never finds you.',
+    hidden: true,
+    repeatable: true, // the lifetime curse tally, worn with pride
+  },
+  {
     id: 'anniversary',
     name: 'The Anniversary',
     requirement: 'Play on the calendar day you first teed off, a year or more later',
@@ -416,8 +425,10 @@ export function computeProgress(
   let dawnPatrol = 0
   let midnightOil = 0
   let hooky = 0
+  let smited = 0
   const charactersUsed = new Set<string>()
   for (const r of log) {
+    if (r.misfortuneHole) smited++
     if (r.character) charactersUsed.add(r.character)
     const res = r.results
     // "Play a full round with no bogeys" — full round of whatever course you
@@ -483,6 +494,7 @@ export function computeProgress(
     dawnPatrol,
     midnightOil,
     hooky,
+    smited,
     anniversary,
   }
 

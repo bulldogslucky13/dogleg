@@ -341,4 +341,8 @@ export interface HoleScore {
   result: HoleResult
   note: string
   shots: ShotRecord[]
+  /** the hole was forced to double par by a Mis-fortune (engine/misfortune.ts).
+   * Set identically by the client store and the referee's replay — the shot
+   * record above stays what actually happened. */
+  misfortune?: boolean
 }

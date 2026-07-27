@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { characterById } from '../engine/characters'
 import { SITE_URL, streakTag, toParLabel } from '../engine/daily'
 import { MOMENT_COPY, type MomentKind } from '../engine/fortune'
+import { MISFORTUNE_CONFIG, misfortuneLine, misfortuneOddsCopy, MISFORTUNE_COPY } from '../engine/misfortune'
+import { puzzleNumberForDateKey } from '../engine/daily'
 import type { CharacterId } from '../engine/types'
 import { track } from '../lib/analytics'
 import { CharacterAvatar } from './Avatars'
@@ -26,9 +28,19 @@ export function MomentSplash(props: {
   character?: CharacterId
   /** current day streak — rides along on shares when it's worth bragging about */
   streak?: number
+  /** misfortune only: drives the odds copy and the deterministic punchline */
+  mode?: 'daily' | 'practice'
+  seed?: string
+  /** misfortune only: the cursed hole's par, for the scoreline */
+  par?: number
   onClose: () => void
 }) {
-  const copy = MOMENT_COPY[props.kind]
+  const grim = props.kind === 'misfortune'
+  const copy = grim
+    ? { title: MISFORTUNE_COPY.title, sub: misfortuneOddsCopy(props.mode ?? 'daily') }
+    : MOMENT_COPY[props.kind as 'ace' | 'albatross']
+  const line = grim ? misfortuneLine(props.seed ?? '') : null
+  const grimScore = grim && props.par ? `${article(props.par * 2)} ${props.par * 2} on the par-${props.par} ${ordinal(props.holeNumber)}.` : null
   const char = characterById(props.character)
   const confetti = Array.from({ length: 26 })
   const [locked, setLocked] = useState(true)
@@ -61,6 +73,7 @@ export function MomentSplash(props: {
       toPar: props.toPar,
       character: props.character,
       streak: props.streak,
+      ...(grim ? { copy: { title: copy.title, sub: line ?? copy.sub } } : {}),
     })
       .then((blob) => {
         if (alive) cardBlob.current = blob
@@ -84,10 +97,15 @@ export function MomentSplash(props: {
     if (busy) return
     setBusy(true)
     try {
-      const line = props.kind === 'ace' ? `Hole in one at ${props.courseName} ⛳` : `Albatross at ${props.courseName} 🕊️`
+      const line =
+        props.kind === 'ace'
+          ? `Hole in one at ${props.courseName} ⛳`
+          : props.kind === 'albatross'
+            ? `Albatross at ${props.courseName} 🕊️`
+            : misfortuneShareLine(props)
       const opts = {
-        filename: `dogleg-${props.kind === 'ace' ? 'hole-in-one' : 'albatross'}.png`,
-        text: `${line}${streakTag(props.streak)} — DogLeg`,
+        filename: `dogleg-${props.kind === 'ace' ? 'hole-in-one' : props.kind === 'albatross' ? 'albatross' : 'mis-fortune'}.png`,
+        text: props.kind === 'misfortune' ? line : `${line}${streakTag(props.streak)} — DogLeg`,
         url: `https://${SITE_URL}`,
       }
       // Ready card → no await before shareMomentCard, so navigator.share() fires
@@ -102,6 +120,7 @@ export function MomentSplash(props: {
           toPar: props.toPar,
           character: props.character,
           streak: props.streak,
+          ...(grim ? { copy: { title: copy.title, sub: line ?? copy.sub } } : {}),
         }))
       cardBlob.current = blob
       const outcome = await shareMomentCard(blob, opts)
@@ -137,7 +156,9 @@ export function MomentSplash(props: {
           <span />
         </div>
         <h1 className="moment-title">{copy.title}</h1>
+        {grimScore && <p className="moment-grim-score">{grimScore}</p>}
         <p className="moment-sub">{copy.sub}</p>
+        {line && <p className="moment-grim-line">{line}</p>}
         <div className="moment-meta">
           {char && (
             <span className="moment-char">
@@ -177,6 +198,27 @@ function confettiStyle(i: number): React.CSSProperties {
     height: size * 1.6,
     transform: `rotate(${(i * 47) % 360}deg)`,
   }
+}
+
+/** Share text for the disaster: misery + the odds + the puzzle number — the
+ * "wait, WHAT" package. Mirrors the fortune share format. */
+function misfortuneShareLine(props: { courseName: string; holeNumber: number; par?: number; mode?: 'daily' | 'practice'; dateKey: string }): string {
+  const par = props.par ?? 4
+  const daily = props.mode !== 'practice'
+  const where = daily ? `DOGLEG #${puzzleNumberForDateKey(props.dateKey)}` : 'DogLeg'
+  const odds = MISFORTUNE_CONFIG[props.mode ?? 'daily'].par4sPerEvent.toLocaleString()
+  return `Mis-fortune 🌩️ ${where}: forced to ${article(par * 2).toLowerCase()} ${par * 2} on the par-${par} ${ordinal(props.holeNumber)} at ${props.courseName}. 1 par 4 in ${odds}. It chose me.`
+}
+
+/** 'An 8', 'An 11', 'An 18' — but 'A 6', 'A 10' */
+function article(n: number): string {
+  return n === 8 || n === 11 || n === 18 ? 'An' : 'A'
+}
+
+function ordinal(n: number): string {
+  const s = ['th', 'st', 'nd', 'rd']
+  const v = n % 100
+  return `${n}${s[(v - 20) % 10] ?? s[v] ?? s[0]}`
 }
 
 function shortDate(dateKey: string): string {

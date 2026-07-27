@@ -155,4 +155,6 @@ export const MOMENT_COPY: Record<'ace' | 'albatross', { title: string; sub: stri
   albatross: { title: 'ALBATROSS', sub: 'Two shots on a par five. Nobody does that.' },
 }
 
-export type MomentKind = 'ace' | 'albatross'
+/** The full-screen moment vocabulary. 'misfortune' is Fortune's evil twin
+ * (engine/misfortune.ts) — same splash machinery, opposite emotion. */
+export type MomentKind = 'ace' | 'albatross' | 'misfortune'

@@ -1459,6 +1459,33 @@ button {
   background: radial-gradient(90% 90% at 50% 45%, #3f7a44 0%, #26512d 45%, #0e2415 100%);
 }
 
+/* mis-fortune: storm slate — the same fireworks machine, pointed at a funeral */
+.moment-backdrop.misfortune {
+  background: radial-gradient(90% 90% at 50% 45%, #5a6472 0%, #39404b 45%, #14171c 100%);
+}
+
+.moment-backdrop.misfortune .moment-confetti:nth-child(3n) {
+  background: #d94a32;
+}
+
+.moment-backdrop.misfortune .moment-confetti:nth-child(3n + 1) {
+  background: #8a93a0;
+}
+
+/* the scoreline lands like a verdict; the punchline goes under the odds */
+.moment-grim-score {
+  font-size: 1.3rem;
+  font-weight: 900;
+  color: #f8f4e9;
+}
+
+.moment-grim-line {
+  font-size: 0.92rem;
+  font-style: italic;
+  color: rgba(248, 244, 233, 0.85);
+  max-width: 30ch;
+}
+
 .moment-backdrop.alltime .moment-confetti:nth-child(3n) {
   background: #ffd968;
 }

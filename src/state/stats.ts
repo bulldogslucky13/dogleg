@@ -35,6 +35,9 @@ export interface LoggedRound {
    * result+par. Needed because the engine collapses every diff ≥ 3 into
    * 'triple', so a blow-up hole can't be reconstructed from its result alone. */
   strokesByHole?: number[]
+  /** 1-based hole number a Mis-fortune struck, if one did — a forced double
+   * par is otherwise indistinguishable from an honest 8 in the results */
+  misfortuneHole?: number
 }
 
 const LOG_KEY = 'dogleg:roundlog:v1'
@@ -183,6 +186,10 @@ export function logRound(state: RoundState): void {
     strokes: state.scores.reduce((s, sc) => s + (sc?.strokes ?? 0), 0),
     results: state.scores.map((s) => s?.result ?? 'triple'),
     strokesByHole: state.scores.map((s) => s?.strokes ?? 0),
+    misfortuneHole: (() => {
+      const i = state.scores.findIndex((s) => s?.misfortune)
+      return i >= 0 ? i + 1 : undefined
+    })(),
   })
   writeLog({ v: 1, rounds })
 }

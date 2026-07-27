@@ -646,6 +646,10 @@ export default function App() {
     } else if (justScored && parNow === 5 && justScored.strokes === 2) {
       setMoment({ kind: 'albatross', holeNumber: nextRound.currentHole + 1 })
       momentFired = true
+    } else if (justScored?.misfortune) {
+      // the evil twin: the store just forced this hole to double par
+      setMoment({ kind: 'misfortune', holeNumber: nextRound.currentHole + 1 })
+      momentFired = true
     }
     if (momentFired) {
       // the marquee moment — previously only visible if the player shared it
@@ -726,6 +730,9 @@ export default function App() {
           toPar={toPar}
           character={round.character}
           streak={shareStreak}
+          mode={round.mode}
+          seed={round.seed}
+          par={course.holes[moment.holeNumber - 1]?.par}
           onClose={() => setMoment(null)}
         />
       )}

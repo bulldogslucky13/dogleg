@@ -1,6 +1,7 @@
 import { courseBySlug } from './courses'
 import { dailyConditions, courseForPuzzle, practiceConditions, puzzleNumberForDateKey } from './daily'
-import { destinyDue, fortuneEligible, fortuneShotOdds, splitFortune, type FortuneState, type MomentKind } from './fortune'
+import { destinyDue, fortuneEligible, fortuneShotOdds, splitFortune, type FortuneState } from './fortune'
+import { applyMisfortune, misfortuneHole } from './misfortune'
 import { buildLayout } from './layout'
 import { aceEligible, playShot, startHole, type HoleInPlay } from './resolve'
 import { rngFromString } from './rng'
@@ -69,7 +70,7 @@ export function setupFromSeed(seed: string): SeedInfo | null {
   // every historical practice prefix parses forever; the prefix itself is the
   // conditions version (practiceConditions gates pin/gust draws on it) — see
   // the conditions-versioning note in daily.ts
-  const practice = /^practice2?:([a-z0-9-]+):/.exec(base)
+  const practice = /^practice\d*:([a-z0-9-]+):/.exec(base)
   if (practice) {
     const course = courseBySlug(practice[1])
     if (!course) return null
@@ -118,11 +119,14 @@ export function replayRound(seed: string, character: CharacterId | undefined, de
   }
 
   // dice ignore the fortune tail — see roundRng in the store for why
-  const rng = rngFromString(splitFortune(seed).base)
+  const base = splitFortune(seed).base
+  const rng = rngFromString(base)
   const scores: HoleScore[] = []
   let aggressiveLeft = AGGRESSIVE_BUDGET
   const plan = destinyPlan(info)
   const fOdds = fortuneOddsFor(info)
+  // the curse, if this seed carries one — own hash stream, moves no dice
+  const cursed = misfortuneHole(info.mode, base, info.course, info.dateKey)
 
   for (let i = 0; i < holeCount; i++) {
     const spec = info.course.holes[i]
@@ -147,7 +151,7 @@ export function replayRound(seed: string, character: CharacterId | undefined, de
       // (h.strokes === 1): after a tee-shot penalty the "go" would finish as
       // an eagle, so it neither fires nor spends the guarantee — the plan
       // stays live for the next clean chance.
-      let destiny: MomentKind | undefined
+      let destiny: 'ace' | 'albatross' | undefined
       if (plan.ace && aceEligible(h, choice)) {
         destiny = 'ace'
         plan.ace = false
@@ -158,7 +162,7 @@ export function replayRound(seed: string, character: CharacterId | undefined, de
       playShot(h, choice, rng, destiny)
     }
     if (h.stage !== 'done' || !h.score) return { ok: false, error: `hole ${i + 1}: round left unfinished` }
-    scores.push(h.score)
+    scores.push(i === cursed ? applyMisfortune(h.score, spec.par) : h.score)
   }
 
   const par = info.course.holes.reduce((s, hole) => s + hole.par, 0)
@@ -243,7 +247,7 @@ export function replayFrames(seed: string, character: CharacterId | undefined, d
     const h = startHole(layout, info.cond, character, fOdds)
     frames.push({ holeIndex: i, shotIndex: 0, hole: snapshot(h), runningToPar: runToPar })
     decisions[i].forEach((choice, j) => {
-      let destiny: MomentKind | undefined
+      let destiny: 'ace' | 'albatross' | undefined
       if (plan.ace && aceEligible(h, choice)) {
         destiny = 'ace'
         plan.ace = false

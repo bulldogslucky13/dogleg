@@ -240,14 +240,19 @@ describe('smoke: par-3 short courses play start to finish at their real length',
     // across the cutover for the same rng key shape
     expect(typeof prePin.wind).toBe('number')
 
-    // old-format practice seeds (the pre-pin `practice:` prefix) parse forever
-    // and reconstruct pin-free; the current prefix carries pins
+    // every historical practice prefix parses forever and keeps ITS OWN
+    // envelope: `practice:` is pin-free, `practice2:` (the pin era) keeps its
+    // pins even though the current prefix has moved past it, and the current
+    // prefix (`practice3:`, the mis-fortune era) carries pins too
     const oldSeed = `practice:${COURSES[0].slug}:12345`
     const oldInfo = setupFromSeed(oldSeed)
     expect(oldInfo).not.toBeNull()
     expect(oldInfo!.cond.pins).toBeUndefined()
+    const pinEra = setupFromSeed(`practice2:${COURSES[0].slug}:12345`)
+    expect(pinEra).not.toBeNull()
+    expect(pinEra!.cond.pins).toBeDefined()
     const fresh = practiceSetup(COURSES[0].slug, '12345')
-    expect(fresh.seed.startsWith('practice2:')).toBe(true)
+    expect(fresh.seed.startsWith('practice3:')).toBe(true)
     expect(setupFromSeed(fresh.seed)!.cond.pins).toBeDefined()
   })
 

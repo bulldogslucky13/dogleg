@@ -6,6 +6,7 @@ import type { CharacterId, Choice, Conditions, HoleResult, HoleScore, Stage } fr
 import { courseBySlug } from '../engine/courses'
 import { EMPTY_FORTUNE, encodeFortune, fortuneEligible, splitFortune, type FortuneState } from '../engine/fortune'
 import { gradeRound } from '../engine/grade'
+import { applyMisfortune, misfortuneHole } from '../engine/misfortune'
 import { AGGRESSIVE_BUDGET, decisionsFromScores, destinyPlan, fortuneOddsFor, setupFromSeed } from '../engine/replay'
 import { ENGINE_VERSION } from '../engine/version'
 import { track } from '../lib/analytics'
@@ -226,7 +227,11 @@ export function applyChoice(state: RoundState, choice: Choice): RoundState {
     scores: state.scores.slice(),
   }
   if (h.stage === 'done' && h.score) {
-    next.scores[state.currentHole] = h.score
+    // the curse lands at the same instant the referee applies it in replay:
+    // hole completion, after the real shots resolved (misfortune.ts)
+    const spec = courseBySlug(state.courseSlug)!.holes[state.currentHole]
+    const cursed = misfortuneHole(state.mode, splitFortune(state.seed).base, courseBySlug(state.courseSlug)!, state.dateKey)
+    next.scores[state.currentHole] = cursed === state.currentHole ? applyMisfortune(h.score, spec.par) : h.score
   }
   return next
 }

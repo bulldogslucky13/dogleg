@@ -307,4 +307,9 @@
 // 0.0469 -> 0.0191. No threshold was moved.
 // Play Ratings regenerated LAST, after every odds change: 22 of 53 courses
 // shift, every one by exactly one point (16 down, 6 up).
-export const ENGINE_VERSION = 18
+// v19 = Mis-fortune (engine/misfortune.ts): a seed-derived rare curse forcing
+// one par 4 to double par. Gated on MISFORTUNE_FROM_DATEKEY / the practice3:
+// seed prefix, so only post-cutover seeds replay differently — and its roll
+// uses its own hash streams, consuming NOTHING from the shared shot rng, so
+// pre-cutover dice are bit-for-bit untouched.
+export const ENGINE_VERSION = 19

@@ -56,6 +56,8 @@ const PALETTE: Record<CardKind, { stops: [string, string, string]; confetti: [st
   albatross: { stops: ['#7c56b8', '#4c3378', '#150d24'], confetti: ['#c9a7ff', '#6fbf66', '#f4efe3'] },
   // course-record reclaim: clubhouse greens with gold confetti
   record: { stops: ['#3f7a44', '#26512d', '#0e2415'], confetti: ['#ffd968', '#c9a227', '#f4efe3'] },
+  // mis-fortune: storm slate with flag-red confetti — a funeral with balloons
+  misfortune: { stops: ['#5a6472', '#39404b', '#14171c'], confetti: ['#d94a32', '#8a93a0', '#f4efe3'] },
 }
 
 export async function momentCardBlob(props: MomentCardProps): Promise<Blob> {
@@ -67,7 +69,8 @@ export async function momentCardBlob(props: MomentCardProps): Promise<Blob> {
   ctx.scale(SCALE, SCALE)
 
   const pal = PALETTE[props.kind]
-  const copy = props.copy ?? MOMENT_COPY[props.kind as MomentKind]
+  // misfortune and record kinds always arrive with their own copy
+  const copy = props.copy ?? MOMENT_COPY[props.kind as 'ace' | 'albatross']
 
   // backdrop — radial wash centered a touch above the middle, like the CSS
   // centred on the ball rather than the canvas, so the glow stays behind the

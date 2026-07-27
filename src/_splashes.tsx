@@ -57,6 +57,20 @@ const CASES: Record<string, (close: () => void) => React.ReactNode> = {
   'moment · ace': (close) => (
     <MomentSplash kind="ace" holeNumber={7} courseName={COMMON.courseName} dateKey={COMMON.dateKey} toPar={-4} character="dart" streak={6} onClose={close} />
   ),
+  'moment · mis-fortune': (close) => (
+    <MomentSplash
+      kind="misfortune"
+      holeNumber={11}
+      courseName={COMMON.courseName}
+      dateKey="2026-07-29"
+      toPar={2}
+      character="greens"
+      mode="daily"
+      seed="round:2026-07-29:royal-portrush:demo"
+      par={4}
+      onClose={close}
+    />
+  ),
   'moment · albatross': (close) => (
     <MomentSplash kind="albatross" holeNumber={13} courseName={COMMON.courseName} dateKey={COMMON.dateKey} toPar={-6} character="fairway" streak={12} onClose={close} />
   ),

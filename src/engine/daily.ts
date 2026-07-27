@@ -117,12 +117,26 @@ const GREEN_BUMP: Record<Greens, Greens[]> = {
  * Pin positions (and par-3 gusts) are the first versioned addition: dailies
  * dealt before PINS_FROM_DATEKEY and practice seeds without the `practice2:`
  * prefix predate pins and reconstruct pin-free, exactly as played.
+ *
+ * Mis-fortune is the second: dailies gate on MISFORTUNE_FROM_DATEKEY
+ * (engine/misfortune.ts) and practice on the `practice3:` prefix. Its roll
+ * uses its own hash streams — it consumes nothing from the shared shot rng,
+ * so it moves no dice; the gate exists because a forced double par changes
+ * what a seed + decisions REPLAY into.
  */
 export const PINS_FROM_DATEKEY = '2026-07-24'
 
 /** The seed prefix current practice rounds are dealt under (see versioning
- * note above). Old `practice:` seeds stay parseable — and pin-free — forever. */
-export const PRACTICE_SEED_PREFIX = 'practice2'
+ * note above). Every historical prefix stays parseable forever. */
+export const PRACTICE_SEED_PREFIX = 'practice3'
+
+/** Which conditions-envelope version a practice seed was dealt under:
+ * `practice:` = 1, `practice2:` = 2, … Features gate on `>= N`, so a newer
+ * feature can never un-deal an older seed's conditions. */
+export function practiceSeedVersion(seed: string): number {
+  const m = /^practice(\d*):/.exec(seed)
+  return m ? Number(m[1] || 1) : 0
+}
 
 /**
  * Draws today's pin on every par-3 hole, plus a per-hole gust on par-3 short
@@ -175,7 +189,9 @@ export function dailyConditions(dateKey: string, course: CourseSpec): Conditions
 /** For practice the round seed itself is the conditions key. Par-3 shorts
  * draw from a gustier band — wind is half their personality. */
 export function practiceConditions(seed: string, course: CourseSpec): Conditions {
-  return jitteredConditions(seed, course, course.par3Course ? 18 : 12, 3, seed.startsWith(`${PRACTICE_SEED_PREFIX}:`))
+  // pins arrived with envelope v2 — gate on the version, not the CURRENT
+  // prefix, or every later prefix bump would silently un-pin v2 history
+  return jitteredConditions(seed, course, course.par3Course ? 18 : 12, 3, practiceSeedVersion(seed) >= 2)
 }
 
 /**

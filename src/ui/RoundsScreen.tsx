@@ -20,6 +20,7 @@ import { lifetimeRounds, loadArchive, type ArchivedRound, type HistoryEntry } fr
 import { pastSeasons, roundsInSeason, seasonAwards, type SeasonAward } from '../state/seasonStore'
 import { loadLedger, syncLedger } from '../lib/records'
 import { AccountPanel } from './AccountPanel'
+import { AchievementsView } from './Achievements'
 import { RoundScorecard } from './RoundScorecard'
 import { shortCourseName } from './courseName'
 import { track } from '../lib/analytics'
@@ -34,7 +35,7 @@ import { track } from '../lib/analytics'
  */
 
 type LockerView = 'main' | 'stats' | 'ace' | 'albatross'
-type LockerTab = 'recent' | 'records' | 'seasons'
+type LockerTab = 'recent' | 'records' | 'seasons' | 'awards'
 
 /** an archived round already carries everything the scorecard needs */
 function toLogged(r: ArchivedRound): LoggedRound {
@@ -428,7 +429,17 @@ export function RoundsScreen(props: {
             >
               Seasons
             </button>
+            <button
+              role="tab"
+              aria-selected={tab === 'awards'}
+              className={`locker-tab${tab === 'awards' ? ' on' : ''}`}
+              onClick={() => setTab('awards')}
+            >
+              Awards
+            </button>
           </div>
+
+          {tab === 'awards' && <AchievementsView />}
 
           {tab === 'recent' && (
             <section className="rounds-section">

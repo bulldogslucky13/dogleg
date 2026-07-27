@@ -180,7 +180,7 @@ export function FortuneInfo(props: { onClose: () => void }) {
 export function Tutorial(props: {
   onClose: () => void
   /** the Fortunes step's one quiet sync line routes here — the same account
-   * flow the Locker CTA opens. This is How to Play's ONLY sync mention. */
+   * flow the Clubhouse CTA opens. This is How to Play's ONLY sync mention. */
   onSync?: () => void
 }) {
   const [step, setStep] = useState(0)

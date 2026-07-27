@@ -382,6 +382,48 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
     expect(screen.queryByText(/Season record open/)).toBeNull()
   })
 
+  it('the Awards tab shows the ladders, the backfill summary once, and hides hidden badges', async () => {
+    localStorage.setItem('dogleg:tutorial:v1', 'done')
+    // a stored history earns real tiers before the app ever opens
+    const { logRound } = await import('./state/stats')
+    const { newRound, applyChoice, advanceHole, archiveRound } = await import('./state/store')
+    const { practiceSetup } = await import('./engine/daily')
+    let st = newRound(practiceSetup('pebble-beach', 'smokeawards'), 'practice', 'dart')
+    let guard = 0
+    while (!st.complete && guard++ < 500) {
+      if (st.hole?.stage === 'done') {
+        st = advanceHole(st)
+        continue
+      }
+      const next = applyChoice(st, 'normal')
+      st = next === st ? applyChoice(st, 'safe') : next
+    }
+    archiveRound(st) // the Clubhouse entry on home gates on the archive
+    logRound(st)
+    render(<App />)
+    // the app-start quiet pass granted without a single toast
+    expect(document.querySelector('.ach-toast')).toBeNull()
+    const ledger = JSON.parse(localStorage.getItem('dogleg:achievements:v1')!)
+    expect(ledger.earned['rounds:1']).toMatchObject({ backfilled: true })
+    expect(ledger.backfill.granted).toBeGreaterThan(0)
+
+    fireEvent.click(screen.getByText(/Clubhouse/))
+    fireEvent.click(screen.getByRole('tab', { name: 'Awards' }))
+    // the one-time summary line, then never again
+    expect(screen.getByText(/already earned/)).toBeTruthy()
+    // ladders show the carrot: the next tier by name
+    expect(screen.getByText('The Flock')).toBeTruthy()
+    expect(screen.getByText('The Grind')).toBeTruthy()
+    expect(screen.getAllByText(/next:/).length).toBeGreaterThan(0)
+    // hidden one-offs stay masked until earned; visible ones show requirements
+    expect(screen.getAllByText('???').length).toBeGreaterThan(0)
+    expect(screen.getByText('Name on the Wall')).toBeTruthy()
+    // leaving and returning: summary marked seen, gone for good
+    fireEvent.click(screen.getByRole('tab', { name: 'Recent' }))
+    fireEvent.click(screen.getByRole('tab', { name: 'Awards' }))
+    expect(screen.queryByText(/already earned/)).toBeNull()
+  })
+
   it('the Clubhouse scorecard opens on paper, outside the dark screen', async () => {
     const { newRound, applyChoice, advanceHole, archiveRound } = await import('./state/store')
     const { logRound } = await import('./state/stats')

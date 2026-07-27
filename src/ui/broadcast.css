@@ -1123,6 +1123,251 @@
   border-radius: 0;
 }
 
+/* ------------------------------------------------------- achievements ----
+   Ladders read like broadcast stat panels: keyline card, tower-condensed
+   rank name on the right, a thin progress bar chasing the next named tier.
+   Gold only ever means a FINISHED ladder — records language, kept scarce. */
+
+.achievements .ach-backfill {
+  background: var(--bg-card);
+  border-left: var(--keyline-w) solid var(--trophy-400);
+  border-radius: 3px var(--r-bug) var(--r-bug) 3px;
+  padding: 9px 12px;
+  font-size: 0.8rem;
+  color: var(--text-mid);
+}
+
+.achievements .ach-backfill b {
+  color: var(--trophy-300);
+}
+
+.ach-ladder {
+  background: var(--bg-card);
+  border-left: var(--keyline-w) solid var(--tracer-400);
+  border-radius: 3px var(--r-bug) var(--r-bug) 3px;
+  padding: 10px 12px 9px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ach-ladder.complete {
+  border-left-color: var(--trophy-400);
+}
+
+.ach-ladder-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.ach-title {
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+
+/* the current rank: the name you've earned, tower-condensed like a lower third */
+.ach-rank {
+  font-family: var(--font-display);
+  font-variation-settings: 'wdth' var(--wdth-tower);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: var(--track-tower);
+  font-size: 0.88rem;
+  color: var(--trophy-300);
+  white-space: nowrap;
+}
+
+.ach-rank.none {
+  color: var(--text-low);
+}
+
+.ach-bar {
+  height: 5px;
+  border-radius: 3px;
+  background: var(--bg-elevated);
+  overflow: hidden;
+}
+
+.ach-bar i {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  background: linear-gradient(90deg, var(--tracer-400), var(--fairway-300));
+}
+
+.ach-ladder.complete .ach-bar i {
+  background: var(--trophy-400);
+}
+
+.ach-ladder-foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 0.72rem;
+  color: var(--text-mid);
+}
+
+.ach-progress {
+  font-variant-numeric: tabular-nums;
+}
+
+.ach-progress.top {
+  color: var(--trophy-300);
+}
+
+.ach-next {
+  color: var(--text-low);
+  white-space: nowrap;
+}
+
+.ach-next b {
+  color: var(--text-mid);
+}
+
+/* one dot per rung, lit as they fall */
+.ach-dots {
+  display: flex;
+  gap: 4px;
+}
+
+.ach-dots i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--bg-elevated);
+}
+
+.ach-dots i.on {
+  background: var(--trophy-400);
+}
+
+/* ---- one-off badges ---- */
+
+.ach-badges {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--sp-2);
+}
+
+.ach-badge {
+  background: var(--bg-card);
+  border-left: var(--keyline-w) solid var(--fairway-300);
+  border-radius: 3px var(--r-bug) var(--r-bug) 3px;
+  padding: 9px 11px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.ach-badge b {
+  font-size: 0.85rem;
+  line-height: 1.2;
+}
+
+.ach-badge span {
+  font-size: 0.68rem;
+  line-height: 1.35;
+  color: var(--text-low);
+}
+
+.ach-badge .ach-count {
+  font-style: normal;
+  color: var(--trophy-300);
+  font-variant-numeric: tabular-nums;
+}
+
+.ach-badge.locked {
+  border-left-color: var(--edge-strong);
+  opacity: 0.75;
+}
+
+.ach-badge.locked b {
+  color: var(--text-mid);
+}
+
+.ach-badge.hidden-badge span {
+  font-style: italic;
+}
+
+.ach-fine {
+  text-align: center;
+}
+
+/* ---- the unlock toast: a nod from the booth, never a modal ---- */
+
+.ach-toast {
+  position: fixed;
+  left: 50%;
+  bottom: max(18px, env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  z-index: 60;
+  width: min(92vw, 360px);
+  text-align: left;
+  background: var(--bg-panel);
+  border: 1px solid rgba(226, 185, 59, 0.5);
+  border-left: 4px solid var(--trophy-400);
+  border-radius: 3px var(--r-card) var(--r-card) 3px;
+  box-shadow: var(--shadow-pop);
+  color: var(--text-hi);
+  padding: 10px 14px 11px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  animation: ach-toast-in 240ms ease-out;
+}
+
+.ach-toast-kicker {
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: var(--track-kicker);
+  text-transform: uppercase;
+  color: var(--trophy-300);
+}
+
+.ach-toast-name {
+  font-family: var(--font-display);
+  font-variation-settings: 'wdth' var(--wdth-tower);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: var(--track-tower);
+  font-size: 1.15rem;
+}
+
+.ach-toast-detail {
+  font-size: 0.74rem;
+  color: var(--text-mid);
+}
+
+.ach-toast-queue {
+  position: absolute;
+  top: 9px;
+  right: 12px;
+  font-size: 0.62rem;
+  font-weight: 700;
+  color: var(--text-low);
+  font-variant-numeric: tabular-nums;
+}
+
+@keyframes ach-toast-in {
+  from {
+    transform: translateX(-50%) translateY(14px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(-50%) translateY(0);
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ach-toast {
+    animation: none;
+  }
+}
+
 /* --------------------------- paper game screens: brand accents ONLY */
 
 /* The pick and play screens deliberately KEEP the light paper look — they are

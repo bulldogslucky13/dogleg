@@ -7,7 +7,7 @@ import { holeStrokes, type LoggedRound } from '../state/stats'
 import { CharacterAvatar } from './Avatars'
 
 /**
- * THE scorecard — one component for every round the Locker can name: recent
+ * THE scorecard — one component for every round the Clubhouse can name: recent
  * rounds, personal bests, course records, fortune rounds, the lifetime
  * highest/lowest. Renders from the round log's per-hole results (strokes are
  * derived from result + par, so pre-log daily history renders identically).

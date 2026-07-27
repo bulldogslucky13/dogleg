@@ -38,6 +38,8 @@ import { CharacterAvatar } from './ui/Avatars'
 import { GreenView, HoleMap, useMapSize } from './ui/HoleMap'
 import { SideMap } from './ui/SideMap'
 import { CaddyThoughts, ChoiceCards, ClassicScorecard, HazardChips, HoleComplete, RoundCardSheet, StatusBanner, TierBanner } from './ui/panels'
+import { reconcileAchievements, type Unlock } from './state/achievements'
+import { UnlockToasts } from './ui/Achievements'
 import { prefersReducedMotion } from './ui/motion'
 import type { MomentKind } from './engine/fortune'
 import { MomentSplash } from './ui/MomentSplash'
@@ -131,6 +133,8 @@ export default function App() {
   const [mapRef, mapSize] = useMapSize()
   /** the full-18 round card, opened by tapping the header score chip */
   const [showCard, setShowCard] = useState(false)
+  /** achievements newly earned by the round that just finished — toast queue */
+  const [unlocks, setUnlocks] = useState<Unlock[]>([])
 
   useEffect(() => {
     saveRound(round)
@@ -142,6 +146,9 @@ export default function App() {
     // a device with no rounds behind it has nothing to catch up on — stamp the
     // current drop so a first-timer never gets a "what's changed" card later
     primeWhatsNew()
+    // grant whatever the stored stats already earn, silently — the first run
+    // records a summary the Clubhouse shows once; re-runs are no-ops
+    reconcileAchievements('quiet')
     ensureIdentity()
     // a device that already holds a NAMED player is a returning known user —
     // attach their events to that stable id so cross-device stats line up.
@@ -366,7 +373,7 @@ export default function App() {
           <Tutorial
             onClose={closeTutorial}
             onSync={() => {
-              // the same account flow as the Locker CTA: land in the locker
+              // the same account flow as the Clubhouse CTA: land in the Clubhouse
               // with the panel open
               closeTutorial()
               setLockerView('main')
@@ -505,31 +512,34 @@ export default function App() {
     // the swing coach's report needs the same shot-by-shot record the recap does
     const grade = recapSource ? roundGrade : null
     return (
-      <ResultScreen
-        setup={setup}
-        results={results}
-        toPar={toPar}
-        practice={isPractice}
-        recap={recapSource ? buildRecap(recapSource) : null}
-        grade={grade}
-        boardRound={recapSource}
-        ghostClose={
-          isPractice && round && ghost
-            ? { margin: roundToPar(round) - ghost.toPar, kind: ghost.kind, holder: ghost.holder }
-            : null
-        }
-        character={isPractice && round ? round.character : entry?.character}
-        history={history}
-        onHome={() => setView('home')}
-        onPracticeAgain={() => {
-          if (round) {
-            // rematch on the same course, but pick your player fresh each run
-            // (round_started is tracked by the pick screen's onPick)
-            setPending({ mode: 'practice', setup: practiceSetup(round.courseSlug, `${Date.now()}`) })
-            setView('pick')
+      <>
+        {unlocks.length > 0 && <UnlockToasts unlocks={unlocks} onDone={() => setUnlocks([])} />}
+        <ResultScreen
+          setup={setup}
+          results={results}
+          toPar={toPar}
+          practice={isPractice}
+          recap={recapSource ? buildRecap(recapSource) : null}
+          grade={grade}
+          boardRound={recapSource}
+          ghostClose={
+            isPractice && round && ghost
+              ? { margin: roundToPar(round) - ghost.toPar, kind: ghost.kind, holder: ghost.holder }
+              : null
           }
-        }}
-      />
+          character={isPractice && round ? round.character : entry?.character}
+          history={history}
+          onHome={() => setView('home')}
+          onPracticeAgain={() => {
+            if (round) {
+              // rematch on the same course, but pick your player fresh each run
+              // (round_started is tracked by the pick screen's onPick)
+              setPending({ mode: 'practice', setup: practiceSetup(round.courseSlug, `${Date.now()}`) })
+              setView('pick')
+            }
+          }}
+        />
+      </>
     )
   }
 
@@ -610,8 +620,11 @@ export default function App() {
     if (after.complete) {
       const h = recordResult(after)
       setHistory(h)
-      archiveRound(after) // into the locker — replayable forever if it's a PR/CR
+      archiveRound(after) // into the Clubhouse — replayable forever if it's a PB/CR
       logRound(after) // into the round log — scorecard + stats material, forever
+      // read-only pass over the stats the round just moved; anything newly
+      // earned toasts over the wrap screen, politely queued
+      setUnlocks(reconcileAchievements('live'))
       setResultFor(after.mode)
       setView('result')
     }

@@ -574,7 +574,7 @@ function saveArchive(rounds: ArchivedRound[]): void {
 }
 
 /** An ace (par-3 eagle — that IS a hole in one) or an albatross anywhere in
- * the round. These are the trophy moments the Locker features. */
+ * the round. These are the trophy moments the Clubhouse features. */
 export function hasFortuneMoment(courseSlug: string, results: HoleResult[]): boolean {
   const pars = courseBySlug(courseSlug)?.holes.map((h) => h.par) ?? []
   return results.some((r, i) => r === 'albatross' || (r === 'eagle' && pars[i] === 3))
@@ -584,7 +584,7 @@ export function hasFortuneMoment(courseSlug: string, results: HoleResult[]): boo
  * Retention: the 10 most recent rounds always stay. Beyond that, a round
  * lives forever if it's your personal best on its course (PR), a confirmed
  * course record, or holds a fortune moment (ace/albatross) — trophies don't
- * age out, so their replays stay watchable from the Locker.
+ * age out, so their replays stay watchable from the Clubhouse.
  */
 export function pruneArchive(rounds: ArchivedRound[]): ArchivedRound[] {
   const byNewest = [...rounds].sort((a, b) => b.playedAt - a.playedAt)

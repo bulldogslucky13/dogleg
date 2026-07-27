@@ -47,21 +47,15 @@ export const CHANGE_KIND_LABEL: Record<ChangeKind, string> = {
 export const CHANGELOG: ChangeEntry[] = [
   {
     date: '2026-07-27',
-<<<<<<< HEAD
     kind: 'feature',
     title: 'Achievements',
     note: 'The Clubhouse grows an Awards tab: named ranks for every pursuit \u2014 birdies, streaks, records, rounds \u2014 plus one-off badges, a few of them hidden until you stumble into them. Your whole history counts from day one: anything you\u2019d already earned is waiting on the shelf.',
   },
   {
     date: '2026-07-27',
-    kind: 'feature',
-    title: 'The wrap screen gets the 2.0 treatment',
-    note: 'Finish a round and the new post-round screen leads with your score, your share card, and a proper leaderboard tower \u2014 ties share a place, podium spots wear their medals, and Copy and Share sit side by side. Same numbers, better ceremony.',
-=======
     kind: 'fix',
     title: 'No more trees on treeless courses',
     note: 'Drive it somewhere nobody mapped and the game used to put you "in the trees" — even on a links with not a tree on it, and it drew your ball sitting on the fairway while it said so. Now each course names its own junk, and the ball is drawn where you actually are.',
->>>>>>> origin/main
   },
   {
     date: '2026-07-25',

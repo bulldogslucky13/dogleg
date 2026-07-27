@@ -108,28 +108,42 @@ describe('course-level rough severity', () => {
  * how it went unnoticed.
  */
 describe('the junk floor names something the course actually has', () => {
-  it('every course with no trees anywhere gives its junk a name', () => {
+  // Keyed on `trees` ALONE. Counting `deeprough` as trees was the first
+  // version's bug and it hid Carnoustie completely: gorse and hay are the very
+  // things this is meant to name, so letting them satisfy the check answered
+  // "does the course have trees?" with "it has vegetation", which is not the
+  // same question.
+  it('never says "trees" on a hole whose course has none', () => {
     for (const c of COURSES) {
-      const hasTrees = c.holes.some((spec) =>
-        buildLayout(c.slug, spec, COND).zones.some((z) => z.kind === 'trees' || z.kind === 'deeprough'),
-      )
+      const hasTrees = c.holes.some((spec) => buildLayout(c.slug, spec, COND).zones.some((z) => z.kind === 'trees'))
       if (hasTrees) continue
-      expect(
-        c.junkLabel ?? c.roughLabel,
-        `${c.slug} has no trees on any hole, so a junk-floor lie would claim one — set junkLabel`,
-      ).toBeTruthy()
+      for (const spec of c.holes) {
+        expect(
+          buildLayout(c.slug, spec, COND).junkLabel,
+          `${c.slug}:${spec.number} would claim trees on a course that has none — set junkLabel`,
+        ).not.toBe('trees')
+      }
     }
   })
 
-  it('resolves the label per hole: real trees win, then the course, then the default', () => {
+  it('resolves the label per hole: real trees win, then the course, then deep rough', () => {
     for (const c of COURSES) {
+      const courseWord = c.junkLabel ?? c.roughLabel
       for (const spec of c.holes) {
         const layout = buildLayout(c.slug, spec, COND)
-        const treed = layout.zones.some((z) => z.kind === 'trees' || z.kind === 'deeprough')
-        if (treed) expect(layout.junkLabel, `${c.slug}:${spec.number}`).toBe('trees')
-        else expect(layout.junkLabel, `${c.slug}:${spec.number}`).toBe(c.junkLabel ?? c.roughLabel ?? 'trees')
+        const expected = layout.zones.some((z) => z.kind === 'trees')
+          ? 'trees'
+          : (courseWord ?? (layout.zones.some((z) => z.kind === 'deeprough') ? 'deep rough' : layout.junkLabel))
+        expect(layout.junkLabel, `${c.slug}:${spec.number}`).toBe(expected)
       }
     }
+    // the course's own word reaches its deep-rough holes — the case that
+    // regressed when any vegetation zone short-circuited to "trees"
+    const portrush = COURSES.find((c) => c.slug === 'royal-portrush-dunluce')!
+    const deepHole = portrush.holes.find((spec) =>
+      buildLayout(portrush.slug, spec, COND).zones.some((z) => z.kind === 'deeprough'),
+    )!
+    expect(buildLayout(portrush.slug, deepHole, COND).junkLabel).toBe('gorse')
     // unknown slugs (tests use fakes) still get a usable word, never undefined
     expect(buildLayout('not-a-course', COURSES[0].holes[0], COND).junkLabel).toBe('trees')
   })

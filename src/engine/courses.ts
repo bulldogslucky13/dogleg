@@ -176,6 +176,10 @@ export const COURSES: CourseSpec[] = [
     greens: 'Firm',
     wind: 18,
     blurb: 'They call it Car-nasty for a reason — the meanest finish in championship golf.',
+    // A links with no trees mapped anywhere, so the odds' junk floor had
+    // nothing honest to call itself — see CourseSpec.junkLabel. Whins is what
+    // Angus calls the gorse that eats a ball off these fairways.
+    junkLabel: 'whins',
     holes: holes([
       [4, 401, 10, 'S', 'none'],
       [4, 435, 4, 'R', 'sand'],

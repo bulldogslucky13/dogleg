@@ -222,6 +222,25 @@
   border-color: var(--edge-strong);
 }
 
+/* The handicap chip: quiet wayfinding under the Clubhouse button, deep-linked
+   to the lifetime stats view. The element predates the re-skin and its logic
+   is untouched — but it was styled only for paper (dark ink, dark hairline),
+   which the dark Teebox rendered invisible at ~1.1:1. It hides itself until a
+   handicap is established, so every young-profile verification pass missed
+   it. Broadcast dress: mid text, hairline pill, display-face numerals. */
+.screen.home .hcap-chip {
+  color: var(--text-mid);
+  border-color: var(--edge-strong);
+}
+
+.screen.home .hcap-chip b {
+  font-family: var(--font-display);
+  font-variation-settings: 'wdth' var(--wdth-score);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-hi);
+}
+
 /* today's course: the light lower-third slab — sand block, flag keyline.
    The corner notch is EARNED: .notched (today's round in the books) punches
    the corner like a marked paper scorecard; unplayed cards stay square. */

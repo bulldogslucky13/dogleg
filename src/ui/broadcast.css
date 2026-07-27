@@ -1529,6 +1529,9 @@
   padding: 8px 6px;
 }
 
+/* Filters and Sort are IDENTICAL fixed-size cells: the pill never resizes —
+   only the sort label's text changes inside it, centred, sized to fit the
+   longest label so no state shifts the layout by a pixel. */
 .screen.home .filter-bar-actions {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -1536,8 +1539,16 @@
 }
 
 .screen.home .filter-bar-actions .filter-chip {
+  /* width comes from the CELL, never the label — the pill cannot resize */
+  width: 100%;
   white-space: nowrap;
-  padding: 7px 10px;
+  padding: 8px 6px;
+  font-size: 0.66rem;
+  min-height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
 }
 
 .screen.home .course-cr.loading {

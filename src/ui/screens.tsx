@@ -64,6 +64,7 @@ export function HomeScreen(props: {
   const [favsOnly, setFavsOnly] = useState(false)
   const [courseSort, setCourseSort] = useState<'tour' | 'easiest' | 'hardest' | 'beatable' | 'recent'>('tour')
   const [favs, setFavs] = useState<Set<string>>(() => loadFavorites())
+  const [filterSheet, setFilterSheet] = useState(false)
   const [courseRecs, setCourseRecs] = useState<Map<string, CourseRecord> | null>(null)
   const [seasonRecs, setSeasonRecs] = useState<Map<string, CourseRecord> | null>(null)
   /** which season the loaded seasonRecs belong to — a rollover while the
@@ -156,8 +157,9 @@ export function HomeScreen(props: {
   // same source and the same honesty as the played notch itself.
   const lastPlayed = new Map<string, number>()
   for (const r of loadArchive()) lastPlayed.set(r.courseSlug, Math.max(lastPlayed.get(r.courseSlug) ?? 0, r.playedAt))
-  const filtersActive =
-    playedFilter !== 'all' || ratingFilter !== 'any' || recordFilter !== 'any' || favsOnly || courseSort !== 'tour'
+  const activeFilterCount =
+    (playedFilter !== 'all' ? 1 : 0) + (ratingFilter !== 'any' ? 1 : 0) + (recordFilter !== 'any' ? 1 : 0) + (favsOnly ? 1 : 0)
+  const filtersActive = activeFilterCount > 0 || courseSort !== 'tour'
   // guest courses browse (and filter, and sort) like everything else — one pool
   const browsable = [...COURSES, ...GUEST_COURSES]
   const visibleCourses = browsable.filter((c) => {
@@ -358,13 +360,18 @@ export function HomeScreen(props: {
           )}
           {courseTab === 'courses' && (
             <div className="course-filters">
-              {/* which record the hunt is against — governs filters AND rows */}
-              <div className="rec-toggle" role="group" aria-label="Record type">
-                <button className={`rec-toggle-btn${recType === 'season' ? ' on' : ''}`} onClick={() => setRecType('season')}>
-                  Season
-                </button>
-                <button className={`rec-toggle-btn${recType === 'alltime' ? ' on' : ''}`} onClick={() => setRecType('alltime')}>
-                  All-time
+              {/* one slim row; the full controls live in the sheet below */}
+              <div className="filter-bar">
+                <div className="rec-toggle" role="group" aria-label="Record type">
+                  <button className={`rec-toggle-btn${recType === 'season' ? ' on' : ''}`} onClick={() => setRecType('season')}>
+                    Season
+                  </button>
+                  <button className={`rec-toggle-btn${recType === 'alltime' ? ' on' : ''}`} onClick={() => setRecType('alltime')}>
+                    All-time
+                  </button>
+                </div>
+                <button className={`filter-chip${activeFilterCount > 0 ? ' on' : ''}`} onClick={() => setFilterSheet(true)}>
+                  ☰ Filters{activeFilterCount > 0 ? ` · ${activeFilterCount}` : ''}
                 </button>
                 <button
                   className="filter-chip sort"
@@ -385,65 +392,92 @@ export function HomeScreen(props: {
                 >
                   ⇅{' '}
                   {courseSort === 'tour'
-                    ? 'Tour order'
+                    ? 'Tour'
                     : courseSort === 'easiest'
-                      ? 'Easiest first'
+                      ? 'Easiest'
                       : courseSort === 'hardest'
-                        ? 'Hardest first'
+                        ? 'Hardest'
                         : courseSort === 'beatable'
-                          ? 'Beatable records'
-                          : 'Recently played'}
+                          ? 'Beatable'
+                          : 'Recent'}
                 </button>
               </div>
-              <div className="filter-row" role="group" aria-label="Filter by played">
-                {(['all', 'unplayed', 'played'] as const).map((f) => (
-                  <button key={f} className={`filter-chip${playedFilter === f ? ' on' : ''}`} onClick={() => setPlayedFilter(f)}>
-                    {f === 'all' ? 'All' : f === 'unplayed' ? 'Never played' : 'Played ▸'}
-                  </button>
-                ))}
-                <button className={`filter-chip fav${favsOnly ? ' on' : ''}`} onClick={() => setFavsOnly(!favsOnly)}>
-                  ★ Favorites{favs.size > 0 ? ` · ${favs.size}` : ''}
-                </button>
-              </div>
-              <div className="filter-row" role="group" aria-label="Filter by difficulty">
-                {(['any', 'easy', 'mid', 'hard'] as const).map((f) => (
-                  <button key={f} className={`filter-chip${ratingFilter === f ? ' on' : ''}`} onClick={() => setRatingFilter(f)}>
-                    {f === 'any' ? 'Any difficulty' : f === 'easy' ? 'Easy 1–3' : f === 'mid' ? 'Medium 4–7' : 'Hard 8–10'}
-                  </button>
-                ))}
-              </div>
-              <div className="filter-row" role="group" aria-label="Filter by record">
-                {(['any', 'open', 'attainable', 'mine', 'notmine'] as const).map((f) => (
-                  <button
-                    key={f}
-                    className={`filter-chip${recordFilter === f ? ' on' : ''}`}
-                    disabled={f !== 'any' && !recsReady}
-                    title={f !== 'any' && !recsReady ? 'Records still loading' : undefined}
-                    onClick={() => setRecordFilter(f)}
-                  >
-                    {f === 'any'
-                      ? 'Any record'
-                      : f === 'open'
-                        ? 'Open record'
-                        : f === 'attainable'
-                          ? `Attainable (${ATTAINABLE_RECORD_TO_PAR} or worse)`
-                          : f === 'mine'
-                            ? 'I hold it'
-                            : "I don't hold it"}
-                  </button>
-                ))}
-              </div>
-              <div className="filter-foot">
-                {filtersActive && (
-                  <button className="filter-reset" onClick={resetFilters}>
-                    Reset filters
-                  </button>
-                )}
+              {visibleCourses.length !== browsable.length && (
                 <p className="fine filter-count">
-                  {visibleCourses.length === browsable.length
-                    ? `All ${browsable.length} courses`
-                    : `${visibleCourses.length} of ${browsable.length} courses`}
+                  {visibleCourses.length} of {browsable.length} courses
                 </p>
+              )}
+            </div>
+          )}
+          {filterSheet && (
+            <div className="tut-backdrop filter-sheet-backdrop" role="dialog" aria-modal="true" aria-label="Course filters" onClick={() => setFilterSheet(false)}>
+              <div className="tut-card filter-sheet" onClick={(e) => e.stopPropagation()}>
+                <button className="tut-skip" onClick={() => setFilterSheet(false)} aria-label="Close">
+                  Done
+                </button>
+                <div className="kicker">Filter courses</div>
+                <div className="filter-group">
+                  <span className="filter-label">Played</span>
+                  <div className="filter-row" role="group" aria-label="Filter by played">
+                    {(['all', 'unplayed', 'played'] as const).map((f) => (
+                      <button key={f} className={`filter-chip${playedFilter === f ? ' on' : ''}`} onClick={() => setPlayedFilter(f)}>
+                        {f === 'all' ? 'All' : f === 'unplayed' ? 'Never played' : 'Played ▸'}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="filter-group">
+                  <span className="filter-label">Difficulty</span>
+                  <div className="filter-row" role="group" aria-label="Filter by difficulty">
+                    {(['any', 'easy', 'mid', 'hard'] as const).map((f) => (
+                      <button key={f} className={`filter-chip${ratingFilter === f ? ' on' : ''}`} onClick={() => setRatingFilter(f)}>
+                        {f === 'any' ? 'Any' : f === 'easy' ? 'Easy 1–3' : f === 'mid' ? 'Medium 4–7' : 'Hard 8–10'}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="filter-group">
+                  <span className="filter-label">{recType === 'season' ? 'Season record' : 'All-time record'}</span>
+                  <div className="filter-row" role="group" aria-label="Filter by record">
+                    {(['any', 'open', 'attainable', 'mine', 'notmine'] as const).map((f) => (
+                      <button
+                        key={f}
+                        className={`filter-chip${recordFilter === f ? ' on' : ''}`}
+                        disabled={f !== 'any' && !recsReady}
+                        title={f !== 'any' && !recsReady ? 'Records still loading' : undefined}
+                        onClick={() => setRecordFilter(f)}
+                      >
+                        {f === 'any'
+                          ? 'Any'
+                          : f === 'open'
+                            ? 'Open'
+                            : f === 'attainable'
+                              ? `Attainable (${ATTAINABLE_RECORD_TO_PAR} or worse)`
+                              : f === 'mine'
+                                ? 'I hold it'
+                                : "I don't hold it"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="filter-group">
+                  <span className="filter-label">Favorites</span>
+                  <div className="filter-row">
+                    <button className={`filter-chip fav${favsOnly ? ' on' : ''}`} onClick={() => setFavsOnly(!favsOnly)}>
+                      ★ Favorites only{favs.size > 0 ? ` · ${favs.size}` : ''}
+                    </button>
+                  </div>
+                </div>
+                <div className="filter-foot">
+                  {filtersActive && (
+                    <button className="filter-reset" onClick={resetFilters}>
+                      Reset filters
+                    </button>
+                  )}
+                  <button className="cta filter-apply" onClick={() => setFilterSheet(false)}>
+                    Show {visibleCourses.length} course{visibleCourses.length === 1 ? '' : 's'}
+                  </button>
+                </div>
               </div>
             </div>
           )}

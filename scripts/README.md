@@ -48,6 +48,27 @@ find the polygon name for a new course, query Overpass for
 - **Harbour Town (all 18)** — full-course import for a daily; lengths track the
   card (18 dead-on 470), signature holes match imagery (7's sand ring, 13's
   horseshoe, 16's waste bunker). Two hand-fixes — see the artifact modes below.
+- **Whistling Straits — Straits (all 18)** — 1383 mapped bunkers come through
+  as up to 29 zones on a hole, which is the course being honest rather than an
+  artifact. One hand-fix (17's lake, below). Also the case for pulling the card
+  *before* trusting the tuple: the shipped ~7497 setup was replaced by the
+  club's 7790 BLACK card, moving 16 of 18 yardages and 16 of 18 stroke indices.
+- **TPC Potomac at Avenel Farm (all 18)** — the rare course whose shipped tuple
+  already matched the card on par *and* stroke index for all 18, so the import
+  was pure geometry. Notable for two things. First, the phantom-cross mode at
+  its most convincing: hole 13 imported a 136-yd full-width water `cross`,
+  which would have made the card's 3rd-easiest hole a 189-yd forced carry, when
+  the lake is really a lateral hazard the fairway runs alongside — the
+  centreline just clips the corner it bends around. Hole 4's superficially
+  identical 104-yd cross *is* real, and the only thing that separates them is
+  looking from the tee. Second, worth copying: before hand-fixing anything,
+  every centreline was checked to start on a `golf=tee` polygon and end on a
+  `golf=green` (all 18 did), and each fragmented hazard got a yard-by-yard
+  distance-to-centreline profile, so "one creek the corridor chopped up" (hole
+  6, thirteen fragments, one polygon 12-35 yd out the whole way) could be told
+  from "genuinely separate water" without guessing. Same trick in reverse
+  cleared hole 15, which imports with just two zones on the #4 handicap hole
+  and is simply that bare.
 
 ### Known gaps & importer artifact modes
 
@@ -73,6 +94,18 @@ find the polygon name for a new course, query Overpass for
   - *Dropped greenside bunkers*: rings hugging or behind the green can
     rasterize to nothing (`harbour-town:4`). If imagery shows sand at the
     green and the zones don't, add it.
+  - *A big water body that vanishes entirely*: only `natural=coastline` gets
+    the seaward half-plane and its 160-yd `OCEAN_REACH_YD`. A lake mapped as a
+    `natural=water` polygon — including a Great Lake — is rasterised like any
+    pond, so it must come inside `CORRIDOR_YD` (50) to register at all. A
+    course played along a bluff above the water therefore imports with *no
+    water on the holes that are most obviously beside it*. Red flag: a hole
+    whose card or `signature` names water comes through with zero water zones
+    (`whistling-straits:17` — Lake Michigan runs down its whole left at
+    91 yd narrowing to 47, so nothing registered). Measure the real
+    centreline-to-shore distance before deciding: at Whistling Straits the
+    same check *cleared* 9 and 18, whose water genuinely never comes into
+    play, and hand-authoring there would have been invention.
 - Output is meant to be **reviewed and committed as static data**, not fetched
   live. `buildLayout` prefers a hole's `OSM_GEOMETRY` entry and falls back to
   procedural when absent.

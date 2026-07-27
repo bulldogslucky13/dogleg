@@ -37,4 +37,20 @@
 // aggressive goes at the flag. Cypress 16 is the first, re-laid along the line
 // it is actually played. Changes the stage machine, the odds and the geometry —
 // every part of what a seed replays into.
-export const ENGINE_VERSION = 7
+// v8 = Whistling Straits real geometry (OSM import, tee-end shifted to the
+// BLACK card, plus the hand-restored Lake Michigan on 17) and its scorecard
+// fix: the shipped ~7497 tuple moves to the club's 7790 BLACK card, changing
+// 16 of 18 yardages and 16 of 18 stroke indices — and SI feeds pressure() in
+// the odds, so the card half changes replays just as much as the geometry.
+// v8 also carries the safe-lay-up fix in odds.ts (MIN_LAYUP_ADVANCE): the
+// stay-short-of-a-crossing rule could collapse a lay-up to a 13-yd nudge, or
+// -5 yd on harbour-town:15, so it now carries crossings too close to lay up
+// behind. That changes lay-up landing spots on Harbour Town and Oakmont as
+// well as Whistling Straits — QA on the new course surfaced it, but the bug
+// was already shipped. One version covers both: v8 has never been deployed,
+// so they go out together.
+// v9 = TPC Potomac real geometry (OSM import off relation 357652, every hole
+// shifted to the club's GOLD card). Pure geometry: the shipped tuple already
+// matched the card on par and stroke index for all 18, so nothing in the odds
+// inputs moved — but the layout a seed replays into does, on every hole.
+export const ENGINE_VERSION = 9

@@ -106,9 +106,14 @@ export function HomeScreen(props: {
   // the all-time board loads once when the browser opens — the wall of legends
   useEffect(() => {
     if (showCourses && backendEnabled && courseRecs === null) {
-      void fetchCourseRecords().then((r) => setCourseRecs(r ?? new Map()))
+      // a FAILED fetch stays null, same rule the season board follows: an
+      // empty map reads as "every record open — be the first", and 49 rows of
+      // that lie is exactly what a flaky connection must not produce. While
+      // null the rows say the records are still loading and the record
+      // filters stay disabled. Flipping the toggle retries (recType dep).
+      void fetchCourseRecords().then((r) => setCourseRecs(r))
     }
-  }, [showCourses, courseRecs])
+  }, [showCourses, courseRecs, recType])
 
   // the season board is the live race: fetched per season KEY, so any render
   // after a quarterly rollover swaps in the fresh board
@@ -364,43 +369,45 @@ export function HomeScreen(props: {
               <div className="filter-bar">
                 <div className="rec-toggle" role="group" aria-label="Record type">
                   <button className={`rec-toggle-btn${recType === 'season' ? ' on' : ''}`} onClick={() => setRecType('season')}>
-                    Season
+                    View Season Records
                   </button>
                   <button className={`rec-toggle-btn${recType === 'alltime' ? ' on' : ''}`} onClick={() => setRecType('alltime')}>
-                    All-time
+                    View All-Time Records
                   </button>
                 </div>
-                <button className={`filter-chip${activeFilterCount > 0 ? ' on' : ''}`} onClick={() => setFilterSheet(true)}>
-                  ☰ Filters{activeFilterCount > 0 ? ` · ${activeFilterCount}` : ''}
-                </button>
-                <button
-                  className="filter-chip sort"
-                  onClick={() =>
-                    setCourseSort(
-                      courseSort === 'tour'
-                        ? 'easiest'
-                        : courseSort === 'easiest'
-                          ? 'hardest'
-                          : courseSort === 'hardest'
-                            ? 'beatable'
-                            : courseSort === 'beatable'
-                              ? 'recent'
-                              : 'tour',
-                    )
-                  }
-                  aria-label="Change sort order"
-                >
-                  ⇅{' '}
-                  {courseSort === 'tour'
-                    ? 'Tour'
-                    : courseSort === 'easiest'
-                      ? 'Easiest'
-                      : courseSort === 'hardest'
-                        ? 'Hardest'
-                        : courseSort === 'beatable'
-                          ? 'Beatable'
-                          : 'Recent'}
-                </button>
+                <div className="filter-bar-actions">
+                  <button className={`filter-chip${activeFilterCount > 0 ? ' on' : ''}`} onClick={() => setFilterSheet(true)}>
+                    ☰ Filters{activeFilterCount > 0 ? ` · ${activeFilterCount}` : ''}
+                  </button>
+                  <button
+                    className="filter-chip sort"
+                    onClick={() =>
+                      setCourseSort(
+                        courseSort === 'tour'
+                          ? 'easiest'
+                          : courseSort === 'easiest'
+                            ? 'hardest'
+                            : courseSort === 'hardest'
+                              ? 'beatable'
+                              : courseSort === 'beatable'
+                                ? 'recent'
+                                : 'tour',
+                      )
+                    }
+                    aria-label="Change sort order"
+                  >
+                    ⇅ Sort:{' '}
+                    {courseSort === 'tour'
+                      ? 'Tour'
+                      : courseSort === 'easiest'
+                        ? 'Easiest'
+                        : courseSort === 'hardest'
+                          ? 'Hardest'
+                          : courseSort === 'beatable'
+                            ? 'Beatable'
+                            : 'Recent'}
+                  </button>
+                </div>
               </div>
               {visibleCourses.length !== browsable.length && (
                 <p className="fine filter-count">
@@ -506,6 +513,7 @@ export function HomeScreen(props: {
                     <span>
                       {c.location} · Play Rating {playRatingFor(c.slug)}/10
                     </span>
+                    {!recsReady && <em className="course-cr loading">{recLabel} records loading…</em>}
                     {recsReady &&
                       (rec ? (
                         <em className={`course-cr${recType === 'alltime' ? ' alltime' : ''}`}>

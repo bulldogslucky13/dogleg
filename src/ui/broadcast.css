@@ -1510,19 +1510,39 @@
   gap: 6px;
 }
 
-/* the slim bar: toggle · Filters · sort — one row, everything else in the sheet */
+/* the bar: two rows of two — record toggle up top, Filters | Sort below.
+   Everything else lives in the sheet. */
 .screen.home .filter-bar {
   display: flex;
-  align-items: center;
+  flex-direction: column;
   gap: 6px;
 }
 
-.screen.home .filter-bar .filter-chip {
-  white-space: nowrap;
+.screen.home .filter-bar .rec-toggle {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
 }
 
-.screen.home .filter-bar .rec-toggle {
-  margin-right: auto;
+.screen.home .filter-bar .rec-toggle-btn {
+  white-space: nowrap;
+  font-size: 0.66rem;
+  padding: 8px 6px;
+}
+
+.screen.home .filter-bar-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.screen.home .filter-bar-actions .filter-chip {
+  white-space: nowrap;
+  padding: 7px 10px;
+}
+
+.screen.home .course-cr.loading {
+  opacity: 0.55;
+  font-style: italic;
 }
 
 /* the sheet rises from the bottom like a hand of cards */

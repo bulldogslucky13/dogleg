@@ -238,9 +238,11 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
     expect(JSON.parse(localStorage.getItem('dogleg:favorites:v1')!).slugs.length).toBe(1)
 
     // the season/all-time toggle sits on the bar and defaults to season
-    expect(screen.getByText('Season').className).toContain(' on')
-    fireEvent.click(screen.getByText('All-time'))
-    expect(screen.getByText('All-time').className).toContain(' on')
+    expect(screen.getByText('View Season Records').className).toContain(' on')
+    fireEvent.click(screen.getByText('View All-Time Records'))
+    expect(screen.getByText('View All-Time Records').className).toContain(' on')
+    // with records unfetched (backend off), rows say so instead of lying
+    expect(screen.getAllByText(/records loading…/).length).toBeGreaterThan(0)
   })
 
   it('the season splash shows once after a rollover, explains the goal, then never again', () => {

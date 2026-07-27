@@ -849,6 +849,24 @@ async function main() {
       }
       ringHits.set(r, m)
     }
+    // The sea is a half-plane, not a polygon, so it is nowhere in `rings` — an
+    // `ocean` cross has no ring to find and would report as an artifact with no
+    // culprits at all, which is exactly backwards on the carries most worth
+    // checking (Cypress 15-17, Pebble 8). Sample it the way the importer does,
+    // off the coastline, so ocean crossings get the same straddle evidence.
+    const oceanHits = new Map<number, number[]>()
+    if (coast.length) {
+      for (let a = 0; a <= length; a += STEP_YD) {
+        const { p, dir } = pointAtArc(center, cum, toMeters(a))
+        const nrm: Vec = [-dir[1], dir[0]]
+        const offs: number[] = []
+        for (let off = -CORRIDOR_YD; off <= CORRIDOR_YD; off += RAKE_YD) {
+          const q: Vec = [p[0] + nrm[0] * toMeters(off), p[1] + nrm[1] * toMeters(off)]
+          if (seaSide(coast, q, coastReach) === true) offs.push(off)
+        }
+        if (offs.length) oceanHits.set(a, offs)
+      }
+    }
     console.error('')
     console.log(`# ${geo.name} — hole ${holeNo}  (ring profiles)`)
     const straddles = (offs: number[]) =>
@@ -866,26 +884,42 @@ async function main() {
       )
     }
     console.log('\n  verdict per `cross` zone:')
+    console.log(
+      '  (REAL CARRY = one hazard lies across the line. That is necessary, not sufficient —\n' +
+        '   check for mapped `golf=fairway` alongside it before believing a forced carry:\n' +
+        "   seminole:11's lake spans 49 of 49 samples and is still a lateral, because the\n" +
+        '   fairway runs up its left for every yard of it.)',
+    )
+    // A zone only has as many samples as its length allows (STEP_YD apart), and
+    // merged zones can be 4 yd — two samples. Demanding a flat 3 made every
+    // short crossing unprovable and so reported it as an artifact whatever the
+    // geometry said. Ask instead for the strongest evidence the zone COULD
+    // carry: three samples where there's room, all of them where there isn't.
+    const needed = (samples: number) => Math.max(1, Math.min(3, samples))
     for (const z of zones.filter((z) => z.side === 'cross')) {
       const culprits: string[] = []
       let real: string | null = null
-      for (const r of hazardRings) {
-        if (r.kind !== z.kind) continue
-        const m = ringHits.get(r)!
-        const inSpan = [...m.keys()].filter((a) => a >= z.from && a < z.to)
+      const sources: { label: string; hits: Map<number, number[]> }[] = hazardRings
+        .filter((r) => r.kind === z.kind)
+        .map((r) => ({ label: `way/${r.id}`, hits: ringHits.get(r)! }))
+      if (z.kind === 'ocean' && oceanHits.size) sources.push({ label: 'coastline', hits: oceanHits })
+      for (const s of sources) {
+        const inSpan = [...s.hits.keys()].filter((a) => a >= z.from && a < z.to)
         if (!inSpan.length) continue
-        const offs = inSpan.flatMap((a) => m.get(a)!)
-        const spanning = inSpan.filter((a) => straddles(m.get(a)!)).length
-        if (spanning >= 3) real = `way/${r.id} spans the line at ${spanning} samples`
+        const offs = inSpan.flatMap((a) => s.hits.get(a)!)
+        const spanning = inSpan.filter((a) => straddles(s.hits.get(a)!)).length
+        if (spanning >= needed(inSpan.length))
+          real = `${s.label} spans the line at ${spanning} of ${inSpan.length} samples`
         culprits.push(
-          `way/${r.id} (${Math.min(...offs)}..${Math.max(...offs)}${spanning ? `, spans ${spanning}` : ''})`,
+          `${s.label} (${Math.min(...offs)}..${Math.max(...offs)}${spanning ? `, spans ${spanning}/${inSpan.length}` : ''})`,
         )
       }
       const greenStart = isFinite(greenLo) ? greenLo : length - greenDepth
       const intoGreen = z.to > greenStart ? '  INTO THE GREEN' : ''
+      const none = z.kind === 'ocean' && !coast.length ? 'no coastline in the corridor' : 'none'
       console.log(
         `  ${z.id.padEnd(4)} ${z.kind.padEnd(7)} ${String(z.from).padStart(4)}-${String(z.to).padEnd(4)}` +
-          `  ${real ? `REAL CARRY — ${real}` : `ARTIFACT (no single ring spans) — ${culprits.join(' + ') || 'none'}`}${intoGreen}`,
+          `  ${real ? `REAL CARRY — ${real}` : `ARTIFACT (nothing spans the line) — ${culprits.join(' + ') || none}`}${intoGreen}`,
       )
     }
     return

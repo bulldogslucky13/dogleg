@@ -128,3 +128,43 @@ jobs:
     steps:
       - id: deployment
         uses: actions/deploy-pages@v4
+
+  # The Supabase Auth email templates (magic link, confirm signup). Same
+  # reasoning as the schema and the functions: these used to be a manual step,
+  # and a manual step at merge time is the one that gets missed — these two
+  # lived only in the dashboard and sat on the old brand through an entire
+  # re-skin because nothing in a pull request could show they existed.
+  #
+  # Ordered AFTER the site deploy, which is deliberately the opposite of the
+  # functions job. The functions job goes first so the referee is never older
+  # than the clients submitting to it. These go last because they point the
+  # other way: the masthead is an <img> served from the site
+  # (/brand/wordmark-email.png), so pushing a template before the site is live
+  # would put a 404 in everyone's inbox.
+  #
+  # The token was already validated by the functions job upstream, so a bad
+  # credential fails there rather than here, after a site deploy.
+  email-templates:
+    needs: deploy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          # 24, not the 22 the other jobs pin: scripts/ are plain .ts run
+          # straight through node's native type stripping.
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # Push reads the copy from _shared/auth-emails.ts, but what a reviewer
+      # actually read is the generated HTML in supabase/templates/. If those
+      # two ever drift, CI would push something nobody reviewed — so require
+      # them to agree before touching the project.
+      - name: Check committed templates are up to date
+        run: pnpm gen:email-templates --check
+      - name: Push auth email templates
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_REF: ${{ vars.SUPABASE_PROJECT_REF }}
+        run: pnpm push:email-templates

@@ -39,7 +39,7 @@ export function MomentSplash(props: {
   const copy = grim
     ? { title: MISFORTUNE_COPY.title, sub: misfortuneOddsCopy(props.mode ?? 'daily') }
     : MOMENT_COPY[props.kind as 'ace' | 'albatross']
-  const line = grim ? misfortuneLine(props.seed ?? '') : null
+  const line = grim ? misfortuneLine(props.seed ?? '', props.mode ?? 'daily') : null
   const grimScore = grim && props.par ? `${article(props.par * 2)} ${props.par * 2} on the par-${props.par} ${ordinal(props.holeNumber)}.` : null
   const char = characterById(props.character)
   const confetti = Array.from({ length: 26 })

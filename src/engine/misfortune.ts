@@ -33,12 +33,12 @@ import type { CourseSpec, HoleScore } from './types'
 export const MISFORTUNE_CONFIG = {
   /** One event expected per this many PAR-4 HOLES played, per mode. The
    * per-hole roll IS this number — round-level frequency follows from the
-   * course's par-4 count (~10 per round → roughly 1-in-150 rounds at 1500).
+   * course's par-4 count (~10 per round → roughly 1-in-190 rounds at 2000).
    * Retune by changing a number; 0 disables the mode entirely. Splash and
    * share copy read these values, so the punchline can never drift from the
    * real odds. */
-  daily: { par4sPerEvent: 1500 },
-  practice: { par4sPerEvent: 1500 },
+  daily: { par4sPerEvent: 2000 },
+  practice: { par4sPerEvent: 2000 },
 } as const
 
 /** Dailies dealt before this date replay uncursed, exactly as played. */
@@ -101,22 +101,27 @@ export function misfortuneOddsCopy(mode: 'daily' | 'practice'): string {
 }
 
 /** Rotating punchlines. Deterministic pick per seed, so the referee-replayed
- * share and the live splash tell the same joke. */
-export const MISFORTUNE_LINES: readonly string[] = [
-  'An 8 on a par 4. Frame it. Hang it somewhere the kids can’t see.',
-  'The golf gods reward the faithful. You, they picked for content.',
-  'Statistically, buy a lottery ticket. Emotionally, lie down.',
-  'Your ball found water that is not on the map.',
-  'One in fifteen hundred. You absolute unicorn.',
-  'This is why scorecards are written in pencil.',
-  'Grief has five stages. The group chat is all of them.',
-  'Somewhere a butterfly flapped its wings. Anyway, that’s an 8.',
-  'Take the 8. Tell no one. (Share button below.)',
-  'New personal worst on that hole. Cherish it.',
-] as const
+ * share and the live splash tell the same joke. Built per mode so the one
+ * line that quotes the odds always quotes the CURRENT config. */
+export function misfortuneLines(mode: 'daily' | 'practice' = 'daily'): readonly string[] {
+  const n = MISFORTUNE_CONFIG[mode].par4sPerEvent.toLocaleString()
+  return [
+    'An 8 on a par 4. Frame it. Hang it somewhere the kids can’t see.',
+    'The golf gods reward the faithful. You, they picked for content.',
+    'Statistically, buy a lottery ticket. Emotionally, lie down.',
+    'Your ball found water that is not on the map.',
+    `One in ${n}. You absolute unicorn.`,
+    'This is why scorecards are written in pencil.',
+    'Grief has five stages. The group chat is all of them.',
+    'Somewhere a butterfly flapped its wings. Anyway, that’s an 8.',
+    'Take the 8. Tell no one. (Share button below.)',
+    'New personal worst on that hole. Cherish it.',
+  ]
+}
 
-export function misfortuneLine(baseSeed: string): string {
-  return MISFORTUNE_LINES[Math.floor(rngFromString(`${baseSeed}:mfline`)() * MISFORTUNE_LINES.length)]
+export function misfortuneLine(baseSeed: string, mode: 'daily' | 'practice' = 'daily'): string {
+  const lines = misfortuneLines(mode)
+  return lines[Math.floor(rngFromString(`${baseSeed}:mfline`)() * lines.length)]
 }
 
 export const MISFORTUNE_COPY = {

@@ -45,6 +45,8 @@
  * plain, specific, no jargon and no PR numbers.
  */
 
+import { MISFORTUNE_CONFIG } from '../engine/misfortune'
+
 export type ChangeKind = 'odds' | 'feature' | 'fix'
 
 export interface ChangeEntry {
@@ -78,7 +80,7 @@ export const CHANGELOG: ChangeEntry[] = [
     date: '2026-07-29',
     kind: 'odds',
     title: 'Mis-fortunes',
-    note: 'Fortune has an evil twin. Very rarely — one par 4 in every 1,500 — the golf gods simply decide your hole is a double par, no appeal. It cannot touch par 3s, par 5s, records you already hold, or anything but that one hole, and it can only strike once a round. Condolences in advance.',
+    note: `Fortune has an evil twin. Very rarely — one par 4 in every ${MISFORTUNE_CONFIG.daily.par4sPerEvent.toLocaleString()} — the golf gods simply decide your hole is a double par, no appeal. It cannot touch par 3s, par 5s, records you already hold, or anything but that one hole, and it can only strike once a round. Condolences in advance.`,
   },
   {
     date: '2026-07-27',

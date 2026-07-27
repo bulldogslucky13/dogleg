@@ -5,9 +5,9 @@ import {
   applyMisfortune,
   MISFORTUNE_CONFIG,
   MISFORTUNE_FROM_DATEKEY,
-  MISFORTUNE_LINES,
   misfortuneHole,
   misfortuneLine,
+  misfortuneLines,
   misfortuneLive,
 } from './misfortune'
 import { decisionsFromScores, replayRound } from './replay'
@@ -63,7 +63,7 @@ describe('the roll', () => {
     expect(hits).toBeGreaterThan(0)
   })
 
-  it('fires at the configured rate: ~1 per 1,500 par-4 holes', () => {
+  it('fires at the configured per-par-4 rate', () => {
     const N = 30000
     let hits = 0
     for (let i = 0; i < N; i++) {
@@ -134,9 +134,12 @@ describe('client and referee agree — the property that keeps boards honest', (
 
 describe('the comedy stays wired to the config', () => {
   it('punchline pick is deterministic per seed and every line exists', () => {
-    expect(MISFORTUNE_LINES.length).toBeGreaterThanOrEqual(8)
+    expect(misfortuneLines('daily').length).toBeGreaterThanOrEqual(8)
     const seed = 'practice3:pebble-beach:zzz'
     expect(misfortuneLine(seed)).toBe(misfortuneLine(seed))
-    expect(MISFORTUNE_LINES).toContain(misfortuneLine(seed))
+    expect(misfortuneLines('daily')).toContain(misfortuneLine(seed))
+    // the odds-quoting line always quotes the live config
+    const quoted = misfortuneLines('daily').find((l) => l.includes('unicorn'))
+    expect(quoted).toContain(MISFORTUNE_CONFIG.daily.par4sPerEvent.toLocaleString())
   })
 })

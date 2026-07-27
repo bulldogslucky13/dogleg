@@ -1502,6 +1502,154 @@
   background: var(--bg-elevated);
 }
 
+/* ------------------------------------------- unlimited course filters */
+
+.screen.home .course-filters {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.screen.home .filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.screen.home .filter-chip {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-mid);
+  background: var(--bg-card);
+  border: 1px solid var(--edge-hairline);
+  border-radius: var(--r-pill);
+  padding: 5px 11px;
+}
+
+.screen.home .filter-chip.on {
+  background: var(--bg-blocked);
+  color: var(--text-on-block);
+  border-color: transparent;
+}
+
+/* the sort cycler reads as a control, not a filter state */
+.screen.home .filter-chip.sort {
+  margin-left: auto;
+  color: var(--tracer-400);
+  border-color: var(--edge-strong);
+}
+
+.screen.home .filter-chip:disabled {
+  opacity: 0.4;
+}
+
+.screen.home .filter-chip.fav.on {
+  background: var(--trophy-400);
+}
+
+/* season / all-time: a segmented switch, unmistakable which side is live */
+.screen.home .rec-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.screen.home .rec-toggle-btn {
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-mid);
+  background: var(--bg-card);
+  border: 1px solid var(--edge-strong);
+  padding: 6px 14px;
+}
+
+.screen.home .rec-toggle-btn:first-child {
+  border-radius: var(--r-pill) 0 0 var(--r-pill);
+}
+
+.screen.home .rec-toggle-btn + .rec-toggle-btn {
+  border-radius: 0 var(--r-pill) var(--r-pill) 0;
+  border-left: none;
+}
+
+.screen.home .rec-toggle-btn.on {
+  background: var(--bg-blocked);
+  color: var(--text-on-block);
+}
+
+.screen.home .filter-foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.screen.home .filter-count {
+  text-align: right;
+  margin: 0 0 0 auto;
+}
+
+.screen.home .filter-reset {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--flag-400);
+  padding: 4px 0;
+}
+
+.screen.home .filter-empty {
+  text-align: center;
+  padding: 10px 0 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: center;
+}
+
+/* row wrapper: the star is a SIBLING of the row button (a button inside a
+   button is invalid HTML and unreachable to assistive tech) */
+.screen.home .course-row-wrap {
+  position: relative;
+}
+
+.screen.home .course-row-wrap .course-row {
+  width: 100%;
+  padding-right: 44px;
+}
+
+.screen.home .course-fav {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 32px;
+  height: 32px;
+  font-size: 1.05rem;
+  color: var(--text-low);
+  border-radius: 50%;
+}
+
+.screen.home .course-fav.on {
+  color: var(--trophy-300);
+}
+
+.screen.home .course-cr-you {
+  font-style: normal;
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--tracer-400);
+  border: 1px solid var(--tracer-400);
+  border-radius: 4px;
+  padding: 1px 5px;
+  margin-left: 6px;
+  vertical-align: 1px;
+}
+
 /* --------------------------- paper game screens: brand accents ONLY */
 
 /* The pick and play screens deliberately KEEP the light paper look — they are

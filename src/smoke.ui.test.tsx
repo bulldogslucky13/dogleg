@@ -204,6 +204,43 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
     expect(localStorage.getItem('dogleg:tutorial:v1')).toBeNull()
   })
 
+  it('unlimited course filters combine, reset, favorite, and respect the record toggle', () => {
+    localStorage.setItem('dogleg:tutorial:v1', 'done')
+    render(<App />)
+    fireEvent.click(screen.getByText(/Play unlimited/))
+    const count = () => screen.getByText(/^(All \d+|\d+ of \d+) courses$/).textContent!
+    expect(count()).toMatch(/^All \d+ courses/)
+    const total = Number(count().match(/\d+/)![0])
+
+    // combinable filters + live count
+    fireEvent.click(screen.getByText('Hard 8–10'))
+    const hard = Number(count().match(/^(\d+) of/)?.[1] ?? total)
+    expect(hard).toBeLessThan(total)
+    fireEvent.click(screen.getByText('Never played'))
+    expect(screen.getByText('Reset filters')).toBeTruthy()
+
+    // record filters are DISABLED until records load (backend off in tests —
+    // they must not pretend to filter on data they don't have)
+    expect((screen.getByText('Open record') as HTMLButtonElement).disabled).toBe(true)
+    expect((screen.getByText('I hold it') as HTMLButtonElement).disabled).toBe(true)
+
+    // favorite the first course, filter to favorites, and it persists
+    fireEvent.click(screen.getAllByRole('button', { name: /^Favorite / })[0])
+    expect(JSON.parse(localStorage.getItem('dogleg:favorites:v1')!).slugs.length).toBe(1)
+    fireEvent.click(screen.getByText(/★ Favorites/))
+
+    // reset restores everything except the star itself
+    fireEvent.click(screen.getByText('Reset filters'))
+    expect(count()).toMatch(/^All \d+ courses/)
+    expect(screen.getAllByRole('button', { name: /^Unfavorite / }).length).toBe(1)
+
+    // the season/all-time toggle exists and defaults to season
+    expect(screen.getByRole('group', { name: 'Record type' })).toBeTruthy()
+    expect(screen.getByText('Season').className).toContain(' on')
+    fireEvent.click(screen.getByText('All-time'))
+    expect(screen.getByText('All-time').className).toContain(' on')
+  })
+
   it('the season splash shows once after a rollover, explains the goal, then never again', () => {
     localStorage.removeItem('dogleg:season-ack:v1')
     const first = render(<App />)

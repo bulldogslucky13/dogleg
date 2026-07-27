@@ -131,6 +131,16 @@ const COURSE_GEO: Record<string, CourseGeo> = {
   // coastline, unlike Pebble/Portrush), so it imports as `water` — see the
   // geometry.ts block note for the relabel decision.
   whistling: { name: 'Whistling Straits — Straits', center: [43.8499, -87.7346], radius: 2500, osmName: '^Whistling Straits$', engineSlug: 'whistling-straits' },
+  // TPC Potomac is relation 357652 (wikidata Q7671115). **OSM misspells the
+  // name "Avanel Farm"** — the regex has to match the typo, not the club's
+  // spelling, or the area lookup finds nothing. Anchored so it can't drift
+  // onto Falls Road GC, the one other golf_course inside the radius. All 18
+  // centrelines are mapped with plain ref=N and no names, so no
+  // osmHolePrefix. Radius 1600 covers the 1721 x 2138 m polygon (1372 m
+  // half-diagonal) and the creek/ponds just outside it.
+  // Note: OSM tags hole 15 par=5; the club's GOLD card says par 4 (490 yd,
+  // HCP 4) and the card wins — OSM is ground truth for shape only.
+  potomac: { name: 'TPC Potomac at Avenel Farm', center: [38.9947, -77.1992], radius: 1600, osmName: '^TPC Potomac at Avanel Farm$', engineSlug: 'tpc-potomac' },
 }
 
 // ---------- Overpass ----------

@@ -49,4 +49,8 @@
 // well as Whistling Straits — QA on the new course surfaced it, but the bug
 // was already shipped. One version covers both: v8 has never been deployed,
 // so they go out together.
-export const ENGINE_VERSION = 8
+// v9 = TPC Potomac real geometry (OSM import off relation 357652, every hole
+// shifted to the club's GOLD card). Pure geometry: the shipped tuple already
+// matched the card on par and stroke index for all 18, so nothing in the odds
+// inputs moved — but the layout a seed replays into does, on every hole.
+export const ENGINE_VERSION = 9

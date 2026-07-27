@@ -151,6 +151,24 @@ export const OSM_BEND: Record<string, number[]> = {
   'whistling-straits:15': [0, 2, 4, 6, 8, 10, 11, 11, 11, 9, 6, 3, 0],
   'whistling-straits:16': [0, -6, -11, -17, -22, -28, -33, -39, -45, -48, -43, -24, 0],
   'whistling-straits:18': [0, -10, -20, -31, -41, -49, -55, -56, -54, -47, -31, -16, 0],
+  // TPC Potomac — 12 of 18 turn hard enough to persist, 10 the big one at
+  // 92 yd. Reading these against the tuple (positive bend ⇒ dogleg RIGHT — the
+  // path bows opposite the turn, see the chip note in ui/panels.tsx): 2, 6 and
+  // 10 shipped BACKWARDS, and 4 and 7 are real ≥20-yd doglegs the tuple calls
+  // straight. 8, 13, 14, 15 and 16 lean under the 20-yd chip threshold and
+  // only bend the drawn hole. Exactly why the bend overrides the flag.
+  'tpc-potomac:1': [0, 8, 15, 23, 30, 38, 42, 46, 46, 41, 30, 15, 0],
+  'tpc-potomac:2': [0, 11, 22, 33, 43, 49, 51, 47, 36, 25, 16, 8, 0],
+  'tpc-potomac:4': [0, -4, -7, -11, -14, -18, -20, -22, -22, -20, -15, -8, 0],
+  'tpc-potomac:6': [0, 8, 15, 23, 30, 36, 40, 41, 40, 35, 23, 12, 0],
+  'tpc-potomac:7': [0, 5, 10, 15, 20, 24, 27, 28, 28, 24, 17, 9, 0],
+  'tpc-potomac:8': [0, -3, -5, -8, -10, -13, -14, -15, -14, -12, -9, -4, 0],
+  'tpc-potomac:10': [0, -17, -35, -52, -67, -80, -88, -92, -90, -80, -62, -32, 0],
+  'tpc-potomac:11': [0, -12, -25, -37, -49, -57, -63, -63, -57, -46, -31, -15, 0],
+  'tpc-potomac:13': [0, 1, 2, 3, 5, 6, 7, 8, 8, 8, 7, 4, 0],
+  'tpc-potomac:14': [0, 3, 5, 8, 10, 13, 15, 16, 17, 16, 14, 7, 0],
+  'tpc-potomac:15': [0, 3, 5, 8, 10, 13, 15, 15, 15, 14, 10, 5, 0],
+  'tpc-potomac:16': [0, -2, -4, -7, -9, -11, -12, -12, -11, -9, -6, -3, 0],
 }
 
 export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
@@ -2765,6 +2783,369 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
       { id: 'z10', kind: 'bunker', from: 499, to: 509, side: 'right' },
       { id: 'z11', kind: 'bunker', from: 503, to: 520, side: 'cross' },
       { id: 'z12', kind: 'bunker', from: 513, to: 519, side: 'left' },
+    ],
+  },
+
+  // ---------------------------------------------------------------------
+  // TPC Potomac at Avenel Farm (OSM relation 357652 — note OSM misspells it
+  // "Avanel Farm"). Card: the club's GOLD tees, par 70, 7139 yd, 75.5/146.
+  // The shipped tuple already matched the card on par AND stroke index for
+  // all 18, so nothing there needed correcting; only hole 17's yardage was
+  // stale (190 vs the card's 222) and that auto-reconciles off `length`.
+  // OSM tags hole 15 par=5 — the card says par 4 (490 yd, HCP 4) and the
+  // card wins; OSM is ground truth for shape only.
+  //
+  // Every hole was shifted (never scaled) so `length` equals the card, per
+  // the freeze process; shifts were -13..+8 except hole 17 at +24, whose
+  // centreline is drawn from a pad ~24 yd ahead of the GOLD tee. All 18
+  // centrelines were verified to start on a `golf=tee` polygon and end on a
+  // `golf=green`, so no hole is drawn to the wrong pad.
+  //
+  // The property drains through a handful of very large water polygons (the
+  // biggest, way/743755556, is ~4 acres) shared between holes, which drives
+  // two of the artifact modes below.
+  // ---------------------------------------------------------------------
+
+  // hole 1 — z7/z8 are a hand fix. The raw import split the greenside sand
+  // into right + `cross` + left, but OSM has exactly two bunkers here
+  // (way/743682561 right, way/743682562 left) that merely overlap in the
+  // sampling corridor. The phantom `cross` ran from 421 into a green that
+  // starts at 420 — you cannot carry the green you are aiming at — so it is
+  // dropped and the two flanks restored to their real spans. The water at
+  // 59-109 is genuinely there (a creek in front of the first tee, centreline
+  // in it at 79-81) but dies 43 yd short of `fairwayFrom`, so it is left as
+  // imported rather than dressed up as a carry anyone faces.
+  'tpc-potomac:1': {
+    length: 440,
+    fairwayFrom: 152,
+    fairwayTo: 428,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 9, to: 15, side: 'left' },
+      { id: 'z2', kind: 'water', from: 59, to: 71, side: 'left' },
+      { id: 'z3', kind: 'water', from: 71, to: 109, side: 'right' },
+      { id: 'z4', kind: 'water', from: 73, to: 81, side: 'cross' },
+      { id: 'z5', kind: 'bunker', from: 277, to: 295, side: 'left' },
+      { id: 'z6', kind: 'bunker', from: 311, to: 327, side: 'left' },
+      { id: 'z7', kind: 'bunker', from: 415, to: 428, side: 'right' },
+      { id: 'z8', kind: 'bunker', from: 421, to: 437, side: 'left' },
+    ],
+  },
+  // hole 2 — par 5. Two phantom `cross` bands dropped (577-595 and 605-609,
+  // the latter inside a green that starts at 599). OSM has three bunkers in
+  // the green complex: way/743682574 right, way/743682575 running 574-608 at
+  // lateral -19..+4 (so predominantly LEFT, only grazing the line), and
+  // way/743682576 greenside right. Rendered as those three.
+  'tpc-potomac:2': {
+    length: 619,
+    fairwayFrom: 212,
+    fairwayTo: 607,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 273, to: 311, side: 'right' },
+      { id: 'z2', kind: 'bunker', from: 573, to: 584, side: 'right' },
+      { id: 'z3', kind: 'bunker', from: 577, to: 608, side: 'left' },
+      { id: 'z4', kind: 'bunker', from: 602, to: 619, side: 'right' },
+    ],
+  },
+  // hole 3 — par 3, as imported.
+  'tpc-potomac:3': {
+    length: 225,
+    fairwayFrom: 75,
+    fairwayTo: 213,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'water', from: 178, to: 182, side: 'left' },
+      { id: 'z2', kind: 'water', from: 182, to: 218, side: 'right' },
+      { id: 'z3', kind: 'bunker', from: 206, to: 214, side: 'left' },
+    ],
+  },
+  // hole 4 — as imported. The 104-yd `cross` at 34-138 looks like the classic
+  // phantom but is real: the lake sits square in front of the tee and the
+  // fairway runs up its right, so the tee shot genuinely carries a corner of
+  // it before the water turns and runs down the left. Confirmed from the tee
+  // in the 3D planner; the centreline is inside the polygon for 114 yd, and
+  // `fairwayFrom` (150) already sits past the carry.
+  'tpc-potomac:4': {
+    length: 440,
+    fairwayFrom: 150,
+    fairwayTo: 428,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'water', from: 20, to: 34, side: 'right' },
+      { id: 'z2', kind: 'bunker', from: 30, to: 40, side: 'left' },
+      { id: 'z3', kind: 'water', from: 34, to: 138, side: 'cross' },
+      { id: 'z4', kind: 'bunker', from: 104, to: 110, side: 'left' },
+      { id: 'z5', kind: 'water', from: 138, to: 330, side: 'left' },
+      { id: 'z6', kind: 'bunker', from: 414, to: 432, side: 'right' },
+    ],
+  },
+  // hole 5 — two of the three imported `cross` bunkers are phantoms and one
+  // is real. Dropped: 282-286 (right-side sand at 271-291 sampled together
+  // with a left bunker sitting 30 yd off the line) and 350-356 (inside a
+  // green that starts at 345). Kept as a genuine cross: way/743719757 at
+  // 304-314, which straddles the centreline at lateral -6..+4.
+  'tpc-potomac:5': {
+    length: 365,
+    fairwayFrom: 125,
+    fairwayTo: 353,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'water', from: 106, to: 236, side: 'left' },
+      { id: 'z2', kind: 'bunker', from: 224, to: 240, side: 'left' },
+      { id: 'z3', kind: 'bunker', from: 271, to: 291, side: 'right' },
+      { id: 'z4', kind: 'bunker', from: 279, to: 288, side: 'left' },
+      { id: 'z5', kind: 'bunker', from: 304, to: 314, side: 'cross' },
+      { id: 'z6', kind: 'bunker', from: 340, to: 358, side: 'right' },
+      { id: 'z7', kind: 'bunker', from: 347, to: 358, side: 'left' },
+    ],
+  },
+  // hole 6 — the course's #1 handicap and the worst broken-lateral case here.
+  // The raw import returned THIRTEEN water fragments, but they are all one
+  // polygon: way/743746911 runs the length of the hole and never leaves the
+  // sampling corridor — measured off the centreline it sits 12-35 yd out the
+  // whole way, touching the line at 140-142 and 163-164. The 3D planner shows
+  // an unbroken creek snaking up the right into the pond at the green. Spanned
+  // continuously (right, crossing where the line is actually in the water):
+  // the gaps rewarded an aggressive right-hand line that does not exist.
+  // Also dropped the import's bunker at -7..-1, which is behind the tee.
+  'tpc-potomac:6': {
+    length: 484,
+    fairwayFrom: 165,
+    fairwayTo: 472,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'water', from: 61, to: 140, side: 'right' },
+      { id: 'z2', kind: 'water', from: 140, to: 164, side: 'cross' },
+      { id: 'z3', kind: 'water', from: 164, to: 484, side: 'right' },
+      { id: 'z4', kind: 'bunker', from: 447, to: 463, side: 'right' },
+    ],
+  },
+  // hole 7 — as imported: the creek crosses at 106-150 (centreline inside the
+  // polygon for 51 yd, confirmed from the tee) then runs away down the right.
+  'tpc-potomac:7': {
+    length: 452,
+    fairwayFrom: 153,
+    fairwayTo: 440,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'water', from: 92, to: 106, side: 'left' },
+      { id: 'z2', kind: 'water', from: 106, to: 150, side: 'cross' },
+      { id: 'z3', kind: 'water', from: 150, to: 226, side: 'right' },
+      { id: 'z4', kind: 'bunker', from: 248, to: 260, side: 'right' },
+      { id: 'z5', kind: 'bunker', from: 270, to: 274, side: 'left' },
+      { id: 'z6', kind: 'bunker', from: 292, to: 316, side: 'left' },
+      { id: 'z7', kind: 'bunker', from: 416, to: 436, side: 'right' },
+      { id: 'z8', kind: 'bunker', from: 436, to: 452, side: 'left' },
+    ],
+  },
+  // hole 8 — as imported. The two bunkers OSM puts at 332-351 and 367-389 sit
+  // 46-49 yd off the line and are correctly left out rather than painted in.
+  'tpc-potomac:8': {
+    length: 467,
+    fairwayFrom: 160,
+    fairwayTo: 455,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 254, to: 262, side: 'left' },
+      { id: 'z2', kind: 'bunker', from: 304, to: 318, side: 'right' },
+      { id: 'z3', kind: 'bunker', from: 430, to: 458, side: 'left' },
+    ],
+  },
+  // hole 9 — par 3. z4 is a hand fix: the import produced a `cross` at
+  // 179-183, running into a green that starts at 181, while dropping the real
+  // left-hand bunker (way/743719737) sitting at 174-182. Replaced the phantom
+  // carry with the bunker that is actually there.
+  'tpc-potomac:9': {
+    length: 201,
+    fairwayFrom: 70,
+    fairwayTo: 189,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'water', from: 131, to: 137, side: 'left' },
+      { id: 'z2', kind: 'water', from: 137, to: 179, side: 'right' },
+      { id: 'z3', kind: 'bunker', from: 175, to: 201, side: 'right' },
+      { id: 'z4', kind: 'bunker', from: 174, to: 182, side: 'left' },
+    ],
+  },
+  // hole 10 — par 5. Broken lateral again (way/743746916, the lake shared with
+  // 11 and 12), but unlike 6 and 11 this creek genuinely weaves from one side
+  // to the other, so it is NOT spanned wholesale. Only same-side neighbours
+  // were merged, and only across gaps where the measured distance to the water
+  // never leaves the corridor: 127-171 + 181-335 (gap at 31-36 yd) and
+  // 359-389 + 435-443 + 461-560 (gaps at 21-33 yd). The right-hand stretch at
+  // 343-359 is where the line is genuinely in the water and stays put.
+  'tpc-potomac:10': {
+    length: 560,
+    fairwayFrom: 188,
+    fairwayTo: 548,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'water', from: 41, to: 123, side: 'right' },
+      { id: 'z2', kind: 'water', from: 123, to: 127, side: 'cross' },
+      { id: 'z3', kind: 'water', from: 127, to: 335, side: 'left' },
+      { id: 'z4', kind: 'water', from: 343, to: 359, side: 'right' },
+      { id: 'z5', kind: 'water', from: 359, to: 560, side: 'left' },
+      { id: 'z6', kind: 'trees', from: 461, to: 560, side: 'right' },
+      { id: 'z7', kind: 'bunker', from: 489, to: 497, side: 'right' },
+      { id: 'z8', kind: 'bunker', from: 551, to: 559, side: 'right' },
+    ],
+  },
+  // hole 11 — seven left-hand water fragments merged into one. The 3D planner
+  // shows a single creek winding down the left from the tee to the green
+  // before wrapping across in front of it, and the measurement agrees: the
+  // water never leaves the corridor, sitting 8-47 yd off the line throughout.
+  // z4 (the right-hand finish) is where it turns across, and stays as
+  // imported.
+  'tpc-potomac:11': {
+    length: 470,
+    fairwayFrom: 170,
+    fairwayTo: 458,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'trees', from: 8, to: 178, side: 'right' },
+      { id: 'z2', kind: 'water', from: 8, to: 408, side: 'left' },
+      { id: 'z3', kind: 'trees', from: 360, to: 440, side: 'right' },
+      { id: 'z4', kind: 'water', from: 416, to: 470, side: 'right' },
+    ],
+  },
+  // hole 12 — par 3, and the dropped-greenside-bunker case. OSM maps SIX
+  // bunkers within 60 yd of this green and the raw import returned exactly
+  // one, which on a 168-yd par 3 deletes the hole's entire defence. z2/z3/z4
+  // restore them at their measured positions: way/743733347 (right, 21 yd
+  // off), way/743733346 (straddling the line at lateral -3..+1, hence
+  // `cross`, and short of the green so it is a carry you really face), and
+  // way/743733345 + way/743733344 merged into the left-hand run. The two
+  // remaining OSM bunkers sit behind the green and clamp to the end of the
+  // hole line, so they are not representable here. The pond off to the left
+  // is ~55 yd off the centreline and correctly stays out.
+  'tpc-potomac:12': {
+    length: 168,
+    fairwayFrom: 57,
+    fairwayTo: 156,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'trees', from: 26, to: 108, side: 'right' },
+      { id: 'z2', kind: 'bunker', from: 117, to: 123, side: 'right' },
+      { id: 'z3', kind: 'bunker', from: 122, to: 132, side: 'cross' },
+      { id: 'z4', kind: 'bunker', from: 137, to: 157, side: 'left' },
+    ],
+  },
+  // hole 13 — the textbook phantom cross, and the one worth reading twice.
+  // The import called 53-189 a full-width `cross`, which would make the 3rd
+  // EASIEST hole on the card (HCP 16) a 189-yd forced carry, and left
+  // `fairwayFrom` at 123 — inside the lake. From the tee it is plainly a
+  // lateral hazard: the lake lies down the left and the fairway runs up its
+  // right-hand side. The centreline merely grazes the shoreline (OSM's line
+  // is inside the polygon for 142 yd because it clips the corner the fairway
+  // bends around), which is exactly the "centreline hugging a hazard's edge
+  // reads the flank as a cross band" mode. Folded into one continuous LEFT
+  // hazard; `fairwayFrom` needs no change once the carry is gone.
+  // z5 also absorbs a small cross at 339-343 that ran into the green (340).
+  'tpc-potomac:13': {
+    length: 360,
+    fairwayFrom: 123,
+    fairwayTo: 348,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'water', from: 1, to: 261, side: 'left' },
+      { id: 'z2', kind: 'bunker', from: 11, to: 23, side: 'right' },
+      { id: 'z3', kind: 'water', from: 283, to: 313, side: 'left' },
+      { id: 'z4', kind: 'bunker', from: 285, to: 293, side: 'right' },
+      { id: 'z5', kind: 'bunker', from: 337, to: 348, side: 'right' },
+      { id: 'z6', kind: 'bunker', from: 354, to: 360, side: 'left' },
+    ],
+  },
+  // hole 14 — the drivable par 4, and the one hole whose `signature` makes a
+  // promise ("water dares the bold to have a go"), so the geometry has to
+  // back it. It does: way/743753271 runs to the green down the right, and the
+  // 2D imagery shows the pond sitting short-and-right of the putting surface,
+  // squarely on the line anyone taking it on would fly. Same-side fragments
+  // merged across gaps where the water stays 20-35 yd off the line (24-36 +
+  // 66-106 left; 168-184 + 216-226 + 242-299 right).
+  'tpc-potomac:14': {
+    length: 299,
+    fairwayFrom: 103,
+    fairwayTo: 287,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 4, to: 18, side: 'left' },
+      { id: 'z2', kind: 'water', from: 24, to: 106, side: 'left' },
+      { id: 'z3', kind: 'water', from: 168, to: 299, side: 'right' },
+      { id: 'z4', kind: 'bunker', from: 188, to: 204, side: 'left' },
+      { id: 'z5', kind: 'bunker', from: 230, to: 260, side: 'right' },
+      { id: 'z6', kind: 'bunker', from: 264, to: 288, side: 'left' },
+    ],
+  },
+  // hole 15 — as imported, and deliberately left bare. Two zones on the #4
+  // handicap hole looks like a failed import, but it is not: OSM maps exactly
+  // two bunkers within 60 yd of this centreline and the import found both,
+  // and the nearest water sits 47 yd off the line, outside the corridor. A
+  // 490-yd par 4 defended by length rather than hazards — inventing sand here
+  // to make it "look" like a hard hole is precisely what not to do.
+  'tpc-potomac:15': {
+    length: 490,
+    fairwayFrom: 168,
+    fairwayTo: 478,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 51, to: 57, side: 'left' },
+      { id: 'z2', kind: 'bunker', from: 485, to: 490, side: 'right' },
+    ],
+  },
+  // hole 16 — as imported. Nine OSM bunkers collapse to four zones here, but
+  // that is the merge working, not sand going missing: four of them
+  // (way/743738825/823/822/824) are one greenside cluster and two more sit
+  // behind the green.
+  'tpc-potomac:16': {
+    length: 412,
+    fairwayFrom: 144,
+    fairwayTo: 400,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 233, to: 251, side: 'right' },
+      { id: 'z2', kind: 'bunker', from: 287, to: 295, side: 'left' },
+      { id: 'z3', kind: 'bunker', from: 381, to: 401, side: 'left' },
+      { id: 'z4', kind: 'bunker', from: 405, to: 412, side: 'right' },
+    ],
+  },
+  // hole 17 — par 3, as imported, and the one hole that needed a real shift:
+  // OSM's centreline measures 198 yd against the card's 222, so every zone
+  // moved +24. That is the tee pad, not a scale error — the planner's own
+  // default setup for this hole reads 195. Water carried to a green with the
+  // pond short and right, bunker left, all confirmed from the tee.
+  'tpc-potomac:17': {
+    length: 222,
+    fairwayFrom: 93,
+    fairwayTo: 210,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 38, to: 56, side: 'left' },
+      { id: 'z2', kind: 'water', from: 126, to: 130, side: 'right' },
+      { id: 'z3', kind: 'water', from: 130, to: 174, side: 'cross' },
+      { id: 'z4', kind: 'water', from: 174, to: 216, side: 'right' },
+      { id: 'z5', kind: 'bunker', from: 206, to: 222, side: 'left' },
+    ],
+  },
+  // hole 18 — z5 and z7 are hand fixes. The import broke way/743738851 (one
+  // long bunker, 405-445 at lateral -16..+6) into left + `cross` + left + a
+  // right-hand sliver, giving the closing hole a full-width sand carry at
+  // 416-436 that does not exist; restored as the single left-hand bunker it
+  // is. It also dropped the greenside left bunker (way/743738850, 455-465)
+  // entirely, so z7 puts it back.
+  'tpc-potomac:18': {
+    length: 465,
+    fairwayFrom: 163,
+    fairwayTo: 453,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 34, to: 46, side: 'right' },
+      { id: 'z2', kind: 'water', from: 70, to: 150, side: 'right' },
+      { id: 'z3', kind: 'bunker', from: 262, to: 308, side: 'left' },
+      { id: 'z4', kind: 'bunker', from: 380, to: 396, side: 'right' },
+      { id: 'z5', kind: 'bunker', from: 405, to: 445, side: 'left' },
+      { id: 'z6', kind: 'bunker', from: 452, to: 463, side: 'right' },
+      { id: 'z7', kind: 'bunker', from: 455, to: 465, side: 'left' },
     ],
   },
 }

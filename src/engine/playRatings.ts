@@ -92,7 +92,7 @@ export const PLAY_INDEX: Record<string, number> = {
   'royal-portrush-dunluce': 1.837,
   'cypress-point': -0.029,
   'whistling-straits': 2.233,
-  'tpc-potomac': 1.789,
+  'tpc-potomac': 2.156,
   'gullwing-point': 0.728,
   'seminole': 2.120,
   'birchwood-national': -0.637,

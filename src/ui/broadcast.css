@@ -412,6 +412,26 @@
   color: var(--text-on-block);
 }
 
+/* The banner re-blocks light here, so the base rule's cream-on-ink ghost
+   button (styles.css) came out cream-on-sand — invisible. Invert it against
+   the slab: a solid turf pill, unmistakably a button, and deliberately not
+   red so it stays subordinate to the primary CTA below it. */
+.screen.home .stale-banner button {
+  background: var(--turf-900);
+  border-color: var(--turf-900);
+  color: var(--sand-100);
+}
+
+.screen.home .stale-banner button:hover {
+  background: var(--turf-800);
+  border-color: var(--turf-800);
+}
+
+.screen.home .stale-banner button:active {
+  background: var(--turf-700);
+  border-color: var(--turf-700);
+}
+
 /* tomorrow's forecast: a compact gold-keyline bug instead of a cream card */
 .screen.home .forecast {
   background: var(--bg-card);

@@ -62,7 +62,7 @@ export function HomeScreen(props: {
   const [ratingFilter, setRatingFilter] = useState<'any' | 'easy' | 'mid' | 'hard'>('any')
   const [recordFilter, setRecordFilter] = useState<'any' | 'open' | 'attainable' | 'mine' | 'notmine'>('any')
   const [favsOnly, setFavsOnly] = useState(false)
-  const [courseSort, setCourseSort] = useState<'tour' | 'easiest' | 'hardest' | 'beatable' | 'recent'>('tour')
+  const [courseSort, setCourseSort] = useState<'tour' | 'easiest' | 'hardest' | 'beatable' | 'recent' | 'favorites'>('tour')
   const [favs, setFavs] = useState<Set<string>>(() => loadFavorites())
   const [filterSheet, setFilterSheet] = useState(false)
   const [courseRecs, setCourseRecs] = useState<Map<string, CourseRecord> | null>(null)
@@ -188,6 +188,9 @@ export function HomeScreen(props: {
     if (courseSort === 'easiest') return playRatingFor(a.slug) - playRatingFor(b.slug)
     if (courseSort === 'hardest') return playRatingFor(b.slug) - playRatingFor(a.slug)
     if (courseSort === 'recent') return (lastPlayed.get(b.slug) ?? 0) - (lastPlayed.get(a.slug) ?? 0)
+    // starred courses first, tour order within each group — the shortlist
+    // floats to the top without needing the filter sheet at all
+    if (courseSort === 'favorites') return Number(favs.has(b.slug)) - Number(favs.has(a.slug))
     if (courseSort === 'beatable') {
       // weakest active record first — open records are the weakest of all
       const va = activeRecs?.get(a.slug)?.to_par ?? 99
@@ -391,7 +394,9 @@ export function HomeScreen(props: {
                               ? 'beatable'
                               : courseSort === 'beatable'
                                 ? 'recent'
-                                : 'tour',
+                                : courseSort === 'recent'
+                                  ? 'favorites'
+                                  : 'tour',
                       )
                     }
                     aria-label="Change sort order"
@@ -405,7 +410,9 @@ export function HomeScreen(props: {
                           ? 'Hardest'
                           : courseSort === 'beatable'
                             ? 'Beatable'
-                            : 'Recent'}
+                            : courseSort === 'recent'
+                              ? 'Recent'
+                              : '★ Favorites'}
                   </button>
                 </div>
               </div>

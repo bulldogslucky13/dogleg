@@ -76,7 +76,7 @@ export const CHANGELOG: ChangeEntry[] = [
     date: '2026-07-26',
     kind: 'design',
     title: 'Welcome to DogLeg 2.0',
-    note: 'One week after launch, we\u2019ve stepped up our design game: a full rebadge of the menus and branding, plus small tweaks under the hood to make your card a little sexier when it hits the group chat. The golf is untouched \u2014 keep on swingin\u2019.',
+    note: 'One week after launch, we\u2019ve stepped up our design game: a full rebadge of the menus and branding, a post-round wrap screen that leads with your score, your share card, and a proper leaderboard \u2014 plus small tweaks under the hood to make your card a little sexier when it hits the group chat. The golf is untouched \u2014 keep on swingin\u2019.',
   },
   {
     date: '2026-07-25',

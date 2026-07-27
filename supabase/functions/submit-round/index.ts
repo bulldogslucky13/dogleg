@@ -21,6 +21,7 @@ import {
   seasonForDate,
 } from './engine.mjs'
 import { buildStealEmail, sendViaResend } from './email.ts'
+import { SITE_URL } from '../_shared/email-chassis.ts'
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -498,7 +499,7 @@ Deno.serve(async (req) => {
         const msg = buildStealEmail({
           courseName: info.course.name,
           thiefName: player.name,
-          siteUrl: 'https://dogleg.cameronbristol.xyz',
+          siteUrl: SITE_URL,
         })
         const sent = await sendViaResend(fetch, resendKey, emailFrom, email, msg)
         if (!sent.ok) console.error('record-steal email send failed with status', sent.status)

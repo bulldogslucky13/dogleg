@@ -7,7 +7,7 @@ describe('buildStealEmail', () => {
   const input = {
     courseName: 'Pebble Creek',
     thiefName: "O'Brien <script>",
-    siteUrl: 'https://dogleg.cameronbristol.xyz',
+    siteUrl: 'https://playdogleg.com',
   }
   const msg = buildStealEmail(input)
 
@@ -18,13 +18,13 @@ describe('buildStealEmail', () => {
   it('names the thief, the course, and the site in the text body', () => {
     expect(msg.text).toContain("O'Brien <script>")
     expect(msg.text).toContain('Pebble Creek')
-    expect(msg.text).toContain('https://dogleg.cameronbristol.xyz')
+    expect(msg.text).toContain('https://playdogleg.com')
   })
 
   it('names the thief, the course, and links the site in the html body', () => {
     expect(msg.html).toContain('O&#39;Brien')
     expect(msg.html).toContain('Pebble Creek')
-    expect(msg.html).toContain('href="https://dogleg.cameronbristol.xyz"')
+    expect(msg.html).toContain('href="https://playdogleg.com"')
   })
 
   it('escapes the thief name in html — no raw script tag survives', () => {

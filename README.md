@@ -106,10 +106,25 @@ anywhere. This repo ships with a GitHub Actions workflow that tests, builds, and
 publishes to **GitHub Pages** on every push to `main` (enable it once in the repo's
 Settings → Pages → Source: "GitHub Actions").
 
-To point a custom domain (e.g. `dogleg.cameronbristol.xyz`) at it, add the domain in
-Settings → Pages and create the matching CNAME record at your DNS provider. Update
-`SITE_URL` in `src/engine/daily.ts` to match whatever domain you choose (it appears in
-the share text).
+The live site is **[playdogleg.com](https://playdogleg.com)**. The domain is kept in
+`public/CNAME` (copied to the root of the build by Vite) and must also be set in
+Settings → Pages — that's what provisions the HTTPS certificate — with an `ALIAS`/`A`
+record for the apex and a `CNAME` for `www` at the DNS provider.
+
+Moving to a different domain means changing it in four places, all of which are
+checked by tests or generated from each other:
+
+1. `public/CNAME` and Settings → Pages (where GitHub serves it from)
+2. `SITE_URL` in `src/engine/daily.ts` — the bare host, used in share text and
+   replay links
+3. `SITE_URL` in `supabase/functions/_shared/email-chassis.ts` — every email's
+   masthead, footer and links; re-run `pnpm gen:email-templates` afterwards
+4. the canonical/Open Graph URLs in `index.html`
+
+Two things live outside the repo and have to be changed in the Supabase dashboard:
+the Auth **site URL** and **redirect allow-list** (magic links redirect to
+`window.location.origin`, so the new origin must be allowed), and the Resend sender
+domain behind `EMAIL_FROM`.
 
 ### Calibration targets (enforced by tests)
 

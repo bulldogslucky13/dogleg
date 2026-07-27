@@ -46,6 +46,12 @@ export const CHANGE_KIND_LABEL: Record<ChangeKind, string> = {
 
 export const CHANGELOG: ChangeEntry[] = [
   {
+    date: '2026-07-27',
+    kind: 'feature',
+    title: 'A new address: playdogleg.com',
+    note: 'The game moved to playdogleg.com — shorter, and easier to pass on. Share text and replay links point there from now on. Your clubhouse lives on this device, so if you linked an email, sign in once at the new address to bring your name and streak across.',
+  },
+  {
     date: '2026-07-25',
     kind: 'odds',
     title: 'A par 3 you can bail out on',

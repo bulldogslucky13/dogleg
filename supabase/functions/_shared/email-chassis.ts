@@ -66,8 +66,11 @@ const FONT_UI = `'Barlow',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Hel
 /** Canonical site. The wordmark is loaded absolute from here rather than from
  *  whatever siteUrl a caller passes: mail only ever goes out from production,
  *  and a localhost asset URL in someone's inbox is a broken image forever. */
-export const SITE_URL = 'https://dogleg.cameronbristol.xyz'
+export const SITE_URL = 'https://playdogleg.com'
 export const WORDMARK_URL = `${SITE_URL}/brand/wordmark-email.png`
+/** The same host, as the footer prints it — derived so the link and its label
+ *  can never disagree the next time the domain moves. */
+export const SITE_HOST = SITE_URL.replace(/^https?:\/\//, '')
 
 /** Clubhouse names allow apostrophes, and angle brackets could sneak in —
  *  escape everything interpolated into the HTML variant. */
@@ -225,7 +228,7 @@ ${fallback}
               ${c.footerFineHtml}
             </p>
             <p style="margin:10px 0 0;font-family:${FONT_UI};font-size:12px;color:${INK.textLowPanel};">
-              DogLeg &middot; <a href="${SITE_URL}/" target="_blank" style="color:${INK.link};text-decoration:none;">dogleg.cameronbristol.xyz</a>
+              DogLeg &middot; <a href="${SITE_URL}/" target="_blank" style="color:${INK.link};text-decoration:none;">${SITE_HOST}</a>
             </p>
           </td>
         </tr>

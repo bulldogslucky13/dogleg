@@ -89,7 +89,7 @@ Cross-device sync is optional email magic links (Supabase Auth): the
 Auth redirect URLs are configured for the prod domain and localhost:5173.
 Mail goes out through Resend — the edge function POSTs its API directly, and
 Supabase Auth is pointed at `smtp.resend.com` (sender `DogLeg Team
-<team@dogleg.cameronbristol.xyz>`, configured in the dashboard).
+<team@playdogleg.com>`, configured in the dashboard).
 
 **Every email we send renders through one chassis**, `supabase/functions/
 _shared/email-chassis.ts` — the broadcast card, with theme.css's tokens

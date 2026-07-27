@@ -750,6 +750,17 @@ export function HoleMap(props: {
     // golfer-left normal is +1 (matches placeZones' sideSign), so the ball's
     // own side sets the sign: left → +1, right → -1.
     let sideDir = b.side === 'left' ? 1 : b.side === 'right' ? -1 : 0
+    // An UN-ANCHORED trouble lie has nowhere of its own to sit. The odds carry
+    // a junk floor (odds.ts): where a shot's window reaches no mapped hazard,
+    // the trouble slice still resolves to a `trees` lie, but `pickZone` finds
+    // no zone to put the ball in, so it arrives here centred — and got drawn
+    // in the middle of the short grass under an "In the …" caption. Push it to
+    // a flank so the map agrees with the banner. The side comes from the ball's
+    // own yardage so it is stable across re-renders, and the blocked-side check
+    // below can still move it off a painted hazard.
+    if (sideDir === 0 && !b.zoneId && (b.lie === 'trees' || b.lie === 'sand')) {
+      sideDir = Math.round(b.pos) % 2 === 0 ? 1 : -1
+    }
     // A ball that isn't IN a hazard must never be *drawn* on top of one. The
     // fixed lateral offset knows nothing about hazards hugging the corridor, so
     // a rough/fairway lie on the trouble side lands on the painted lake, bunker,

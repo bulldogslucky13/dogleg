@@ -89,3 +89,48 @@ describe('course-level rough severity', () => {
     expect(sum).toBeCloseTo(1, 6)
   })
 })
+
+/**
+ * The junk floor's NAME (`CourseSpec.junkLabel`, see types.ts).
+ *
+ * `longOdds` gives every shot a floor of trouble even where its landing window
+ * reaches no mapped hazard — a wild swing finds something on ground nobody drew
+ * a polygon for. That slice lands in the `trees` bucket and resolves to a
+ * `trees` lie. On a parkland course that is a fair fiction. On a course with no
+ * trees mapped ANYWHERE it is a false statement: the game announced "In the
+ * trees", and the map, having no grove to put the ball in, drew it sitting on
+ * the fairway. Whistling Straits shipped like that.
+ *
+ * So: a course with no trees/deeprough zones on any hole has to say what its
+ * junk actually is. This is the same copy/geometry contract the course-import
+ * process enforces on `signature` strings — the difference is that here it is
+ * the ENGINE naming a feature rather than the course tuple, which is exactly
+ * how it went unnoticed.
+ */
+describe('the junk floor names something the course actually has', () => {
+  it('every course with no trees anywhere gives its junk a name', () => {
+    for (const c of COURSES) {
+      const hasTrees = c.holes.some((spec) =>
+        buildLayout(c.slug, spec, COND).zones.some((z) => z.kind === 'trees' || z.kind === 'deeprough'),
+      )
+      if (hasTrees) continue
+      expect(
+        c.junkLabel ?? c.roughLabel,
+        `${c.slug} has no trees on any hole, so a junk-floor lie would claim one — set junkLabel`,
+      ).toBeTruthy()
+    }
+  })
+
+  it('resolves the label per hole: real trees win, then the course, then the default', () => {
+    for (const c of COURSES) {
+      for (const spec of c.holes) {
+        const layout = buildLayout(c.slug, spec, COND)
+        const treed = layout.zones.some((z) => z.kind === 'trees' || z.kind === 'deeprough')
+        if (treed) expect(layout.junkLabel, `${c.slug}:${spec.number}`).toBe('trees')
+        else expect(layout.junkLabel, `${c.slug}:${spec.number}`).toBe(c.junkLabel ?? c.roughLabel ?? 'trees')
+      }
+    }
+    // unknown slugs (tests use fakes) still get a usable word, never undefined
+    expect(buildLayout('not-a-course', COURSES[0].holes[0], COND).junkLabel).toBe('trees')
+  })
+})

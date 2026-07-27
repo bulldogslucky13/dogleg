@@ -4,6 +4,23 @@ import { OSM_GEOMETRY, OSM_BEND } from './geometry'
 import { courseBySlug } from './courses'
 
 /**
+ * What to call a bad lie on ground this hole has no polygon for — the `trees`
+ * bucket's junk floor (see `CourseSpec.junkLabel`). A hole with real trees or
+ * deep rough names them; otherwise the course speaks for itself, and a course
+ * with neither keeps the historical word so nothing but the genuinely treeless
+ * courses change. Copy only — `buildLayout` resolves it once so no caller has
+ * to look a course up.
+ */
+function resolveJunkLabel(
+  zones: HazardZone[],
+  junkLabel: string | undefined,
+  roughLabel: string | undefined,
+): string {
+  if (zones.some((z) => z.kind === 'trees' || z.kind === 'deeprough')) return 'trees'
+  return junkLabel ?? roughLabel ?? 'trees'
+}
+
+/**
  * Generate the geometric layout for a hole. Deterministic per course+hole.
  * Zones live on a 1-D line from tee (0) to pin (length), with a side.
  * The SVG map and the odds engine both consume this — single source of truth.
@@ -24,6 +41,7 @@ export function buildLayout(courseSlug: string, spec: HoleSpec, cond?: Condition
   const course = courseBySlug(courseSlug)
   const rough = course?.rough
   const roughLabel = course?.roughLabel
+  const junk = course?.junkLabel
   const real = OSM_GEOMETRY[`${courseSlug}:${spec.number}`]
   if (real) {
     return {
@@ -39,6 +57,7 @@ export function buildLayout(courseSlug: string, spec: HoleSpec, cond?: Condition
       gust,
       rough,
       roughLabel,
+      junkLabel: resolveJunkLabel(real.zones, junk, roughLabel),
     }
   }
 
@@ -73,7 +92,7 @@ export function buildLayout(courseSlug: string, spec: HoleSpec, cond?: Condition
       add({ kind: 'bunker', from: L - 16, to: L - 2, side: 'right' })
       if (rng() < 0.5) add({ kind: 'bunker', from: L - 34, to: L - 20, side: 'cross' })
     }
-    return { spec, length: L, zones, fairwayFrom: 0, fairwayTo: 0, greenDepth, pin, gust, rough, roughLabel }
+    return { spec, length: L, zones, fairwayFrom: 0, fairwayTo: 0, greenDepth, pin, gust, rough, roughLabel, junkLabel: resolveJunkLabel(zones, junk, roughLabel) }
   }
 
   // --- par 4 / par 5 ---
@@ -124,7 +143,7 @@ export function buildLayout(courseSlug: string, spec: HoleSpec, cond?: Condition
     add({ kind: 'deeprough', from: fairwayFrom, to: fairwayTo - 40, side: offSide })
   }
 
-  return { spec, length: L, zones, fairwayFrom, fairwayTo, greenDepth, rough, roughLabel }
+  return { spec, length: L, zones, fairwayFrom, fairwayTo, greenDepth, rough, roughLabel, junkLabel: resolveJunkLabel(zones, junk, roughLabel) }
 }
 
 /**

@@ -1008,8 +1008,10 @@ async function main() {
   // side-by-side with the current procedural layout the game ships today
   if (flags.includes('--compare')) {
     const { buildLayout } = await import('../src/engine/layout.ts')
-    const { COURSES } = await import('../src/engine/courses.ts')
-    const course = COURSES.find((c: { slug: string }) => c.slug === geo.engineSlug)
+    // courseBySlug spans the whole library — rotation, par-3 shorts, and guest
+    // courses alike — so a course outside the daily walk still compares.
+    const { courseBySlug } = await import('../src/engine/courses.ts')
+    const course = courseBySlug(geo.engineSlug)
     const spec = course?.holes[holeNo - 1]
     if (!spec) {
       console.error(`\n(no engine hole for ${geo.engineSlug} #${holeNo} to compare)`)

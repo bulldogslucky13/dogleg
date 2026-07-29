@@ -63,4 +63,11 @@
 // between. That reshapes only newly imported geometry (committed courses are
 // static data and untouched), but Seminole is the first course to ship from
 // it, so the two go out together.
-export const ENGINE_VERSION = 10
+// v11 = Kings Creek CC (guest course, Kemp TX) + the DAILY_OVERRIDES table:
+// 2026-08-01's daily maps to the guest course instead of the rotation walk,
+// which changes what that day's seeds replay into (they don't exist yet — the
+// override ships before the day does). The rotation array itself is untouched;
+// this is the gated-cutover shape the note above asks for, expressed as an
+// explicit per-day table. (If PR #87's Mis-fortune v11 merges first, renumber
+// this to v12 — same collision Seminole/Mis-fortune had.)
+export const ENGINE_VERSION = 11

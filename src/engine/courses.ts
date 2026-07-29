@@ -1597,7 +1597,51 @@ export const PAR3_COURSES: CourseSpec[] = [
 ]
 
 /** Every playable course: the daily-rotation library plus the par-3 courses. */
-export const ALL_COURSES: CourseSpec[] = [...COURSES, ...PAR3_COURSES]
+
+/**
+ * GUEST COURSES — real courses that live in the library and unlimited play but
+ * are NOT part of the daily rotation walk. The rotation array above is fixed
+ * history (courseForPuzzle is a modulo over it, and appending re-maps every
+ * future daily), so one-off additions land here and reach the daily only via
+ * an explicit DAILY_OVERRIDES entry in daily.ts. First occupant: Jackson's
+ * golf-trip easter egg, played by the crew on 2026-08-01.
+ */
+export const GUEST_COURSES: CourseSpec[] = [
+  {
+    slug: 'kings-creek',
+    name: 'Kings Creek Country Club',
+    location: 'Kemp, Texas',
+    difficulty: 5,
+    greens: 'Medium',
+    wind: 12,
+    blurb: 'Water on sixteen of eighteen. Bring extra balls, your boys, and a dog or two.',
+    // The club's BLUE card: par 71 (35/36), 6507 yds, 72.0/124. Five par 3s,
+    // back-to-back par 5s at 7 and 9's turn, and a drivable 276yd 16th. SI is
+    // the card's men's handicap row. Geometry: OSM_GEOMETRY 'kings-creek:*'.
+    holes: holes([
+      [4, 351, 3, 'L', 'water'],
+      [4, 340, 15, 'L', 'water'],
+      [3, 200, 1, 'S', 'water'],
+      [4, 393, 5, 'R', 'water'],
+      [4, 360, 11, 'R', 'water'],
+      [3, 164, 17, 'S', 'water'],
+      [5, 515, 13, 'L', 'water'],
+      [3, 209, 7, 'S', 'water'],
+      [5, 567, 9, 'L', 'water', 'The turn: nine down, nine to go. Grab a dog.'],
+      [4, 443, 4, 'S', 'water'],
+      [3, 151, 18, 'S', 'water'],
+      [5, 576, 2, 'S', 'water'],
+      [4, 415, 6, 'L', 'water'],
+      [4, 387, 12, 'R', 'water'],
+      [4, 394, 10, 'R', 'water'],
+      [4, 276, 14, 'R', 'water'],
+      [3, 191, 16, 'S', 'water'],
+      [5, 575, 8, 'L', 'water'],
+    ]),
+  },
+]
+
+export const ALL_COURSES: CourseSpec[] = [...COURSES, ...PAR3_COURSES, ...GUEST_COURSES]
 
 // Reconcile hole yardage with imported OSM geometry: where a hole has real
 // geography, its measured length is the single source of truth, so the tuple's

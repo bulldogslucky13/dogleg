@@ -14,9 +14,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { track } from './lib/analytics'
 import { castLinesForHole, castRound } from './engine/cast'
 import { CHARACTERS } from './engine/characters'
-import { COURSES, PAR3_COURSES, courseBySlug, playRatingFor } from './engine/courses'
+import { COURSES, GUEST_COURSES, PAR3_COURSES, courseBySlug, playRatingFor } from './engine/courses'
 import { PLAY_RATINGS } from './engine/playRatings'
-import { courseForPuzzle, dailyConditions, dailySetup, forecastSetup, practiceSetup, shareText, type DailySetup } from './engine/daily'
+import { DAILY_OVERRIDES, courseForPuzzle, dailyConditions, dailySetup, forecastSetup, practiceSetup, puzzleNumberForDateKey, shareText, type DailySetup } from './engine/daily'
 import { splitFortune } from './engine/fortune'
 import { gradeCopy, gradeRound } from './engine/grade'
 import { decisionsFromScores, destinyPlan, fortuneOddsFor, replayRound, setupFromSeed } from './engine/replay'
@@ -86,9 +86,28 @@ function expectCompleteAndSane(s: RoundState): void {
   expect(Number.isFinite(roundToPar(s))).toBe(true)
 }
 
+// The guest-course override must be a scalpel: exactly one day maps to the
+// guest, and every other day's mapping is byte-identical to the plain
+// rotation walk — that identity is what keeps historical replays valid.
+describe('daily overrides', () => {
+  it('2026-08-01 is Kings Creek, and no other day moved', () => {
+    const n = puzzleNumberForDateKey('2026-08-01')
+    expect(courseForPuzzle(n).slug).toBe('kings-creek')
+    for (let k = 1; k <= 120; k++) {
+      if (DAILY_OVERRIDES[k]) continue
+      expect(courseForPuzzle(k).slug).toBe(COURSES[(k - 1) % COURSES.length].slug)
+    }
+  })
+
+  it('the guest course is not in the rotation array', () => {
+    expect(COURSES.some((c) => c.slug === 'kings-creek')).toBe(false)
+    expect(GUEST_COURSES.some((c) => c.slug === 'kings-creek')).toBe(true)
+  })
+})
+
 describe('smoke: every course is playable start to finish', () => {
   it('completes a full round on all courses (characters rotated across courses)', () => {
-    COURSES.forEach((course, i) => {
+    ;[...COURSES, ...GUEST_COURSES].forEach((course, i) => {
       const character = CHARACTERS[i % CHARACTERS.length].id
       const setup = practiceSetup(course.slug, 'smoke')
       const done = playRound(newRound(setup, 'practice', character), normalPolicy)

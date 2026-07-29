@@ -27,7 +27,27 @@ export function puzzleNumberForDateKey(dateKey: string): number {
 }
 
 /** The rotation is the array order: puzzle n plays COURSES[(n-1) % length]. */
+/**
+ * One-off daily overrides, keyed by puzzle number derived from a dateKey so
+ * the intent reads in plain English. The rotation walk below is fixed history
+ * — COURSES must never grow or reorder (it re-maps every future daily and
+ * invalidates historical seeds) — so a guest course reaches the daily ONLY
+ * through this table. One day, one course, everything else untouched.
+ * Remove a row after its day passes if you like; leaving it is harmless
+ * (historical replays of that day NEED it, so prefer leaving it).
+ */
+export const DAILY_OVERRIDES: Record<number, string> = {
+  // 2026-08-01 — Kings Creek CC: Jackson's golf-trip easter egg. The crew
+  // plays the real course that morning; DogLeg plays it with them.
+  [puzzleNumberForDateKey('2026-08-01')]: 'kings-creek',
+}
+
 export function courseForPuzzle(n: number): CourseSpec {
+  const override = DAILY_OVERRIDES[n]
+  if (override) {
+    const c = courseBySlug(override)
+    if (c) return c
+  }
   return COURSES[(n - 1) % COURSES.length]
 }
 

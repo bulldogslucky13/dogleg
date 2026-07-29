@@ -127,21 +127,26 @@
 
         function collect() {
           var keys = {}
-          var found = 0
           try {
             for (var i = 0; i < localStorage.length; i++) {
               var k = localStorage.key(i)
               if (!k || k.indexOf(PREFIX) !== 0) continue
               var v = localStorage.getItem(k)
-              if (v !== null) {
-                keys[k] = v
-                found++
-              }
+              if (v !== null) keys[k] = v
             }
           } catch (e) {
-            /* private mode: nothing to carry, and nothing broken */
+            // private mode is the expected case and is silent; anything else
+            // (a patched localStorage, a future browser quirk) at least
+            // leaves a trace, since this page has no other way to be watched
+            if (!(e && (e.name === 'SecurityError' || e.name === 'QuotaExceededError'))) {
+              try {
+                console.error('handoff: storage sweep failed', e)
+              } catch (e2) {
+                /* no console either — truly nothing left to do */
+              }
+            }
           }
-          return found ? keys : null
+          return Object.keys(keys).length ? keys : null
         }
 
         function pack() {
@@ -168,23 +173,16 @@
         }
 
         // A failure here must still deliver the player to the new site — losing
-        // a streak is bad, losing the game is worse.
-        var done = false
-        function once(payload) {
-          if (done) return
-          done = true
-          leave(payload)
-        }
-        setTimeout(function () {
-          once(null)
-        }, 4000)
-        try {
-          pack().then(once, function () {
-            once(null)
-          })
-        } catch (e) {
-          once(null)
-        }
+        // a streak is bad, losing the game is worse. First of {pack settles,
+        // 6s ceiling} wins; gzip of even a heavy archive is native-code-fast
+        // (single-digit milliseconds), so 6s is a last-resort ceiling against
+        // an anomalous browser, not a real budget — it should never be felt.
+        var timedOut = new Promise(function (resolve) {
+          setTimeout(function () {
+            resolve(null)
+          }, 6000)
+        })
+        Promise.race([pack()['catch'](function () { return null }), timedOut]).then(leave)
       })()
     </script>
   </body>

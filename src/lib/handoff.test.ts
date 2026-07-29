@@ -7,7 +7,7 @@
  * silently arrives as a stranger — so the format is asserted literally here,
  * not just round-tripped.
  */
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 // the real file, verbatim — ?raw so this stays a browser-typed test with no
 // node builtins (tsconfig.app.json carries no node types)
 import handoffHtml from '../../handoff/index.html?raw'
@@ -175,15 +175,96 @@ describe('importing onto a device that has already been played on', () => {
   it('unions the archive by seed and keeps it newest-first', async () => {
     const target = seeded({
       'dogleg:player:v1': ANON,
+      // already newest-first, as every real write path (pruneArchive) leaves it
       'dogleg:archive:v1': [
-        { seed: 'seed-a', playedAt: 1 },
         { seed: 'seed-b', playedAt: 300 },
+        { seed: 'seed-a', playedAt: 1 },
       ],
     })
     await importHandoff(await packHandoff(seeded(OLD_DEVICE)), target)
     const merged = JSON.parse(target.getItem('dogleg:archive:v1')!) as { seed: string; playedAt: number }[]
     expect(merged.map((r) => r.seed)).toEqual(['seed-b', 'seed-a'])
     expect(merged.find((r) => r.seed === 'seed-a')!.playedAt).toBe(1)
+  })
+
+  it('skips the rewrite entirely when the incoming side has nothing new to add', async () => {
+    // OLD_DEVICE's only archive entry is seed-a — already present locally
+    const target = seeded({ 'dogleg:player:v1': ANON, 'dogleg:archive:v1': [{ seed: 'seed-a', playedAt: 1 }] })
+    const before = target.getItem('dogleg:archive:v1')
+    await importHandoff(await packHandoff(seeded(OLD_DEVICE)), target)
+    expect(target.getItem('dogleg:archive:v1')).toBe(before) // same string, not just same value — no rewrite happened
+  })
+
+  it('never adopts an incoming round-in-progress even when this device has none of its own', async () => {
+    const target = seeded({ 'dogleg:player:v1': ANON })
+    await importHandoff(await packHandoff(seeded({ ...OLD_DEVICE, 'dogleg:round:v1': { hole: 17 } })), target)
+    expect(target.getItem('dogleg:round:v1')).toBeNull()
+  })
+
+  it('unions the posted-daily set so the fortune streak/drought math (store.ts) stays in sync with history', async () => {
+    // local already posted 07-26; the incoming device posted the two days in
+    // OLD_DEVICE's history. If posted:v1 were left on "local wins" (the
+    // default for anything not specially merged), the merged history would
+    // include 07-20/07-21 while posted:v1 forgot they were ever posted —
+    // silently undercounting postedStreak() and re-opening a closed ace/
+    // albatross drought in postedDailyCounters().
+    const target = seeded({
+      'dogleg:player:v1': ANON,
+      'dogleg:history:v1': [{ dateKey: '2026-07-26', toPar: 0 }],
+      'dogleg:posted:v1': ['2026-07-26'],
+    })
+    await importHandoff(await packHandoff(seeded({ ...OLD_DEVICE, 'dogleg:posted:v1': ['2026-07-20', '2026-07-21'] })), target)
+    const posted = JSON.parse(target.getItem('dogleg:posted:v1')!) as string[]
+    expect(posted.sort()).toEqual(['2026-07-20', '2026-07-21', '2026-07-26'])
+  })
+
+  it('unions the round log by seed — the source every lifetime stat and the handicap window compute from', async () => {
+    const target = seeded({
+      'dogleg:player:v1': ANON,
+      'dogleg:roundlog:v1': { v: 1, rounds: [{ seed: 'seed-local', playedAt: 500 }] },
+    })
+    await importHandoff(
+      await packHandoff(seeded({ ...OLD_DEVICE, 'dogleg:roundlog:v1': { v: 1, rounds: [{ seed: 'seed-old', playedAt: 100 }] } })),
+      target,
+    )
+    const log = JSON.parse(target.getItem('dogleg:roundlog:v1')!) as { rounds: { seed: string }[] }
+    expect(log.rounds.map((r) => r.seed)).toEqual(['seed-local', 'seed-old'])
+  })
+
+  it('unions the record ledger, local winning a same-course conflict', async () => {
+    const target = seeded({
+      'dogleg:player:v1': ANON,
+      'dogleg:records:v1': { v: 1, held: { 'pebble-beach': { toPar: -2, since: 1 } }, stolen: {} },
+    })
+    await importHandoff(
+      await packHandoff(
+        seeded({
+          ...OLD_DEVICE,
+          'dogleg:records:v1': {
+            v: 1,
+            held: { 'pebble-beach': { toPar: -5, since: 2 }, augusta: { toPar: 0, since: 3 } },
+            stolen: {},
+          },
+        }),
+      ),
+      target,
+    )
+    const ledger = JSON.parse(target.getItem('dogleg:records:v1')!) as { held: Record<string, { toPar: number }> }
+    expect(ledger.held['pebble-beach'].toPar).toBe(-2) // local's conflicting entry wins
+    expect(ledger.held.augusta.toPar).toBe(0) // incoming's non-conflicting entry still arrives
+  })
+
+  it('heals a corrupted local fortune counter from a valid incoming payload instead of perpetuating it', async () => {
+    const target = seeded({ 'dogleg:player:v1': ANON })
+    target.setItem('dogleg:fortune:v1', '{not valid json')
+    await importHandoff(await packHandoff(seeded(OLD_DEVICE)), target)
+    expect(JSON.parse(target.getItem('dogleg:fortune:v1')!).p).toEqual(OLD_DEVICE['dogleg:fortune:v1'].p)
+  })
+
+  it('clamps a non-finite lifetime count instead of letting it poison Math.max forever', async () => {
+    const target = seeded({ 'dogleg:player:v1': ANON, 'dogleg:lifetime:v1': '7' })
+    await importHandoff(await packHandoff(seeded({ ...OLD_DEVICE, 'dogleg:lifetime:v1': '1e400' })), target)
+    expect(target.getItem('dogleg:lifetime:v1')).toBe('7')
   })
 
   it('takes the higher of each fortune counter and the higher lifetime count', async () => {
@@ -288,5 +369,56 @@ describe('the boot path', () => {
   it('does nothing at all on an ordinary load', async () => {
     expect(await runHandoff()).toBeNull()
     expect(localStorage.length).toBe(0)
+  })
+
+  it('strips every occurrence of a duplicated handoff= param, not just the first', async () => {
+    const payload = await packHandoff(seeded(OLD_DEVICE))
+    // a malformed/concatenated link — the second copy is the same secret and
+    // must not be left sitting in the address bar
+    window.location.hash = `#handoff=${payload}&handoff=${payload}`
+    expect(await runHandoff()).toBe('imported')
+    expect(window.location.hash).toBe('')
+  })
+
+  it('clears a dead #handoff= with no value instead of re-triggering forever', async () => {
+    window.location.hash = '#handoff='
+    expect(await runHandoff()).toBeNull()
+    expect(window.location.hash).toBe('')
+  })
+
+  it('never hangs boot forever if the unpack stream stalls instead of settling', async () => {
+    // simulate an anomalous DecompressionStream that never produces a chunk
+    // and never closes — through()'s reader.read() would await this forever
+    class HangingStream {
+      writable = { getWriter: () => ({ write: () => Promise.resolve(), close: () => Promise.resolve() }) }
+      readable = { getReader: () => ({ read: () => new Promise<never>(() => {}) }) }
+    }
+    const real = globalThis.DecompressionStream
+    // @ts-expect-error — stubbing with a minimal stand-in for the test
+    globalThis.DecompressionStream = HangingStream
+    vi.useFakeTimers()
+    try {
+      const payload = await packHandoff(seeded(OLD_DEVICE)) // built with the REAL CompressionStream, still valid gzip
+      window.location.hash = `#handoff=${payload}`
+      const result = runHandoff()
+      await vi.advanceTimersByTimeAsync(5000)
+      expect(await result).toBe('invalid') // the 5s fallback wins the race, not a hang
+    } finally {
+      vi.useRealTimers()
+      globalThis.DecompressionStream = real
+    }
+  })
+})
+
+describe('packHandoff on storage that throws (private-mode-style)', () => {
+  it('packs whatever it collected before the throw, rather than rejecting the whole page', async () => {
+    class ThrowingStorage extends MemoryStorage {
+      override get length(): number {
+        throw new DOMException('blocked', 'SecurityError')
+      }
+    }
+    const payload = await packHandoff(new ThrowingStorage())
+    const unpacked = await unpackHandoff(payload)
+    expect(unpacked?.keys).toEqual({})
   })
 })

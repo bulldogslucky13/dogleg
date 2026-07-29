@@ -750,6 +750,19 @@ export function HoleMap(props: {
     // golfer-left normal is +1 (matches placeZones' sideSign), so the ball's
     // own side sets the sign: left → +1, right → -1.
     let sideDir = b.side === 'left' ? 1 : b.side === 'right' ? -1 : 0
+    // An UN-ANCHORED trouble lie has nowhere of its own to sit. The odds carry
+    // a junk floor (odds.ts): where a shot's window reaches no mapped hazard,
+    // the trouble slice still resolves to a `trees` lie, but `pickZone` finds
+    // no zone to put the ball in, so it arrives here centred — and got drawn
+    // in the middle of the short grass under an "In the …" caption. Push it to
+    // a flank so the map agrees with the banner. The side comes from the ball's
+    // own yardage so it is stable across re-renders, and the blocked-side check
+    // below can still move it off a painted hazard.
+    let unanchoredJunk = false
+    if (sideDir === 0 && !b.zoneId && (b.lie === 'trees' || b.lie === 'sand')) {
+      sideDir = Math.round(b.pos) % 2 === 0 ? 1 : -1
+      unanchoredJunk = true
+    }
     // A ball that isn't IN a hazard must never be *drawn* on top of one. The
     // fixed lateral offset knows nothing about hazards hugging the corridor, so
     // a rough/fairway lie on the trouble side lands on the painted lake, bunker,
@@ -770,7 +783,10 @@ export function HoleMap(props: {
       if (sideDir > 0 && blockLeft && !blockRight) sideDir = -1
       else if (sideDir < 0 && blockRight && !blockLeft) sideDir = 1
     }
-    const offYd = sideDir * (b.lie === 'rough' || b.lie === 'trees' ? 20 : 10)
+    // 20 yd only reaches the fairway EDGE, which still reads as "on the short
+    // grass" for a ball the banner says is in the junk — so an un-anchored junk
+    // lie sits clearly outside it.
+    const offYd = sideDir * (unanchoredJunk ? 30 : b.lie === 'rough' || b.lie === 'trees' ? 20 : 10)
     const bn = normalAt(Math.min(b.pos, L - 1))
     const p = at(b.pos)
     return { x: p.x + bn.x * offYd * uPerYd, y: p.y + bn.y * offYd * uPerYd }

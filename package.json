@@ -15,6 +15,7 @@
     "build:validator": "vite build --config vite.validator.config.ts",
     "gen:ratings": "node scripts/gen-play-ratings.ts",
     "gen:email-wordmark": "node scripts/gen-email-wordmark.ts",
+    "gen:og-image": "node scripts/gen-og-image.ts",
     "gen:email-templates": "node scripts/gen-email-templates.ts",
     "push:email-templates": "node scripts/push-email-templates.ts",
     "import:osm": "node scripts/import-osm.ts"

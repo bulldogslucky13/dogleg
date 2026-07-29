@@ -1,7 +1,43 @@
-import type { Conditions, HazardZone, HoleLayout, HoleSpec } from './types'
+import type { Conditions, CourseSpec, HazardZone, HoleLayout, HoleSpec } from './types'
 import { rngFromString } from './rng'
 import { OSM_GEOMETRY, OSM_BEND } from './geometry'
 import { courseBySlug } from './courses'
+
+/**
+ * Does this course have a tree anywhere? Answered WITHOUT `buildLayout`, which
+ * would recurse: imported holes are read straight off `OSM_GEOMETRY`, and the
+ * procedural generator below plants a tree line on every hole that isn't an
+ * ocean hole. Lets a tree-lined course still say "trees" on a hole whose
+ * corridor happens to have no grove drawn — a fair fiction on a course that
+ * really is wooded, and a lie on one that isn't.
+ */
+function courseHasTrees(course: CourseSpec | undefined, courseSlug: string): boolean {
+  if (!course) return true // unknown slug (tests use fakes): keep the historical word
+  return course.holes.some((spec) => {
+    const real = OSM_GEOMETRY[`${courseSlug}:${spec.number}`]
+    return real ? real.zones.some((z) => z.kind === 'trees') : spec.hazard !== 'ocean'
+  })
+}
+
+/**
+ * What to call a bad lie on ground this hole has no polygon for — the `trees`
+ * bucket's junk floor (see `CourseSpec.junkLabel`). Copy only; `buildLayout`
+ * resolves it once so no caller has to look a course up.
+ *
+ * `deeprough` deliberately does NOT earn the word "trees": gorse, scrub and hay
+ * are the whole reason this exists, and calling them trees is the bug, not the
+ * fix. So the course's own word outranks the fiction — Portrush's `roughLabel`
+ * now reaches its deep-rough holes, which it didn't when any vegetation zone
+ * short-circuited to "trees".
+ */
+function resolveJunkLabel(zones: HazardZone[], course: CourseSpec | undefined, courseSlug: string): string {
+  if (zones.some((z) => z.kind === 'trees')) return 'trees' // the map is drawing trees here
+  const named = course?.junkLabel ?? course?.roughLabel
+  if (named) return named
+  if (zones.some((z) => z.kind === 'deeprough')) return 'deep rough'
+  // a course with no trees at all must have named its junk — rough.test.ts
+  return courseHasTrees(course, courseSlug) ? 'trees' : 'junk'
+}
 
 /**
  * Generate the geometric layout for a hole. Deterministic per course+hole.
@@ -39,6 +75,7 @@ export function buildLayout(courseSlug: string, spec: HoleSpec, cond?: Condition
       gust,
       rough,
       roughLabel,
+      junkLabel: resolveJunkLabel(real.zones, course, courseSlug),
     }
   }
 
@@ -73,7 +110,7 @@ export function buildLayout(courseSlug: string, spec: HoleSpec, cond?: Condition
       add({ kind: 'bunker', from: L - 16, to: L - 2, side: 'right' })
       if (rng() < 0.5) add({ kind: 'bunker', from: L - 34, to: L - 20, side: 'cross' })
     }
-    return { spec, length: L, zones, fairwayFrom: 0, fairwayTo: 0, greenDepth, pin, gust, rough, roughLabel }
+    return { spec, length: L, zones, fairwayFrom: 0, fairwayTo: 0, greenDepth, pin, gust, rough, roughLabel, junkLabel: resolveJunkLabel(zones, course, courseSlug) }
   }
 
   // --- par 4 / par 5 ---
@@ -124,7 +161,7 @@ export function buildLayout(courseSlug: string, spec: HoleSpec, cond?: Condition
     add({ kind: 'deeprough', from: fairwayFrom, to: fairwayTo - 40, side: offSide })
   }
 
-  return { spec, length: L, zones, fairwayFrom, fairwayTo, greenDepth, rough, roughLabel }
+  return { spec, length: L, zones, fairwayFrom, fairwayTo, greenDepth, rough, roughLabel, junkLabel: resolveJunkLabel(zones, course, courseSlug) }
 }
 
 /**

@@ -201,6 +201,55 @@ describe('importing onto a device that has already been played on', () => {
     expect(target.getItem('dogleg:round:v1')).toBeNull()
   })
 
+  it('drops a daily salted for the identity being replaced — it could never be posted', async () => {
+    // Visit the new domain, get a nameless minted id, start today's daily
+    // (dice salted for THAT id), then follow the old bookmark. The referee
+    // derives the expected salt from whoever submits, so playing this round
+    // out as the arriving player ends in "seed is not yours" after 18 holes.
+    const target = seeded({
+      'dogleg:player:v1': ANON,
+      'dogleg:round:v1': { seed: 'round:2026-07-29:pebble-beach:k3n9xq2mb1z7', mode: 'daily', complete: false },
+    })
+    expect(await importHandoff(await packHandoff(seeded(OLD_DEVICE)), target)).toBe('imported')
+    expect(target.getItem('dogleg:round:v1')).toBeNull()
+    expect(JSON.parse(target.getItem('dogleg:player:v1')!)).toEqual(NAMED)
+  })
+
+  it('keeps an UNSALTED daily — the referee accepts those from anyone, so it is still postable', async () => {
+    const unsalted = JSON.stringify({ seed: 'round:2026-07-29:pebble-beach', mode: 'daily', complete: false })
+    const target = seeded({ 'dogleg:player:v1': ANON })
+    target.setItem('dogleg:round:v1', unsalted)
+    await importHandoff(await packHandoff(seeded(OLD_DEVICE)), target)
+    expect(target.getItem('dogleg:round:v1')).toBe(unsalted)
+  })
+
+  it('keeps a practice round, which carries no player salt at all', async () => {
+    const practice = JSON.stringify({ seed: 'practice2:pebble-beach:abc', mode: 'practice', complete: false })
+    const target = seeded({ 'dogleg:player:v1': ANON })
+    target.setItem('dogleg:round:v1', practice)
+    await importHandoff(await packHandoff(seeded(OLD_DEVICE)), target)
+    expect(target.getItem('dogleg:round:v1')).toBe(practice)
+  })
+
+  it('keeps a salted daily when the identity is not actually changing hands', async () => {
+    // same player arriving back through a second old bookmark — their own
+    // round is still theirs, and dropping it would cost them the round
+    const mine = JSON.stringify({ seed: 'round:2026-07-29:pebble-beach:k3n9xq2mb1z7', mode: 'daily', complete: false })
+    const target = seeded({ 'dogleg:player:v1': NAMED })
+    target.setItem('dogleg:round:v1', mine)
+    await importHandoff(await packHandoff(seeded(OLD_DEVICE)), target)
+    expect(target.getItem('dogleg:round:v1')).toBe(mine)
+  })
+
+  it('drops a salted daily whose seed also carries a fortune tail', async () => {
+    const target = seeded({
+      'dogleg:player:v1': ANON,
+      'dogleg:round:v1': { seed: 'round:2026-07-29:pebble-beach:k3n9xq2mb1z7:f12.0.3.0.5', mode: 'daily' },
+    })
+    await importHandoff(await packHandoff(seeded(OLD_DEVICE)), target)
+    expect(target.getItem('dogleg:round:v1')).toBeNull()
+  })
+
   it('unions the posted-daily set so the fortune streak/drought math (store.ts) stays in sync with history', async () => {
     // local already posted 07-26; the incoming device posted the two days in
     // OLD_DEVICE's history. If posted:v1 were left on "local wins" (the
@@ -267,15 +316,47 @@ describe('importing onto a device that has already been played on', () => {
     expect(target.getItem('dogleg:lifetime:v1')).toBe('7')
   })
 
-  it('takes the higher of each fortune counter and the higher lifetime count', async () => {
+  it('merges each fortune track as a pair, and takes the higher lifetime count', async () => {
+    // OLD_DEVICE carries { ace: 3, aceK: 1, alb: 0, albK: 0 }.
+    // ace track: local has had MORE aces (5 vs 1), so local's drought stands.
+    // alb track: event counts tie (0 vs 0), so the longer drought wins.
     const target = seeded({
       'dogleg:player:v1': ANON,
       'dogleg:fortune:v1': { p: { ace: 1, aceK: 5, alb: 2, albK: 0 } },
       'dogleg:lifetime:v1': '7',
     })
     await importHandoff(await packHandoff(seeded(OLD_DEVICE)), target)
-    expect(JSON.parse(target.getItem('dogleg:fortune:v1')!).p).toEqual({ ace: 3, aceK: 5, alb: 2, albK: 0 })
+    expect(JSON.parse(target.getItem('dogleg:fortune:v1')!).p).toEqual({ ace: 1, aceK: 5, alb: 2, albK: 0 })
     expect(target.getItem('dogleg:lifetime:v1')).toBe('42')
+  })
+
+  it('never hands back a drought the player already cashed (tracks move as pairs, not per-field maxima)', async () => {
+    // The regression this rule exists for: an ace earned HERE resets the
+    // drought to 0 and ticks aceK to 1. A stale old bookmark still carrying
+    // the pre-ace state {ace: 500, aceK: 0} must not resurrect that drought —
+    // a per-field maximum would produce {ace: 500, aceK: 1}, a state neither
+    // device was ever in, firing the next destiny hundreds of rounds early.
+    const target = seeded({
+      'dogleg:player:v1': ANON,
+      'dogleg:fortune:v1': { p: { ace: 0, aceK: 1, alb: 0, albK: 0 } },
+    })
+    await importHandoff(
+      await packHandoff(seeded({ ...OLD_DEVICE, 'dogleg:fortune:v1': { p: { ace: 500, aceK: 0, alb: 0, albK: 0 } } })),
+      target,
+    )
+    expect(JSON.parse(target.getItem('dogleg:fortune:v1')!).p).toEqual({ ace: 0, aceK: 1, alb: 0, albK: 0 })
+  })
+
+  it('takes the arriving track when IT is the one that has seen more moments', async () => {
+    const target = seeded({
+      'dogleg:player:v1': ANON,
+      'dogleg:fortune:v1': { p: { ace: 400, aceK: 0, alb: 0, albK: 0 } },
+    })
+    await importHandoff(
+      await packHandoff(seeded({ ...OLD_DEVICE, 'dogleg:fortune:v1': { p: { ace: 2, aceK: 3, alb: 0, albK: 0 } } })),
+      target,
+    )
+    expect(JSON.parse(target.getItem('dogleg:fortune:v1')!).p).toEqual({ ace: 2, aceK: 3, alb: 0, albK: 0 })
   })
 
   it('never overwrites an in-progress round', async () => {
@@ -386,16 +467,63 @@ describe('the boot path', () => {
     expect(window.location.hash).toBe('')
   })
 
+  it('muzzles an import that finishes AFTER the boot timeout gave up on it', async () => {
+    // Promise.race stops the waiting, not the work. A decompression that
+    // finally lands at 6s must not write behind the mounted app's back, where
+    // it would race ensureIdentity's freshly minted id and leave the running
+    // app holding state for an identity it never rendered.
+    // REAL streams, not hand-rolled fakes: through() drains via
+    // `new Response(ts.readable)`, which only accepts a genuine ReadableStream
+    let release!: (v: Uint8Array) => void
+    class StallingStream {
+      writable = new WritableStream()
+      readable = new ReadableStream({
+        start(c) {
+          release = (v: Uint8Array) => {
+            c.enqueue(v)
+            c.close()
+          }
+        },
+      })
+    }
+    const realDS = globalThis.DecompressionStream
+    // a genuine payload, built with the real compressor before it is stubbed
+    const payload = await packHandoff(seeded(OLD_DEVICE))
+    // the stand-in IS the decompressor, so whatever it emits is taken as the
+    // decompressed bytes — no need to actually gzip them
+    const decompressed = new TextEncoder().encode(
+      JSON.stringify({ v: 1, keys: { 'dogleg:player:v1': JSON.stringify(NAMED) } }),
+    )
+    globalThis.DecompressionStream = StallingStream as unknown as typeof DecompressionStream
+    vi.useFakeTimers()
+    try {
+      window.location.hash = `#handoff=${payload}`
+      const result = runHandoff()
+      await vi.advanceTimersByTimeAsync(5000)
+      expect(await result).toBe('invalid')
+      expect(localStorage.getItem('dogleg:player:v1')).toBeNull()
+
+      // NOW let the abandoned import complete — it must write nothing
+      release(decompressed)
+      await vi.advanceTimersByTimeAsync(1000)
+      await Promise.resolve()
+      expect(localStorage.getItem('dogleg:player:v1')).toBeNull()
+    } finally {
+      vi.useRealTimers()
+      globalThis.DecompressionStream = realDS
+    }
+  })
+
   it('never hangs boot forever if the unpack stream stalls instead of settling', async () => {
-    // simulate an anomalous DecompressionStream that never produces a chunk
-    // and never closes — through()'s reader.read() would await this forever
+    // An anomalous DecompressionStream that never produces a chunk and never
+    // closes, so through()'s drain would await it forever. A real
+    // ReadableStream, for the same reason as the test above.
     class HangingStream {
-      writable = { getWriter: () => ({ write: () => Promise.resolve(), close: () => Promise.resolve() }) }
-      readable = { getReader: () => ({ read: () => new Promise<never>(() => {}) }) }
+      writable = new WritableStream()
+      readable = new ReadableStream({ start() {} })
     }
     const real = globalThis.DecompressionStream
-    // @ts-expect-error — stubbing with a minimal stand-in for the test
-    globalThis.DecompressionStream = HangingStream
+    globalThis.DecompressionStream = HangingStream as unknown as typeof DecompressionStream
     vi.useFakeTimers()
     try {
       const payload = await packHandoff(seeded(OLD_DEVICE)) // built with the REAL CompressionStream, still valid gzip

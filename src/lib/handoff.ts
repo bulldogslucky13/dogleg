@@ -317,11 +317,25 @@ function safeCount(raw: string): number {
   return Number.isFinite(n) && n >= 0 ? Math.floor(n) : 0
 }
 
-/** Counters toward the destiny guarantee. Highest wins per counter: a player
- *  carrying progress across should never be set back by an empty device, and
- *  can't gain by bouncing through the handoff twice either. If ONE side
- *  failed to parse (a corrupted local write, say), the valid side always
- *  wins outright rather than the corruption perpetuating itself forever. */
+/**
+ * Counters toward the destiny guarantee (practice tracks only — the daily
+ * ones derive from posted dailies, see store.ts).
+ *
+ * MERGE BY TRACK, NOT BY FIELD. A track is a PAIR: `ace` is rounds since the
+ * last ace, `aceK` is how many aces you have had (fortune.ts). They move in
+ * opposite directions — the drought resets to 0 at the moment the event count
+ * ticks up — so `ace` is not monotonic and a per-field maximum invents a state
+ * neither device was ever in. Take a player who aces on the new origin
+ * (`{ace: 0, aceK: 1}`) and later opens a stale old bookmark carrying
+ * `{ace: 500, aceK: 0}`: per-field max yields `{ace: 500, aceK: 1}`, handing
+ * back a 500-round drought they had just cashed and firing the next destiny
+ * hundreds of rounds early.
+ *
+ * So each track takes the state with the HIGHER event count — that device
+ * knows about a moment the other doesn't — and only breaks a tie on the
+ * longer drought, which is the "more rounds played" side. A device with no
+ * counters at all can still never set a carried-across player back.
+ */
 function mergeFortuneJson(local: string, incoming: string): string {
   const parse = (raw: string): Record<string, number> | null => {
     try {
@@ -335,11 +349,39 @@ function mergeFortuneJson(local: string, incoming: string): string {
   const b = parse(incoming)
   if (!a) return b ? JSON.stringify({ p: b }) : local
   if (!b) return local
+
+  const num = (v: unknown): number => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? v : 0)
   const p: Record<string, number> = { ...a }
-  for (const [k, v] of Object.entries(b)) {
-    if (typeof v === 'number' && Number.isFinite(v) && (typeof p[k] !== 'number' || v > p[k])) p[k] = v
+  // 'ace' pairs with 'aceK', 'alb' with 'albK'
+  for (const [drought, count] of [
+    ['ace', 'aceK'],
+    ['alb', 'albK'],
+  ]) {
+    const mineK = num(a[count])
+    const theirsK = num(b[count])
+    const winner = theirsK > mineK ? b : mineK > theirsK ? a : num(b[drought]) > num(a[drought]) ? b : a
+    p[drought] = num(winner[drought])
+    p[count] = Math.max(mineK, theirsK)
   }
   return JSON.stringify({ p })
+}
+
+/** A daily seed carries the per-player dice salt as a fourth colon segment
+ *  (`round:<date>:<slug>:<salt>`, see setupFromSeed in replay.ts), with the
+ *  fortune tail — `:f…` — riding on the end. Parsed by hand rather than
+ *  imported: this module stays dependency-free (see the note at the top). */
+function isSaltedDaily(roundJson: string): boolean {
+  try {
+    const seed = (JSON.parse(roundJson) as { seed?: unknown }).seed
+    if (typeof seed !== 'string') return false
+    const base = seed.replace(/:f\d{1,6}\.\d{1,3}\.\d{1,6}\.\d{1,3}\.\d{1,4}$/, '')
+    const parts = base.split(':')
+    // ['round', dateKey, slug, salt] — a slug may contain hyphens but never a
+    // colon, so a fourth segment is unambiguously the salt
+    return parts[0] === 'round' && parts.length === 4
+  } catch {
+    return false
+  }
 }
 
 function mergeInto(store: Storage, key: string, incoming: string): void {
@@ -407,6 +449,19 @@ export async function importHandoff(payload: string, store: Storage): Promise<Im
     if (key === PLAYER_KEY || key === ROUND_KEY || !key.startsWith(KEY_PREFIX) || typeof value !== 'string') continue
     mergeInto(store, key, value)
   }
+  if (incoming && incoming.id !== local?.id) {
+    // The identity is genuinely changing hands. A daily already in progress
+    // here was dealt from dice salted for the id being replaced, and the
+    // referee derives the expected salt from whoever submits
+    // (submit-round/index.ts) — so playing it out under the arriving identity
+    // ends in "round rejected: seed is not yours" after eighteen holes. That
+    // is the one case where keeping the round is worse than dropping it:
+    // dropped, today's daily simply starts again as the arriving player.
+    // Unsalted rounds (the offline path, where no id had been minted) stay —
+    // the referee accepts those from anyone, so they are still postable.
+    const live = store.getItem(ROUND_KEY)
+    if (live !== null && isSaltedDaily(live)) store.removeItem(ROUND_KEY)
+  }
   if (incoming) store.setItem(PLAYER_KEY, JSON.stringify(incoming))
   return 'imported'
 }
@@ -446,6 +501,35 @@ function afterDelay<T>(ms: number, value: T): Promise<T> {
 }
 
 /**
+ * A Storage view that stops writing once the boot timeout has given up on it.
+ *
+ * Promise.race only stops the WAITING; it cannot cancel the loser. Without
+ * this, an import that finally decompresses at six seconds would still write
+ * — but by then main.tsx has mounted the app and `ensureIdentity` may have
+ * minted its own id, so the two writers clobber each other and the running app
+ * holds state belonging to an identity it never rendered. Reads stay open:
+ * the merge functions need them, and they change nothing.
+ */
+function abortableStore(store: Storage, aborted: () => boolean): Storage {
+  return {
+    get length() {
+      return store.length
+    },
+    key: (i) => store.key(i),
+    getItem: (k) => store.getItem(k),
+    setItem: (k, v) => {
+      if (!aborted()) store.setItem(k, v)
+    },
+    removeItem: (k) => {
+      if (!aborted()) store.removeItem(k)
+    },
+    clear: () => {
+      if (!aborted()) store.clear()
+    },
+  } as Storage
+}
+
+/**
  * Called once at boot, before React mounts, so the app never renders a frame
  * as the wrong player and `ensureIdentity` never mints a competing id.
  * Returns null when there was no handoff to do — the overwhelmingly common
@@ -454,13 +538,22 @@ function afterDelay<T>(ms: number, value: T): Promise<T> {
  * Bounded to 5s no matter what: the stream plumbing in `through()` rejects
  * cleanly on a malformed payload (caught below), but a boot path has no
  * business being able to hang forever on an anomalous browser condition —
- * mount() (main.tsx) has to fire eventually either way.
+ * mount() (main.tsx) has to fire eventually either way. Once that bound is
+ * hit the import is not merely abandoned but muzzled, so a late finisher
+ * cannot write behind the mounted app's back.
  */
 export async function runHandoff(): Promise<ImportOutcome | null> {
   const payload = takeHandoffFromUrl()
   if (!payload) return null
+  let timedOut = false
   try {
-    return await Promise.race([importHandoff(payload, localStorage), afterDelay<ImportOutcome>(5000, 'invalid')])
+    return await Promise.race([
+      importHandoff(payload, abortableStore(localStorage, () => timedOut)),
+      afterDelay<ImportOutcome>(5000, 'invalid').then((v) => {
+        timedOut = true
+        return v
+      }),
+    ])
   } catch {
     return 'invalid'
   }

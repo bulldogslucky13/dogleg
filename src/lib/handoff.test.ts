@@ -280,6 +280,85 @@ describe('importing onto a device that has already been played on', () => {
     expect(log.rounds.map((r) => r.seed)).toEqual(['seed-local', 'seed-old'])
   })
 
+  it('carries a pre-migration player whose history is still under the legacy bp: key', async () => {
+    // Their last visit predates migrateLegacyStorage, and the old domain now
+    // serves the handoff page instead of the app — so that migration will
+    // never run for them again. A dogleg:-only sweep would hand over nothing
+    // and strand their entire history on a dead origin.
+    const target = new MemoryStorage()
+    const old = seeded({ 'dogleg:player:v1': NAMED })
+    old.setItem('bp:history:v1', JSON.stringify([{ dateKey: '2026-07-19', toPar: 4 }]))
+    expect(await importHandoff(await packHandoff(old), target)).toBe('imported')
+    const history = JSON.parse(target.getItem('dogleg:history:v1')!) as { dateKey: string }[]
+    expect(history.map((e) => e.dateKey)).toEqual(['2026-07-19'])
+    // renamed on arrival — the legacy key itself never lands here
+    expect(target.getItem('bp:history:v1')).toBeNull()
+  })
+
+  it('unions legacy and modern history when an old bundle wrote both', async () => {
+    const target = seeded({ 'dogleg:player:v1': ANON })
+    const old = seeded({ 'dogleg:player:v1': NAMED, 'dogleg:history:v1': [{ dateKey: '2026-07-21', toPar: 1 }] })
+    old.setItem('bp:history:v1', JSON.stringify([{ dateKey: '2026-07-19', toPar: 4 }]))
+    await importHandoff(await packHandoff(old), target)
+    const history = JSON.parse(target.getItem('dogleg:history:v1')!) as { dateKey: string }[]
+    expect(history.map((e) => e.dateKey)).toEqual(['2026-07-19', '2026-07-21'])
+  })
+
+  it('does not adopt a legacy in-progress round, same as the modern round key', async () => {
+    const target = new MemoryStorage()
+    const old = seeded({ 'dogleg:player:v1': NAMED })
+    old.setItem('bp:round:v1', JSON.stringify({ seed: 'round:2026-07-19:pebble-beach', mode: 'daily' }))
+    await importHandoff(await packHandoff(old), target)
+    expect(target.getItem('dogleg:round:v1')).toBeNull()
+    expect(target.getItem('bp:round:v1')).toBeNull()
+  })
+
+  it('keeps held and stolen mutually exclusive per course, as records.ts does', async () => {
+    // local lost the record here; the stale bookmark still thinks it is held.
+    // Left unresolved, pendingSteals() would announce the theft while the
+    // Locker listed the same course as ours.
+    const target = seeded({
+      'dogleg:player:v1': ANON,
+      'dogleg:records:v1': { v: 1, held: {}, stolen: { 'pebble-beach': { by: 'Sandy Lyle', theirToPar: -6 } } },
+    })
+    await importHandoff(
+      await packHandoff(
+        seeded({ ...OLD_DEVICE, 'dogleg:records:v1': { v: 1, held: { 'pebble-beach': { toPar: -5, since: 1 } }, stolen: {} } }),
+      ),
+      target,
+    )
+    const ledger = JSON.parse(target.getItem('dogleg:records:v1')!) as {
+      held: Record<string, unknown>
+      stolen: Record<string, unknown>
+    }
+    expect('pebble-beach' in ledger.stolen).toBe(true) // local's view wins
+    expect('pebble-beach' in ledger.held).toBe(false)
+  })
+
+  it('keeps the hold when this device knew the course under neither state', async () => {
+    // an inconsistent incoming ledger must not invent a theft notice
+    const target = seeded({ 'dogleg:player:v1': ANON, 'dogleg:records:v1': { v: 1, held: {}, stolen: {} } })
+    await importHandoff(
+      await packHandoff(
+        seeded({
+          ...OLD_DEVICE,
+          'dogleg:records:v1': {
+            v: 1,
+            held: { augusta: { toPar: -3, since: 1 } },
+            stolen: { augusta: { by: 'Nobody', theirToPar: -4 } },
+          },
+        }),
+      ),
+      target,
+    )
+    const ledger = JSON.parse(target.getItem('dogleg:records:v1')!) as {
+      held: Record<string, unknown>
+      stolen: Record<string, unknown>
+    }
+    expect('augusta' in ledger.held).toBe(true)
+    expect('augusta' in ledger.stolen).toBe(false)
+  })
+
   it('unions the record ledger, local winning a same-course conflict', async () => {
     const target = seeded({
       'dogleg:player:v1': ANON,
@@ -408,6 +487,21 @@ describe("the old domain's packing half (handoff/index.html)", () => {
 
   it('sends a never-played visitor straight on, with no empty payload', async () => {
     expect(await runPage(new MemoryStorage())).toBe('https://playdogleg.com/')
+  })
+
+  it('sweeps the legacy bp: keys too — the app that used to migrate them no longer runs here', async () => {
+    // a player who has ONLY pre-migration keys must still be carried, not
+    // treated as someone who never played
+    const old = new MemoryStorage()
+    old.setItem('bp:history:v1', JSON.stringify([{ dateKey: '2026-07-19', toPar: 4 }]))
+    const url = await runPage(old)
+    expect(url.startsWith('https://playdogleg.com/#handoff=')).toBe(true)
+    const unpacked = await unpackHandoff(url.split('#handoff=')[1])
+    expect(Object.keys(unpacked!.keys)).toContain('bp:history:v1')
+
+    const target = new MemoryStorage()
+    await importHandoff(url.split('#handoff=')[1], target)
+    expect(JSON.parse(target.getItem('dogleg:history:v1')!)).toHaveLength(1)
   })
 
   it('points at the domain this app is actually served from', () => {

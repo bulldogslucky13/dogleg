@@ -77,6 +77,12 @@
       ;(function () {
         var NEW_SITE = 'https://playdogleg.com/'
         var PREFIX = 'dogleg:'
+        // The Break Par-era prefix. The app migrates these keys on read, but
+        // THIS PAGE now serves in the app's place, so that migration will never
+        // run here again — a player whose last visit predates it holds their
+        // whole history under bp:history:v1 and would otherwise hand over
+        // nothing. Collected as-is; src/lib/handoff.ts renames them on arrival.
+        var LEGACY_PREFIX = 'bp:'
         var status = document.getElementById('status')
         var go = document.getElementById('go')
 
@@ -130,7 +136,7 @@
           try {
             for (var i = 0; i < localStorage.length; i++) {
               var k = localStorage.key(i)
-              if (!k || k.indexOf(PREFIX) !== 0) continue
+              if (!k || (k.indexOf(PREFIX) !== 0 && k.indexOf(LEGACY_PREFIX) !== 0)) continue
               var v = localStorage.getItem(k)
               if (v !== null) keys[k] = v
             }

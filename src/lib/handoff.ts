@@ -52,6 +52,25 @@ const FORTUNE_KEY = 'dogleg:fortune:v1'
  *  resume a round for a day the merged history already shows as posted. */
 const ROUND_KEY = 'dogleg:round:v1'
 
+/**
+ * The Break Par-era prefix, and the two keys the app still migrates off it
+ * (`migrateLegacyStorage`, store.ts).
+ *
+ * That migration runs inside the APP, on read. Once the old domain serves the
+ * handoff page instead of the app, it never runs there again — so a player
+ * whose last visit predates it still holds their entire history under
+ * `bp:history:v1`, a `dogleg:`-only sweep collects nothing from them, and they
+ * arrive as a total stranger with the original stranded on an origin that no
+ * longer serves the game. Swept here and renamed on arrival instead, where the
+ * ordinary merge rules then apply — `bp:history:v1` unions by day exactly like
+ * its modern twin, and the round key is dropped like any other.
+ */
+const LEGACY_PREFIX = 'bp:'
+const LEGACY_RENAMES: Record<string, string> = {
+  'bp:history:v1': HISTORY_KEY,
+  'bp:round:v1': ROUND_KEY,
+}
+
 /** Codec markers. Both halves are hand-written on opposite sides of a domain
  *  move and can never share a bundle, so the wire format is explicit. */
 const GZIP = 'z.'
@@ -122,7 +141,7 @@ export async function packHandoff(store: Storage): Promise<string> {
   try {
     for (let i = 0; i < store.length; i++) {
       const k = store.key(i)
-      if (!k || !k.startsWith(KEY_PREFIX)) continue
+      if (!k || !(k.startsWith(KEY_PREFIX) || k.startsWith(LEGACY_PREFIX))) continue
       const v = store.getItem(k)
       if (v !== null) keys[k] = v
     }
@@ -263,31 +282,49 @@ function mergeRoundLogJson(local: string, incoming: string): string {
   return JSON.stringify({ v: 1, rounds })
 }
 
-/** The course-record ledger (`dogleg:records:v1`) is a courtesy cache the app
- *  reconciles against server truth on open (records.ts) — losing an entry
- *  costs a missed "your record fell" notification, not data corruption, so a
- *  plain shallow union (local wins per-slug conflicts, same convention as
- *  everywhere else in this file) is enough. */
+/**
+ * The course-record ledger (`dogleg:records:v1`) — a courtesy cache the app
+ *  reconciles against server truth on open (records.ts), so losing an entry
+ *  costs a missed "your record fell" notification rather than real data. A
+ *  shallow union per map, local winning a same-slug conflict, is enough.
+ *
+ *  EXCEPT that `held` and `stolen` are MUTUALLY EXCLUSIVE per course, and
+ *  records.ts keeps them that way at every transition — winning a record
+ *  deletes the steal, being stolen from deletes the hold, reclaiming deletes
+ *  the steal again. Unioning the two maps independently is what breaks that:
+ *  a device that lost the record while the stale bookmark still called it held
+ *  ends up with the slug in both, and then `pendingSteals()` announces the
+ *  theft while the Locker goes on listing it as a record we hold. A server
+ *  sync would eventually settle it — but not offline, and not before the
+ *  player sees the contradiction. So the exclusion is restored here, with the
+ *  device's own state deciding, since it is the one that has been playing.
+ */
 function mergeRecordsJson(local: string, incoming: string): string {
-  let mine: { held?: Record<string, unknown>; stolen?: Record<string, unknown> } | null
-  let theirs: { held?: Record<string, unknown>; stolen?: Record<string, unknown> } | null
+  type Ledger = { held?: Record<string, unknown>; stolen?: Record<string, unknown> }
+  let mine: Ledger | null
+  let theirs: Ledger | null
   try {
-    mine = JSON.parse(local) as typeof mine
+    mine = JSON.parse(local) as Ledger
   } catch {
     mine = null
   }
   try {
-    theirs = JSON.parse(incoming) as typeof theirs
+    theirs = JSON.parse(incoming) as Ledger
   } catch {
     theirs = null
   }
   if (!theirs) return local
   if (!mine) return incoming
-  return JSON.stringify({
-    v: 1,
-    held: { ...(theirs.held ?? {}), ...(mine.held ?? {}) },
-    stolen: { ...(theirs.stolen ?? {}), ...(mine.stolen ?? {}) },
-  })
+  const held = { ...(theirs.held ?? {}), ...(mine.held ?? {}) }
+  const stolen = { ...(theirs.stolen ?? {}), ...(mine.stolen ?? {}) }
+  for (const slug of Object.keys(held)) {
+    if (!(slug in stolen)) continue
+    // local decides; if it knew the course under neither state, keep the hold
+    // rather than raise a theft notice this device never observed
+    if (mine.stolen && slug in mine.stolen && !(mine.held && slug in mine.held)) delete held[slug]
+    else delete stolen[slug]
+  }
+  return JSON.stringify({ v: 1, held, stolen })
 }
 
 /** Date keys this device has successfully posted — the OTHER half of the
@@ -445,8 +482,13 @@ export async function importHandoff(payload: string, store: Storage): Promise<Im
   const incoming = readIdentity(unpacked.keys[PLAYER_KEY] ?? null)
   const local = readIdentity(store.getItem(PLAYER_KEY))
   if (local?.name && local.id !== incoming?.id) return 'conflict'
-  for (const [key, value] of Object.entries(unpacked.keys)) {
-    if (key === PLAYER_KEY || key === ROUND_KEY || !key.startsWith(KEY_PREFIX) || typeof value !== 'string') continue
+  for (const [rawKey, value] of Object.entries(unpacked.keys)) {
+    if (typeof value !== 'string') continue
+    // a legacy key lands on its modern name and then merges normally; if the
+    // payload carries BOTH (an old-bundle tab kept writing bp: after the app
+    // migrated), each is merged in turn and the union is the same either way
+    const key = LEGACY_RENAMES[rawKey] ?? rawKey
+    if (key === PLAYER_KEY || key === ROUND_KEY || !key.startsWith(KEY_PREFIX)) continue
     mergeInto(store, key, value)
   }
   if (incoming && incoming.id !== local?.id) {

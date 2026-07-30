@@ -27,8 +27,18 @@ const steal = buildStealEmail({
   siteUrl: SITE_URL,
 })
 
+// the season variant: same chassis, different board — the "Record" row and
+// the horn-urgency copy are what distinguish it, so eyeball both side by side
+const seasonSteal = buildStealEmail({
+  courseName: 'Whistling Straits',
+  thiefName: "O'Brien <script>",
+  siteUrl: SITE_URL,
+  seasonLabel: 'Summer 2026',
+})
+
 const EMAILS = [
-  { name: 'Record stolen', subject: steal.subject, html: steal.html, text: steal.text },
+  { name: 'Record stolen (all-time)', subject: steal.subject, html: steal.html, text: steal.text },
+  { name: 'Record stolen (season)', subject: seasonSteal.subject, html: seasonSteal.html, text: seasonSteal.text },
   ...AUTH_EMAILS.map((e) => ({ name: e.file.replace('.html', ''), subject: e.subject, html: e.html, text: null })),
 ]
 

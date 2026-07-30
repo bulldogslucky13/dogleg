@@ -196,6 +196,27 @@ export const OSM_BEND: Record<string, number[]> = {
   'kings-creek:15': [0, 3, 6, 8, 11, 14, 16, 17, 17, 15, 11, 6, 0],
   'kings-creek:16': [0, 2, 5, 7, 10, 12, 14, 16, 16, 14, 11, 6, 0],
   'kings-creek:18': [0, -24, -48, -72, -96, -116, -131, -138, -129, -103, -74, -39, 0],
+  // Torrey Pines — South. Unusually, the tuple's dogleg flags were all RIGHT
+  // where it set one (2, 6 dogleg right; 13 left — signs per the note above,
+  // positive bows golfer-left = turns right). What the real centrelines add is
+  // the holes the "straight" flag missed: 1, 5 and 7 turn right (+21..+46) and
+  // 14 turns left (-31), all past the chip's 20-yd threshold. 10, 12, 15, 17
+  // and 18 bend too gently to chip but are persisted so the map still curves
+  // them — which is also what retires hole 12's and 17's overstated 'R' flags.
+  // Hole 4's flag said 'L' on a centreline that bends 4 yd; its tuple is now
+  // 'S', since with no entry here the stale flag would have been the chip.
+  'torrey-pines-south:1': [0, 4, 9, 13, 17, 20, 23, 23, 22, 19, 12, 6, 0],
+  'torrey-pines-south:2': [0, 4, 9, 13, 17, 21, 24, 25, 25, 22, 16, 8, 0],
+  'torrey-pines-south:5': [0, 3, 7, 10, 14, 17, 19, 21, 21, 19, 14, 7, 0],
+  'torrey-pines-south:6': [0, 13, 26, 40, 52, 61, 65, 64, 56, 45, 32, 17, 0],
+  'torrey-pines-south:7': [0, 8, 17, 25, 34, 40, 44, 46, 44, 38, 29, 16, 0],
+  'torrey-pines-south:10': [0, -2, -4, -7, -9, -11, -12, -12, -12, -10, -7, -3, 0],
+  'torrey-pines-south:12': [0, 3, 6, 9, 11, 14, 15, 16, 16, 14, 9, 5, 0],
+  'torrey-pines-south:13': [0, -9, -18, -27, -34, -38, -38, -36, -31, -23, -16, -8, 0],
+  'torrey-pines-south:14': [0, -4, -9, -13, -18, -22, -26, -29, -31, -30, -25, -14, 0],
+  'torrey-pines-south:15': [0, -1, -2, -3, -4, -5, -6, -7, -8, -8, -8, -6, 0],
+  'torrey-pines-south:17': [0, -2, -4, -6, -8, -9, -10, -10, -9, -7, -5, -3, 0],
+  'torrey-pines-south:18': [0, 3, 6, 9, 11, 13, 13, 12, 9, 5, 1, -1, 0],
 }
 
 export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
@@ -3824,6 +3845,307 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
       { id: 'z2', kind: 'water', from: 22, to: 116, side: 'right' },
       { id: 'z3', kind: 'water', from: 334, to: 364, side: 'right' },
       { id: 'z4', kind: 'bunker', from: 546, to: 560, side: 'left' },
+    ],
+  },
+
+  // ---- Torrey Pines — South (all 18) ------------------------------------
+  // Card = the BLACK tees (BlueGolf `torreypinessouth`): par 72, 7802 yd.
+  // OSM's own `par` AND `handicap` tags match that card on all 18, and
+  // ProVisualizer's independent satellite measurement lands within 3 yd of it
+  // on 16 of 18 holes — so the card is unusually well corroborated here.
+  // Zones are SHIFTED onto the card per hole (never scaled), except hole 6.
+  //
+  // Every centreline starts on a `golf=tee` polygon and ends on a `golf=green`
+  // (the TPC Potomac check, 18 of 18), so no hole runs to a neighbour's green.
+  //
+  // Five deviations from the raw import, each measured rather than eyeballed:
+  //
+  // 1. HOLE 10 imported 36 yd SHORT (419 arc vs 454 card) — OSM drew its
+  //    centreline from a forward pad. ProVisualizer measures 457, confirming
+  //    the card, so every zone is shifted +36 (royal-portrush-dunluce:14
+  //    rationale). Its greenside sand lands at 427-454 beside a 434-454 green.
+  //
+  // 2. HOLE 6 imported 22 yd LONG (591 arc vs 564 card, 562 by ProVisualizer)
+  //    and is the ONLY hole here where a shift would have been wrong. Its tee
+  //    and green endpoints are both correct; the excess is curvature in a
+  //    wandering polyline (bend max 65 yd, the biggest on the course). Proof:
+  //    each fairway bunker's straight-line distance from the tee matches its
+  //    ARC position to within 2 yd (312-333 vs 304-326, 379-398 vs 378-398),
+  //    so a blind -22 shift would have walked the driving-zone sand ~25 yd
+  //    back from where it measurably is. Zones are instead remapped through
+  //    arc -> straight-line-from-tee (1:1 to the dogleg at 300 yd, then
+  //    compressing) with a -5 correction to land the pin on the card.
+  //
+  // 3. HOLES 3 and 8 each imported ONE greenside bunker as TWO overlapping
+  //    zones — a `cross` slice inside a flanking slice (3: 180-186 inside
+  //    178-188; 8: 146-152 inside 152-164) — because a single polygon that
+  //    straddles the line rasterises to a different `side` at different
+  //    along-samples. Measured, each is one bunker fronting the green
+  //    (3: way/903058692, along 178-189, lateral -15..+7; 8: way/35974273,
+  //    along 143-164, lateral -16..+6), abutting a green that starts at 189
+  //    and 165. Modelled as one `cross` each: a front bunker on a par 3 is a
+  //    genuine carry, but it is ONE hazard, not two.
+  //
+  // 4. HOLE 18's pond imported as three slices (water left / cross / left)
+  //    from one `golf=water_hazard` way whose edge wobbles across the coarse
+  //    centreline — the phantom-cross half of the broken-lateral mode. The
+  //    polygon runs along 518-556 at lateral -22..+4, i.e. overwhelmingly
+  //    down ONE side, and straddles at only 6 of 19 samples: a lateral
+  //    hazard, not a forced carry. Merged into one continuous `water` left,
+  //    which is also what the hole's `signature` promises.
+  //
+  // 5. THE CANYONS (holes 3, 4, 6, 13, 17) are the course's defining hazard
+  //    and OSM has NOT ONE polygon for them — no `natural=scrub`, no
+  //    `natural=wood` anywhere inside or within 900 m of the boundary, so the
+  //    import came back sand-only and read the canyon side of five holes as
+  //    open ground. This is the Carnoustie-gorse gap (hand-author `deeprough`
+  //    where vegetation defines a hole; harbour-town:18's trees are the
+  //    precedent). Rather than draw them by eye, the rims were MEASURED: USGS
+  //    NED 10m elevation transects (the same source ProVisualizer quotes)
+  //    every 10 yd along each centreline, sampling +/-20..60 yd, taking the
+  //    nearest offset whose ground sits >= 6 m below the playing line. A zone
+  //    is authored ONLY where that rim falls inside the importer's own 50-yd
+  //    corridor, and it spans exactly the measured run — these ARE the runs:
+  //      h3  left  110-190          (rim 30-40; the canyon left of the green)
+  //      h4  left  10-480           (rim 30-50; the bluff, 8-16 m deep)
+  //      h6  right 5-255            (rim 30-50; matches the tee-view imagery)
+  //      h13 left  10-230           (rim 20-40; the closest rim on the course)
+  //      h17 left  10-120, 210-340  (rim 20-40 / 40-50)
+  //    Two merges, both because the rim wanders just past 50 yd for a stretch
+  //    of a feature the imagery shows unbroken, and a hole in a continuous
+  //    hazard rewards an aggressive line for the wrong reason (the
+  //    broken-lateral-hazard mode in scripts/README.md): h4 spans gaps at
+  //    120-140 and 350-410, h17 spans 240-270. h17's 120-210 gap is NOT
+  //    merged — 90 yd is too long to call one hazard, so that hole carries
+  //    two zones. Nothing is extrapolated past a measured endpoint.
+  //    Holes 2, 7, 8, 9, 14, 15 and 16 also fall away, but at 55-70 yd —
+  //    outside the corridor — so they were deliberately left alone, the same
+  //    call that cleared whistling-straits:9/18. Holes 1, 5, 10, 11, 12 and 18
+  //    have no drop at all within 70 yd. Hole 6 has a second, LEFT rim over
+  //    10-50 yd; it is tee-adjacent and unreachable, so it is not authored.
+  //
+  // Zone `side` was calibrated against the importer's own output on holes 6,
+  // 10 and 18 before any of this was written, and the canyon sides were then
+  // checked against the 3D planner's tee views (6 right, 13 left, 17 left).
+  // Data (c) OpenStreetMap contributors, ODbL. Terrain: USGS 3DEP/NED.
+  'torrey-pines-south:1': {
+    length: 451,
+    fairwayFrom: 161,
+    fairwayTo: 439,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 55, to: 75, side: 'left' },
+      { id: 'z2', kind: 'bunker', from: 281, to: 297, side: 'right' },
+      { id: 'z3', kind: 'bunker', from: 289, to: 321, side: 'left' },
+      { id: 'z4', kind: 'bunker', from: 321, to: 335, side: 'right' },
+      { id: 'z5', kind: 'bunker', from: 427, to: 449, side: 'right' },
+      { id: 'z6', kind: 'bunker', from: 433, to: 451, side: 'left' },
+    ],
+  },
+  'torrey-pines-south:2': {
+    length: 389,
+    fairwayFrom: 136,
+    fairwayTo: 377,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 261, to: 281, side: 'right' },
+      { id: 'z2', kind: 'bunker', from: 267, to: 313, side: 'left' },
+      { id: 'z3', kind: 'bunker', from: 359, to: 385, side: 'left' },
+      { id: 'z4', kind: 'bunker', from: 365, to: 387, side: 'right' },
+    ],
+  },
+  'torrey-pines-south:3': {
+    length: 201,
+    fairwayFrom: 71,
+    fairwayTo: 189,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'deeprough', from: 110, to: 190, side: 'left' },
+      { id: 'z2', kind: 'bunker', from: 179, to: 190, side: 'cross' },
+    ],
+  },
+  'torrey-pines-south:4': {
+    length: 490,
+    fairwayFrom: 173,
+    fairwayTo: 478,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'deeprough', from: 10, to: 480, side: 'left' },
+      { id: 'z2', kind: 'bunker', from: 276, to: 328, side: 'right' },
+      { id: 'z3', kind: 'bunker', from: 460, to: 470, side: 'left' },
+    ],
+  },
+  'torrey-pines-south:5': {
+    length: 454,
+    fairwayFrom: 160,
+    fairwayTo: 442,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 279, to: 315, side: 'right' },
+      { id: 'z2', kind: 'bunker', from: 279, to: 321, side: 'left' },
+      { id: 'z3', kind: 'bunker', from: 427, to: 445, side: 'left' },
+      { id: 'z4', kind: 'bunker', from: 433, to: 454, side: 'right' },
+    ],
+  },
+  'torrey-pines-south:6': {
+    length: 564,
+    fairwayFrom: 200,
+    fairwayTo: 552,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'deeprough', from: 5, to: 255, side: 'right' },
+      { id: 'z2', kind: 'bunker', from: 95, to: 121, side: 'left' },
+      { id: 'z3', kind: 'bunker', from: 169, to: 199, side: 'left' },
+      { id: 'z4', kind: 'bunker', from: 301, to: 350, side: 'left' },
+      { id: 'z5', kind: 'bunker', from: 363, to: 380, side: 'left' },
+      { id: 'z6', kind: 'bunker', from: 539, to: 552, side: 'left' },
+      { id: 'z7', kind: 'bunker', from: 542, to: 559, side: 'right' },
+    ],
+  },
+  'torrey-pines-south:7': {
+    length: 462,
+    fairwayFrom: 162,
+    fairwayTo: 450,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 54, to: 74, side: 'right' },
+      { id: 'z2', kind: 'bunker', from: 268, to: 298, side: 'left' },
+      { id: 'z3', kind: 'bunker', from: 310, to: 324, side: 'left' },
+      { id: 'z4', kind: 'bunker', from: 434, to: 462, side: 'right' },
+    ],
+  },
+  'torrey-pines-south:8': {
+    length: 177,
+    fairwayFrom: 63,
+    fairwayTo: 165,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 145, to: 166, side: 'cross' },
+    ],
+  },
+  'torrey-pines-south:9': {
+    length: 615,
+    fairwayFrom: 214,
+    fairwayTo: 603,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 298, to: 314, side: 'right' },
+      { id: 'z2', kind: 'bunker', from: 304, to: 322, side: 'left' },
+      { id: 'z3', kind: 'bunker', from: 328, to: 350, side: 'right' },
+      { id: 'z4', kind: 'bunker', from: 334, to: 344, side: 'left' },
+      { id: 'z5', kind: 'bunker', from: 492, to: 510, side: 'right' },
+      { id: 'z6', kind: 'bunker', from: 546, to: 556, side: 'right' },
+      { id: 'z7', kind: 'bunker', from: 576, to: 614, side: 'left' },
+      { id: 'z8', kind: 'bunker', from: 596, to: 615, side: 'right' },
+    ],
+  },
+  'torrey-pines-south:10': {
+    length: 454,
+    fairwayFrom: 182,
+    fairwayTo: 442,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 36, to: 72, side: 'right' },
+      { id: 'z2', kind: 'bunker', from: 278, to: 302, side: 'left' },
+      { id: 'z3', kind: 'bunker', from: 318, to: 334, side: 'right' },
+      { id: 'z4', kind: 'bunker', from: 428, to: 452, side: 'right' },
+      { id: 'z5', kind: 'bunker', from: 432, to: 454, side: 'left' },
+    ],
+  },
+  'torrey-pines-south:11': {
+    length: 225,
+    fairwayFrom: 81,
+    fairwayTo: 213,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 201, to: 211, side: 'left' },
+      { id: 'z2', kind: 'bunker', from: 207, to: 225, side: 'right' },
+      { id: 'z3', kind: 'bunker', from: 223, to: 225, side: 'left' },
+    ],
+  },
+  'torrey-pines-south:12': {
+    length: 505,
+    fairwayFrom: 179,
+    fairwayTo: 493,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 279, to: 311, side: 'right' },
+      { id: 'z2', kind: 'bunker', from: 305, to: 333, side: 'left' },
+      { id: 'z3', kind: 'bunker', from: 479, to: 499, side: 'left' },
+      { id: 'z4', kind: 'bunker', from: 491, to: 505, side: 'right' },
+    ],
+  },
+  'torrey-pines-south:13': {
+    length: 621,
+    fairwayFrom: 218,
+    fairwayTo: 609,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'deeprough', from: 10, to: 230, side: 'left' },
+      { id: 'z2', kind: 'bunker', from: 279, to: 293, side: 'left' },
+      { id: 'z3', kind: 'bunker', from: 303, to: 319, side: 'left' },
+      { id: 'z4', kind: 'bunker', from: 333, to: 399, side: 'right' },
+      { id: 'z5', kind: 'bunker', from: 579, to: 613, side: 'right' },
+      { id: 'z6', kind: 'bunker', from: 587, to: 609, side: 'left' },
+    ],
+  },
+  'torrey-pines-south:14': {
+    length: 437,
+    fairwayFrom: 155,
+    fairwayTo: 425,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 273, to: 305, side: 'left' },
+      { id: 'z2', kind: 'bunker', from: 403, to: 429, side: 'left' },
+      { id: 'z3', kind: 'bunker', from: 421, to: 437, side: 'right' },
+    ],
+  },
+  'torrey-pines-south:15': {
+    length: 517,
+    fairwayFrom: 182,
+    fairwayTo: 505,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 220, to: 242, side: 'right' },
+      { id: 'z2', kind: 'bunker', from: 498, to: 517, side: 'right' },
+    ],
+  },
+  'torrey-pines-south:16': {
+    length: 227,
+    fairwayFrom: 80,
+    fairwayTo: 215,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 197, to: 227, side: 'left' },
+      { id: 'z2', kind: 'bunker', from: 211, to: 227, side: 'right' },
+    ],
+  },
+  'torrey-pines-south:17': {
+    length: 443,
+    fairwayFrom: 159,
+    fairwayTo: 431,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'deeprough', from: 10, to: 120, side: 'left' },
+      { id: 'z2', kind: 'deeprough', from: 210, to: 340, side: 'left' },
+      { id: 'z3', kind: 'bunker', from: 266, to: 324, side: 'right' },
+      { id: 'z4', kind: 'bunker', from: 414, to: 432, side: 'right' },
+      { id: 'z5', kind: 'bunker', from: 424, to: 436, side: 'left' },
+    ],
+  },
+  'torrey-pines-south:18': {
+    length: 570,
+    fairwayFrom: 200,
+    fairwayTo: 558,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 114, to: 128, side: 'left' },
+      { id: 'z2', kind: 'bunker', from: 274, to: 318, side: 'left' },
+      { id: 'z3', kind: 'bunker', from: 314, to: 354, side: 'right' },
+      { id: 'z4', kind: 'bunker', from: 342, to: 358, side: 'left' },
+      { id: 'z5', kind: 'water', from: 518, to: 556, side: 'left' },
+      { id: 'z6', kind: 'bunker', from: 556, to: 570, side: 'left' },
+      { id: 'z7', kind: 'bunker', from: 560, to: 570, side: 'right' },
     ],
   },
 }

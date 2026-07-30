@@ -6,6 +6,7 @@ import {
   loadAchievements,
   markBackfillSeen,
   ONE_OFFS,
+  type Tier,
   type Unlock,
 } from '../state/achievements'
 import { prefersReducedMotion } from './motion'
@@ -121,14 +122,31 @@ export function AchievementsView() {
 
       {LADDERS.map((ladder) => {
         const value = progress.ladders[ladder.id] ?? 0
-        const done = ladder.tiers.filter((t) => value >= t.threshold)
-        const next = ladder.tiers.find((t) => value < t.threshold)
-        const top = done.length === ladder.tiers.length
+        /**
+         * A rank, once earned, is yours — so the ledger decides what you hold,
+         * and the live value only drives the bar toward the NEXT one.
+         *
+         * Most ladders only ever climb, but `recordsNow` counts records held
+         * *right now* and falls when someone takes one. Reading the rank off
+         * the live value alone demoted those players to Unranked and dangled
+         * Landlord as their next carrot — a tier already in the append-only
+         * earned map, which reconcile will therefore never grant again. The
+         * value is still shown honestly underneath ("1 / 10 records held right
+         * now"); it's the RANK that doesn't get taken back.
+         */
+        const earned = (t: Tier) => Boolean(ledger.earned[`${ladder.id}:${t.tier}`]) || value >= t.threshold
+        const done = ladder.tiers.filter(earned)
+        const next = ladder.tiers.find((t) => !earned(t))
+        const top = !next
         const current = done[done.length - 1]
         // progress toward the next tier measured from the previous one, so a
-        // fresh rung starts near empty instead of inheriting the old bar
+        // fresh rung starts near empty instead of inheriting the old bar. The
+        // floor can now sit ABOVE the value (a rank kept through a fall), so
+        // the bar clamps at both ends rather than going negative.
         const floor = current?.threshold ?? 0
-        const pct = next ? Math.min(100, ((value - floor) / (next.threshold - floor)) * 100) : 100
+        const pct = next
+          ? Math.max(0, Math.min(100, ((value - floor) / (next.threshold - floor)) * 100))
+          : 100
         return (
           <div key={ladder.id} className={`ach-ladder${top ? ' complete' : ''}`}>
             <div className="ach-ladder-head">
@@ -156,7 +174,7 @@ export function AchievementsView() {
             </div>
             <div className="ach-dots" aria-hidden>
               {ladder.tiers.map((t) => (
-                <i key={t.tier} className={value >= t.threshold ? 'on' : ''} title={`${t.name} · ${t.threshold.toLocaleString()}`} />
+                <i key={t.tier} className={earned(t) ? 'on' : ''} title={`${t.name} · ${t.threshold.toLocaleString()}`} />
               ))}
             </div>
           </div>

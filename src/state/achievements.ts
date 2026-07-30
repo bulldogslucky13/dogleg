@@ -596,6 +596,19 @@ export function reconcileAchievements(mode: 'quiet' | 'live', snapshot = compute
   return unlocks
 }
 
+/**
+ * Has this device earned anything at all? Both Clubhouse doors ask, because
+ * awards can exist where rounds don't: the record sync adopts records set on
+ * another device and grants Name on the Wall and the record ladders off them,
+ * while account history only ever carries DAILIES — so a player whose records
+ * were all set in practice play elsewhere arrives with a trophy shelf and an
+ * empty round log. A genuinely fresh device answers false: every tier and
+ * badge needs a round, a record or an established handicap behind it.
+ */
+export function hasEarnedAwards(ledger = loadAchievements()): boolean {
+  return Object.keys(ledger.earned).length > 0
+}
+
 /** The Clubhouse surfaces the backfill summary once; this marks it read. */
 export function markBackfillSeen(): void {
   const ledger = loadAchievements()

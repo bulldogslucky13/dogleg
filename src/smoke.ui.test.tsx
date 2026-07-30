@@ -452,6 +452,79 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
     expect(screen.queryByText(/▶ Replay/)).toBeNull()
   })
 
+  it('a record-only synced player reaches Awards with no rounds anywhere', () => {
+    // Narrower than the case above and it defeats it: account history carries
+    // DAILIES only, so a player whose course records were all set in practice
+    // play on another device syncs in with an adopted records ledger and no
+    // rounds at all — no archive, no history, no round log. The awards are
+    // real (Name on the Wall, the record ladders); the doors used to be shut.
+    localStorage.setItem(
+      'dogleg:records:v1',
+      JSON.stringify({
+        v: 1,
+        held: {
+          'pebble-beach': { toPar: -6, since: 1 },
+          'st-andrews-old': { toPar: -4, since: 2 },
+          'royal-portrush': { toPar: -3, since: 3 },
+        },
+        stolen: {},
+        reclaimed: {},
+      }),
+    )
+    expect(localStorage.getItem('dogleg:archive:v1')).toBeNull()
+    expect(localStorage.getItem('dogleg:history:v1')).toBeNull()
+
+    render(<App />)
+    // the app-start quiet pass grants off the records alone
+    fireEvent.click(screen.getByText(/Clubhouse/))
+    expect(screen.queryByText(/No rounds in the clubhouse/)).toBeNull()
+    fireEvent.click(screen.getByRole('tab', { name: 'Awards' }))
+    expect(screen.getByText('Name on the Wall')).toBeTruthy()
+    // three held records is Landlord, the first rung of The Wall
+    expect(screen.getByText('Landlord')).toBeTruthy()
+
+    // Recent says so plainly rather than claiming "Last 0 rounds"
+    fireEvent.click(screen.getByRole('tab', { name: 'Recent' }))
+    expect(screen.getByText(/No rounds on this device yet/)).toBeTruthy()
+    expect(screen.queryByText(/Last 0 rounds/)).toBeNull()
+  })
+
+  it('a rank survives the number behind it falling', () => {
+    // The Wall counts records held RIGHT NOW, the one ladder whose value can
+    // go down. Earn Landlord at three, lose two to thieves, and the rank has
+    // to stay — the earned ledger is append-only, so reconcile will never
+    // grant it again and showing "Unranked · next: Landlord" would dangle a
+    // carrot the player already owns and can never re-earn.
+    localStorage.setItem(
+      'dogleg:achievements:v1',
+      JSON.stringify({ v: 1, earned: { 'recordsNow:1': { at: 1 } }, counts: {}, backfill: { at: 1, granted: 1, seen: true } }),
+    )
+    localStorage.setItem(
+      'dogleg:records:v1',
+      JSON.stringify({ v: 1, held: { 'pebble-beach': { toPar: -6, since: 1 } }, stolen: {}, reclaimed: {} }),
+    )
+
+    render(<App />)
+    fireEvent.click(screen.getByText(/Clubhouse/))
+    fireEvent.click(screen.getByRole('tab', { name: 'Awards' }))
+
+    const wall = [...document.querySelectorAll('.ach-ladder')].find((el) =>
+      el.textContent?.includes('The Wall'),
+    )!
+    expect(wall).toBeTruthy()
+    // the rank stands…
+    expect(wall.querySelector('.ach-rank')!.textContent).toBe('Landlord')
+    expect(wall.querySelector('.ach-rank')!.className).not.toMatch(/none/)
+    // …the carrot moves on to the tier actually still unearned…
+    expect(wall.textContent).toMatch(/The Baron/)
+    expect(wall.textContent).not.toMatch(/next:\s*Landlord/)
+    // …and the live number is still reported honestly underneath
+    expect(wall.textContent).toMatch(/1 \/ 10 records held right now/)
+    // the bar can't run backwards past its floor
+    const width = (wall.querySelector('.ach-bar i') as HTMLElement).style.width
+    expect(Number.parseFloat(width)).toBeGreaterThanOrEqual(0)
+  })
+
   it('the Clubhouse scorecard opens on paper, outside the dark screen', async () => {
     const { newRound, applyChoice, advanceHole, archiveRound } = await import('./state/store')
     const { logRound } = await import('./state/stats')

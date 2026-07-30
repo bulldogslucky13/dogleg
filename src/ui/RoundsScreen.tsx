@@ -19,7 +19,7 @@ import {
 import { lifetimeRounds, loadArchive, type ArchivedRound, type HistoryEntry } from '../state/store'
 import { pastSeasons, roundsInSeason, seasonAwards, type SeasonAward } from '../state/seasonStore'
 import { loadLedger, syncLedger } from '../lib/records'
-import { reconcileAchievements } from '../state/achievements'
+import { hasEarnedAwards, reconcileAchievements } from '../state/achievements'
 import { AccountPanel } from './AccountPanel'
 import { AchievementsView } from './Achievements'
 import { RoundScorecard } from './RoundScorecard'
@@ -234,11 +234,15 @@ export function RoundsScreen(props: {
   // "Last 0 rounds". `row()` already offers Replay only where the archive still
   // has the decisions, so log-only rounds simply come without that button.
   const recent = [...log].sort((a, b) => b.playedAt - a.playedAt).slice(0, 10)
-  // …and the tabs themselves gate on the log for the same reason: they used to
-  // gate on the archive, which hid the Awards and Seasons tabs (neither of
-  // which reads the archive at all) behind an empty-state message on any device
-  // whose history arrived by sync.
+  // …and the tabs themselves gate on anything the clubhouse can show, for the
+  // same reason: they used to gate on the archive, which hid the Awards and
+  // Seasons tabs (neither of which reads the archive at all) behind an
+  // empty-state message on any device whose history arrived by sync. Earned
+  // awards count on their own — the record sync can grant them on a device
+  // holding no rounds at all, since only dailies sync and a player's records
+  // may all have been set in practice play elsewhere.
   const hasRounds = log.length > 0 || rounds.length > 0
+  const hasAnything = hasRounds || hasEarnedAwards()
 
   const scorecard = card && (
     <RoundScorecard
@@ -420,7 +424,7 @@ export function RoundsScreen(props: {
         <span className="fine">Handicap, score breakdown, best &amp; worst</span>
       </button>
 
-      {!hasRounds ? (
+      {!hasAnything ? (
         <p className="tagline center">No rounds in the clubhouse yet — go play one and it'll show up here.</p>
       ) : (
         <>
@@ -463,10 +467,21 @@ export function RoundsScreen(props: {
 
           {tab === 'recent' && (
             <section className="rounds-section">
-              <div className="kicker">
-                Last {recent.length} round{recent.length === 1 ? '' : 's'}
-              </div>
-              {recent.map((r) => row(r))}
+              {recent.length === 0 ? (
+                // reachable now that awards alone open the clubhouse: records
+                // synced from another device, no rounds on this one yet
+                <p className="fine">
+                  No rounds on this device yet — your awards and records came across with your account. Play one
+                  and it'll show up here.
+                </p>
+              ) : (
+                <>
+                  <div className="kicker">
+                    Last {recent.length} round{recent.length === 1 ? '' : 's'}
+                  </div>
+                  {recent.map((r) => row(r))}
+                </>
+              )}
             </section>
           )}
 

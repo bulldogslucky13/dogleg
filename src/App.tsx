@@ -38,7 +38,7 @@ import { CharacterAvatar } from './ui/Avatars'
 import { GreenView, HoleMap, useMapSize } from './ui/HoleMap'
 import { SideMap } from './ui/SideMap'
 import { CaddyThoughts, ChoiceCards, ClassicScorecard, HazardChips, HoleComplete, RoundCardSheet, StatusBanner, TierBanner } from './ui/panels'
-import { reconcileAchievements, type Unlock } from './state/achievements'
+import { hasEarnedAwards, reconcileAchievements, type Unlock } from './state/achievements'
 import { UnlockToasts } from './ui/Achievements'
 import { prefersReducedMotion } from './ui/motion'
 import type { MomentKind } from './engine/fortune'
@@ -141,6 +141,20 @@ export default function App() {
   /** the toast rail dismissed — the wrap card must OUTLIVE the toasts, so the
    * rail hides via this flag while `unlocks` persists until the wrap is left */
   const [toastsDone, setToastsDone] = useState(false)
+  /**
+   * Does the Clubhouse have awards to show? It gates the Clubhouse door
+   * alongside rounds, because a record sync can grant awards on a device
+   * holding no rounds at all (only dailies sync, so a player whose records
+   * were set in practice play elsewhere arrives with a trophy shelf and an
+   * empty log).
+   *
+   * It has to be STATE, not a read at render: the app-start backfill below
+   * runs in an effect, which lands after the first paint, and nothing else
+   * re-renders home. Read once up front for a returning device, refreshed
+   * after every reconcile.
+   */
+  const [awardsEarned, setAwardsEarned] = useState(hasEarnedAwards)
+  const refreshAwards = () => setAwardsEarned(hasEarnedAwards())
 
   useEffect(() => {
     saveRound(round)
@@ -155,6 +169,7 @@ export default function App() {
     // grant whatever the stored stats already earn, silently — the first run
     // records a summary the Clubhouse shows once; re-runs are no-ops
     reconcileAchievements('quiet')
+    refreshAwards()
     ensureIdentity()
     // a device that already holds a NAMED player is a returning known user —
     // attach their events to that stable id so cross-device stats line up.
@@ -357,6 +372,7 @@ export default function App() {
     // a moment, and it must not burst a toast rail over whatever screen the
     // sync happened to land on.
     reconcileAchievements('quiet')
+    refreshAwards()
     // a synced day supersedes this device's unfinished daily for the
     // same date — drop it so a refresh can't replay a completed day
     if (supersededDaily(round, h)) setRound(null)
@@ -375,6 +391,7 @@ export default function App() {
    */
   const handleRecordsChanged = () => {
     const more = reconcileAchievements('live')
+    refreshAwards()
     if (more.length) setUnlocks((u) => [...u, ...more])
   }
 
@@ -434,6 +451,8 @@ export default function App() {
               : null
           }
           playedToday={playedToday}
+          awardsEarned={awardsEarned}
+          onAwardsChanged={refreshAwards}
           onHistorySynced={handleHistorySynced}
           onTeeOff={() => {
             setPending({ mode: 'daily', setup: dailySetup() })

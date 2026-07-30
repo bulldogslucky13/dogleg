@@ -12,7 +12,7 @@ import { fetchCourseRecords, fetchSeasonRecords, loadPlayer, type CourseRecord }
 import { seasonCountdown, seasonForDate } from '../engine/season'
 import { FortuneInfo } from './Tutorial'
 import { ChangeLog } from './ChangeLog'
-import { reconcileAchievements, type Unlock } from '../state/achievements'
+import { hasEarnedAwards, reconcileAchievements, type Unlock } from '../state/achievements'
 import { Wordmark } from './Wordmark'
 import { dismissSteals, pendingSteals, syncLedger, type StolenRecord } from '../lib/records'
 import { loadGhost, type Ghost } from '../state/ghost'
@@ -35,6 +35,12 @@ export function HomeScreen(props: {
   onMyRounds: () => void
   /** deep-link into the locker's lifetime stats view */
   onStats: () => void
+  /** the Clubhouse holds earned awards — opens its door even with no rounds
+   * on this device. Owned by App because the app-start backfill that grants
+   * them lands after this screen's first render (see App.tsx). */
+  awardsEarned?: boolean
+  /** this screen's own record sync just reconciled — re-check the above */
+  onAwardsChanged?: () => void
   onHistorySynced?: (h: HistoryEntry[]) => void
 }) {
   const setup = dailySetup()
@@ -113,6 +119,7 @@ export function HomeScreen(props: {
       // ladders, Repo Man), and this fetch lands long after the app-start
       // reconcile. Quiet: nobody earned anything just now, we only found out.
       reconcileAchievements('quiet')
+      props.onAwardsChanged?.()
       setSteals(pendingSteals())
     })
   }, [])
@@ -350,12 +357,17 @@ export function HomeScreen(props: {
           <p className="fine">Practice rounds don't touch your streak.</p>
         </div>
       )}
-      {/* The door opens on any round we know about, not just replayable ones.
-          The archive holds rounds THIS device played; a device whose history
-          arrived by account sync has a full round log, stats and awards behind
-          an empty archive, and gating on the archive alone locked it out of its
-          own clubhouse. `history` is the synced half and is already in hand. */}
-      {(loadArchive().length > 0 || props.history.length > 0) && (
+      {/* The door opens on anything the clubhouse can show, not just replayable
+          rounds. The archive holds rounds THIS device played; a device whose
+          history arrived by account sync has a full round log, stats and awards
+          behind an empty archive, and gating on the archive alone locked it out
+          of its own clubhouse. `history` is the synced half and is already in
+          hand — but it only ever carries DAILIES, so a player whose records
+          were all set in practice play elsewhere syncs in with earned awards
+          and no rounds at all. Earned awards open the door too. (A genuinely
+          fresh device earns nothing: every tier and badge needs at least one
+          round, record or established handicap behind it.) */}
+      {(loadArchive().length > 0 || props.history.length > 0 || (props.awardsEarned ?? hasEarnedAwards())) && (
         <button className="cta ghost" onClick={props.onMyRounds}>
           🏆 Clubhouse
           <span className="cta-sub">My rounds</span>

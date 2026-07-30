@@ -411,6 +411,11 @@ export const COURSES: CourseSpec[] = [
     greens: 'Fast',
     wind: 16,
     blurb: 'Ross by the sea in Florida, a Donald Ross favorite ringed by ocean wind.',
+    // The import drew no trees/deeprough anywhere: Seminole's off-corridor
+    // ground is the native sandy scrub the importer deliberately ignores as
+    // hazard zones (see the osmIgnore note in scripts/import-osm.ts) — so
+    // that's the word for an unmapped bad lie, not the 'junk' fallback.
+    junkLabel: 'scrub',
     holes: holes([
       [4, 405, 17, 'S', 'sand'],
       [4, 480, 5, 'L', 'water'],
@@ -1617,6 +1622,11 @@ export const GUEST_COURSES: CourseSpec[] = [
     greens: 'Medium',
     wind: 12,
     blurb: 'Water on sixteen of eighteen. Bring extra balls, your boys, and a dog or two.',
+    // Every imported hole is water-only — no trees/deeprough polygons anywhere
+    // — so the junk floor needs the course's own word or wild shots read "In
+    // the junk" (see CourseSpec.junkLabel). On a lake course where the trouble
+    // is the margins, the honest word is the reeds you're hacking out of.
+    junkLabel: 'cattails',
     // The club's BLUE card: par 71 (35/36), 6507 yds, 72.0/124. Five par 3s,
     // back-to-back par 5s at 7 and 9's turn, and a drivable 276yd 16th. SI is
     // the card's men's handicap row. Geometry: OSM_GEOMETRY 'kings-creek:*'.

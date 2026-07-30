@@ -424,6 +424,34 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
     expect(screen.queryByText(/already earned/)).toBeNull()
   })
 
+  it('a device whose history arrived by sync can still reach its Awards', () => {
+    // The shape account sync leaves behind: daily history and a round log, and
+    // an EMPTY replay archive — the decisions never leave the device that
+    // played them. Both clubhouse doors used to be gated on the archive, so
+    // this player had full ladder progress and no way to look at it.
+    const history: HistoryEntry[] = [
+      { dateKey: '2026-07-18', puzzleNumber: 1, courseSlug: 'pebble-beach', toPar: -2, results: Array(18).fill('par'), character: 'dart' },
+      { dateKey: '2026-07-19', puzzleNumber: 2, courseSlug: 'pebble-beach', toPar: 1, results: Array(18).fill('par'), character: 'dart' },
+    ]
+    localStorage.setItem('dogleg:history:v1', JSON.stringify(history))
+    expect(localStorage.getItem('dogleg:archive:v1')).toBeNull()
+
+    render(<App />)
+    fireEvent.click(screen.getByText(/Clubhouse/))
+    // the tab strip is present at all — it used to be replaced wholesale by
+    // the "no rounds in the clubhouse" line
+    expect(screen.queryByText(/No rounds in the clubhouse/)).toBeNull()
+    fireEvent.click(screen.getByRole('tab', { name: 'Awards' }))
+    expect(screen.getByText('The Grind')).toBeTruthy()
+    // …and the ladders count the synced rounds, rather than reading zero
+    expect(screen.getByText(/^2 \/ 10 rounds$/)).toBeTruthy()
+
+    // Recent lists them too — no Replay button, since no decisions came with
+    fireEvent.click(screen.getByRole('tab', { name: 'Recent' }))
+    expect(screen.getByText(/Last 2 rounds/)).toBeTruthy()
+    expect(screen.queryByText(/▶ Replay/)).toBeNull()
+  })
+
   it('the Clubhouse scorecard opens on paper, outside the dark screen', async () => {
     const { newRound, applyChoice, advanceHole, archiveRound } = await import('./state/store')
     const { logRound } = await import('./state/stats')
@@ -1040,6 +1068,54 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
     const save = JSON.parse(localStorage.getItem('dogleg:round:v1') ?? 'null')
     expect(save.character).toBe(CHARACTERS[2].id)
     expect(save.currentHole).toBe(0)
+  })
+
+  it("following the wrap's earned card into Awards retires that round's unlocks", () => {
+    vi.useFakeTimers()
+    render(<App />)
+
+    // play today's daily to the wrap screen — a first round always earns
+    // ladder tier 1s, so the earned card is guaranteed to be there
+    fireEvent.click(screen.getByText('Tee off'))
+    fireEvent.click(screen.getByText(CHARACTERS[0].name))
+    for (let guard = 0; guard < 400; guard++) {
+      if (screen.queryByText('Back to the Teebox')) break
+      const splash = screen.queryByText('HOLE IN ONE') ?? screen.queryByText('ALBATROSS')
+      if (splash) {
+        act(() => {
+          vi.advanceTimersByTime(5100)
+        })
+        fireEvent.click(splash)
+        continue
+      }
+      const advance = screen.queryByText('Next hole') ?? screen.queryByText('Sign the card')
+      if (advance) {
+        fireEvent.click(advance)
+        continue
+      }
+      const card = document.querySelector<HTMLButtonElement>('button.choice')!
+      fireEvent.click(card)
+      fireEvent.click(card)
+      act(() => {
+        vi.advanceTimersByTime(1500)
+      })
+    }
+
+    // the durable earned card is on the wrap, and it deep-links to Awards
+    const earned = document.querySelector<HTMLButtonElement>('button.ach-earned')
+    expect(earned).toBeTruthy()
+    fireEvent.click(earned!)
+    expect(screen.getByRole('tab', { name: 'Awards' }).getAttribute('aria-selected')).toBe('true')
+
+    // …and following it LEAVES the wrap, so those unlocks retire with it.
+    // They used to survive the trip, so re-opening today's card served the same
+    // earned list (and its toast rail) all over again on a round that had
+    // already been celebrated.
+    fireEvent.click(screen.getByText('‹ Teebox'))
+    fireEvent.click(screen.getByText(/See today's card/))
+    expect(screen.getByText(/Daily No\./)).toBeTruthy()
+    expect(document.querySelector('button.ach-earned')).toBeNull()
+    expect(document.querySelector('.ach-toast')).toBeNull()
   })
 
   it('a destiny ace fires the HOLE IN ONE splash, which dismisses on tap', () => {

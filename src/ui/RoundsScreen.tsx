@@ -220,7 +220,19 @@ export function RoundsScreen(props: {
   const prs = [...bestByCourse.values()]
     .filter((r) => !recordByCourse.has(r.courseSlug))
     .sort((a, b) => a.toPar - b.toPar)
-  const recent = [...rounds].sort((a, b) => b.playedAt - a.playedAt).slice(0, 10)
+  // Recent comes off the round LOG, not the replay archive. The two aren't the
+  // same set: the archive is pruned (src/state/store.ts) and only ever holds
+  // rounds this device played, while the log keeps every round forever and
+  // absorbs dailies synced from other devices. Reading the archive here meant a
+  // freshly-synced device — full stats, full awards, empty archive — showed
+  // "Last 0 rounds". `row()` already offers Replay only where the archive still
+  // has the decisions, so log-only rounds simply come without that button.
+  const recent = [...log].sort((a, b) => b.playedAt - a.playedAt).slice(0, 10)
+  // …and the tabs themselves gate on the log for the same reason: they used to
+  // gate on the archive, which hid the Awards and Seasons tabs (neither of
+  // which reads the archive at all) behind an empty-state message on any device
+  // whose history arrived by sync.
+  const hasRounds = log.length > 0 || rounds.length > 0
 
   const scorecard = card && (
     <RoundScorecard
@@ -402,7 +414,7 @@ export function RoundsScreen(props: {
         <span className="fine">Handicap, score breakdown, best &amp; worst</span>
       </button>
 
-      {rounds.length === 0 ? (
+      {!hasRounds ? (
         <p className="tagline center">No rounds in the clubhouse yet — go play one and it'll show up here.</p>
       ) : (
         <>
@@ -448,7 +460,7 @@ export function RoundsScreen(props: {
               <div className="kicker">
                 Last {recent.length} round{recent.length === 1 ? '' : 's'}
               </div>
-              {recent.map((r) => row(toLogged(r)))}
+              {recent.map((r) => row(r))}
             </section>
           )}
 

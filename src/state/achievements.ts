@@ -227,7 +227,7 @@ export const ONE_OFFS: OneOff[] = [
     name: 'Repo Man',
     requirement: 'Win back a course record that was taken from you',
     hidden: false,
-    repeatable: true, // counts courses reclaimed
+    repeatable: true, // counts every record taken back, same course or not
   },
   {
     id: 'spotless',
@@ -365,8 +365,13 @@ export function computeProgress(
   for (const r of log) perCourse.set(r.courseSlug, (perCourse.get(r.courseSlug) ?? 0) + 1)
 
   const heldNow = Object.keys(records.held)
-  const everHeld = new Set([...heldNow, ...Object.keys(records.stolen)])
-  const reclaimed = Object.keys(records.stolen).filter((slug) => slug in records.held)
+  const everHeld = new Set([...heldNow, ...Object.keys(records.stolen), ...Object.keys(records.reclaimed)])
+  // Reclaims are NOT derivable from held ∩ stolen: the records ledger keeps
+  // those two maps mutually exclusive (winning a record back deletes its steal
+  // entry), so that intersection is always empty. records.ts tallies each
+  // take-back at the moment it happens; this just reads the tally. Every
+  // repossession counts, including a second one on the same course.
+  const reclaims = Object.values(records.reclaimed).reduce((s, n) => s + n, 0)
 
   const ladders: Record<string, number> = {
     birdies: stats.distribution.birdie,
@@ -441,7 +446,7 @@ export function computeProgress(
 
   const oneOffs: Record<string, number> = {
     firstRecord: everHeld.size > 0 ? 1 : 0,
-    reclaim: reclaimed.length,
+    reclaim: reclaims,
     spotless,
     scratch: handicap.established && handicap.value <= 0 ? 1 : 0,
     fullBag: CHARACTERS.every((c) => charactersUsed.has(c.id)) ? 1 : 0,

@@ -349,9 +349,33 @@ export default function App() {
   const handleHistorySynced = (h: HistoryEntry[]) => {
     setHistory(h)
     absorbHistory(h) // the round log counts synced dailies too
+    // …and so do the achievements. Rounds arriving from another device can
+    // carry whole ladders' worth of progress the app-start reconcile never
+    // saw, and without this pass the Awards tab would show the derived
+    // numbers climbing while the ranks they earn stay locked until the next
+    // reload. QUIET on purpose: history you played elsewhere is backfill, not
+    // a moment, and it must not burst a toast rail over whatever screen the
+    // sync happened to land on.
+    reconcileAchievements('quiet')
     // a synced day supersedes this device's unfinished daily for the
     // same date — drop it so a refresh can't replay a completed day
     if (supersededDaily(round, h)) setRound(null)
+  }
+
+  /**
+   * The referee confirmed a course record. `recordWon()` writes the ledger
+   * inside ScoreBoard's async submit — which necessarily happens AFTER the
+   * wrap screen mounted and after `next()` already reconciled — so the record
+   * ladders and Name on the Wall would otherwise sit unearned until some later
+   * app start. Reconcile again and append: reconcile only ever adds keys, so
+   * this returns exactly the tiers the record just earned and nothing else.
+   *
+   * If the player already dismissed the rail, the new unlocks ride the wrap
+   * screen's durable card rather than re-opening toasts they just closed.
+   */
+  const handleRecordsChanged = () => {
+    const more = reconcileAchievements('live')
+    if (more.length) setUnlocks((u) => [...u, ...more])
   }
 
   if (view === 'home') {
@@ -538,7 +562,14 @@ export default function App() {
           character={isPractice && round ? round.character : entry?.character}
           history={history}
           unlocks={unlocks}
+          onRecordsChanged={handleRecordsChanged}
           onAwards={() => {
+            // following the link LEAVES the wrap — retire this round's unlocks
+            // with it, exactly as Back to the Teebox does. Otherwise they'd be
+            // waiting on the next result screen opened, which could be a
+            // different round entirely (or today's daily wearing a practice
+            // round's card).
+            setUnlocks([])
             setLockerTab('awards')
             setView('rounds')
           }}

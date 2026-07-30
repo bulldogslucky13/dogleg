@@ -345,7 +345,12 @@ export function HomeScreen(props: {
           <p className="fine">Practice rounds don't touch your streak.</p>
         </div>
       )}
-      {loadArchive().length > 0 && (
+      {/* The door opens on any round we know about, not just replayable ones.
+          The archive holds rounds THIS device played; a device whose history
+          arrived by account sync has a full round log, stats and awards behind
+          an empty archive, and gating on the archive alone locked it out of its
+          own clubhouse. `history` is the synced half and is already in hand. */}
+      {(loadArchive().length > 0 || props.history.length > 0) && (
         <button className="cta ghost" onClick={props.onMyRounds}>
           🏆 Clubhouse
           <span className="cta-sub">My rounds</span>
@@ -701,6 +706,9 @@ export function ResultScreen(props: {
   unlocks?: Unlock[]
   /** deep-link into the Clubhouse Awards tab */
   onAwards?: () => void
+  /** the board confirmed a course record — record-derived achievements only
+   * become earnable at this point, well after the round's own reconcile */
+  onRecordsChanged?: () => void
   onHome: () => void
   onPracticeAgain: () => void
 }) {
@@ -915,7 +923,7 @@ export function ResultScreen(props: {
         </div>
       )}
       {props.boardRound ? (
-        <ScoreBoard round={props.boardRound} />
+        <ScoreBoard round={props.boardRound} onRecordsChanged={props.onRecordsChanged} />
       ) : (
         // re-opening today's card after the full round left memory (a practice
         // round took the slot, or a refreshed device only kept the day's

@@ -44,7 +44,7 @@ function round(overrides: Partial<LoggedRound> & { results?: HoleResult[] } = {}
   }
 }
 
-const emptyLedger = () => ({ v: 1 as const, held: {}, stolen: {} })
+const emptyLedger = () => ({ v: 1 as const, held: {}, stolen: {}, reclaimed: {} })
 
 describe('computeProgress', () => {
   it('counts ladder stats off the log', () => {
@@ -98,20 +98,57 @@ describe('computeProgress', () => {
     expect(computeProgress([dawn], [], emptyLedger()).oneOffs.dawnPatrol).toBe(1)
   })
 
-  it('reads records held, ever-held, and reclaims from the ledger', () => {
+  it('reads records held and ever-held from the ledger', () => {
     const ledger = {
       v: 1 as const,
       held: { 'pebble-beach': { toPar: -4, since: 1 }, augusta: { toPar: -2, since: 2 } },
       stolen: {
-        'pebble-beach': { by: 'X', theirToPar: -5, myToPar: -4, at: 3, notifiedOn: 'd', dismissed: true },
         'st-andrews': { by: 'Y', theirToPar: -6, myToPar: -3, at: 4, notifiedOn: 'd', dismissed: true },
       },
+      reclaimed: {},
     }
     const p = computeProgress([], [], ledger)
     expect(p.ladders.recordsNow).toBe(2)
     expect(p.ladders.recordsEver).toBe(3) // pebble, augusta, st-andrews
-    expect(p.oneOffs.reclaim).toBe(1) // pebble: stolen AND held again
     expect(p.oneOffs.firstRecord).toBe(1)
+    expect(p.oneOffs.reclaim).toBe(0) // nothing has been taken back
+  })
+
+  /**
+   * Repo Man counts reclaims off `ledger.reclaimed`, and this test drives the
+   * REAL writers to fill it. That matters: the first version of this counted
+   * `held ∩ stolen`, which reads plausibly and is always empty — records.ts
+   * deletes the steal entry the moment a record is won back, so no ledger a
+   * player can actually produce has a slug in both maps. A test that hand-built
+   * such a ledger passed while the badge was unearnable, so this one refuses to
+   * build ledger state by hand.
+   */
+  it('counts every reclaim the records ledger actually records', async () => {
+    const { recordWon, syncLedger, loadLedger } = await import('../lib/records')
+    const server = (holder: string, toPar: number) =>
+      new Map([['pebble-beach', { player_name: holder, to_par: toPar }]])
+
+    recordWon('pebble-beach', -4, 1000) // ours
+    expect(computeProgress([], [], loadLedger()).oneOffs.reclaim).toBe(0)
+
+    syncLedger(server('Hank', -6), 'Jackson', 2000, '2026-07-20') // stolen
+    expect(computeProgress([], [], loadLedger()).oneOffs.reclaim).toBe(0)
+
+    recordWon('pebble-beach', -7, 3000) // taken back, on this device
+    const once = computeProgress([], [], loadLedger())
+    expect(once.oneOffs.reclaim).toBe(1)
+    expect(once.ladders.recordsNow).toBe(1)
+
+    // a later sync agreeing the record is ours must not re-count the same
+    // take-back — the steal entry is already gone
+    syncLedger(server('Jackson', -7), 'Jackson', 4000, '2026-07-21')
+    expect(computeProgress([], [], loadLedger()).oneOffs.reclaim).toBe(1)
+
+    // stolen again, then reclaimed on ANOTHER device — sync learns it as a diff
+    syncLedger(server('Marge', -8), 'Jackson', 5000, '2026-07-22')
+    syncLedger(server('Jackson', -9), 'Jackson', 6000, '2026-07-23')
+    expect(computeProgress([], [], loadLedger()).oneOffs.reclaim).toBe(2)
+    expect(loadLedger().stolen['pebble-beach']).toBeUndefined()
   })
 })
 

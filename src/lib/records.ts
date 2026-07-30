@@ -36,6 +36,17 @@ export interface RecordLedger {
   v: 1
   held: Record<string, HeldRecord>
   stolen: Record<string, StolenRecord>
+  /**
+   * Courses whose record we took BACK, and how many times each.
+   *
+   * `held` and `stolen` are mutually exclusive by construction — winning a
+   * record deletes its steal entry, and adopting one under our name does the
+   * same — so a reclaim leaves no trace in either map and cannot be derived
+   * from the ledger after the fact. It is counted at the moment it happens
+   * instead, and kept forever. (Anything reading reclaims off the two maps is
+   * reading a set that is always empty.)
+   */
+  reclaimed: Record<string, number>
 }
 
 const LEDGER_KEY = 'dogleg:records:v1'
@@ -45,12 +56,14 @@ export function loadLedger(): RecordLedger {
     const raw = localStorage.getItem(LEDGER_KEY)
     if (raw) {
       const j = JSON.parse(raw) as RecordLedger
-      if (j?.v === 1) return { v: 1, held: j.held ?? {}, stolen: j.stolen ?? {} }
+      // `reclaimed` post-dates the ledger: an older document simply starts its
+      // tally at zero rather than inventing take-backs it never recorded
+      if (j?.v === 1) return { v: 1, held: j.held ?? {}, stolen: j.stolen ?? {}, reclaimed: j.reclaimed ?? {} }
     }
   } catch {
     /* fall through */
   }
-  return { v: 1, held: {}, stolen: {} }
+  return { v: 1, held: {}, stolen: {}, reclaimed: {} }
 }
 
 export function saveLedger(ledger: RecordLedger): void {
@@ -69,6 +82,8 @@ export function saveLedger(ledger: RecordLedger): void {
 export function recordWon(courseSlug: string, toPar: number, now = Date.now()): StolenRecord | null {
   const ledger = loadLedger()
   const wasStolen = ledger.stolen[courseSlug] ?? null
+  // the take-back is recorded HERE because the next line destroys the evidence
+  if (wasStolen) ledger.reclaimed[courseSlug] = (ledger.reclaimed[courseSlug] ?? 0) + 1
   delete ledger.stolen[courseSlug]
   ledger.held[courseSlug] = { toPar, since: now }
   saveLedger(ledger)
@@ -144,7 +159,10 @@ export function syncLedger(
     if (sameName(rec.player_name, myName)) {
       // reclaimed under our name (a win posted on another device) — the
       // adoption pass above already put it back in `held`; drop the stale
-      // steal so chasing()/pendingSteals() stop flagging a record we hold
+      // steal so chasing()/pendingSteals() stop flagging a record we hold.
+      // Count it first: this is the OTHER device's recordWon(), reaching us
+      // as a diff, and it's the last moment the take-back is visible.
+      ledger.reclaimed[slug] = (ledger.reclaimed[slug] ?? 0) + 1
       delete ledger.stolen[slug]
       continue
     }

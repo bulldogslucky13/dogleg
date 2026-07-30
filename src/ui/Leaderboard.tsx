@@ -51,7 +51,14 @@ export function competitionRanks(rows: Array<{ to_par: number }>): number[] {
   return out
 }
 
-export function ScoreBoard(props: { round: RoundState }) {
+export function ScoreBoard(props: {
+  round: RoundState
+  /** the records ledger just moved (a record taken or taken back). Fires
+   * AFTER the referee confirms, which is necessarily after the wrap screen
+   * mounted — anything derived from the ledger has to be recomputed here or
+   * it misses this round entirely. */
+  onRecordsChanged?: () => void
+}) {
   const { round } = props
   const [player, setPlayer] = useState(loadPlayer)
   const [name, setName] = useState('')
@@ -111,6 +118,9 @@ export function ScoreBoard(props: { round: RoundState }) {
       // exactly one full-screen moment ever shows
       const stolen = recordWon(round.courseSlug, r.record.toPar)
       reclaimed = !!stolen
+      // the ledger moved — let the wrap screen re-check the achievements that
+      // read it (Name on the Wall, The Wall, The Deed Office, Repo Man)
+      props.onRecordsChanged?.()
       // tookSeason: only claim the season title when the referee actually
       // wrote one — during the pre-migration window seasonRecord is absent
       // and the splash must not promise a row that doesn't exist

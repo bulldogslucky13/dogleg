@@ -38,6 +38,8 @@ import { CharacterAvatar } from './ui/Avatars'
 import { GreenView, HoleMap, useMapSize } from './ui/HoleMap'
 import { SideMap } from './ui/SideMap'
 import { CaddyThoughts, ChoiceCards, ClassicScorecard, HazardChips, HoleComplete, RoundCardSheet, StatusBanner, TierBanner } from './ui/panels'
+import { hasEarnedAwards, reconcileAchievements, type Unlock } from './state/achievements'
+import { UnlockToasts } from './ui/Achievements'
 import { prefersReducedMotion } from './ui/motion'
 import type { MomentKind } from './engine/fortune'
 import { MomentSplash } from './ui/MomentSplash'
@@ -131,6 +133,28 @@ export default function App() {
   const [mapRef, mapSize] = useMapSize()
   /** the full-18 round card, opened by tapping the header score chip */
   const [showCard, setShowCard] = useState(false)
+  /** achievements newly earned by the round that just finished — feeds both
+   * the toast queue and the wrap screen's earned-this-round card */
+  const [unlocks, setUnlocks] = useState<Unlock[]>([])
+  /** deep-link the Clubhouse onto a tab (the wrap's achievements card) */
+  const [lockerTab, setLockerTab] = useState<'recent' | 'awards'>('recent')
+  /** the toast rail dismissed — the wrap card must OUTLIVE the toasts, so the
+   * rail hides via this flag while `unlocks` persists until the wrap is left */
+  const [toastsDone, setToastsDone] = useState(false)
+  /**
+   * Does the Clubhouse have awards to show? It gates the Clubhouse door
+   * alongside rounds, because a record sync can grant awards on a device
+   * holding no rounds at all (only dailies sync, so a player whose records
+   * were set in practice play elsewhere arrives with a trophy shelf and an
+   * empty log).
+   *
+   * It has to be STATE, not a read at render: the app-start backfill below
+   * runs in an effect, which lands after the first paint, and nothing else
+   * re-renders home. Read once up front for a returning device, refreshed
+   * after every reconcile.
+   */
+  const [awardsEarned, setAwardsEarned] = useState(hasEarnedAwards)
+  const refreshAwards = () => setAwardsEarned(hasEarnedAwards())
 
   useEffect(() => {
     saveRound(round)
@@ -142,6 +166,10 @@ export default function App() {
     // a device with no rounds behind it has nothing to catch up on — stamp the
     // current drop so a first-timer never gets a "what's changed" card later
     primeWhatsNew()
+    // grant whatever the stored stats already earn, silently — the first run
+    // records a summary the Clubhouse shows once; re-runs are no-ops
+    reconcileAchievements('quiet')
+    refreshAwards()
     ensureIdentity()
     // a device that already holds a NAMED player is a returning known user —
     // attach their events to that stable id so cross-device stats line up.
@@ -336,9 +364,35 @@ export default function App() {
   const handleHistorySynced = (h: HistoryEntry[]) => {
     setHistory(h)
     absorbHistory(h) // the round log counts synced dailies too
+    // …and so do the achievements. Rounds arriving from another device can
+    // carry whole ladders' worth of progress the app-start reconcile never
+    // saw, and without this pass the Awards tab would show the derived
+    // numbers climbing while the ranks they earn stay locked until the next
+    // reload. QUIET on purpose: history you played elsewhere is backfill, not
+    // a moment, and it must not burst a toast rail over whatever screen the
+    // sync happened to land on.
+    reconcileAchievements('quiet')
+    refreshAwards()
     // a synced day supersedes this device's unfinished daily for the
     // same date — drop it so a refresh can't replay a completed day
     if (supersededDaily(round, h)) setRound(null)
+  }
+
+  /**
+   * The referee confirmed a course record. `recordWon()` writes the ledger
+   * inside ScoreBoard's async submit — which necessarily happens AFTER the
+   * wrap screen mounted and after `next()` already reconciled — so the record
+   * ladders and Name on the Wall would otherwise sit unearned until some later
+   * app start. Reconcile again and append: reconcile only ever adds keys, so
+   * this returns exactly the tiers the record just earned and nothing else.
+   *
+   * If the player already dismissed the rail, the new unlocks ride the wrap
+   * screen's durable card rather than re-opening toasts they just closed.
+   */
+  const handleRecordsChanged = () => {
+    const more = reconcileAchievements('live')
+    refreshAwards()
+    if (more.length) setUnlocks((u) => [...u, ...more])
   }
 
   if (view === 'home') {
@@ -366,7 +420,7 @@ export default function App() {
           <Tutorial
             onClose={closeTutorial}
             onSync={() => {
-              // the same account flow as the Locker CTA: land in the locker
+              // the same account flow as the Clubhouse CTA: land in the Clubhouse
               // with the panel open
               closeTutorial()
               setLockerView('main')
@@ -397,6 +451,8 @@ export default function App() {
               : null
           }
           playedToday={playedToday}
+          awardsEarned={awardsEarned}
+          onAwardsChanged={refreshAwards}
           onHistorySynced={handleHistorySynced}
           onTeeOff={() => {
             setPending({ mode: 'daily', setup: dailySetup() })
@@ -440,6 +496,7 @@ export default function App() {
       <RoundsScreen
         initialView={lockerView}
         initialAccount={lockerAccount}
+        initialTab={lockerTab}
         onWatch={(p) => {
           setWatching(p)
           setView('watch')
@@ -447,6 +504,7 @@ export default function App() {
         onHistorySynced={handleHistorySynced}
         onBack={() => {
           setLockerAccount(false)
+          setLockerTab('recent')
           setView('home')
         }}
       />
@@ -505,31 +563,50 @@ export default function App() {
     // the swing coach's report needs the same shot-by-shot record the recap does
     const grade = recapSource ? roundGrade : null
     return (
-      <ResultScreen
-        setup={setup}
-        results={results}
-        toPar={toPar}
-        practice={isPractice}
-        recap={recapSource ? buildRecap(recapSource) : null}
-        grade={grade}
-        boardRound={recapSource}
-        ghostClose={
-          isPractice && round && ghost
-            ? { margin: roundToPar(round) - ghost.toPar, kind: ghost.kind, holder: ghost.holder }
-            : null
-        }
-        character={isPractice && round ? round.character : entry?.character}
-        history={history}
-        onHome={() => setView('home')}
-        onPracticeAgain={() => {
-          if (round) {
-            // rematch on the same course, but pick your player fresh each run
-            // (round_started is tracked by the pick screen's onPick)
-            setPending({ mode: 'practice', setup: practiceSetup(round.courseSlug, `${Date.now()}`) })
-            setView('pick')
+      <>
+        {unlocks.length > 0 && !toastsDone && <UnlockToasts unlocks={unlocks} onDone={() => setToastsDone(true)} />}
+        <ResultScreen
+          setup={setup}
+          results={results}
+          toPar={toPar}
+          practice={isPractice}
+          recap={recapSource ? buildRecap(recapSource) : null}
+          grade={grade}
+          boardRound={recapSource}
+          ghostClose={
+            isPractice && round && ghost
+              ? { margin: roundToPar(round) - ghost.toPar, kind: ghost.kind, holder: ghost.holder }
+              : null
           }
-        }}
-      />
+          character={isPractice && round ? round.character : entry?.character}
+          history={history}
+          unlocks={unlocks}
+          onRecordsChanged={handleRecordsChanged}
+          onAwards={() => {
+            // following the link LEAVES the wrap — retire this round's unlocks
+            // with it, exactly as Back to the Teebox does. Otherwise they'd be
+            // waiting on the next result screen opened, which could be a
+            // different round entirely (or today's daily wearing a practice
+            // round's card).
+            setUnlocks([])
+            setLockerTab('awards')
+            setView('rounds')
+          }}
+          onHome={() => {
+            setUnlocks([])
+            setView('home')
+          }}
+          onPracticeAgain={() => {
+            if (round) {
+              // rematch on the same course, but pick your player fresh each run
+              // (round_started is tracked by the pick screen's onPick)
+              setUnlocks([])
+              setPending({ mode: 'practice', setup: practiceSetup(round.courseSlug, `${Date.now()}`) })
+              setView('pick')
+            }
+          }}
+        />
+      </>
     )
   }
 
@@ -610,8 +687,12 @@ export default function App() {
     if (after.complete) {
       const h = recordResult(after)
       setHistory(h)
-      archiveRound(after) // into the locker — replayable forever if it's a PR/CR
+      archiveRound(after) // into the Clubhouse — replayable forever if it's a PB/CR
       logRound(after) // into the round log — scorecard + stats material, forever
+      // read-only pass over the stats the round just moved; anything newly
+      // earned toasts over the wrap screen, politely queued
+      setUnlocks(reconcileAchievements('live'))
+      setToastsDone(false)
       setResultFor(after.mode)
       setView('result')
     }

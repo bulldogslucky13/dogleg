@@ -12,6 +12,7 @@ import { fetchCourseRecords, fetchSeasonRecords, loadPlayer, type CourseRecord }
 import { seasonCountdown, seasonForDate } from '../engine/season'
 import { FortuneInfo } from './Tutorial'
 import { ChangeLog } from './ChangeLog'
+import { hasEarnedAwards, reconcileAchievements, type Unlock } from '../state/achievements'
 import { Wordmark } from './Wordmark'
 import { dismissSteals, pendingSteals, syncLedger, type StolenRecord } from '../lib/records'
 import { loadGhost, type Ghost } from '../state/ghost'
@@ -34,6 +35,12 @@ export function HomeScreen(props: {
   onMyRounds: () => void
   /** deep-link into the locker's lifetime stats view */
   onStats: () => void
+  /** the Clubhouse holds earned awards — opens its door even with no rounds
+   * on this device. Owned by App because the app-start backfill that grants
+   * them lands after this screen's first render (see App.tsx). */
+  awardsEarned?: boolean
+  /** this screen's own record sync just reconciled — re-check the above */
+  onAwardsChanged?: () => void
   onHistorySynced?: (h: HistoryEntry[]) => void
 }) {
   const setup = dailySetup()
@@ -107,6 +114,12 @@ export function HomeScreen(props: {
     void fetchCourseRecords().then((recs) => {
       if (!recs) return
       syncLedger(recs, myName)
+      // the sync can adopt records set on another device, or learn that one was
+      // taken back there — both move achievements (Name on the Wall, the record
+      // ladders, Repo Man), and this fetch lands long after the app-start
+      // reconcile. Quiet: nobody earned anything just now, we only found out.
+      reconcileAchievements('quiet')
+      props.onAwardsChanged?.()
       setSteals(pendingSteals())
     })
   }, [])
@@ -344,7 +357,17 @@ export function HomeScreen(props: {
           <p className="fine">Practice rounds don't touch your streak.</p>
         </div>
       )}
-      {loadArchive().length > 0 && (
+      {/* The door opens on anything the clubhouse can show, not just replayable
+          rounds. The archive holds rounds THIS device played; a device whose
+          history arrived by account sync has a full round log, stats and awards
+          behind an empty archive, and gating on the archive alone locked it out
+          of its own clubhouse. `history` is the synced half and is already in
+          hand — but it only ever carries DAILIES, so a player whose records
+          were all set in practice play elsewhere syncs in with earned awards
+          and no rounds at all. Earned awards open the door too. (A genuinely
+          fresh device earns nothing: every tier and badge needs at least one
+          round, record or established handicap behind it.) */}
+      {(loadArchive().length > 0 || props.history.length > 0 || (props.awardsEarned ?? hasEarnedAwards())) && (
         <button className="cta ghost" onClick={props.onMyRounds}>
           🏆 Clubhouse
           <span className="cta-sub">My rounds</span>
@@ -696,6 +719,13 @@ export function ResultScreen(props: {
   /** the ghost race's quiet close: final margin vs the chased round */
   ghostClose?: { margin: number; kind: 'record' | 'personal'; holder: string | null } | null
   history: HistoryEntry[]
+  /** achievements this round earned — the wrap card renders only when some did */
+  unlocks?: Unlock[]
+  /** deep-link into the Clubhouse Awards tab */
+  onAwards?: () => void
+  /** the board confirmed a course record — record-derived achievements only
+   * become earnable at this point, well after the round's own reconcile */
+  onRecordsChanged?: () => void
   onHome: () => void
   onPracticeAgain: () => void
 }) {
@@ -872,6 +902,26 @@ export function ResultScreen(props: {
           <p className="fine coach-line">{gradeCopy(props.grade).luckLine}</p>
         </div>
       )}
+      {/* achievements this round earned — durable record of what the toasts
+          announced, and the door to the full trophy room. Absent entirely on
+          a round that earned nothing. */}
+      {props.unlocks && props.unlocks.length > 0 && props.onAwards && (
+        <button className="ach-earned" onClick={props.onAwards}>
+          <span className="kicker">
+            Achievement{props.unlocks.length === 1 ? '' : 's'} earned this round
+          </span>
+          {props.unlocks.map((u) => (
+            <span key={u.id} className="ach-earned-row">
+              <b>
+                {u.name}
+                {u.count ? <em className="ach-count"> ×{u.count}</em> : null}
+              </b>
+              <span className="ach-earned-detail">{u.detail}</span>
+            </span>
+          ))}
+          <span className="ach-earned-link">See all awards ›</span>
+        </button>
+      )}
       {/* the share card sits ABOVE the board: brag first, standings second */}
       {!props.practice && (
         <div className="share-block">
@@ -890,7 +940,7 @@ export function ResultScreen(props: {
         </div>
       )}
       {props.boardRound ? (
-        <ScoreBoard round={props.boardRound} />
+        <ScoreBoard round={props.boardRound} onRecordsChanged={props.onRecordsChanged} />
       ) : (
         // re-opening today's card after the full round left memory (a practice
         // round took the slot, or a refreshed device only kept the day's

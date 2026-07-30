@@ -9,7 +9,7 @@ import { loadArchive, loadHistory, type HistoryEntry, type RoundState } from './
  * per-hole results for practice rounds too), far lighter than the archive
  * (no decision lists, so nothing here ever needs pruning — a thousand rounds
  * is ~200KB). Every lifetime stat, the handicap window, and every scorecard
- * in the Locker computes FROM this log, so the numbers can't drift out of
+ * in the Clubhouse computes FROM this log, so the numbers can't drift out of
  * sync with a separately-maintained counter.
  *
  * Local-first by design: anonymous players accumulate everything here, and

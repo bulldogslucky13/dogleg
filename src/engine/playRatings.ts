@@ -78,6 +78,7 @@ export const PLAY_RATINGS: Record<string, number> = {
   'cobblestone-creek': 5,
   'the-swing': 1,
   'palm-beach-par-3': 8,
+  'kings-creek': 5,
 }
 
 /** avg score-to-par measured per course, kept for the methodology disclaimer. */
@@ -134,4 +135,5 @@ export const PLAY_INDEX: Record<string, number> = {
   'cobblestone-creek': 0.817,
   'the-swing': -1.092,
   'palm-beach-par-3': 2.061,
+  'kings-creek': 0.863,
 }

@@ -183,6 +183,19 @@ export const OSM_BEND: Record<string, number[]> = {
   'seminole:15': [0, 10, 20, 30, 40, 50, 56, 60, 60, 53, 37, 19, 0],
   'seminole:16': [0, 10, 21, 31, 41, 50, 56, 58, 56, 49, 33, 16, 0],
   'seminole:18': [0, -8, -16, -24, -32, -40, -46, -50, -50, -46, -35, -17, 0],
+
+  // Kings Creek CC (see OSM_GEOMETRY note)
+  'kings-creek:1': [0, -1, -2, -4, -5, -6, -7, -8, -8, -8, -6, -3, 0],
+  'kings-creek:2': [0, -3, -7, -10, -13, -17, -20, -22, -23, -23, -20, -10, 0],
+  'kings-creek:4': [0, 6, 11, 17, 22, 28, 31, 33, 33, 29, 20, 10, 0],
+  'kings-creek:5': [0, 8, 16, 24, 32, 38, 43, 43, 40, 34, 23, 11, 0],
+  'kings-creek:7': [0, -5, -11, -16, -21, -25, -27, -28, -26, -23, -18, -11, 0],
+  'kings-creek:9': [0, -12, -23, -35, -46, -56, -64, -68, -68, -60, -47, -25, 0],
+  'kings-creek:13': [0, -5, -9, -14, -19, -23, -26, -27, -27, -24, -17, -9, 0],
+  'kings-creek:14': [0, 4, 8, 13, 17, 21, 24, 26, 27, 25, 20, 10, 0],
+  'kings-creek:15': [0, 3, 6, 8, 11, 14, 16, 17, 17, 15, 11, 6, 0],
+  'kings-creek:16': [0, 2, 5, 7, 10, 12, 14, 16, 16, 14, 11, 6, 0],
+  'kings-creek:18': [0, -24, -48, -72, -96, -116, -131, -138, -129, -103, -74, -39, 0],
 }
 
 export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
@@ -3580,6 +3593,237 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
       { id: 'z8', kind: 'bunker', from: 392, to: 410, side: 'left' },
       { id: 'z9', kind: 'bunker', from: 418, to: 439, side: 'right' },
       { id: 'z10', kind: 'bunker', from: 420, to: 439, side: 'left' },
+    ],
+  },
+
+  // ---------------------------------------------------------------------------
+  // Kings Creek Country Club — Kemp, Texas (GUEST course; see courses.ts).
+  // Imported from OSM way 386836594 against the club's BLUE card (par 71,
+  // 6507 yd, 72.0/124). Card is Jackson's, cross-checked against the printed
+  // OUT/IN totals; hole 6 was verified as the short par 3 (a first image read
+  // doubled hole 7's 515 into it — the totals caught it, and OSM's real 159yd
+  // hole-6 centreline agreed). Zones card-shifted per hole (shift, never
+  // scale); 16 and 18 clamp a tee-front zone at 0 after negative shifts (18's
+  // centreline is drawn from the tips, 66 long of the Blues).
+  // NAME-COLLISION: a Kings Creek CC also exists in Rehoboth Beach, Delaware.
+  // This is the Texas club, pinned by center + apostrophe in import-osm.ts.
+  'kings-creek:1': {
+    length: 351,
+    fairwayFrom: 127,
+    fairwayTo: 339,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'water', from: 118, to: 146, side: 'left' },
+      { id: 'z2', kind: 'water', from: 250, to: 351, side: 'left' },
+    ],
+  },
+  'kings-creek:2': {
+    length: 340,
+    fairwayFrom: 140,
+    fairwayTo: 328,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'water', from: 54, to: 340, side: 'left' },
+    ],
+  },
+  'kings-creek:3': {
+    length: 200,
+    fairwayFrom: 72,
+    fairwayTo: 188,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'water', from: 13, to: 49, side: 'right' },
+      { id: 'z2', kind: 'water', from: 37, to: 49, side: 'left' },
+      { id: 'z3', kind: 'water', from: 49, to: 161, side: 'cross' },
+      { id: 'z4', kind: 'water', from: 161, to: 200, side: 'right' },
+      { id: 'z5', kind: 'bunker', from: 181, to: 195, side: 'right' },
+      { id: 'z6', kind: 'bunker', from: 185, to: 199, side: 'left' },
+    ],
+  },
+  'kings-creek:4': {
+    length: 393,
+    fairwayFrom: 143,
+    fairwayTo: 381,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 9, to: 17, side: 'left' },
+      { id: 'z2', kind: 'water', from: 63, to: 139, side: 'left' },
+      { id: 'z3', kind: 'bunker', from: 65, to: 77, side: 'right' },
+      { id: 'z4', kind: 'water', from: 199, to: 227, side: 'left' },
+      { id: 'z5', kind: 'bunker', from: 379, to: 393, side: 'left' },
+    ],
+  },
+  'kings-creek:5': {
+    length: 360,
+    fairwayFrom: 129,
+    fairwayTo: 348,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 72, to: 88, side: 'right' },
+      { id: 'z2', kind: 'water', from: 140, to: 150, side: 'left' },
+      { id: 'z3', kind: 'water', from: 190, to: 314, side: 'right' },
+      { id: 'z4', kind: 'water', from: 272, to: 360, side: 'left' },
+    ],
+  },
+  'kings-creek:6': {
+    length: 164,
+    fairwayFrom: 61,
+    fairwayTo: 152,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'water', from: 5, to: 9, side: 'right' },
+    ],
+  },
+  'kings-creek:7': {
+    length: 515,
+    fairwayFrom: 185,
+    fairwayTo: 503,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'water', from: 8, to: 102, side: 'right' },
+      { id: 'z2', kind: 'bunker', from: 480, to: 492, side: 'right' },
+      { id: 'z3', kind: 'bunker', from: 492, to: 508, side: 'left' },
+    ],
+  },
+  'kings-creek:8': {
+    length: 209,
+    fairwayFrom: 74,
+    fairwayTo: 197,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 77, to: 89, side: 'right' },
+      { id: 'z2', kind: 'water', from: 87, to: 129, side: 'cross' },
+      { id: 'z3', kind: 'water', from: 129, to: 183, side: 'right' },
+      { id: 'z4', kind: 'water', from: 129, to: 133, side: 'left' },
+      { id: 'z5', kind: 'bunker', from: 191, to: 205, side: 'left' },
+    ],
+  },
+  'kings-creek:9': {
+    length: 567,
+    fairwayFrom: 206,
+    fairwayTo: 555,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'water', from: 448, to: 506, side: 'right' },
+      { id: 'z2', kind: 'bunker', from: 536, to: 554, side: 'right' },
+      { id: 'z3', kind: 'bunker', from: 538, to: 542, side: 'cross' },
+    ],
+  },
+  'kings-creek:10': {
+    length: 443,
+    fairwayFrom: 160,
+    fairwayTo: 431,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'water', from: 397, to: 443, side: 'right' },
+    ],
+  },
+  'kings-creek:11': {
+    length: 151,
+    fairwayFrom: 52,
+    fairwayTo: 139,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'water', from: 44, to: 64, side: 'right' },
+      { id: 'z2', kind: 'water', from: 92, to: 138, side: 'right' },
+      { id: 'z3', kind: 'water', from: 100, to: 120, side: 'left' },
+      { id: 'z4', kind: 'water', from: 120, to: 136, side: 'cross' },
+      { id: 'z5', kind: 'water', from: 140, to: 151, side: 'left' },
+    ],
+  },
+  'kings-creek:12': {
+    length: 576,
+    fairwayFrom: 202,
+    fairwayTo: 564,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'water', from: 0, to: 144, side: 'left' },
+      { id: 'z2', kind: 'water', from: 64, to: 576, side: 'right' },
+      { id: 'z3', kind: 'water', from: 302, to: 400, side: 'left' },
+      { id: 'z4', kind: 'water', from: 328, to: 336, side: 'cross' },
+      { id: 'z5', kind: 'water', from: 416, to: 528, side: 'left' },
+    ],
+  },
+  'kings-creek:13': {
+    length: 415,
+    fairwayFrom: 155,
+    fairwayTo: 403,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'water', from: 15, to: 89, side: 'left' },
+      { id: 'z2', kind: 'water', from: 33, to: 179, side: 'right' },
+      { id: 'z3', kind: 'water', from: 77, to: 81, side: 'cross' },
+      { id: 'z4', kind: 'water', from: 135, to: 169, side: 'left' },
+      { id: 'z5', kind: 'water', from: 307, to: 317, side: 'right' },
+    ],
+  },
+  'kings-creek:14': {
+    length: 387,
+    fairwayFrom: 141,
+    fairwayTo: 375,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'water', from: 77, to: 93, side: 'right' },
+      { id: 'z2', kind: 'water', from: 83, to: 95, side: 'left' },
+      { id: 'z3', kind: 'water', from: 93, to: 107, side: 'cross' },
+      { id: 'z4', kind: 'water', from: 107, to: 141, side: 'right' },
+      { id: 'z5', kind: 'water', from: 107, to: 145, side: 'left' },
+      { id: 'z6', kind: 'water', from: 237, to: 383, side: 'right' },
+      { id: 'z7', kind: 'water', from: 249, to: 271, side: 'left' },
+      { id: 'z8', kind: 'water', from: 319, to: 327, side: 'left' },
+    ],
+  },
+  'kings-creek:15': {
+    length: 394,
+    fairwayFrom: 148,
+    fairwayTo: 382,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'water', from: 16, to: 50, side: 'right' },
+      { id: 'z2', kind: 'water', from: 44, to: 88, side: 'cross' },
+      { id: 'z3', kind: 'water', from: 74, to: 330, side: 'right' },
+      { id: 'z4', kind: 'water', from: 88, to: 96, side: 'left' },
+      { id: 'z5', kind: 'water', from: 196, to: 210, side: 'left' },
+      { id: 'z6', kind: 'water', from: 360, to: 378, side: 'left' },
+    ],
+  },
+  'kings-creek:16': {
+    length: 276,
+    fairwayFrom: 95,
+    fairwayTo: 264,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'water', from: 0, to: 82, side: 'right' },
+      { id: 'z2', kind: 'water', from: 82, to: 126, side: 'cross' },
+      { id: 'z3', kind: 'water', from: 126, to: 218, side: 'right' },
+      { id: 'z4', kind: 'water', from: 218, to: 244, side: 'cross' },
+      { id: 'z5', kind: 'water', from: 242, to: 252, side: 'right' },
+      { id: 'z6', kind: 'water', from: 244, to: 276, side: 'left' },
+    ],
+  },
+  'kings-creek:17': {
+    length: 191,
+    fairwayFrom: 68,
+    fairwayTo: 179,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'water', from: 46, to: 86, side: 'right' },
+      { id: 'z2', kind: 'water', from: 106, to: 128, side: 'right' },
+      { id: 'z3', kind: 'water', from: 128, to: 148, side: 'cross' },
+      { id: 'z4', kind: 'water', from: 148, to: 152, side: 'left' },
+      { id: 'z5', kind: 'water', from: 162, to: 191, side: 'right' },
+    ],
+  },
+  'kings-creek:18': {
+    length: 575,
+    fairwayFrom: 158,
+    fairwayTo: 563,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'water', from: 0, to: 340, side: 'left' },
+      { id: 'z2', kind: 'water', from: 22, to: 116, side: 'right' },
+      { id: 'z3', kind: 'water', from: 334, to: 364, side: 'right' },
+      { id: 'z4', kind: 'bunker', from: 546, to: 560, side: 'left' },
     ],
   },
 }

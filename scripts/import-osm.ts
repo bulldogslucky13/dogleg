@@ -99,6 +99,11 @@ type CourseGeo = {
 }
 
 const COURSE_GEO: Record<string, CourseGeo> = {
+  // King's Creek CC, Kemp TX (OSM way 386836594). NAME-COLLISION WARNING:
+  // a second "Kings Creek Country Club" exists in Rehoboth Beach, Delaware —
+  // never import that one's geography under this slug. The Texas club is
+  // pinned by center + the apostrophe in its OSM name.
+  kingscreek: { name: 'Kings Creek Country Club', center: [32.4039, -96.2461], radius: 1500, osmName: "King's Creek Country Club", engineSlug: 'kings-creek' },
   sawgrass: { name: 'TPC Sawgrass — Stadium', center: [30.1985, -81.396], radius: 1400, osmName: 'Stadium Course', osmHolePrefix: 'Stadium', engineSlug: 'tpc-sawgrass' },
   augusta: { name: 'Augusta National', center: [33.5021, -82.0233], radius: 1600, osmName: 'Augusta National', engineSlug: 'augusta-national' },
   pebble: { name: 'Pebble Beach Links', center: [36.5686, -121.9497], radius: 2500, osmName: 'Pebble Beach Golf', engineSlug: 'pebble-beach' },
@@ -1003,8 +1008,10 @@ async function main() {
   // side-by-side with the current procedural layout the game ships today
   if (flags.includes('--compare')) {
     const { buildLayout } = await import('../src/engine/layout.ts')
-    const { COURSES } = await import('../src/engine/courses.ts')
-    const course = COURSES.find((c: { slug: string }) => c.slug === geo.engineSlug)
+    // courseBySlug spans the whole library — rotation, par-3 shorts, and guest
+    // courses alike — so a course outside the daily walk still compares.
+    const { courseBySlug } = await import('../src/engine/courses.ts')
+    const course = courseBySlug(geo.engineSlug)
     const spec = course?.holes[holeNo - 1]
     if (!spec) {
       console.error(`\n(no engine hole for ${geo.engineSlug} #${holeNo} to compare)`)

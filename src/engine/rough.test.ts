@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { COURSES, courseBySlug } from './courses'
+import { COURSES, GUEST_COURSES, courseBySlug } from './courses'
 import { buildLayout } from './layout'
 import { approachOdds } from './odds'
 import type { BallState, Conditions } from './types'
@@ -113,21 +113,31 @@ describe('the junk floor names something the course actually has', () => {
   // things this is meant to name, so letting them satisfy the check answered
   // "does the course have trees?" with "it has vegetation", which is not the
   // same question.
-  it('never says "trees" on a hole whose course has none', () => {
-    for (const c of COURSES) {
+  // Guest courses are swept too: kings-creek shipped water-only geometry with
+  // no junkLabel and slipped past this describe because the sweep read only
+  // COURSES — and because the literal 'junk' fallback satisfied a not-'trees'
+  // assertion. Both halves of that hole are closed here: every playable
+  // 18-hole course, and no fallback word either.
+  it('never says "trees" — or the unnamed fallback — on a hole whose course has none', () => {
+    for (const c of [...COURSES, ...GUEST_COURSES]) {
       const hasTrees = c.holes.some((spec) => buildLayout(c.slug, spec, COND).zones.some((z) => z.kind === 'trees'))
       if (hasTrees) continue
       for (const spec of c.holes) {
+        const label = buildLayout(c.slug, spec, COND).junkLabel
         expect(
-          buildLayout(c.slug, spec, COND).junkLabel,
+          label,
           `${c.slug}:${spec.number} would claim trees on a course that has none — set junkLabel`,
         ).not.toBe('trees')
+        expect(
+          label,
+          `${c.slug}:${spec.number} fell through to the literal 'junk' — a treeless course must name its junk (set junkLabel)`,
+        ).not.toBe('junk')
       }
     }
   })
 
   it('resolves the label per hole: real trees win, then the course, then deep rough', () => {
-    for (const c of COURSES) {
+    for (const c of [...COURSES, ...GUEST_COURSES]) {
       const courseWord = c.junkLabel ?? c.roughLabel
       for (const spec of c.holes) {
         const layout = buildLayout(c.slug, spec, COND)

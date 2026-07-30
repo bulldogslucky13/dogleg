@@ -5,6 +5,7 @@ import { courseBySlug } from './engine/courses'
 import { dailySetup, localDateKey, practiceSetup, toParLabel, type DailySetup } from './engine/daily'
 import { longOdds } from './engine/odds'
 import { LOOK_LABEL, madePuttLook, oddsFor, pinChip } from './engine/resolve'
+import { seasonForDate } from './engine/season'
 import type { ApproachOdds, CharacterAdvantage, CharacterId, Choice } from './engine/types'
 import {
   advanceHole,
@@ -30,7 +31,7 @@ import {
 } from './state/store'
 import { absorbHistory, logRound } from './state/stats'
 import { ghostBallAt, ghostNoun, loadGhost, paceLabel, paceVs, type Ghost } from './state/ghost'
-import { chasing } from './lib/records'
+import { chasing, chasingSeason } from './lib/records'
 import { identifyPlayer, track } from './lib/analytics'
 import { clubhouseLine, fetchHoleChoices, groupChoices, type TallyRow } from './lib/decisionStats'
 import { ensureIdentity, loadIdentity, loadPlayer } from './lib/leaderboard'
@@ -700,9 +701,26 @@ export default function App() {
 
   const classic = uiMode === 'classic'
   const char = characterById(round.character)
-  // the target on the wall: a stolen record being chased stays visible in
-  // the HUD for the whole unlimited round
+  // the targets on the wall: stolen records being chased stay visible in the
+  // HUD for the whole unlimited round — each labeled with its board. One
+  // round routinely takes both boards with one score; that's one target, one
+  // chip, the merged label.
   const chase = round.mode === 'practice' ? chasing(round.courseSlug) : null
+  const seasonChase = round.mode === 'practice' ? chasingSeason(round.courseSlug, seasonForDate().key) : null
+  const sameTheft =
+    !!chase &&
+    !!seasonChase &&
+    chase.by.toLowerCase() === seasonChase.by.toLowerCase() &&
+    chase.theirToPar === seasonChase.theirToPar
+  // the season chip stands down when its target is already on screen: merged
+  // into the all-time chip, or the very record round the ghost is racing
+  const seasonChipRedundant =
+    !seasonChase ||
+    sameTheft ||
+    (ghost?.kind === 'record' &&
+      !!ghost.holder &&
+      ghost.holder.toLowerCase() === seasonChase.by.toLowerCase() &&
+      ghost.toPar === seasonChase.theirToPar)
 
   // A Fortune shares the day streak, but the daily in progress isn't in
   // `history` until it's signed (recordResult), so counting from history alone
@@ -806,7 +824,7 @@ export default function App() {
           230px chip inside it squeezed the par/course text to ~11px — "Par 4 ·
           SI 8" wrapped and the course name clipped to its first letter on
           every ghost round. Visually this is where the chips already sat. */}
-      {(ghost || chase) && (
+      {(ghost || chase || seasonChase) && (
         <div className="ghost-chip-row">
           {ghost &&
             (() => {
@@ -824,7 +842,15 @@ export default function App() {
               a personal-best fallback ghost races "your best", so the real target
               (holder + score) must stay visible for a "win it back" attempt */}
           {chase && (!ghost || ghost.kind === 'personal') && (
-            <div className="chase-chip">🎯 Record {toParLabel(chase.theirToPar)} · {chase.by}</div>
+            <div className="chase-chip">
+              🎯 {sameTheft ? 'All-time + season record' : 'All-time record'} {toParLabel(chase.theirToPar)} ·{' '}
+              {chase.by}
+            </div>
+          )}
+          {seasonChase && !seasonChipRedundant && (
+            <div className="chase-chip season">
+              🎯 Season record {toParLabel(seasonChase.theirToPar)} · {seasonChase.by}
+            </div>
           )}
         </div>
       )}

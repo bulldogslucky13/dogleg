@@ -421,6 +421,17 @@
   color: var(--record-gold);
 }
 
+.screen.home .steal-tag.alltime,
+.screen.home .steal-tag.both {
+  background: var(--record-gold);
+  color: var(--turf-950);
+}
+
+.screen.home .steal-tag.season {
+  border-color: var(--record-gold);
+  color: var(--record-gold);
+}
+
 .screen.home .steal-cta {
   background: linear-gradient(180deg, var(--flag-400), var(--flag-500));
   color: var(--action-on-primary);

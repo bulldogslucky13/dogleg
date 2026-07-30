@@ -14,7 +14,7 @@ import { FortuneInfo } from './Tutorial'
 import { ChangeLog } from './ChangeLog'
 import { hasEarnedAwards, reconcileAchievements, type Unlock } from '../state/achievements'
 import { Wordmark } from './Wordmark'
-import { dismissSteals, pendingSteals, syncLedger, type StolenRecord } from '../lib/records'
+import { dismissSteals, pendingSteals, syncLedger, syncSeasonLedger, type PendingSteal } from '../lib/records'
 import { loadBrowsePrefs, saveBrowsePrefs } from '../lib/browsePrefs'
 import { loadFavorites, toggleFavorite } from '../lib/favorites'
 import { loadGhost, type Ghost } from '../state/ghost'
@@ -135,7 +135,10 @@ export function HomeScreen(props: {
   }, [showCourses, seasonRecsKey, season.key])
 
   // the record-stolen check: compare the records this device holds against
-  // the server's holders. Purely a read — the "notification" is derived.
+  // the server's holders, on BOTH boards. Purely reads — the "notification"
+  // is derived. Each fetch reconciles its own shelf independently, so one
+  // board being unreachable never silences (or fakes) the other; a failed
+  // fetch stays null and that shelf simply isn't reconciled this visit.
   useEffect(() => {
     if (!backendEnabled) return
     const myName = loadPlayer()?.name ?? null
@@ -151,6 +154,12 @@ export function HomeScreen(props: {
       props.onAwardsChanged?.()
       setSteals(pendingSteals())
     })
+    void fetchSeasonRecords(season.key).then((recs) => {
+      if (!recs) return
+      syncSeasonLedger(recs, season.key, myName)
+      setSteals(pendingSteals())
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
   // remember the browse view as it changes, not on leave — a mid-session
   // reload (or the tab dying) must not lose the configuration either
@@ -753,25 +762,45 @@ export function ForecastCard(props: { today: HistoryEntry }) {
  * their putter, not their feelings. "Win it back" deep-links straight into
  * unlimited play on that course.
  */
+/** which wall the name came off — worn by every steal surface so an all-time
+ * fall and a season fall can never be mistaken for each other. Solid gold is
+ * the all-time record, the gold keyline is the season board — the same
+ * convention as the Records tab's badges. */
+function StealTag({ scope }: { scope: PendingSteal['scope'] }) {
+  const label = scope === 'both' ? 'All-time + Season' : scope === 'alltime' ? 'All-time' : 'Season'
+  return <span className={`steal-tag ${scope}`}>{label}</span>
+}
+
 function StealCard(props: {
-  steals: Array<{ courseSlug: string } & StolenRecord>
+  steals: PendingSteal[]
   onDismiss: () => void
   onWinItBack: (slug: string) => void
 }) {
   const [expanded, setExpanded] = useState(props.steals.length === 1)
   const courseName = (slug: string) => courseBySlug(slug)?.name ?? slug
   const one = props.steals.length === 1 ? props.steals[0] : null
+  // the kicker names the board outright when every fall is on the same one
+  const kicker = props.steals.every((s) => s.scope === 'season')
+    ? '🚨 Season record stolen'
+    : props.steals.every((s) => s.scope === 'alltime')
+      ? '🚨 Course record stolen'
+      : '🚨 Records stolen'
   return (
     <div className="steal-card" role="status">
       <button className="steal-x" onClick={props.onDismiss} aria-label="Dismiss">
         ✕
       </button>
-      <div className="kicker">🚨 Course record stolen</div>
+      <div className="kicker">{kicker}</div>
       {one ? (
         <>
           <p>
-            <b>{one.by}</b> shot <b>{toParLabel(one.theirToPar)}</b> at {courseName(one.courseSlug)}, sliding past
-            your {toParLabel(one.myToPar)}. Word travels fast around here.
+            <StealTag scope={one.scope} /> <b>{one.by}</b> shot <b>{toParLabel(one.theirToPar)}</b> at{' '}
+            {courseName(one.courseSlug)}
+            {one.scope === 'season'
+              ? `, knocking your ${toParLabel(one.myToPar)} off the season board. The horn hasn't blown yet — plenty of time to answer.`
+              : one.scope === 'both'
+                ? ` — past your ${toParLabel(one.myToPar)}, taking the all-time record and the season board in one round. The nerve.`
+                : `, sliding past your ${toParLabel(one.myToPar)} on the all-time board. Word travels fast around here.`}
           </p>
           <button className="cta steal-cta" onClick={() => props.onWinItBack(one.courseSlug)}>
             Win it back
@@ -780,15 +809,16 @@ function StealCard(props: {
       ) : (
         <>
           <p>
-            <b>{props.steals.length} of your course records fell</b> while you were gone.
+            <b>{props.steals.length} of your records fell</b> while you were gone.
             {!expanded && ' The nerve.'}
           </p>
           {expanded ? (
             <div className="steal-list">
               {props.steals.map((s) => (
-                <div key={s.courseSlug} className="steal-row">
+                <div key={`${s.scope}:${s.courseSlug}`} className="steal-row">
                   <span>
-                    <b>{courseName(s.courseSlug)}</b> — {s.by}, {toParLabel(s.theirToPar)} (yours: {toParLabel(s.myToPar)})
+                    <StealTag scope={s.scope} /> <b>{courseName(s.courseSlug)}</b> — {s.by},{' '}
+                    {toParLabel(s.theirToPar)} (yours: {toParLabel(s.myToPar)})
                   </span>
                   <button className="cta ghost slim" onClick={() => props.onWinItBack(s.courseSlug)}>
                     Win it back

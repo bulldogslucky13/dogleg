@@ -1,4 +1,5 @@
 import { CHARACTERS } from '../engine/characters'
+import { courseBySlug } from '../engine/courses'
 import type { HoleResult } from '../engine/types'
 import { loadLedger } from '../lib/records'
 import { computeStreaks, loadHistory } from './store'
@@ -345,6 +346,21 @@ const isOver = (r: HoleResult) => OVER.includes(r)
  * timestamp — time-of-day badges must not read those as real clock times. */
 const hasRealClock = (r: LoggedRound) => !r.seed.startsWith('hist:')
 
+/**
+ * A round that went the distance on ITS OWN course — 9, 10 or 18 holes,
+ * whichever that course has. Par-3 courses are real courses at their real
+ * length (cobblestone-creek is 9, the-swing is 10), so a badge that promises
+ * "a full round" has to mean a full round of what you actually played;
+ * hard-coding eighteen locked short-course players out of it entirely.
+ *
+ * Only complete rounds are ever logged, but daily history recovered from old
+ * saves can carry an empty results array, so the length is still checked.
+ * An unknown slug (a course retired from the library) falls back to 18, the
+ * same assumption `coursePars` makes in stats.ts.
+ */
+const isFullRound = (r: LoggedRound) =>
+  r.results.length > 0 && r.results.length === (courseBySlug(r.courseSlug)?.holes.length ?? 18)
+
 export interface ProgressSnapshot {
   /** ladder id → current value */
   ladders: Record<string, number>
@@ -404,15 +420,23 @@ export function computeProgress(
   for (const r of log) {
     if (r.character) charactersUsed.add(r.character)
     const res = r.results
-    if (res.length >= 18) {
-      if (!res.some(isOver)) spotless++
+    // "Play a full round with no bogeys" — full round of whatever course you
+    // teed it up on, nine holes included
+    if (isFullRound(r) && !res.some(isOver)) spotless++
+    // Even Steven and Bookends stay EIGHTEEN-hole badges on purpose: their own
+    // copy names the distance ("Par all eighteen holes", "Birdie the 1st and
+    // the 18th"), so a nine-hole card can't satisfy what the badge says. Same
+    // for the Comeback, whose +3-through-six-then-break-par shape is calibrated
+    // for an 18-hole round — six of nine is a different challenge, and
+    // rescaling it is a design decision, not a bug fix.
+    if (res.length === 18) {
       if (res.every((x) => x === 'par')) evenSteven++
       if (isUnder(res[0]) && isUnder(res[17])) bookends++
     }
     const throughSix = res
       .slice(0, 6)
       .reduce((s, x) => s + ({ albatross: -3, eagle: -2, birdie: -1, par: 0, bogey: 1, double: 2, triple: 3 })[x], 0)
-    if (res.length >= 18 && throughSix >= 3 && r.toPar < 0) comeback++
+    if (res.length === 18 && throughSix >= 3 && r.toPar < 0) comeback++
     let run = 0
     let sawHeater = false
     for (let i = 0; i < res.length; i++) {

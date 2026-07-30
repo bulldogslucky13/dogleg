@@ -19,6 +19,7 @@ import {
 import { lifetimeRounds, loadArchive, type ArchivedRound, type HistoryEntry } from '../state/store'
 import { pastSeasons, roundsInSeason, seasonAwards, type SeasonAward } from '../state/seasonStore'
 import { loadLedger, syncLedger } from '../lib/records'
+import { reconcileAchievements } from '../state/achievements'
 import { AccountPanel } from './AccountPanel'
 import { AchievementsView } from './Achievements'
 import { RoundScorecard } from './RoundScorecard'
@@ -104,6 +105,11 @@ export function RoundsScreen(props: {
     void fetchCourseRecords().then((recs) => {
       if (!live || !recs) return
       syncLedger(recs, myName)
+      // same as the home screen's pass: a record adopted or reclaimed elsewhere
+      // moves the record achievements, and this lands after the app-start
+      // reconcile. Quietly — finding out isn't earning. setLedger below
+      // re-renders, so an open Awards tab picks the grants up immediately.
+      reconcileAchievements('quiet')
       setLedger(loadLedger())
     })
     return () => {

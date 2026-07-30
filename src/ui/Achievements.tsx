@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import {
   computeProgress,
@@ -86,8 +86,16 @@ export function UnlockToasts(props: { unlocks: Unlock[]; onDone: () => void }) {
  * Hidden one-offs show only a wry hint until the day they unlock.
  */
 export function AchievementsView() {
+  // Both reads happen on every render, deliberately. An empty-dependency memo
+  // pinned the snapshot taken when the tab mounted, so a record sync or an
+  // account-history sync landing while Awards is open moved the earned ledger
+  // underneath bars, ranks and counts that went on showing pre-sync numbers
+  // until the player closed the tab and came back. Every sibling in
+  // RoundsScreen already re-reads storage per render (loadRoundLog,
+  // loadArchive, lifetimeStats) — this is the same contract, and reconcile's
+  // own cost note puts a thousand-round recompute at ~2ms.
   const ledger = loadAchievements()
-  const progress = useMemo(() => computeProgress(), [])
+  const progress = computeProgress()
 
   // the one-time backfill summary is considered delivered once this tab
   // has been seen

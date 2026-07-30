@@ -69,6 +69,30 @@ describe('computeProgress', () => {
     expect(allPar.oneOffs.spotless).toBe(1)
   })
 
+  it('counts a full round of a SHORT course, not just eighteen holes', () => {
+    // cobblestone-creek is a real 9-hole par-3 course; the-swing is 10. A gate
+    // of `results.length >= 18` locked every short-course player out of
+    // Spotless, whose requirement is "a full round" — not eighteen holes.
+    const nine = round({ courseSlug: 'cobblestone-creek', results: Array(9).fill('par') })
+    expect(computeProgress([nine], [], emptyLedger()).oneOffs.spotless).toBe(1)
+    const ten = round({ courseSlug: 'the-swing', results: Array(10).fill('par') })
+    expect(computeProgress([ten], [], emptyLedger()).oneOffs.spotless).toBe(1)
+    // a bogey still spoils it, short course or long
+    const blemished = round({ courseSlug: 'cobblestone-creek', results: ['bogey', ...Array(8).fill('par')] })
+    expect(computeProgress([blemished], [], emptyLedger()).oneOffs.spotless).toBe(0)
+
+    // …but the badges whose own copy names eighteen stay eighteen-hole badges:
+    // an all-par nine is not "par all eighteen holes"
+    const shortAllPar = computeProgress([nine], [], emptyLedger())
+    expect(shortAllPar.oneOffs.evenSteven).toBe(0)
+    expect(shortAllPar.oneOffs.bookends).toBe(0)
+
+    // a PARTIAL card never counts as a full round — daily history recovered
+    // from old saves can carry an empty results array
+    const stub = round({ courseSlug: 'cobblestone-creek', results: [] })
+    expect(computeProgress([stub], [], emptyLedger()).oneOffs.spotless).toBe(0)
+  })
+
   it('scores the comeback and the bounce-backs', () => {
     // +4 through six, then storms home to -1
     const results: HoleResult[] = [

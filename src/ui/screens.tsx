@@ -12,7 +12,7 @@ import { fetchCourseRecords, fetchSeasonRecords, loadPlayer, type CourseRecord }
 import { seasonCountdown, seasonForDate } from '../engine/season'
 import { FortuneInfo } from './Tutorial'
 import { ChangeLog } from './ChangeLog'
-import type { Unlock } from '../state/achievements'
+import { reconcileAchievements, type Unlock } from '../state/achievements'
 import { Wordmark } from './Wordmark'
 import { dismissSteals, pendingSteals, syncLedger, type StolenRecord } from '../lib/records'
 import { loadGhost, type Ghost } from '../state/ghost'
@@ -108,6 +108,11 @@ export function HomeScreen(props: {
     void fetchCourseRecords().then((recs) => {
       if (!recs) return
       syncLedger(recs, myName)
+      // the sync can adopt records set on another device, or learn that one was
+      // taken back there — both move achievements (Name on the Wall, the record
+      // ladders, Repo Man), and this fetch lands long after the app-start
+      // reconcile. Quiet: nobody earned anything just now, we only found out.
+      reconcileAchievements('quiet')
       setSteals(pendingSteals())
     })
   }, [])

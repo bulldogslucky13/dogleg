@@ -2,11 +2,14 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import {
   chasing,
+  chasingSeason,
   dismissSteals,
   loadLedger,
   pendingSteals,
   recordWon,
+  seasonRecordWon,
   syncLedger,
+  syncSeasonLedger,
   type ServerRecord,
 } from './records'
 
@@ -105,5 +108,94 @@ describe('the reclaim closes the loop', () => {
     expect(chasing('pebble-beach')).toBeNull()
     expect(pendingSteals()).toHaveLength(0)
     expect(loadLedger().held['pebble-beach'].toPar).toBe(-7)
+  })
+})
+
+describe('the season shelf runs the same rivalry, scoped to one season', () => {
+  const SUMMER = '2026-q2-summer'
+  const FALL = '2026-q3-fall'
+
+  it('a held season record under a new holder becomes a season-scoped steal', () => {
+    seasonRecordWon('pebble-beach', -3, SUMMER, 1000)
+    syncSeasonLedger(server([['pebble-beach', 'Hank', -5]]), SUMMER, 'Jackson', 2000, '2026-07-20')
+    const steals = pendingSteals()
+    expect(steals).toHaveLength(1)
+    expect(steals[0]).toMatchObject({ courseSlug: 'pebble-beach', scope: 'season', by: 'Hank' })
+    expect(chasingSeason('pebble-beach', SUMMER)?.by).toBe('Hank')
+    // the all-time chase is untouched — the ghost keys on it
+    expect(chasing('pebble-beach')).toBeNull()
+  })
+
+  it('ROLLOVER IS NOT THEFT: held and stolen entries from a past season drop silently', () => {
+    seasonRecordWon('pebble-beach', -3, SUMMER, 1000)
+    seasonRecordWon('st-andrews-old', -2, SUMMER, 1000)
+    syncSeasonLedger(server([['st-andrews-old', 'Hank', -6]]), SUMMER, 'Jackson', 2000, '2026-07-20')
+    expect(pendingSteals()).toHaveLength(1)
+    // the horn blows; the new season's board opens with a different holder
+    syncSeasonLedger(server([['pebble-beach', 'Marge', -4]]), FALL, 'Jackson', 3000, '2026-08-01')
+    expect(pendingSteals()).toHaveLength(0)
+    expect(loadLedger().heldSeason['pebble-beach']).toBeUndefined()
+    expect(chasingSeason('st-andrews-old', FALL)).toBeNull()
+  })
+
+  it('reclaiming a season record returns the steal only within the same season', () => {
+    seasonRecordWon('pebble-beach', -3, SUMMER, 1000)
+    syncSeasonLedger(server([['pebble-beach', 'Hank', -5]]), SUMMER, 'Jackson', 2000, '2026-07-20')
+    const reclaimed = seasonRecordWon('pebble-beach', -6, SUMMER, 3000)
+    expect(reclaimed?.by).toBe('Hank')
+    expect(chasingSeason('pebble-beach', SUMMER)).toBeNull()
+  })
+
+  it('a stale steal from last season is never a reclaim in the new one', () => {
+    seasonRecordWon('pebble-beach', -3, SUMMER, 1000)
+    syncSeasonLedger(server([['pebble-beach', 'Hank', -5]]), SUMMER, 'Jackson', 2000, '2026-07-20')
+    // no sync ran after rollover; the win itself is the first season event
+    expect(seasonRecordWon('pebble-beach', -4, FALL, 3000)).toBeNull()
+  })
+
+  it('one round taking both boards from me is ONE steal event, scope both', () => {
+    recordWon('pebble-beach', -4, 1000)
+    seasonRecordWon('pebble-beach', -4, SUMMER, 1000)
+    syncLedger(server([['pebble-beach', 'Hank', -6]]), 'Jackson', 2000, '2026-07-20')
+    syncSeasonLedger(server([['pebble-beach', 'Hank', -6]]), SUMMER, 'Jackson', 2000, '2026-07-20')
+    const steals = pendingSteals()
+    expect(steals).toHaveLength(1)
+    expect(steals[0].scope).toBe('both')
+  })
+
+  it('different thieves on the two boards stay two distinct events', () => {
+    recordWon('pebble-beach', -8, 1000)
+    seasonRecordWon('pebble-beach', -3, SUMMER, 1000)
+    // Hank beats the season score but not the legend round
+    syncSeasonLedger(server([['pebble-beach', 'Hank', -5]]), SUMMER, 'Jackson', 2000, '2026-07-20')
+    syncLedger(server([['pebble-beach', 'Jackson', -8]]), 'Jackson', 2000, '2026-07-20')
+    const steals = pendingSteals()
+    expect(steals).toHaveLength(1)
+    expect(steals[0].scope).toBe('season')
+    expect(chasing('pebble-beach')).toBeNull()
+  })
+
+  it('dismissal covers both shelves in one gesture', () => {
+    recordWon('pebble-beach', -4, 1000)
+    seasonRecordWon('st-andrews-old', -2, SUMMER, 1000)
+    syncLedger(server([['pebble-beach', 'Hank', -6]]), 'Jackson', 2000, '2026-07-20')
+    syncSeasonLedger(server([['st-andrews-old', 'Marge', -4]]), SUMMER, 'Jackson', 2000, '2026-07-20')
+    expect(pendingSteals()).toHaveLength(2)
+    dismissSteals('2026-07-20')
+    expect(pendingSteals()).toHaveLength(0)
+  })
+
+  it('a v1 ledger (pre-season devices) loads with empty season shelves intact', () => {
+    localStorage.setItem(
+      'dogleg:records:v1',
+      JSON.stringify({ v: 1, held: { 'pebble-beach': { toPar: -4, since: 1000 } }, stolen: {} }),
+    )
+    const ledger = loadLedger()
+    expect(ledger.v).toBe(2)
+    expect(ledger.held['pebble-beach'].toPar).toBe(-4)
+    expect(ledger.heldSeason).toEqual({})
+    // and the old data still notices thefts
+    syncLedger(server([['pebble-beach', 'Hank', -6]]), 'Jackson', 2000, '2026-07-20')
+    expect(pendingSteals()).toHaveLength(1)
   })
 })

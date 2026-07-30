@@ -3902,18 +3902,27 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   //    where vegetation defines a hole; harbour-town:18's trees are the
   //    precedent). Rather than draw them by eye, the rims were MEASURED: USGS
   //    NED 10m elevation transects (the same source ProVisualizer quotes)
-  //    every 25 yd along each centreline, sampling +/-18..70 yd, taking the
-  //    nearest offset whose ground sits >= 6 m below the playing line. Only
-  //    rims inside the importer's own 50-yd corridor were authored:
-  //      h3  left 28-40 yd out over 120-170     (canyon left of the green)
-  //      h4  left 28-55 yd out over the WHOLE hole, 8-16 m deep (the bluff)
-  //      h6  right 28-40 yd out over 20-245     (matches the tee-view imagery)
-  //      h13 left 18-28 yd out over 20-220      (the closest rim on the course)
-  //      h17 left 28-40 yd out over 20-120      (canyon down the whole left)
+  //    every 10 yd along each centreline, sampling +/-20..60 yd, taking the
+  //    nearest offset whose ground sits >= 6 m below the playing line. A zone
+  //    is authored ONLY where that rim falls inside the importer's own 50-yd
+  //    corridor, and it spans exactly the measured run — these ARE the runs:
+  //      h3  left  110-190          (rim 30-40; the canyon left of the green)
+  //      h4  left  10-480           (rim 30-50; the bluff, 8-16 m deep)
+  //      h6  right 5-255            (rim 30-50; matches the tee-view imagery)
+  //      h13 left  10-230           (rim 20-40; the closest rim on the course)
+  //      h17 left  10-120, 210-340  (rim 20-40 / 40-50)
+  //    Two merges, both because the rim wanders just past 50 yd for a stretch
+  //    of a feature the imagery shows unbroken, and a hole in a continuous
+  //    hazard rewards an aggressive line for the wrong reason (the
+  //    broken-lateral-hazard mode in scripts/README.md): h4 spans gaps at
+  //    120-140 and 350-410, h17 spans 240-270. h17's 120-210 gap is NOT
+  //    merged — 90 yd is too long to call one hazard, so that hole carries
+  //    two zones. Nothing is extrapolated past a measured endpoint.
   //    Holes 2, 7, 8, 9, 14, 15 and 16 also fall away, but at 55-70 yd —
   //    outside the corridor — so they were deliberately left alone, the same
   //    call that cleared whistling-straits:9/18. Holes 1, 5, 10, 11, 12 and 18
-  //    have no drop at all within 70 yd.
+  //    have no drop at all within 70 yd. Hole 6 has a second, LEFT rim over
+  //    10-50 yd; it is tee-adjacent and unreachable, so it is not authored.
   //
   // Zone `side` was calibrated against the importer's own output on holes 6,
   // 10 and 18 before any of this was written, and the canyon sides were then
@@ -3951,7 +3960,7 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
     fairwayTo: 189,
     greenDepth: 20,
     zones: [
-      { id: 'z1', kind: 'deeprough', from: 120, to: 201, side: 'left' },
+      { id: 'z1', kind: 'deeprough', from: 110, to: 190, side: 'left' },
       { id: 'z2', kind: 'bunker', from: 179, to: 190, side: 'cross' },
     ],
   },
@@ -3961,7 +3970,7 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
     fairwayTo: 478,
     greenDepth: 20,
     zones: [
-      { id: 'z1', kind: 'deeprough', from: 171, to: 490, side: 'left' },
+      { id: 'z1', kind: 'deeprough', from: 10, to: 480, side: 'left' },
       { id: 'z2', kind: 'bunker', from: 276, to: 328, side: 'right' },
       { id: 'z3', kind: 'bunker', from: 460, to: 470, side: 'left' },
     ],
@@ -3984,8 +3993,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
     fairwayTo: 552,
     greenDepth: 20,
     zones: [
-      { id: 'z1', kind: 'bunker', from: 95, to: 121, side: 'left' },
-      { id: 'z2', kind: 'deeprough', from: 95, to: 245, side: 'right' },
+      { id: 'z1', kind: 'deeprough', from: 5, to: 255, side: 'right' },
+      { id: 'z2', kind: 'bunker', from: 95, to: 121, side: 'left' },
       { id: 'z3', kind: 'bunker', from: 169, to: 199, side: 'left' },
       { id: 'z4', kind: 'bunker', from: 301, to: 350, side: 'left' },
       { id: 'z5', kind: 'bunker', from: 363, to: 380, side: 'left' },
@@ -4072,7 +4081,7 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
     fairwayTo: 609,
     greenDepth: 20,
     zones: [
-      { id: 'z1', kind: 'deeprough', from: 100, to: 240, side: 'left' },
+      { id: 'z1', kind: 'deeprough', from: 10, to: 230, side: 'left' },
       { id: 'z2', kind: 'bunker', from: 279, to: 293, side: 'left' },
       { id: 'z3', kind: 'bunker', from: 303, to: 319, side: 'left' },
       { id: 'z4', kind: 'bunker', from: 333, to: 399, side: 'right' },
@@ -4117,10 +4126,11 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
     fairwayTo: 431,
     greenDepth: 20,
     zones: [
-      { id: 'z1', kind: 'deeprough', from: 100, to: 350, side: 'left' },
-      { id: 'z2', kind: 'bunker', from: 266, to: 324, side: 'right' },
-      { id: 'z3', kind: 'bunker', from: 414, to: 432, side: 'right' },
-      { id: 'z4', kind: 'bunker', from: 424, to: 436, side: 'left' },
+      { id: 'z1', kind: 'deeprough', from: 10, to: 120, side: 'left' },
+      { id: 'z2', kind: 'deeprough', from: 210, to: 340, side: 'left' },
+      { id: 'z3', kind: 'bunker', from: 266, to: 324, side: 'right' },
+      { id: 'z4', kind: 'bunker', from: 414, to: 432, side: 'right' },
+      { id: 'z5', kind: 'bunker', from: 424, to: 436, side: 'left' },
     ],
   },
   'torrey-pines-south:18': {

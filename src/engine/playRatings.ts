@@ -97,7 +97,7 @@ export const PLAY_INDEX: Record<string, number> = {
   'gullwing-point': 0.728,
   'seminole': 1.938,
   'birchwood-national': -0.637,
-  'torrey-pines-south': 1.424,
+  'torrey-pines-south': 1.420,
   'pacific-dunes': 1.589,
   'pine-valley': 1.443,
   'bandon-dunes': 1.806,

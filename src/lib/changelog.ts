@@ -97,6 +97,12 @@ export const CHANGELOG: ChangeEntry[] = [
     note: 'Every course drawn from real-world maps had its greens come out about half as deep as they really are. That put the front edge too close to the pin, so sand guarding the front of a green was not always counted as guarding it, and those bunkers read as slightly less dangerous than they are. All 199 holes are re-measured against the real green. No course changed its difficulty rating.',
   },
   {
+    date: '2026-07-29',
+    kind: 'feature',
+    title: 'Season records are worth defending too',
+    note: 'Losing a season record now gets you the same treatment as losing an all-time one — the rivalry card on the Teebox, the target chip during the rematch, and the email all fire. Every one of them says which board the name came off, and winning a stolen season record back gets its own celebration.',
+  },
+  {
     date: '2026-07-27',
     kind: 'feature',
     title: 'Achievements',

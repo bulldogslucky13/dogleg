@@ -13,10 +13,10 @@
  * conditions derivation, or anything else that could make a replay of the
  * same seed + decisions come out differently. Pure additions the replay
  * ignores (new UI, new optional payload fields) don't need a bump. Careful
- * with courses: adding to or reordering the daily COURSES rotation changes
- * which slug `courseForPuzzle` maps a date to (src/engine/daily.ts), which
- * breaks replay of existing daily seeds — that's a bump, or better, a gated
- * cutover per the conditions-versioning note in daily.ts. Only a course
+ * with courses: adding to or reordering the daily rotation changes which
+ * slug `courseForPuzzle` maps a date to (src/engine/daily.ts) — do it ONLY
+ * via a new future-dated ROTATION_ERAS entry (never by editing a shipped
+ * era's array), and bump this for the cutover day forward. Only a course
  * reachable purely by practice seeds (which name their slug) is a pure
  * addition. The deploy
  * pipeline already redeploys the function on every push to main, so both
@@ -63,4 +63,11 @@
 // between. That reshapes only newly imported geometry (committed courses are
 // static data and untouched), but Seminole is the first course to ship from
 // it, so the two go out together.
-export const ENGINE_VERSION = 10
+// v11 = Kings Creek CC (guest course, Kemp TX) + the DAILY_OVERRIDES table:
+// 2026-08-01's daily maps to the guest course instead of the rotation walk,
+// which changes what that day's seeds replay into (they don't exist yet — the
+// override ships before the day does). The rotation array itself is untouched;
+// this is the gated-cutover shape the note above asks for, expressed as an
+// explicit per-day table. (If PR #87's Mis-fortune v11 merges first, renumber
+// this to v12 — same collision Seminole/Mis-fortune had.)
+export const ENGINE_VERSION = 11

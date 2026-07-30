@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { characterById, playableCharacters } from '../engine/characters'
-import { courseBySlug, COURSES, PAR3_COURSES, playRatingFor } from '../engine/courses'
+import { courseBySlug, COURSES, GUEST_COURSES, PAR3_COURSES, playRatingFor } from '../engine/courses'
 import { dailySetup, forecastSetup, RESULT_LABEL, RESULT_SQUARE, shareText, SITE_URL, toParLabel, type DailySetup } from '../engine/daily'
 import { gradeCopy, type RoundGrade } from '../engine/grade'
 import { decisionsFromScores, encodeReplay } from '../engine/replay'
@@ -279,7 +279,7 @@ export function HomeScreen(props: {
             </p>
           )}
           {courseTab === 'courses' &&
-            COURSES.map((c) => {
+            [...COURSES, ...GUEST_COURSES].map((c) => {
               const sr = seasonRecs?.get(c.slug)
               const at = courseRecs?.get(c.slug)
               return (

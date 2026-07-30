@@ -42,9 +42,9 @@ registerHooks({
 // imports must be reached via `await import` from inside the running body.
 import type { Choice, Conditions } from '../src/engine/types.ts'
 import type { HoleInPlay } from '../src/engine/resolve.ts'
-const { COURSES, PAR3_COURSES } = await import('../src/engine/courses.ts')
+const { COURSES, GUEST_COURSES, PAR3_COURSES } = await import('../src/engine/courses.ts')
 // rate everything playable — the par-3 shorts get a display rating too
-const RATED = [...COURSES, ...PAR3_COURSES]
+const RATED = [...COURSES, ...PAR3_COURSES, ...GUEST_COURSES]
 const { buildLayout } = await import('../src/engine/layout.ts')
 const { oddsFor, playShot, startHole } = await import('../src/engine/resolve.ts')
 const { rngFromString } = await import('../src/engine/rng.ts')

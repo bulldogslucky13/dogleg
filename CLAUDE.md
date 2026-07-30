@@ -34,13 +34,23 @@ conditions); additions the replay ignores don't need a bump. **A bump also
 requires a `kind: 'odds'` entry in the player-facing change log
 (`src/lib/changelog.ts`) in the same PR** — the log is the public record that
 the odds only move in the open, and it is worthless the moment it lags the
-engine. Player-visible features and fixes get an entry too. **One deliberate
-exception: per-course work is never logged** — imports, scorecard corrections
-and geometry passes bump the engine but stay out of the feed, because courses
-are tuned the day before they come up as the daily and logging each one would
-both flood the log and misrepresent routine prep as meddling with the math.
-Log changes to how the game behaves *everywhere*, not a course's arrival; see
-the note at the top of `changelog.ts`. Payloads without
+engine. Player-visible features and fixes get an entry too — with **two
+deliberate exceptions, neither of which is ever logged**:
+
+- **Per-course work.** Imports, scorecard corrections and geometry passes bump
+  the engine but stay out of the feed, because courses are tuned the day before
+  they come up as the daily and logging each one would both flood the log and
+  misrepresent routine prep as meddling with the math. Log changes to how the
+  game behaves *everywhere*, not a course's arrival.
+- **Cosmetic work.** Colour, contrast, spacing, layout, type, animation and
+  copy polish get no entry however visible the change is. "A player can see it"
+  is not the bar — the bar is whether the bug could have cost a stroke or
+  misled someone about their round. A caddy note that misread the hole is a
+  logged fix; an unreadable button is not, because fixing it changed neither
+  what the game did nor what it told you.
+
+Both are spelled out in the note at the top of `changelog.ts`, which is the
+source of truth for this policy. Payloads without
 a version (pre-handshake clients) still replay as before. Preventively, the
 build also emits `version.json` beside the bundle (vite.config.ts) and the
 home screen fetches it no-store (`src/lib/freshness.ts`) — a mismatch shows a
@@ -135,6 +145,38 @@ gen:email-wordmark`) because Gmail strips inline SVG — it is rasterised from
 no information the alt text doesn't, since Gmail blocks remote images on first
 open. Look at all three at `/_emails.html` in dev, images on **and** off.
 
+## Brand assets are generated, never drawn
+
+**No image carrying the logo is hand-made.** Each is rendered from
+`src/ui/Wordmark.tsx` and `src/ui/theme.css` by a script, so retuning the mark
+or a token carries to every surface with one command:
+
+- `pnpm gen:email-wordmark` → `public/brand/wordmark-email.*` (the mail masthead)
+- `pnpm gen:og-image` → `public/og.png` (the link-preview card)
+
+Both read the component through `scripts/lib/wordmark.ts` and rasterise through
+`scripts/lib/rasterise.ts` (headless Chrome — no node-canvas/sharp dependency).
+The extractor hands back the mark **unresolved**, `currentColor` and
+`var(--logo-*)` intact, because the two callers want opposite things: the OG
+card renders in a real browser and resolves both against theme.css, while mail
+can resolve neither and substitutes literals itself.
+
+The OG card is the surface with no eyes on it — nobody on the team sees it,
+because it only ever renders in someone else's thread. That is how it sat on
+pre-rebrand artwork for a week after every other surface had moved. So: it is
+generated (there is no artwork left to go stale), `scripts/og-image.test.ts`
+pins its size and its meta tags, and `og:image` carries a **`?v=` cache-bust —
+bump it whenever the card changes**, because iMessage, Slack and Facebook key
+their preview cache on the image URL and will otherwise keep serving the old
+picture forever. Iterate on the design with `pnpm gen:og-image --html`, which
+writes the page to /tmp and prints the path to open in a browser.
+
+The app icons (`public/favicon.svg`, `icon.png`, `apple-touch-icon.png`) are the
+one exception — they are square badge/app-icon lockups rather than the wordmark,
+so they are exported from the design tool's own files (which live outside this
+repo, with the designer) rather than generated here. Ask for fresh exports when
+the mark changes; there is no `pnpm` command for them.
+
 ## Commands
 
 ```sh
@@ -144,6 +186,7 @@ pnpm typecheck      # tsc -b
 pnpm test           # full vitest suite (unit + calibration + smoke)
 pnpm test:smoke     # just the smoke suite (fast, ~2s)
 pnpm build          # typecheck + production build to dist/
+pnpm gen:og-image   # redraw the link-preview card (public/og.png)
 ```
 
 ## Tests — read this before changing anything

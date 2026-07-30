@@ -10,8 +10,8 @@
  * MAINTENANCE — this is not optional, and it rides an existing rule:
  * a change that bumps `ENGINE_VERSION` (src/engine/version.ts) MUST add an
  * entry here with kind 'odds', in the same PR. Player-visible features and
- * fixes get an entry too; refactors, docs, and test-only work don't (they're
- * invisible from the tee).
+ * fixes get an entry too, subject to the two exceptions below; refactors,
+ * docs, and test-only work don't (they're invisible from the tee).
  *
  * NEVER LOG PER-COURSE WORK (Jackson's rule, 2026-07-26). Courses are
  * fine-tuned the day before they come up as the daily and shipped then, so
@@ -20,9 +20,26 @@
  * course prep reads as constant meddling with the math, which is the opposite
  * of what this screen is for. Log a course's arrival nowhere; log only changes
  * to how the GAME behaves everywhere (a new hole type, a new hazard weight, a
- * new luck rule). This is the one documented exception to the bump-implies-
- * entry rule above, and it is deliberate: `ENGINE_VERSION` bumps for course
- * geometry alone get no entry.
+ * new luck rule). This is the only exception to the bump-implies-entry rule
+ * above, and it is deliberate: `ENGINE_VERSION` bumps for course geometry
+ * alone get no entry. (The cosmetic rule below is an exception to the
+ * player-visible-fixes rule instead — cosmetic work never bumps the engine.)
+ *
+ * NEVER LOG COSMETIC WORK (2026-07-27). Colour, contrast, spacing, layout,
+ * type, animation and copy polish stay out of the feed even when the change
+ * is plainly visible — "player can see it" is not the bar, and it is the
+ * wrong bar, because it lets a paint job sit in the same list as the odds
+ * moving. The bar is whether the bug could have COST A STROKE OR MISLED
+ * SOMEONE ABOUT THEIR ROUND. A caddy note that misread the hole, a ball
+ * drawn in a lie it wasn't in, a score that posted wrong: those changed what
+ * the game did or what it told you, and they get an entry. A button nobody
+ * could read is a real bug and still gets none — fixing it changed neither.
+ * Ship it silently; the diff is the record for that kind of work.
+ *
+ * The reason both exceptions exist is the same one: this screen counts its
+ * own 'odds' entries and stakes the game's honesty on that number being
+ * legible. Every entry that didn't need to be here makes the ones that did
+ * harder to find.
  *
  * Entries are newest-first and dated ET. Keep them in the game's voice —
  * plain, specific, no jargon and no PR numbers.

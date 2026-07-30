@@ -193,9 +193,14 @@ const COURSE_GEO: Record<string, CourseGeo> = {
   // All 18 South centrelines are mapped with plain ref=N and no names, so no
   // osmHolePrefix. Radius 1400 covers the 878 x 1573 m polygon (901 m
   // half-diagonal) and reaches past the bluff to the coastline that makes
-  // 3/4/6/14. OSM's `handicap` tags on the hole ways disagree with the club's
-  // card on 14 of 18 holes — ignored, as always: the card is ground truth for
-  // stroke index, OSM for shape only.
+  // 3/4/6/14. OSM's `handicap` tags on the hole ways match the club's BLACK
+  // card on ALL 18 — it was the SHIPPED tuple that disagreed, on 13 — so here
+  // the tags corroborated the card rather than competing with it, which is
+  // what gave confidence to overwrite 13 stroke indices at once. That does not
+  // promote OSM: the card stays ground truth for stroke index and OSM for
+  // shape only, and where the two conflict the card still wins (potomac's
+  // hole 15 par above). A matching `handicap`/`par` row is a useful second
+  // opinion on a card, nothing more.
   torrey: { name: 'Torrey Pines — South', center: [32.8971, -117.2477], radius: 1400, osmName: '^Torrey Pines South Course$', engineSlug: 'torrey-pines-south' },
 }
 

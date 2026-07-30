@@ -88,6 +88,40 @@ find the polygon name for a new course, query Overpass for
   cleared hole 15, which imports with just two zones on the #4 handicap hole
   and is simply that bare.
 
+- **Torrey Pines — South (all 18)** — the course that proves "shift, don't
+  scale" is a rule about a *diagnosis*, not a reflex. Two holes missed the
+  BLACK card by more than tee-box variance, for opposite reasons, and the same
+  fix would have been right on one and wrong on the other. Hole 10 imported 36
+  yd SHORT off a forward pad — the textbook case, shifted +36. Hole 6 imported
+  22 yd LONG, and shifting it would have been the error: its tee and green
+  endpoints are both correct, so the excess is curvature in a wandering
+  polyline (bend 65 yd, the course's biggest). The tell is cheap and worth
+  copying — **compare each bunker's STRAIGHT-LINE distance from the tee to its
+  arc position**. On hole 6 they agree to within 2 yd in the fairway and
+  diverge only near the green, which says the excess accumulates along the
+  hole rather than sitting at the tee; a blind shift would have walked the
+  driving-zone sand ~25 yd back from measured truth. It is remapped through
+  arc → straight-line instead.
+  Also the first course whose defining hazard was **absent from OSM
+  entirely**: no `natural=scrub` or `wood` polygon exists inside or within
+  900 m of the property, so the canyons that give the course its character
+  imported as open ground on five holes. They were hand-authored as
+  `deeprough` from **USGS NED 10m elevation transects** (`api.opentopodata.org`,
+  the same 3DEP data ProVisualizer quotes) — sampled every 25 yd along each
+  centreline at ±18-70 yd, taking the nearest offset sitting ≥6 m below the
+  playing line. That turns "there's a canyon there" into a measurement, and it
+  cuts both ways: it authored rims on 3/4/6/13/17 (18-40 yd out) and it
+  *declined* 2/7/8/9/14/15/16, whose ground falls away at 55-70 yd, outside
+  the importer's own 50-yd corridor. Reach for it on any course with terrain
+  the polygons don't describe.
+  Two more worth knowing: a single bunker straddling the centreline can
+  rasterise into **two overlapping zones** (a `cross` slice nested inside a
+  flanking slice — holes 3 and 8, both front greenside bunkers), and the
+  stroke index disagreed with the card on 13 of 18 holes while OSM's own
+  `handicap` tags matched the card on all 18 — a reminder that OSM's hole tags
+  are a useful *corroborator* of a card even though its geometry is only ever
+  ground truth for shape.
+
 ### Known gaps & importer artifact modes
 
 - **Coverage** — obscure courses may lack `golf=hole` centerlines, and many

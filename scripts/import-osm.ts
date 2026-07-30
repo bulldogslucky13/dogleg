@@ -182,6 +182,21 @@ const COURSE_GEO: Record<string, CourseGeo> = {
     engineSlug: 'seminole',
     osmIgnore: [697252551, 697255070, 697249629],
   },
+  // Torrey Pines maps its two courses as SEPARATE golf_course polygons — South
+  // is way 35679036, North is way 35679009 — and both carry a full set of
+  // plain ref=N hole ways, so the anchored name is doing real work here: North
+  // sits 1.3 km up the mesa, well inside the radius, and an unanchored
+  // /Torrey Pines/ would match both and mix two courses' holes under one ref.
+  // map_to_area on the South polygon keeps `golf=*` features (and therefore
+  // every bunker) South-only; the radius applies only to water/coastline,
+  // which is what we want — the Pacific is outside the course boundary.
+  // All 18 South centrelines are mapped with plain ref=N and no names, so no
+  // osmHolePrefix. Radius 1400 covers the 878 x 1573 m polygon (901 m
+  // half-diagonal) and reaches past the bluff to the coastline that makes
+  // 3/4/6/14. OSM's `handicap` tags on the hole ways disagree with the club's
+  // card on 14 of 18 holes — ignored, as always: the card is ground truth for
+  // stroke index, OSM for shape only.
+  torrey: { name: 'Torrey Pines — South', center: [32.8971, -117.2477], radius: 1400, osmName: '^Torrey Pines South Course$', engineSlug: 'torrey-pines-south' },
 }
 
 // ---------- Overpass ----------

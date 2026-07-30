@@ -68,6 +68,16 @@
 // which changes what that day's seeds replay into (they don't exist yet — the
 // override ships before the day does). The rotation array itself is untouched;
 // this is the gated-cutover shape the note above asks for, expressed as an
-// explicit per-day table. (If PR #87's Mis-fortune v11 merges first, renumber
-// this to v12 — same collision Seminole/Mis-fortune had.)
-export const ENGINE_VERSION = 11
+// explicit per-day table.
+// v12 = Torrey Pines South real geometry (OSM way 35679036, every hole shifted
+// to the club's BLACK card) plus that card's stroke index, which disagreed
+// with the shipped tuple on 13 of 18 holes — and SI feeds pressure() in the
+// odds, so the card half changes replays as much as the geometry. Two parts of
+// the geometry are hand-work rather than raw import, both documented at the
+// block in geometry.ts: hole 6 is remapped through arc -> straight-line rather
+// than shifted (its centreline wanders 22 yd long, and a shift would have
+// moved the driving-zone sand ~25 yd off measured truth), and the canyons on
+// 3/4/6/13/17 are hand-authored `deeprough` from USGS NED 10m terrain
+// transects, because OSM has no scrub or wood polygon anywhere on the
+// property and the import read five canyon flanks as open ground.
+export const ENGINE_VERSION = 12

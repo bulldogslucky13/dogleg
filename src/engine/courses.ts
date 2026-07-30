@@ -478,25 +478,42 @@ export const COURSES: CourseSpec[] = [
     greens: 'Firm',
     wind: 12,
     blurb: 'Long clifftop municipal that hosts majors above the Pacific.',
+    // Real geometry found 82 bunkers and not one tree polygon — OSM has no
+    // wood inside the boundary — so the odds' junk floor had nothing to name
+    // (see CourseSpec.junkLabel), and without a word here the import would
+    // have quietly downgraded "trees" to "junk" on the course named for its
+    // pines. The pines line the corridors but almost never decide a shot;
+    // what actually swallows a ball at Torrey is the kikuyu, thick enough
+    // that every US Open broadcast talks about it.
+    junkLabel: 'kikuyu',
     holes: holes([
-      [4, 452, 11, 'S', 'sand'],
-      [4, 389, 13, 'R', 'sand'],
-      [3, 198, 15, 'S', 'ocean', 'A clifftop par 3 with the Pacific shimmering far below'],
-      [4, 488, 3, 'L', 'ocean'],
-      [4, 453, 7, 'S', 'sand'],
-      [5, 560, 9, 'R', 'ocean'],
-      [4, 462, 5, 'S', 'sand'],
-      [3, 173, 17, 'S', 'sand'],
-      [5, 614, 1, 'S', 'sand'],
-      [4, 416, 10, 'S', 'sand'],
-      [3, 221, 16, 'S', 'sand'],
-      [4, 504, 2, 'R', 'sand'],
-      [5, 612, 12, 'L', 'sand'],
+      // Card = the BLACK tees (`torreypinessouth`): par 72, 7802 yd,
+      // 78.8/148 — the championship set this course is known for, and the
+      // longest of the six men's tee sets BlueGolf publishes. strokeIndex is
+      // that card's HCP row, which disagreed with the shipped tuple on 13 of
+      // 18 holes and feeds pressure() in the odds; OSM's own `handicap` tags
+      // match the card on all 18, which is the corroboration. Par matched the
+      // shipped tuple exactly and is likewise corroborated by OSM's `par`.
+      // Yardages are the card's; they auto-reconcile to the imported geometry
+      // below, which was shifted onto the card hole by hole.
+      [4, 451, 5, 'S', 'sand'],
+      [4, 389, 15, 'R', 'sand'],
+      [3, 201, 13, 'S', 'ocean', 'A clifftop par 3 with the Pacific shimmering far below'],
+      [4, 490, 3, 'S', 'ocean'], // flag said 'L'; the real centreline bends 4 yd
+      [4, 454, 11, 'S', 'sand'],
+      [5, 564, 9, 'R', 'ocean'],
+      [4, 462, 1, 'S', 'sand'],
+      [3, 177, 17, 'S', 'sand'],
+      [5, 615, 7, 'S', 'sand'],
+      [4, 454, 16, 'S', 'sand'],
+      [3, 225, 14, 'S', 'sand'],
+      [4, 505, 2, 'R', 'sand'],
+      [5, 621, 6, 'L', 'sand'],
       [4, 437, 8, 'S', 'sand'],
-      [4, 478, 4, 'S', 'sand'],
-      [3, 227, 14, 'S', 'ocean'],
-      [4, 442, 6, 'R', 'sand'],
-      [5, 568, 18, 'S', 'water', 'The par 5 where Tiger made the putt — water fronts the green'],
+      [4, 517, 12, 'S', 'sand'],
+      [3, 227, 18, 'S', 'ocean'],
+      [4, 443, 4, 'R', 'sand'],
+      [5, 570, 10, 'S', 'water', 'The par 5 where Tiger made the putt — water fronts the green'],
     ]),
   },
   {

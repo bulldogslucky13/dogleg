@@ -26,15 +26,13 @@ export function puzzleNumberForDateKey(dateKey: string): number {
   return puzzleNumber(new Date(y, m - 1, d))
 }
 
-/** The rotation is the array order: puzzle n plays COURSES[(n-1) % length]. */
 /**
  * One-off daily overrides, keyed by puzzle number derived from a dateKey so
- * the intent reads in plain English. The rotation walk below is fixed history
- * — COURSES must never grow or reorder (it re-maps every future daily and
- * invalidates historical seeds) — so a guest course reaches the daily ONLY
- * through this table. One day, one course, everything else untouched.
- * Remove a row after its day passes if you like; leaving it is harmless
- * (historical replays of that day NEED it, so prefer leaving it).
+ * the intent reads in plain English. A shipped era's walk is fixed history
+ * (see ROTATION_ERAS below), so a guest course reaches the daily ONLY through
+ * this table. One day, one course, everything else untouched. Remove a row
+ * after its day passes if you like; leaving it is harmless (historical
+ * replays of that day NEED it, so prefer leaving it).
  */
 export const DAILY_OVERRIDES: Record<number, string> = {
   // 2026-08-01 — Kings Creek CC: Jackson's golf-trip easter egg. The crew
@@ -42,13 +40,47 @@ export const DAILY_OVERRIDES: Record<number, string> = {
   [puzzleNumberForDateKey('2026-08-01')]: 'kings-creek',
 }
 
+/**
+ * ROTATION ERAS — how the daily schedule changes without rewriting history.
+ *
+ * The daily course is never stored anywhere; records, replay links, ghosts and
+ * the referee all re-derive it from the puzzle number through this table. So
+ * an era's walk is frozen history for every day it has covered: editing a
+ * shipped era's array (grow, shrink, reorder) re-maps those days, and every
+ * stored round on them stops replaying on its own course.
+ *
+ * To add courses to the rotation — or reorder it — append a NEW era with a
+ * cutover date safely in the future at merge time:
+ *
+ *   { fromPuzzle: puzzleNumberForDateKey('2027-01-01'), courses: ROTATION_V2 }
+ *
+ * Days before the cutover keep resolving through the old era byte-identically;
+ * the new array's order is entirely free, because each era's walk starts fresh
+ * at its own cutover. Rules, enforced by the rotation-era tests in
+ * src/smoke.test.ts:
+ *   - the first era starts at puzzle 1; cutovers are strictly ascending;
+ *   - eras are append-only and a shipped era's array is never edited — the
+ *     golden checksum test pins the mapping, so a re-map fails CI instead of
+ *     silently corrupting records;
+ *   - a new era changes what its cutover day's seed replays into, so it ships
+ *     with an ENGINE_VERSION bump (src/engine/version.ts) like any other
+ *     replay-affecting change.
+ * One-day exceptions (guest takeovers) stay in DAILY_OVERRIDES above; eras
+ * are for permanent schedule changes.
+ */
+export const ROTATION_ERAS: { fromPuzzle: number; courses: CourseSpec[] }[] = [
+  { fromPuzzle: 1, courses: COURSES },
+]
+
 export function courseForPuzzle(n: number): CourseSpec {
   const override = DAILY_OVERRIDES[n]
   if (override) {
     const c = courseBySlug(override)
     if (c) return c
   }
-  return COURSES[(n - 1) % COURSES.length]
+  let era = ROTATION_ERAS[0]
+  for (const e of ROTATION_ERAS) if (e.fromPuzzle <= n) era = e
+  return era.courses[(n - era.fromPuzzle) % era.courses.length]
 }
 
 export interface DailySetup {

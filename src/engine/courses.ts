@@ -1601,10 +1601,12 @@ export const PAR3_COURSES: CourseSpec[] = [
 /**
  * GUEST COURSES — real courses that live in the library and unlimited play but
  * are NOT part of the daily rotation walk. The rotation array above is fixed
- * history (courseForPuzzle is a modulo over it, and appending re-maps every
- * future daily), so one-off additions land here and reach the daily only via
- * an explicit DAILY_OVERRIDES entry in daily.ts. First occupant: Jackson's
- * golf-trip easter egg, played by the crew on 2026-08-01.
+ * history (a shipped era's walk is a modulo over it, and editing it re-maps
+ * already-covered dailies — see ROTATION_ERAS in daily.ts), so one-off
+ * additions land here and reach the daily only via an explicit DAILY_OVERRIDES
+ * entry in daily.ts; permanent rotation changes go through a new future-dated
+ * era instead. First occupant: Jackson's golf-trip easter egg, played by the
+ * crew on 2026-08-01.
  */
 export const GUEST_COURSES: CourseSpec[] = [
   {

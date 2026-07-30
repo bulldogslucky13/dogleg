@@ -13,10 +13,10 @@
  * conditions derivation, or anything else that could make a replay of the
  * same seed + decisions come out differently. Pure additions the replay
  * ignores (new UI, new optional payload fields) don't need a bump. Careful
- * with courses: adding to or reordering the daily COURSES rotation changes
- * which slug `courseForPuzzle` maps a date to (src/engine/daily.ts), which
- * breaks replay of existing daily seeds — that's a bump, or better, a gated
- * cutover per the conditions-versioning note in daily.ts. Only a course
+ * with courses: adding to or reordering the daily rotation changes which
+ * slug `courseForPuzzle` maps a date to (src/engine/daily.ts) — do it ONLY
+ * via a new future-dated ROTATION_ERAS entry (never by editing a shipped
+ * era's array), and bump this for the cutover day forward. Only a course
  * reachable purely by practice seeds (which name their slug) is a pure
  * addition. The deploy
  * pipeline already redeploys the function on every push to main, so both

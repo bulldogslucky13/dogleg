@@ -44,7 +44,7 @@ function round(overrides: Partial<LoggedRound> & { results?: HoleResult[] } = {}
   }
 }
 
-const emptyLedger = () => ({ v: 1 as const, held: {}, stolen: {}, reclaimed: {} })
+const emptyLedger = () => ({ v: 2 as const, held: {}, stolen: {}, reclaimed: {}, heldSeason: {}, stolenSeason: {} })
 
 describe('computeProgress', () => {
   it('counts ladder stats off the log', () => {
@@ -124,12 +124,14 @@ describe('computeProgress', () => {
 
   it('reads records held and ever-held from the ledger', () => {
     const ledger = {
-      v: 1 as const,
+      v: 2 as const,
       held: { 'pebble-beach': { toPar: -4, since: 1 }, augusta: { toPar: -2, since: 2 } },
       stolen: {
         'st-andrews': { by: 'Y', theirToPar: -6, myToPar: -3, at: 4, notifiedOn: 'd', dismissed: true },
       },
       reclaimed: {},
+      heldSeason: {},
+      stolenSeason: {},
     }
     const p = computeProgress([], [], ledger)
     expect(p.ladders.recordsNow).toBe(2)

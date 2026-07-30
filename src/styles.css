@@ -1959,6 +1959,32 @@ button {
   background: rgba(201, 162, 39, 0.08);
 }
 
+/* pick which record the ghost races — only rendered when the two boards
+   hold DIFFERENT rounds. Same gold language as everywhere: filled =
+   all-time, keyline = season; the 'on' state is whichever is picked. */
+.ghost-board-toggle {
+  display: flex;
+  gap: 6px;
+  align-self: center;
+}
+
+.ghost-board-toggle button {
+  border: 1px solid rgba(201, 162, 39, 0.55);
+  border-radius: 999px;
+  padding: 4px 12px;
+  font-size: 0.68rem;
+  font-weight: 800;
+  color: rgba(29, 43, 32, 0.65);
+  background: transparent;
+  white-space: nowrap;
+}
+
+.ghost-board-toggle button.on {
+  background: var(--gold);
+  border-color: var(--gold);
+  color: var(--ink);
+}
+
 .ghost-stakes-head {
   display: flex;
   align-items: baseline;

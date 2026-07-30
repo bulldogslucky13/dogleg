@@ -17,7 +17,7 @@ import { Wordmark } from './Wordmark'
 import { dismissSteals, pendingSteals, syncLedger, syncSeasonLedger, type PendingSteal } from '../lib/records'
 import { loadBrowsePrefs, saveBrowsePrefs } from '../lib/browsePrefs'
 import { loadFavorites, toggleFavorite } from '../lib/favorites'
-import { loadGhost, type Ghost } from '../state/ghost'
+import { loadGhost, loadGhostChoices, type Ghost, type GhostBoard } from '../state/ghost'
 import { currentHandicap, formatHandicap } from '../state/stats'
 import { characterRecords, computeStreaks, loadArchive, type HistoryEntry, type RoundRecap, type RoundState } from '../state/store'
 import { AccountPanel } from './AccountPanel'
@@ -838,38 +838,79 @@ function StealCard(props: {
 }
 
 /** what the result screen's quiet close calls the thing that was raced */
-function ghostCloseNoun(close: { kind: 'record' | 'personal'; holder: string | null }): string {
+function ghostCloseNoun(close: { kind: 'record' | 'personal'; board: GhostBoard; holder: string | null }): string {
   if (close.kind !== 'record') return 'your best'
-  return close.holder ? `${close.holder}'s record` : 'your own record'
+  const noun = close.board === 'season' ? 'season record' : 'record'
+  return close.holder ? `${close.holder}'s ${noun}` : `your own ${noun}`
 }
 
 /**
  * The pre-round tale of the tape: who holds the wall, their score, and their
  * actual card hole by hole — so the challenger knows exactly what they're
- * getting into. Self-loading (one fetch + one engine replay) and quick; it
+ * getting into. Self-loading (two fetches + engine replays) and quick; it
  * renders when ready and never delays the tee shot.
+ *
+ * When the all-time and season records are DIFFERENT rounds, a toggle picks
+ * which one the ghost races — the stakes card previews whichever is chosen.
+ * Same round on both boards (or only one board set): no toggle, no choice.
  */
-function GhostStakes(props: { courseSlug: string }) {
-  const [ghost, setGhost] = useState<Ghost | null>(null)
+function GhostStakes(props: { courseSlug: string; board: GhostBoard; onBoard: (b: GhostBoard) => void }) {
+  const [choices, setChoices] = useState<{ alltime: Ghost | null; season: Ghost | null } | null>(null)
+  const [fallback, setFallback] = useState<Ghost | null>(null)
   useEffect(() => {
     let live = true
-    void loadGhost(props.courseSlug).then((g) => {
-      if (live) setGhost(g)
+    void loadGhostChoices(props.courseSlug).then((c) => {
+      if (!live) return
+      setChoices(c)
+      // no record round on either board — show the own-best ghost instead
+      if (!c.alltime && !c.season) {
+        void loadGhost(props.courseSlug).then((g) => {
+          if (live) setFallback(g)
+        })
+      }
     })
     return () => {
       live = false
     }
   }, [props.courseSlug])
+  const canToggle = !!choices?.alltime && !!choices?.season && choices.alltime.seed !== choices.season.seed
+  // a season default that turned out to have nothing to race snaps back to
+  // all-time, so the pick and the loaded ghost can't disagree at tee-off
+  const wantSeason = props.board === 'season'
+  useEffect(() => {
+    if (choices && wantSeason && !choices.season) props.onBoard('alltime')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [choices, wantSeason])
+  const ghost = (wantSeason ? choices?.season : choices?.alltime) ?? choices?.alltime ?? fallback
   if (!ghost) return null
   const char = characterById(ghost.character)
+  const boardNoun = ghost.board === 'season' ? 'season record' : 'record'
   const headline =
     ghost.kind === 'record'
       ? ghost.holder
-        ? `The record: ${ghost.holder}`
-        : 'The record is yours — defend it'
+        ? `The ${boardNoun}: ${ghost.holder}`
+        : `The ${boardNoun} is yours — defend it`
       : 'The ghost: your best round here'
   return (
     <div className={`ghost-stakes${ghost.kind === 'record' ? ' cr' : ''}`}>
+      {canToggle && choices?.alltime && choices?.season && (
+        <div className="ghost-board-toggle" role="radiogroup" aria-label="Which record to race">
+          <button
+            className={!wantSeason ? 'on' : ''}
+            aria-pressed={!wantSeason}
+            onClick={() => props.onBoard('alltime')}
+          >
+            All-time {toParLabel(choices.alltime.toPar)}
+          </button>
+          <button
+            className={wantSeason ? 'on' : ''}
+            aria-pressed={wantSeason}
+            onClick={() => props.onBoard('season')}
+          >
+            Season {toParLabel(choices.season.toPar)}
+          </button>
+        </div>
+      )}
       <div className="ghost-stakes-head">
         <b>👻 {headline}</b>
         <span className="ghost-stakes-score">
@@ -938,6 +979,10 @@ function HandicapChip(props: { onTap: () => void }) {
 export function CharacterPickScreen(props: {
   setup: DailySetup
   practice: boolean
+  /** which record the ghost will race (practice only) — owned by the app so
+   * the choice survives into the round that starts here */
+  ghostBoard: GhostBoard
+  onGhostBoard: (b: GhostBoard) => void
   onPick: (c: CharacterId) => void
   onBack: () => void
 }) {
@@ -954,7 +999,9 @@ export function CharacterPickScreen(props: {
         <h2 className="pick-title">Pick your player</h2>
         <p className="tagline">One edge, all {course.holes.length} holes. Choose for the course in front of you:</p>
       </header>
-      {props.practice && <GhostStakes courseSlug={course.slug} />}
+      {props.practice && (
+        <GhostStakes courseSlug={course.slug} board={props.ghostBoard} onBoard={props.onGhostBoard} />
+      )}
       <div className="chips center">
         <span className="chip">{course.holes.reduce((s, h) => s + h.yards, 0).toLocaleString()} yards</span>
         <span className="chip">Wind {cond.wind} mph</span>
@@ -992,7 +1039,7 @@ export function ResultScreen(props: {
   /** the finished round, when it's still in storage — enables board submission */
   boardRound: RoundState | null
   /** the ghost race's quiet close: final margin vs the chased round */
-  ghostClose?: { margin: number; kind: 'record' | 'personal'; holder: string | null } | null
+  ghostClose?: { margin: number; kind: 'record' | 'personal'; board: GhostBoard; holder: string | null } | null
   history: HistoryEntry[]
   /** achievements this round earned — the wrap card renders only when some did */
   unlocks?: Unlock[]

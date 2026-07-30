@@ -349,3 +349,12 @@ export function chasingSeason(
   const s = ledger.stolenSeason[courseSlug] ?? null
   return s && s.seasonKey === seasonKey ? s : null
 }
+
+/** Which board the ghost should race by default on this course: the season
+ * board when a season record was stolen from this player and the all-time
+ * one wasn't ("win it back" should race the thing being won back) — the
+ * all-time board in every other case, including both-stolen (the bigger
+ * prize; a round beating the all-time score beats the season score too). */
+export function defaultChaseBoard(courseSlug: string, seasonKey: string, ledger = loadLedger()): RecordScope {
+  return !chasing(courseSlug, ledger) && chasingSeason(courseSlug, seasonKey, ledger) ? 'season' : 'alltime'
+}

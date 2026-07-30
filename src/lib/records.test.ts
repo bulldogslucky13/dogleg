@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import {
   chasing,
   chasingSeason,
+  defaultChaseBoard,
   dismissSteals,
   loadLedger,
   pendingSteals,
@@ -183,6 +184,19 @@ describe('the season shelf runs the same rivalry, scoped to one season', () => {
     expect(pendingSteals()).toHaveLength(2)
     dismissSteals('2026-07-20')
     expect(pendingSteals()).toHaveLength(0)
+  })
+
+  it('the default ghost board races what is being won back', () => {
+    // season stolen, all-time not → the season record is the target
+    seasonRecordWon('pebble-beach', -3, SUMMER, 1000)
+    syncSeasonLedger(server([['pebble-beach', 'Hank', -5]]), SUMMER, 'Jackson', 2000, '2026-07-20')
+    expect(defaultChaseBoard('pebble-beach', SUMMER)).toBe('season')
+    // nothing stolen → all-time, the status quo
+    expect(defaultChaseBoard('st-andrews-old', SUMMER)).toBe('alltime')
+    // both stolen → all-time outranks (beating it takes the season back too)
+    recordWon('pebble-beach', -4, 3000)
+    syncLedger(server([['pebble-beach', 'Hank', -5]]), 'Jackson', 4000, '2026-07-20')
+    expect(defaultChaseBoard('pebble-beach', SUMMER)).toBe('alltime')
   })
 
   it('a v1 ledger (pre-season devices) loads with empty season shelves intact', () => {

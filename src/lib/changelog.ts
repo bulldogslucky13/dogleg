@@ -100,7 +100,7 @@ export const CHANGELOG: ChangeEntry[] = [
     date: '2026-07-29',
     kind: 'feature',
     title: 'Season records are worth defending too',
-    note: 'Losing a season record now gets you the same treatment as losing an all-time one — the rivalry card on the Teebox, the target chip during the rematch, and the email all fire. Every one of them says which board the name came off, and winning a stolen season record back gets its own celebration.',
+    note: 'Losing a season record now triggers the rivalry card on the teebox. Racing a record? Toggle between ghost balls in Unlimited Play to pace yourself with your actual target. Happy hunting.',
   },
   {
     date: '2026-07-27',

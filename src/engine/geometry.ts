@@ -217,11 +217,19 @@ export const OSM_BEND: Record<string, number[]> = {
   'torrey-pines-south:15': [0, -1, -2, -3, -4, -5, -6, -7, -8, -8, -8, -6, 0],
   'torrey-pines-south:17': [0, -2, -4, -6, -8, -9, -10, -10, -9, -7, -5, -3, 0],
   'torrey-pines-south:18': [0, 3, 6, 9, 11, 13, 13, 12, 9, 5, 1, -1, 0],
-  // Pacific Dunes. The hand-set `dogleg` flags in courses.ts are INVERTED on
-  // six of these (3, 6, 9, 12, 15, 18) and absent on four more (1, 8, 13, 16);
-  // `bend` overrides the flag, and the direction was verified independently of
-  // the importer (midpoint offset from the tee->green chord) plus a tee view of
-  // 18, the biggest turn at -52 yd, which visibly swings right round the waste.
+  // Pacific Dunes. `bend` is the signed BULGE of the centreline off the
+  // tee->green chord, not the turn, and the two are OPPOSITE: a hole doglegging
+  // RIGHT bows golfer-LEFT of its own chord, because the chord cuts the corner.
+  // So positive = right turn, which is the conversion panels.tsx makes for the
+  // chip (`m < 0 ? 'L' : 'R'`). Verified label-free on all eleven by comparing
+  // the centreline's heading over the first third of the hole against the last
+  // third; every one agrees with the chip.
+  // Against that measurement the hand-set `dogleg` flags in courses.ts are
+  // RIGHT on 3, 6, 9, 12, 15 and 18; absent (S) on 1, 8, 13 and 16, which do
+  // turn; and wrong on exactly one hole — 7 is tagged L and turns right by 14
+  // degrees. `bend` overrides the flag either way, so every chip reads true.
+  // (An earlier draft of this note had it backwards, reading the importer's
+  // console label — which names the bulge — as the turn. Hence the sign note.)
   'pacific-dunes:1': [0, 1, 3, 4, 5, 6, 7, 8, 8, 7, 5, 2, 0],
   'pacific-dunes:3': [0, -5, -9, -14, -18, -22, -25, -26, -26, -25, -20, -11, 0],
   'pacific-dunes:6': [0, 1, 2, 4, 5, 6, 7, 8, 8, 8, 6, 3, 0],

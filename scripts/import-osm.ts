@@ -15,6 +15,10 @@
  *   pnpm import:osm sawgrass 17 --raw      # dump matched OSM features
  *   pnpm import:osm sawgrass 17 --debug    # ring counts + per-ring extents
  *   pnpm import:osm sawgrass 17 --fresh    # bypass the per-course Overpass cache
+ *   pnpm import:osm sawgrass 17 --shift 110  # centreline starts at a forward pad:
+ *                                          # prepend the missing tee run so length,
+ *                                          # zones AND the bend profile come out in
+ *                                          # card coordinates (see --shift below)
  *
  * Registry: COURSE_GEO below maps a short slug → course center, the exact
  * golf_course polygon name (osmName), and the engine slug (for --compare).
@@ -602,7 +606,33 @@ async function main() {
   // reference frame anchored at the tee end of the hole line
   const line = holeWay.geometry
   const proj = projector(line[0].lat, line[0].lon)
-  const center: Vec[] = chaikin(line.map(proj), 2)
+  // --shift <yd>: the centreline starts at a FORWARD pad, so prepend the
+  // missing tee run as a straight segment back along the opening heading —
+  // the same assumption the zone shift already makes ("the real tee is N yards
+  // straight back"), applied to the geometry instead of to the numbers
+  // afterwards. Everything downstream then comes out in CARD coordinates for
+  // free: `length`, every zone's from/to, fairwayFrom/To — and, crucially, the
+  // BEND PROFILE, which cannot be shifted after the fact. Its 13 samples are
+  // evenly spaced fractions of the hole, and HoleMap replays them at the same
+  // fractions of the final card length, so a profile measured on the short raw
+  // line gets STRETCHED over the long one and draws the corner yards early
+  // (64 yd early on pacific-dunes:8, whose pad is 110 yd forward). Re-measuring
+  // on the extended line also re-bases the deviations on the real back-tee ->
+  // green chord, which a resample of the old numbers could not do.
+  const rawPts = line.map(proj)
+  const shiftIdx = flags.indexOf('--shift')
+  const shiftYd = shiftIdx >= 0 ? Number(flags[shiftIdx + 1]) : 0
+  if (shiftIdx >= 0 && !Number.isFinite(shiftYd)) {
+    console.error('--shift needs a yardage, e.g. --shift 110')
+    process.exit(2)
+  }
+  if (shiftYd > 0 && rawPts.length >= 2) {
+    const [p0, p1] = rawPts
+    const back = sub(p0, p1)
+    const bl = len(back) || 1
+    rawPts.unshift([p0[0] + (back[0] / bl) * toMeters(shiftYd), p0[1] + (back[1] / bl) * toMeters(shiftYd)])
+  }
+  const center: Vec[] = chaikin(rawPts, 2)
   const cum = arcLengths(center)
   const holeLenM = cum[cum.length - 1]
   const length = Math.round(toYards(holeLenM))

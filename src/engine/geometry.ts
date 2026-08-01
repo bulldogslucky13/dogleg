@@ -230,17 +230,28 @@ export const OSM_BEND: Record<string, number[]> = {
   // degrees. `bend` overrides the flag either way, so every chip reads true.
   // (An earlier draft of this note had it backwards, reading the importer's
   // console label — which names the bulge — as the turn. Hence the sign note.)
-  'pacific-dunes:1': [0, 1, 3, 4, 5, 6, 7, 8, 8, 7, 5, 2, 0],
+  // MEASURED ON THE SHIFTED LINE (`pnpm import:osm pacificdunes <h> --shift N`),
+  // which is what makes them line up with the yardages. A profile is 13 evenly
+  // spaced fractions of the hole and HoleMap replays it at the same fractions
+  // of the FINAL card length, so a profile measured on a centreline that starts
+  // at a forward pad gets stretched over the longer card hole and draws the
+  // corner early — 64 yd early on hole 8, whose pad is 110 yd forward. Zones
+  // can be shifted after the fact; a bend profile cannot, because the samples
+  // are positions. `--shift` prepends the missing tee run and re-measures, which
+  // also re-bases each deviation on the real back-tee -> green chord. Hole 3 is
+  // the exception: its shift is -4 yd, too small to prepend and worth 0.8% of
+  // the hole, so it keeps its raw profile.
+  'pacific-dunes:1': [0, 1, 3, 4, 5, 7, 8, 9, 9, 8, 6, 3, 0],
   'pacific-dunes:3': [0, -5, -9, -14, -18, -22, -25, -26, -26, -25, -20, -11, 0],
-  'pacific-dunes:6': [0, 1, 2, 4, 5, 6, 7, 8, 8, 8, 6, 3, 0],
-  'pacific-dunes:7': [0, 4, 7, 11, 14, 17, 19, 19, 19, 16, 11, 5, 0],
-  'pacific-dunes:8': [0, 6, 12, 17, 20, 21, 20, 18, 15, 11, 8, 4, 0],
-  'pacific-dunes:9': [0, 1, 3, 4, 5, 7, 8, 10, 10, 8, 5, 3, 0],
-  'pacific-dunes:12': [0, -9, -19, -26, -32, -35, -36, -36, -35, -32, -26, -14, 0],
-  'pacific-dunes:13': [0, -2, -4, -6, -7, -9, -10, -10, -10, -9, -6, -3, 0],
-  'pacific-dunes:15': [0, 3, 5, 8, 10, 11, 13, 14, 15, 14, 11, 6, 0],
-  'pacific-dunes:16': [0, 6, 12, 19, 25, 30, 34, 35, 34, 29, 20, 10, 0],
-  'pacific-dunes:18': [0, -7, -15, -22, -29, -36, -43, -44, -40, -33, -22, -11, 0],
+  'pacific-dunes:6': [0, 1, 2, 4, 5, 6, 7, 8, 8, 8, 7, 3, 0],
+  'pacific-dunes:7': [0, 4, 7, 11, 14, 18, 19, 20, 20, 17, 12, 6, 0],
+  'pacific-dunes:8': [0, 6, 12, 18, 23, 29, 33, 32, 28, 22, 15, 7, 0],
+  'pacific-dunes:9': [0, 1, 3, 4, 5, 7, 8, 10, 10, 9, 6, 3, 0],
+  'pacific-dunes:12': [0, -9, -19, -28, -37, -42, -44, -44, -43, -39, -32, -18, 0],
+  'pacific-dunes:13': [0, -2, -4, -6, -7, -9, -10, -11, -11, -10, -7, -4, 0],
+  'pacific-dunes:15': [0, 3, 5, 8, 10, 13, 14, 16, 17, 16, 14, 8, 0],
+  'pacific-dunes:16': [0, 6, 12, 19, 25, 31, 37, 42, 43, 40, 30, 15, 0],
+  'pacific-dunes:18': [0, -7, -15, -22, -29, -36, -43, -45, -41, -33, -22, -11, 0],
 }
 
 export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {

@@ -785,12 +785,18 @@ async function main() {
     const hit = rings.find((r) => r.kind === 'green' && pointInRing(r.ring, p))
     if (hit) onGreen.push({ a, id: hit.id, type: hit.type })
   }
-  const greensTouched = [...new Set(onGreen.map((g) => g.id))]
+  // Identity is TYPE + ID, never the id alone: OSM way and relation ids are
+  // separate namespaces, so way/123 and relation/123 are different objects and
+  // keying on the number could fuse two greens into one — suppressing the
+  // warning below and letting the run-continuity check bridge them, which is
+  // exactly the inflated depth this whole block exists to prevent. Same reason
+  // the Ring type carries `type` for hazard reporting.
+  const greenKey = (g: { id: number; type: OsmElement['type'] }) => `${g.type}/${g.id}`
+  const greensTouched = [...new Set(onGreen.map(greenKey))]
   if (greensTouched.length > 1) {
-    const spans = greensTouched.map((id) => {
-      const hits = onGreen.filter((g) => g.id === id)
-      const t = hits[0].type
-      return `    ${t}/${id}  ${hits[0].a}-${hits[hits.length - 1].a} yd`
+    const spans = greensTouched.map((key) => {
+      const hits = onGreen.filter((g) => greenKey(g) === key)
+      return `    ${key}  ${hits[0].a}-${hits[hits.length - 1].a} yd`
     })
     console.error(
       `  ! hole ${holeNo}: the centreline runs through ${greensTouched.length} DIFFERENT greens:\n` +
@@ -810,7 +816,7 @@ async function main() {
     while (
       lo > 0 &&
       onGreen[lo].a - onGreen[lo - 1].a <= STEP_YD * 2 &&
-      onGreen[lo].id === onGreen[lo - 1].id
+      greenKey(onGreen[lo]) === greenKey(onGreen[lo - 1])
     )
       lo--
     greenLo = onGreen[lo].a

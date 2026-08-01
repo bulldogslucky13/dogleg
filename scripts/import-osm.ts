@@ -865,7 +865,14 @@ async function main() {
         (!geo.osmHolePrefix || new RegExp(geo.osmHolePrefix, 'i').test(e.tags?.name ?? '')),
     )
     .map((e) => {
-      const l = e.geometry!.map(proj)
+      // The TARGET's line must be the SHIFTED one (rawPts carries the prepended
+      // tee run), or --shift half-works: the corridor rake reaches hazards
+      // beside the new back-tee segment, but ownership still measures them
+      // against the forward pad, so a neighbouring hole's line is nearer and
+      // they get culled — silently dropping exactly the hazards --shift exists
+      // to find. Neighbours keep their own raw geometry; only the hole being
+      // imported grows a tee.
+      const l = e === holeWay ? rawPts : e.geometry!.map(proj)
       return { isTarget: e === holeWay, line: l, cum: arcLengths(l) }
     })
   const distToLine = (hl: { line: Vec[]; cum: number[] }, q: Vec) => Math.abs(projectToPolyline(hl.line, hl.cum, q).lateral)

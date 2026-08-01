@@ -259,8 +259,22 @@ find the polygon name for a new course, query Overpass for
      imported 67 yd short: shifting puts sand at 253 R / 333 L and the imagery
      shows ~246 / ~330, while scaling predicted 217 / 310. A shift also keeps
      greenside features greenside, which is what makes it safe to apply
-     blindly to all 18. (`bend` profiles are lateral yards and need no
-     adjustment either way.)
+     blindly to all 18.
+     **`bend` is the exception — it cannot be shifted afterwards.** Its 13
+     samples are evenly spaced *fractions of the hole*, and `HoleMap` replays
+     them at the same fractions of the final card length, so a profile measured
+     on a short raw line gets STRETCHED over the long card hole and draws the
+     corner yards early (64 yd early on `pacific-dunes:8`, off a 110-yd forward
+     pad). The lateral values need no scaling — that much of the old note was
+     right — but their POSITIONS do. Re-measure instead:
+     `pnpm import:osm <course> <hole> --shift N` prepends the missing tee run
+     as a straight segment back along the opening heading, so `length`, every
+     zone, `fairwayFrom`/`To` and the bend profile all come out in card
+     coordinates in one pass — and the deviations get re-based on the real
+     back-tee → green chord, which no resample of the old numbers could do.
+     It also rasterises the prepended stretch, so hazards beside the back-tee
+     run are found rather than assumed absent. Use it for any hole importing
+     more than ~10 yd short.
 2. `pnpm import:osm <course> <hole> --compare` — sanity-check vs the shipped
    layout and the card from step 1.
 3. Paste the `--json` zones into `src/engine/geometry.ts` under `${slug}:${hole}`.

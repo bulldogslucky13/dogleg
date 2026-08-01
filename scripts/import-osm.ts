@@ -839,6 +839,13 @@ async function main() {
   // wide against 32 deep) the bounding extent reads corner-to-corner and
   // invents depth. Lines that exit their green before the end are untouched.
   if (isFinite(greenHi) && greenHi >= length - STEP_YD) {
+    // Pinned to the run's OWN polygon, not "any green". Two greens that touch or
+    // overlap would otherwise let the ray walk straight out of the target and on
+    // through its neighbour without ever landing a sample on open ground —
+    // rebuilding the very inflated depth this block exists to stop, and doing it
+    // where the multi-green warning above cannot see it, since that is computed
+    // only from samples on the original centreline.
+    const targetKey = greenKey(onGreen[onGreen.length - 1])
     const endP = pointAtArc(center, cum, toMeters(length)).p
     const backP = pointAtArc(center, cum, toMeters(Math.max(0, length - 25))).p
     const app = sub(endP, backP)
@@ -847,7 +854,16 @@ async function main() {
     for (let a = length + STEP_YD; a <= length + 60; a += STEP_YD) {
       const d = toMeters(a - length)
       const q: Vec = [endP[0] + appDir[0] * d, endP[1] + appDir[1] * d]
-      if (!rings.some((r) => r.kind === 'green' && pointInRing(r.ring, q))) break
+      const hit = rings.find((r) => r.kind === 'green' && pointInRing(r.ring, q))
+      if (!hit) break
+      if (greenKey(hit) !== targetKey) {
+        console.error(
+          `  ! hole ${holeNo}: past the pin the approach leaves ${targetKey} and enters ` +
+            `${greenKey(hit)} at ${a} yd — greenDepth stops at the target green's own edge. ` +
+            `Two greens touching here is worth a look.`,
+        )
+        break
+      }
       greenHi = a
     }
   }

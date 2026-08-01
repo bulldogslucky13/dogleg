@@ -38,11 +38,39 @@ export interface OsmHoleGeometry {
  * straight. © OpenStreetMap contributors, ODbL.
  */
 export const OSM_BEND: Record<string, number[]> = {
+  // MEASURED ON THE SHIFTED CENTRELINE, everywhere below — `pnpm import:osm
+  // <course> <hole> --shift N`, where N is the shipped `length` in OSM_GEOMETRY
+  // minus the raw length the importer prints without the flag. Where OSM drew a
+  // hole from a forward pad, the raw line is short by N.
+  //
+  // That matters because a profile is 13 evenly spaced FRACTIONS of the hole,
+  // and HoleMap replays it at the same fractions of the FINAL card length. A
+  // profile measured on the short raw line therefore gets STRETCHED over the
+  // longer card hole and draws the corner early — 64 yd early on pacific-dunes:8,
+  // whose pad is 110 yd forward. Zones can be shifted after the fact; a bend
+  // profile cannot, because its samples are positions, not lengths. `--shift`
+  // prepends the missing tee run and re-measures, which also re-bases every
+  // deviation on the real back-tee -> green chord.
+  //
+  // Earlier notes here said the tee-end shift "does not apply" to these, being
+  // lateral yards. The magnitudes are indeed nearly unmoved (a yard or three);
+  // the read was wrong about what the shift moves, which is WHERE along the hole
+  // each sample sits — and that is the whole of what the map draws.
+  //
+  // EXCEPTION — holes whose centreline imports LONGER than the card (a negative
+  // shift) keep their raw profile: there is no missing tee run to prepend, and
+  // the excess is usually curvature in a wandering polyline rather than a pad
+  // offset — the case measured and documented for torrey-pines-south:6 in
+  // OSM_GEOMETRY below. Those are carnoustie 4 (-30), 6 (-53), 9 (-49), 14 (-33)
+  // and 18 (-42); kings-creek 18 (-66); torrey-pines-south 6 (-22); plus a tail
+  // under 15 yd led by tpc-potomac 10 (-13) and cypress-point 11 (-12).
+  // kings-creek:18 is the largest and wants a look of its own.
+  //
   // Harbour Town Golf Links — real centreline curvature. Note how the signs
   // correct the tuple flags: 5/8/15 bend LEFT (tuple said R), 6 bends RIGHT
   // (tuple said L), 2 is a right dogleg the "straight" flag missed.
   'harbour-town:2': [0, 6, 12, 18, 24, 28, 31, 32, 31, 27, 23, 15, 0],
-  'harbour-town:3': [0, -3, -7, -10, -13, -17, -19, -20, -20, -19, -14, -7, 0],
+  'harbour-town:3': [0, -3, -7, -10, -13, -17, -19, -21, -21, -20, -16, -8, 0],
   'harbour-town:5': [0, -14, -29, -43, -55, -63, -65, -58, -43, -30, -18, -9, 0],
   'harbour-town:6': [0, 6, 12, 17, 23, 29, 33, 36, 36, 34, 25, 12, 0],
   'harbour-town:8': [0, -9, -18, -27, -37, -44, -49, -51, -49, -43, -29, -14, 0],
@@ -52,7 +80,7 @@ export const OSM_BEND: Record<string, number[]> = {
   'harbour-town:12': [0, 5, 11, 16, 22, 27, 31, 34, 34, 31, 24, 12, 0],
   'harbour-town:13': [0, -3, -6, -9, -13, -16, -18, -20, -20, -19, -15, -8, 0],
   'harbour-town:15': [0, -6, -12, -18, -24, -30, -35, -40, -44, -46, -43, -29, 0],
-  'harbour-town:16': [0, -10, -20, -29, -39, -49, -58, -64, -67, -66, -53, -27, 0],
+  'harbour-town:16': [0, -10, -20, -29, -39, -49, -59, -65, -70, -69, -57, -29, 0],
   'harbour-town:18': [0, -4, -8, -13, -17, -21, -23, -25, -25, -22, -16, -8, 0],
 
   // Carnoustie — Championship — real centreline curvature. Signs contradict
@@ -62,7 +90,7 @@ export const OSM_BEND: Record<string, number[]> = {
   // persistence threshold (tuple said R), 11 bends LEFT (tuple said S), 15
   // bends RIGHT (tuple said S), 18 bends RIGHT (tuple said S). Only 3 (L),
   // 6 (L), 12 (L), and 14 (R) agree with their flag.
-  'carnoustie:2': [0, 5, 10, 14, 19, 22, 24, 24, 21, 18, 12, 6, 0],
+  'carnoustie:2': [0, 5, 10, 14, 19, 23, 25, 25, 24, 20, 13, 7, 0],
   'carnoustie:3': [0, 7, 12, 18, 23, 27, 29, 30, 28, 23, 15, 8, 0],
   'carnoustie:4': [0, 9, 18, 27, 34, 40, 42, 41, 37, 30, 20, 10, 0],
   'carnoustie:5': [0, 8, 17, 25, 33, 39, 43, 44, 43, 38, 27, 14, 0],
@@ -75,52 +103,54 @@ export const OSM_BEND: Record<string, number[]> = {
   'carnoustie:15': [0, -6, -13, -19, -26, -30, -33, -33, -30, -25, -17, -8, 0],
   'carnoustie:18': [0, -2, -3, -5, -6, -7, -8, -8, -7, -6, -4, -2, 0],
 
-  // Royal Portrush — Dunluce — real centreline curvature. Lateral yards are
-  // unaffected by the tee-end shift applied to the zones (see OSM_GEOMETRY),
-  // so these are the raw import values. Signs correct the tuple again: 5 and
+  // Royal Portrush — Dunluce — real centreline curvature, re-measured on the
+  // shifted line (see the note at the top of this map). Signs correct the
+  // tuple again: 5 and
   // 10 bend LEFT hard (tuple said R and S), 11 and 18 bend LEFT (tuple said L
   // and S), 8 and 9 bend RIGHT (tuple said S and R), 15 bends RIGHT (tuple
   // said L). 10's 75-yd bend is the Himalayas dogleg.
-  'royal-portrush-dunluce:2': [0, -10, -20, -30, -38, -43, -45, -43, -38, -29, -20, -10, 0],
-  'royal-portrush-dunluce:4': [0, -6, -12, -18, -24, -28, -30, -30, -26, -21, -14, -7, 0],
-  'royal-portrush-dunluce:5': [0, 14, 29, 43, 55, 63, 66, 61, 53, 43, 29, 15, 0],
-  'royal-portrush-dunluce:6': [0, 1, 3, 4, 5, 7, 7, 8, 8, 7, 5, 2, 0],
-  'royal-portrush-dunluce:8': [0, -10, -20, -30, -39, -44, -46, -45, -40, -31, -20, -10, 0],
-  'royal-portrush-dunluce:9': [0, -8, -15, -23, -30, -34, -35, -33, -30, -23, -15, -8, 0],
+  'royal-portrush-dunluce:2': [0, -10, -20, -30, -39, -44, -46, -45, -39, -31, -20, -10, 0],
+  'royal-portrush-dunluce:4': [0, -6, -12, -18, -24, -28, -30, -30, -27, -21, -14, -7, 0],
+  'royal-portrush-dunluce:5': [0, 14, 29, 43, 55, 63, 66, 62, 54, 43, 29, 15, 0],
+  'royal-portrush-dunluce:6': [0, 1, 3, 4, 5, 7, 8, 8, 8, 7, 5, 3, 0],
+  'royal-portrush-dunluce:8': [0, -10, -20, -30, -40, -45, -47, -46, -41, -32, -21, -11, 0],
+  'royal-portrush-dunluce:9': [0, -8, -15, -23, -30, -34, -35, -34, -30, -23, -15, -8, 0],
   'royal-portrush-dunluce:10': [0, 13, 26, 39, 52, 63, 71, 75, 72, 64, 48, 25, 0],
-  'royal-portrush-dunluce:11': [0, 8, 15, 23, 30, 35, 38, 38, 35, 28, 19, 9, 0],
-  'royal-portrush-dunluce:14': [0, -1, -3, -4, -6, -7, -8, -9, -9, -8, -6, -3, 0],
-  'royal-portrush-dunluce:15': [0, -9, -17, -26, -34, -42, -47, -49, -48, -42, -28, -14, 0],
-  'royal-portrush-dunluce:18': [0, 11, 21, 32, 43, 51, 57, 57, 53, 44, 30, 15, 0],
-  // Oakmont Country Club — real centreline curvature. Lateral yards, so the
-  // tee-end shift does not apply.
+  'royal-portrush-dunluce:11': [0, 8, 15, 23, 30, 36, 40, 40, 37, 31, 20, 10, 0],
+  'royal-portrush-dunluce:14': [0, -1, -3, -4, -6, -7, -9, -10, -10, -9, -7, -4, 0],
+  'royal-portrush-dunluce:15': [0, -9, -17, -26, -34, -43, -48, -50, -50, -43, -30, -15, 0],
+  'royal-portrush-dunluce:18': [0, 11, 21, 32, 43, 52, 58, 59, 56, 47, 32, 16, 0],
+  // Oakmont Country Club — real centreline curvature, re-measured on the
+  // shifted line (see the note at the top of this map). Holes 1 and 8 import
+  // long (-8 and -3 yd) and keep their raw profiles.
   'oakmont:1': [0, -1, -2, -3, -5, -6, -7, -7, -8, -8, -7, -4, 0],
-  'oakmont:4': [0, 13, 26, 39, 51, 57, 59, 57, 50, 39, 26, 13, 0],
+  'oakmont:4': [0, 13, 26, 39, 52, 60, 63, 62, 55, 43, 29, 14, 0],
   'oakmont:8': [0, -3, -6, -9, -12, -15, -18, -21, -22, -22, -18, -9, 0],
-  'oakmont:11': [0, 2, 3, 5, 7, 9, 10, 11, 11, 10, 7, 4, 0],
-  'oakmont:12': [0, 5, 11, 16, 22, 26, 29, 30, 29, 26, 17, 9, 0],
-  'oakmont:14': [0, -1, -2, -4, -5, -6, -7, -8, -8, -7, -6, -3, 0],
-  'oakmont:15': [0, 2, 4, 5, 7, 9, 10, 10, 9, 8, 5, 3, 0],
-  'oakmont:16': [0, 1, 2, 4, 5, 6, 7, 8, 8, 8, 7, 4, 0],
+  'oakmont:11': [0, 2, 3, 5, 7, 9, 10, 11, 11, 10, 8, 4, 0],
+  'oakmont:12': [0, 5, 11, 16, 22, 27, 30, 32, 31, 27, 19, 9, 0],
+  'oakmont:14': [0, -1, -2, -4, -5, -6, -7, -8, -8, -8, -7, -4, 0],
+  'oakmont:15': [0, 2, 4, 5, 7, 9, 10, 10, 10, 9, 6, 3, 0],
+  'oakmont:16': [0, 1, 2, 4, 5, 6, 7, 8, 9, 9, 7, 4, 0],
   'oakmont:17': [0, -4, -8, -12, -16, -20, -24, -28, -30, -28, -22, -11, 0],
 
-  // Cypress Point — real centreline curvature. Lateral yards are unaffected by
-  // the tee-end shift applied to the zones (see OSM_GEOMETRY), so these are the
-  // raw import values. Signs correct the tuple again: 2, 5 and 6 bend RIGHT
+  // Cypress Point — real centreline curvature, re-measured on the shifted line
+  // (see the note at the top of this map); 11 imports 12 yd long and 16 is
+  // hand-authored, so both keep their own numbers. Signs correct the tuple
+  // again: 2, 5 and 6 bend RIGHT
   // (tuple said S, S and R), 8, 12 and 14 bend LEFT (tuple said L, L and R),
   // 17 bends LEFT (tuple said L). 12's 61-yd bend and 5's 70-yd are the two
   // real doglegs; 9's 9-yd sits right on the persistence threshold.
   'cypress-point:1': [0, 2, 4, 6, 9, 11, 12, 14, 14, 13, 10, 5, 0],
-  'cypress-point:2': [0, -11, -21, -32, -41, -47, -49, -47, -41, -32, -23, -13, 0],
+  'cypress-point:2': [0, -11, -21, -32, -41, -47, -49, -47, -41, -33, -24, -13, 0],
   'cypress-point:4': [0, 1, 3, 4, 6, 7, 8, 9, 9, 8, 6, 3, 0],
-  'cypress-point:5': [0, -15, -29, -44, -57, -66, -70, -68, -59, -47, -34, -18, 0],
+  'cypress-point:5': [0, -15, -29, -44, -57, -67, -72, -70, -61, -49, -35, -18, 0],
   'cypress-point:6': [0, -10, -21, -31, -41, -48, -52, -53, -50, -43, -34, -21, 0],
-  'cypress-point:8': [0, 6, 12, 18, 24, 29, 35, 39, 41, 41, 35, 18, 0],
+  'cypress-point:8': [0, 6, 12, 18, 23, 29, 35, 39, 43, 42, 37, 20, 0],
   'cypress-point:9': [0, -1, -2, -4, -5, -6, -7, -8, -9, -9, -9, -6, 0],
   'cypress-point:10': [0, 4, 8, 11, 15, 18, 20, 20, 19, 16, 12, 7, 0],
   'cypress-point:11': [0, 3, 6, 10, 13, 15, 17, 18, 17, 15, 10, 5, 0],
-  'cypress-point:12': [0, 10, 21, 31, 42, 52, 58, 61, 60, 52, 35, 18, 0],
-  'cypress-point:14': [0, 4, 8, 12, 16, 19, 22, 24, 25, 23, 18, 9, 0],
+  'cypress-point:12': [0, 10, 21, 31, 42, 52, 58, 62, 62, 53, 37, 19, 0],
+  'cypress-point:14': [0, 4, 8, 12, 16, 19, 22, 25, 25, 23, 19, 9, 0],
   // 16 is the one hand-authored profile in this map. Its OSM centreline is a
   // straight tee→pin chord across the cove, which is the line you play only if
   // you take the hole on; the hole itself doglegs RIGHT round the water to the
@@ -128,29 +158,30 @@ export const OSM_BEND: Record<string, number[]> = {
   // the middle of the measured landing area). Positive = golfer-left = the
   // path bows left = "Dogleg right" on the chip, per the sign note above.
   'cypress-point:16': [0, 10, 20, 29, 37, 44, 49, 53, 55, 54, 43, 24, 0],
-  'cypress-point:17': [0, 7, 14, 21, 28, 36, 40, 43, 43, 39, 28, 14, 0],
+  'cypress-point:17': [0, 7, 14, 21, 28, 36, 41, 45, 45, 41, 31, 15, 0],
   'cypress-point:18': [0, 3, 6, 10, 13, 16, 18, 20, 20, 18, 14, 7, 0],
-  // Whistling Straits — Straits — real centreline curvature. Lateral yards,
-  // so the tee-end shift applied to the zones (see OSM_GEOMETRY) does not
-  // apply. Signs correct a tuple that shipped 15 of 18 holes as 'S': 5 and 11
+  // Whistling Straits — Straits — real centreline curvature, re-measured on the
+  // shifted line (see the note at the top of this map); hole 1's pad is 85 yd
+  // forward, the largest on any course here. Signs correct a tuple that shipped
+  // 15 of 18 holes as 'S': 5 and 11
   // are the two big Dye swings (109 and 82 yd), and 1, 6, 8, 10, 13 and 14
   // all turn hard enough to earn a chip the tuple never gave them. 16 shipped
   // BACKWARDS (tuple 'R', the centreline bends left), and 15's tuple 'L' is a
   // real but gentle 11-yd lean that stays under the 20-yd chip threshold.
-  'whistling-straits:1': [0, -6, -12, -18, -24, -29, -33, -34, -33, -29, -20, -10, 0],
-  'whistling-straits:2': [0, 3, 6, 9, 11, 14, 16, 16, 16, 14, 10, 5, 0],
-  'whistling-straits:4': [0, -4, -8, -12, -15, -18, -21, -21, -20, -17, -12, -6, 0],
-  'whistling-straits:5': [0, 21, 42, 63, 84, 100, 109, 104, 81, 46, 14, -1, 0],
-  'whistling-straits:6': [0, 4, 9, 13, 18, 22, 26, 28, 29, 28, 24, 12, 0],
-  'whistling-straits:8': [0, 8, 17, 25, 33, 39, 44, 45, 42, 36, 24, 12, 0],
+  'whistling-straits:1': [0, -6, -12, -18, -24, -30, -36, -39, -39, -35, -26, -13, 0],
+  'whistling-straits:2': [0, 3, 6, 9, 11, 14, 16, 17, 17, 14, 10, 5, 0],
+  'whistling-straits:4': [0, -4, -8, -12, -15, -19, -21, -21, -21, -18, -12, -6, 0],
+  'whistling-straits:5': [0, 21, 42, 63, 84, 105, 117, 118, 99, 61, 23, 1, 0],
+  'whistling-straits:6': [0, 4, 9, 13, 18, 22, 26, 28, 30, 29, 25, 12, 0],
+  'whistling-straits:8': [0, 8, 17, 25, 33, 41, 45, 46, 45, 39, 26, 13, 0],
   'whistling-straits:9': [0, 2, 5, 7, 10, 12, 14, 15, 15, 14, 11, 5, 0],
-  'whistling-straits:10': [0, -8, -16, -24, -32, -40, -45, -50, -50, -47, -35, -18, 0],
-  'whistling-straits:11': [0, 17, 34, 51, 66, 77, 82, 78, 62, 47, 31, 16, 0],
-  'whistling-straits:13': [0, 6, 13, 19, 26, 30, 33, 33, 31, 26, 17, 9, 0],
-  'whistling-straits:14': [0, -6, -13, -19, -26, -32, -38, -42, -43, -42, -35, -17, 0],
+  'whistling-straits:10': [0, -8, -16, -24, -32, -40, -46, -51, -52, -48, -37, -19, 0],
+  'whistling-straits:11': [0, 17, 34, 51, 68, 79, 84, 81, 67, 50, 33, 17, 0],
+  'whistling-straits:13': [0, 6, 13, 19, 26, 31, 34, 34, 32, 27, 18, 9, 0],
+  'whistling-straits:14': [0, -6, -13, -19, -26, -32, -38, -42, -44, -43, -36, -18, 0],
   'whistling-straits:15': [0, 2, 4, 6, 8, 10, 11, 11, 11, 9, 6, 3, 0],
-  'whistling-straits:16': [0, -6, -11, -17, -22, -28, -33, -39, -45, -48, -43, -24, 0],
-  'whistling-straits:18': [0, -10, -20, -31, -41, -49, -55, -56, -54, -47, -31, -16, 0],
+  'whistling-straits:16': [0, -6, -11, -17, -22, -28, -33, -39, -45, -49, -45, -26, 0],
+  'whistling-straits:18': [0, -10, -20, -31, -41, -51, -57, -60, -59, -51, -35, -18, 0],
   // TPC Potomac — 12 of 18 turn hard enough to persist, 10 the big one at
   // 92 yd. Reading these against the tuple (positive bend ⇒ dogleg RIGHT — the
   // path bows opposite the turn, see the chip note in ui/panels.tsx): 2, 6 and
@@ -164,7 +195,7 @@ export const OSM_BEND: Record<string, number[]> = {
   'tpc-potomac:7': [0, 5, 10, 15, 20, 24, 27, 28, 28, 24, 17, 9, 0],
   'tpc-potomac:8': [0, -3, -5, -8, -10, -13, -14, -15, -14, -12, -9, -4, 0],
   'tpc-potomac:10': [0, -17, -35, -52, -67, -80, -88, -92, -90, -80, -62, -32, 0],
-  'tpc-potomac:11': [0, -12, -25, -37, -49, -57, -63, -63, -57, -46, -31, -15, 0],
+  'tpc-potomac:11': [0, -12, -25, -37, -49, -58, -64, -64, -58, -48, -32, -16, 0],
   'tpc-potomac:13': [0, 1, 2, 3, 5, 6, 7, 8, 8, 8, 7, 4, 0],
   'tpc-potomac:14': [0, 3, 5, 8, 10, 13, 15, 16, 17, 16, 14, 7, 0],
   'tpc-potomac:15': [0, 3, 5, 8, 10, 13, 15, 15, 15, 14, 10, 5, 0],
@@ -173,27 +204,27 @@ export const OSM_BEND: Record<string, number[]> = {
   // Seminole — 10 of 18 bend hard enough to persist. 3 is the big one (75 yd
   // left), with 15 and 16 close behind; 18 turns 50 yd right into the home
   // green. The eight straight holes include all four par 3s.
-  'seminole:1': [0, 2, 5, 7, 9, 11, 14, 15, 17, 17, 16, 11, 0],
-  'seminole:2': [0, -2, -4, -6, -8, -10, -12, -13, -14, -14, -12, -6, 0],
-  'seminole:3': [0, 13, 26, 40, 53, 65, 72, 75, 73, 63, 42, 21, 0],
+  'seminole:1': [0, 2, 5, 7, 9, 11, 14, 16, 17, 18, 17, 12, 0],
+  'seminole:2': [0, -2, -4, -6, -8, -10, -12, -14, -15, -15, -13, -8, 0],
+  'seminole:3': [0, 13, 26, 39, 53, 66, 77, 84, 83, 74, 53, 26, 0],
   'seminole:6': [0, -3, -7, -10, -13, -16, -18, -18, -17, -14, -9, -5, 0],
-  'seminole:7': [0, 2, 4, 5, 7, 9, 10, 11, 11, 11, 9, 4, 0],
+  'seminole:7': [0, 2, 4, 5, 7, 9, 11, 12, 12, 12, 10, 5, 0],
   'seminole:9': [0, -3, -7, -10, -13, -17, -19, -20, -20, -18, -14, -7, 0],
   'seminole:12': [0, 2, 4, 6, 8, 10, 11, 13, 13, 12, 9, 5, 0],
-  'seminole:15': [0, 10, 20, 30, 40, 50, 56, 60, 60, 53, 37, 19, 0],
-  'seminole:16': [0, 10, 21, 31, 41, 50, 56, 58, 56, 49, 33, 16, 0],
+  'seminole:15': [0, 10, 20, 30, 40, 50, 57, 62, 61, 55, 39, 20, 0],
+  'seminole:16': [0, 10, 21, 31, 41, 52, 57, 61, 60, 51, 35, 17, 0],
   'seminole:18': [0, -8, -16, -24, -32, -40, -46, -50, -50, -46, -35, -17, 0],
 
   // Kings Creek CC (see OSM_GEOMETRY note)
-  'kings-creek:1': [0, -1, -2, -4, -5, -6, -7, -8, -8, -8, -6, -3, 0],
-  'kings-creek:2': [0, -3, -7, -10, -13, -17, -20, -22, -23, -23, -20, -10, 0],
-  'kings-creek:4': [0, 6, 11, 17, 22, 28, 31, 33, 33, 29, 20, 10, 0],
-  'kings-creek:5': [0, 8, 16, 24, 32, 38, 43, 43, 40, 34, 23, 11, 0],
-  'kings-creek:7': [0, -5, -11, -16, -21, -25, -27, -28, -26, -23, -18, -11, 0],
-  'kings-creek:9': [0, -12, -23, -35, -46, -56, -64, -68, -68, -60, -47, -25, 0],
-  'kings-creek:13': [0, -5, -9, -14, -19, -23, -26, -27, -27, -24, -17, -9, 0],
-  'kings-creek:14': [0, 4, 8, 13, 17, 21, 24, 26, 27, 25, 20, 10, 0],
-  'kings-creek:15': [0, 3, 6, 8, 11, 14, 16, 17, 17, 15, 11, 6, 0],
+  'kings-creek:1': [0, -1, -2, -4, -5, -6, -7, -8, -8, -8, -7, -3, 0],
+  'kings-creek:2': [0, -3, -7, -10, -13, -17, -20, -22, -24, -24, -21, -12, 0],
+  'kings-creek:4': [0, 6, 11, 17, 22, 28, 31, 33, 33, 29, 21, 10, 0],
+  'kings-creek:5': [0, 8, 16, 24, 32, 38, 43, 43, 41, 35, 23, 12, 0],
+  'kings-creek:7': [0, -5, -11, -16, -22, -25, -28, -28, -27, -23, -18, -11, 0],
+  'kings-creek:9': [0, -12, -23, -35, -46, -56, -64, -69, -69, -61, -48, -26, 0],
+  'kings-creek:13': [0, -5, -9, -14, -19, -23, -26, -28, -28, -25, -18, -9, 0],
+  'kings-creek:14': [0, 4, 8, 13, 17, 21, 24, 27, 27, 26, 21, 10, 0],
+  'kings-creek:15': [0, 3, 6, 8, 11, 14, 16, 17, 17, 16, 12, 6, 0],
   'kings-creek:16': [0, 2, 5, 7, 10, 12, 14, 16, 16, 14, 11, 6, 0],
   'kings-creek:18': [0, -24, -48, -72, -96, -116, -131, -138, -129, -103, -74, -39, 0],
   // Torrey Pines — South. Unusually, the tuple's dogleg flags were all RIGHT
@@ -205,14 +236,14 @@ export const OSM_BEND: Record<string, number[]> = {
   // them — which is also what retires hole 12's and 17's overstated 'R' flags.
   // Hole 4's flag said 'L' on a centreline that bends 4 yd; its tuple is now
   // 'S', since with no entry here the stale flag would have been the chip.
-  'torrey-pines-south:1': [0, 4, 9, 13, 17, 20, 23, 23, 22, 19, 12, 6, 0],
+  'torrey-pines-south:1': [0, 4, 9, 13, 17, 21, 23, 23, 22, 19, 13, 6, 0],
   'torrey-pines-south:2': [0, 4, 9, 13, 17, 21, 24, 25, 25, 22, 16, 8, 0],
   'torrey-pines-south:5': [0, 3, 7, 10, 14, 17, 19, 21, 21, 19, 14, 7, 0],
   'torrey-pines-south:6': [0, 13, 26, 40, 52, 61, 65, 64, 56, 45, 32, 17, 0],
   'torrey-pines-south:7': [0, 8, 17, 25, 34, 40, 44, 46, 44, 38, 29, 16, 0],
-  'torrey-pines-south:10': [0, -2, -4, -7, -9, -11, -12, -12, -12, -10, -7, -3, 0],
-  'torrey-pines-south:12': [0, 3, 6, 9, 11, 14, 15, 16, 16, 14, 9, 5, 0],
-  'torrey-pines-south:13': [0, -9, -18, -27, -34, -38, -38, -36, -31, -23, -16, -8, 0],
+  'torrey-pines-south:10': [0, -2, -4, -7, -9, -11, -12, -13, -13, -11, -8, -4, 0],
+  'torrey-pines-south:12': [0, 3, 6, 9, 11, 14, 16, 16, 16, 14, 9, 5, 0],
+  'torrey-pines-south:13': [0, -9, -18, -27, -34, -38, -38, -36, -31, -24, -16, -8, 0],
   'torrey-pines-south:14': [0, -4, -9, -13, -18, -22, -26, -29, -31, -30, -25, -14, 0],
   'torrey-pines-south:15': [0, -1, -2, -3, -4, -5, -6, -7, -8, -8, -8, -6, 0],
   'torrey-pines-south:17': [0, -2, -4, -6, -8, -9, -10, -10, -9, -7, -5, -3, 0],
@@ -230,17 +261,11 @@ export const OSM_BEND: Record<string, number[]> = {
   // degrees. `bend` overrides the flag either way, so every chip reads true.
   // (An earlier draft of this note had it backwards, reading the importer's
   // console label — which names the bulge — as the turn. Hence the sign note.)
-  // MEASURED ON THE SHIFTED LINE (`pnpm import:osm pacificdunes <h> --shift N`),
-  // which is what makes them line up with the yardages. A profile is 13 evenly
-  // spaced fractions of the hole and HoleMap replays it at the same fractions
-  // of the FINAL card length, so a profile measured on a centreline that starts
-  // at a forward pad gets stretched over the longer card hole and draws the
-  // corner early — 64 yd early on hole 8, whose pad is 110 yd forward. Zones
-  // can be shifted after the fact; a bend profile cannot, because the samples
-  // are positions. `--shift` prepends the missing tee run and re-measures, which
-  // also re-bases each deviation on the real back-tee -> green chord. Hole 3 is
-  // the exception: its shift is -4 yd, too small to prepend and worth 0.8% of
-  // the hole, so it keeps its raw profile.
+  // Measured on the shifted line, per the note at the top of this map — these
+  // were the first profiles done that way, and hole 8 (pad 110 yd forward, corner
+  // drawn 64 yd early) is the hole that found the stretch. Hole 3 is the
+  // exception: its shift is -4 yd, too small to prepend and worth 0.8% of the
+  // hole, so it keeps its raw profile.
   'pacific-dunes:1': [0, 1, 3, 4, 5, 7, 8, 9, 9, 8, 6, 3, 0],
   'pacific-dunes:3': [0, -5, -9, -14, -18, -22, -25, -26, -26, -25, -20, -11, 0],
   'pacific-dunes:6': [0, 1, 2, 4, 5, 6, 7, 8, 8, 8, 7, 3, 0],

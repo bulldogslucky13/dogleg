@@ -737,18 +737,54 @@ async function main() {
   // 45, and it is silent whenever the stray green inflates the number without
   // reaching the clamp. The green a hole is played TO is the one its line ends
   // on, so only the run that reaches the end counts.
-  const onGreen: number[] = []
+  // Carry the polygon id per sample so a line touching MORE THAN ONE green is
+  // reported rather than silently resolved. There is no automatic way to pick
+  // the right one: the tell-tale is which green the hole is played TO, and for
+  // a way drawn tee->pin that is the one its end sits in — but if a way
+  // OVERSHOOTS its own green into a neighbour's, "the green at the end" is the
+  // neighbour, so polygon identity picks the same wrong green the last run
+  // does. What the old min/max at least did was fail LOUDLY (a conspicuous
+  // clamped 45). So the heuristic stays — it is right for every tee->pin way,
+  // which is all 246 shipped holes — and the ambiguity is made loud instead,
+  // naming every green and its span so a human decides. Never let this pass
+  // quietly: a plausible-looking depth off the wrong green is worse than an
+  // obviously wrong one.
+  const onGreen: { a: number; id: number; type: OsmElement['type'] }[] = []
   for (let a = 0; a <= length; a += STEP_YD) {
     const p = pointAtArc(center, cum, toMeters(a)).p
-    if (rings.some((r) => r.kind === 'green' && pointInRing(r.ring, p))) onGreen.push(a)
+    const hit = rings.find((r) => r.kind === 'green' && pointInRing(r.ring, p))
+    if (hit) onGreen.push({ a, id: hit.id, type: hit.type })
+  }
+  const greensTouched = [...new Set(onGreen.map((g) => g.id))]
+  if (greensTouched.length > 1) {
+    const spans = greensTouched.map((id) => {
+      const hits = onGreen.filter((g) => g.id === id)
+      const t = hits[0].type
+      return `    ${t}/${id}  ${hits[0].a}-${hits[hits.length - 1].a} yd`
+    })
+    console.error(
+      `  ! hole ${holeNo}: the centreline runs through ${greensTouched.length} DIFFERENT greens:\n` +
+        spans.join('\n') +
+        `\n    greenDepth is measured from the LAST run (the green a tee->pin line ends on).\n` +
+        `    Check that is this hole's green — a line that overshoots into a neighbour's\n` +
+        `    would measure the neighbour here, and it would look perfectly plausible.\n` +
+        `    (Normal cause: the tee sits beside the PREVIOUS hole's green — cypress-point:1.)`,
+    )
   }
   let greenLo = Infinity
   let greenHi = -Infinity
   if (onGreen.length) {
+    // last contiguous run, and only within ONE polygon — a run that changes
+    // green id mid-stride is two greens touching, not one deep green
     let lo = onGreen.length - 1
-    while (lo > 0 && onGreen[lo] - onGreen[lo - 1] <= STEP_YD * 2) lo--
-    greenLo = onGreen[lo]
-    greenHi = onGreen[onGreen.length - 1]
+    while (
+      lo > 0 &&
+      onGreen[lo].a - onGreen[lo - 1].a <= STEP_YD * 2 &&
+      onGreen[lo].id === onGreen[lo - 1].id
+    )
+      lo--
+    greenLo = onGreen[lo].a
+    greenHi = onGreen[onGreen.length - 1].a
   }
 
   // A centreline that STOPS AT THE PIN runs through only the FRONT HALF of its

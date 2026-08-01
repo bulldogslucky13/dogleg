@@ -402,6 +402,12 @@ function pointAtArc(pts: Vec[], cum: number[], a: number): { p: Vec; dir: Vec } 
 /**
  * Cosmetic dogleg profile: signed lateral deviation (yards, >0 = golfer-left)
  * of the smoothed centreline from the straight tee→green chord, sampled at
+ *
+ * NOTE THE SIGN IS THE BULGE, NOT THE TURN, and they are OPPOSITE: a hole that
+ * doglegs RIGHT bows golfer-LEFT of its own tee→green chord (the chord cuts the
+ * corner), so a POSITIVE profile is a RIGHT dogleg. src/ui/panels.tsx makes
+ * exactly that conversion for the chip (`m < 0 ? 'L' : 'R'`). Read the printed
+ * label below, not the raw sign, or you will document the hole backwards.
  * BEND_SAMPLES+1 evenly-spaced fractions. Endpoints are ~0 by construction; the
  * max-magnitude sample marks where — and how hard — the hole actually turns.
  * Map-only: the odds engine works in 1-D and never sees this, so it is not
@@ -563,8 +569,28 @@ async function main() {
   if (geo.osmHolePrefix) {
     const re = new RegExp(geo.osmHolePrefix, 'i')
     const named = candidates.filter((e) => re.test(e.tags?.name ?? ''))
-    if (named.length) candidates = named
-    else console.error(`  no hole name matched /${geo.osmHolePrefix}/i; falling back to nearest-center`)
+    // FATAL, deliberately, rather than falling through to nearest-centre. A
+    // prefix is only ever set where several courses share ONE golf_course
+    // polygon and therefore share hole `ref`s — Bandon's 54 ways across three
+    // courses, Sawgrass Stadium against Dye's Valley, Carnoustie against its
+    // three siblings — so it is the ONLY thing telling them apart. If an OSM
+    // rename breaks the match, nearest-centre would quietly hand back a
+    // NEIGHBOURING course's hole and emit it under this slug: geometry that
+    // claims to be the real place and isn't, which step 0 of the freeze process
+    // in scripts/README.md calls worse than shipping nothing at all. Stop and
+    // make a human re-pin the prefix.
+    if (!named.length) {
+      const names = candidates.map((e) => JSON.stringify(e.tags?.name ?? null)).join(', ')
+      console.error(
+        `hole ${holeNo}: no golf=hole way matched /${geo.osmHolePrefix}/i on ${geo.name}.\n` +
+          `  ${candidates.length} way(s) share ref=${holeNo} here, named: ${names}\n` +
+          `  That prefix is this course's only identity check against the others on the site,\n` +
+          `  so this refuses to guess. Re-pin osmHolePrefix in COURSE_GEO against the current\n` +
+          `  OSM names before importing.`,
+      )
+      process.exit(2)
+    }
+    candidates = named
   }
   const holeWay = candidates.sort((a, b) => {
     const da = len(sub(centerProj(a.geometry![0]), c0))
@@ -1082,7 +1108,7 @@ async function main() {
   if (Math.abs(bendMax) >= 8) {
     const cornerFrac = bend.indexOf(bendMax) / BEND_SAMPLES
     console.log(
-      `bend: max ${bendMax > 0 ? '+' : ''}${bendMax} yd ${bendMax > 0 ? '(left)' : '(right)'} near ${Math.round(cornerFrac * length)} yd — [${bend.join(', ')}]`,
+      `bend: dogleg ${bendMax > 0 ? 'RIGHT' : 'LEFT'} — bows ${bendMax > 0 ? '+' : ''}${bendMax} yd golfer-${bendMax > 0 ? 'left' : 'right'} of the chord (the bulge is OPPOSITE the turn) near ${Math.round(cornerFrac * length)} yd — [${bend.join(', ')}]`,
     )
   } else {
     console.log(`bend: straight (max ${bendMax} yd, not persisted)`)

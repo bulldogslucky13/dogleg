@@ -702,18 +702,27 @@ async function main() {
   }
   const coastReach = toMeters(CORRIDOR_YD + 120)
 
-  // green depth: the along span where the centre line runs through a green
-  let greenLo = Infinity
-  let greenHi = -Infinity
+  // green depth: the along span where the centre line runs through a green —
+  // specifically the LAST contiguous run of it. Taking min/max across every hit
+  // is what made cypress-point:1 read 402 yd deep: that centreline passes a
+  // NEIGHBOURING green at 28-54 yd before reaching its own at 400, so the span
+  // stretched between two different greens and pinned the 45 clamp. That is the
+  // artifact scripts/README.md says to suspect whenever greenDepth reads exactly
+  // 45, and it is silent whenever the stray green inflates the number without
+  // reaching the clamp. The green a hole is played TO is the one its line ends
+  // on, so only the run that reaches the end counts.
+  const onGreen: number[] = []
   for (let a = 0; a <= length; a += STEP_YD) {
     const p = pointAtArc(center, cum, toMeters(a)).p
-    for (const { kind, ring } of rings) {
-      if (kind === 'green' && pointInRing(ring, p)) {
-        greenLo = Math.min(greenLo, a)
-        greenHi = Math.max(greenHi, a)
-        break
-      }
-    }
+    if (rings.some((r) => r.kind === 'green' && pointInRing(r.ring, p))) onGreen.push(a)
+  }
+  let greenLo = Infinity
+  let greenHi = -Infinity
+  if (onGreen.length) {
+    let lo = onGreen.length - 1
+    while (lo > 0 && onGreen[lo] - onGreen[lo - 1] <= STEP_YD * 2) lo--
+    greenLo = onGreen[lo]
+    greenHi = onGreen[onGreen.length - 1]
   }
 
   // A centreline that STOPS AT THE PIN runs through only the FRONT HALF of its

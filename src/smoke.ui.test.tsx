@@ -557,6 +557,17 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
   })
 
   it('the Clubhouse has a Seasons tab with the in-progress season and archive framing', async () => {
+    // The launch-season framing ("nothing archived yet") only renders while
+    // Summer 2026 is current, so on a real clock this test expired the moment
+    // Fall began (00:00 ET, Aug 1 2026). Pin "now" inside the launch season:
+    // the round below is stamped with Date.now(), so it lands in that season
+    // too, and the assertions hold on any future run date.
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-07-21T12:00:00Z'))
+    // beforeEach acked the splash for the REAL season; re-ack for the pinned
+    // one, or the splash takes over the app before the Clubhouse is reachable
+    localStorage.setItem('dogleg:season-ack:v1', seasonForDate().key)
+
     const { newRound, applyChoice, advanceHole, archiveRound } = await import('./state/store')
     const { logRound } = await import('./state/stats')
     const { practiceSetup } = await import('./engine/daily')
@@ -576,10 +587,12 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
     render(<App />)
     fireEvent.click(screen.getByText(/🏆 Clubhouse/))
     fireEvent.click(screen.getByText('Seasons'))
-    expect(screen.getByText(/in progress — ends in/)).toBeTruthy()
+    // the pinned clock puts us in Summer 2026 — name it, so a bad pin fails
+    // here rather than quietly changing which branch is under test
+    expect(screen.getByText(/Summer Season · in progress — ends in/)).toBeTruthy()
     expect(screen.getByText(/1 round this season/)).toBeTruthy()
     // launch season: nothing archived yet, framed as coming — not missing
-    expect(screen.getByText(/first season in the books-to-be/)).toBeTruthy()
+    expect(screen.getByText(/Summer 2026 is the first season in the books-to-be/)).toBeTruthy()
   })
 
   it('the streak display carries the fortune disclosure note', () => {

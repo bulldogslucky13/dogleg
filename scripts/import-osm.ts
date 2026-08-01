@@ -202,6 +202,31 @@ const COURSE_GEO: Record<string, CourseGeo> = {
   // hole 15 par above). A matching `handicap`/`par` row is a useful second
   // opinion on a card, nothing more.
   torrey: { name: 'Torrey Pines — South', center: [32.8971, -117.2477], radius: 1400, osmName: '^Torrey Pines South Course$', engineSlug: 'torrey-pines-south' },
+  // Pacific Dunes has NO golf_course polygon of its own. It shares way
+  // 362513477 ("Bandon Dunes Golf Resort") with the Bandon Dunes course and
+  // Old Macdonald — 54 hole ways, three complete sets of ref=1..18 — so
+  // map_to_area alone would mix three courses under one ref and osmHolePrefix
+  // is carrying the whole identity check. Sheep Ranch, Bandon Trails, Bandon
+  // Preserve and Shortys are separate polygons with their own names, so the
+  // anchored name keeps them out.
+  // **The prefix deliberately stops before "Hole".** Five of the eighteen ways
+  // are named with a DOUBLE SPACE — "Pacific Dunes  Hole 5", and likewise
+  // 8/9/10/11 — so /^Pacific Dunes Hole/ would silently drop a quarter of the
+  // course, the same shape of trap as Whistling Straits' misspelled hole 1.
+  // No `packed` clause: of the 105 bunkers that reach a Pacific Dunes
+  // corridor, ZERO are nearer a neighbouring course's centreline (the three
+  // courses sit in separate dune blocks), so ownsHazard's default rule is safe
+  // here even though the polygon holds three courses' sand.
+  // Radius 1600 covers the 790 x 1383 m course block (796 m half-diagonal) and
+  // reaches the Pacific coastline west of the bluff holes.
+  pacificdunes: {
+    name: 'Pacific Dunes',
+    center: [43.2005, -124.3923],
+    radius: 1600,
+    osmName: '^Bandon Dunes Golf Resort$',
+    osmHolePrefix: '^Pacific Dunes',
+    engineSlug: 'pacific-dunes',
+  },
 }
 
 // ---------- Overpass ----------
@@ -688,6 +713,35 @@ async function main() {
         greenHi = Math.max(greenHi, a)
         break
       }
+    }
+  }
+
+  // A centreline that STOPS AT THE PIN runs through only the FRONT HALF of its
+  // green, so the walk above measures half a green and the clamp floors it at
+  // 20 — SHALLOWER than the procedural default (28-36) the import is supposed
+  // to improve on. That is not cosmetic: greenDepth sets `fairwayTo` and feeds
+  // isGreenside() in the odds. Bandon maps every hole this way (all 18 Pacific
+  // Dunes lines end within 9 yd of their green's centroid, and 11 of 18
+  // floored), and it is the mirror of the greenDepth-45 mode in the README:
+  // there the line runs on to the WRONG green, here it stops at the right one.
+  // So where the walk is STILL INSIDE a green when the way runs out, keep
+  // walking along the approach direction until it actually leaves. Same test,
+  // same yardstick — the only thing that changes is that the way ending is no
+  // longer mistaken for the green ending. Do NOT substitute the ring's own
+  // extent along that axis: on a green set across the shot (hole 3 is 42 yd
+  // wide against 32 deep) the bounding extent reads corner-to-corner and
+  // invents depth. Lines that exit their green before the end are untouched.
+  if (isFinite(greenHi) && greenHi >= length - STEP_YD) {
+    const endP = pointAtArc(center, cum, toMeters(length)).p
+    const backP = pointAtArc(center, cum, toMeters(Math.max(0, length - 25))).p
+    const app = sub(endP, backP)
+    const appLen = len(app) || 1
+    const appDir: Vec = [app[0] / appLen, app[1] / appLen]
+    for (let a = length + STEP_YD; a <= length + 60; a += STEP_YD) {
+      const d = toMeters(a - length)
+      const q: Vec = [endP[0] + appDir[0] * d, endP[1] + appDir[1] * d]
+      if (!rings.some((r) => r.kind === 'green' && pointInRing(r.ring, q))) break
+      greenHi = a
     }
   }
 

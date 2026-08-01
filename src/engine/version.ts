@@ -80,4 +80,21 @@
 // 3/4/6/13/17 are hand-authored `deeprough` from USGS NED 10m terrain
 // transects, because OSM has no scrub or wood polygon anywhere on the
 // property and the import read five canyon flanks as open ground.
-export const ENGINE_VERSION = 12
+// v13 = Pacific Dunes real geometry (OSM, every hole shifted to the club's
+// BLACK card). Pure geometry like Potomac and Seminole — the shipped tuple
+// already matched the card on par, yardage AND stroke index for all 18 — but
+// the layout a seed replays into moves on every hole. Two parts are hand-work,
+// both documented at the block in geometry.ts: the bluff on 4/11/13 is
+// hand-authored `ocean` from USGS NED 10m transects (the coastline way is
+// drawn at the WATERLINE, 103-210 yd out across a beach, so the course named
+// for the Pacific imported with zero water on all 18), and two `cross` bands
+// that were single polygons clipping the centreline by 2 yd are folded into
+// their flanks. v13 also carries an importer greenDepth fix that changes what
+// future imports produce: a centreline drawn tee->PIN was measuring only the
+// FRONT HALF of its green, so the clamp floored greenDepth at 20 — shallower
+// than the procedural default — and greenDepth sets `fairwayTo` and feeds
+// isGreenside() in the odds. Pacific Dunes is the first course to ship from
+// the fixed importer, so the two go out together. Committed courses are static
+// data and untouched by it; they are still on the floored numbers, tracked
+// separately.
+export const ENGINE_VERSION = 13

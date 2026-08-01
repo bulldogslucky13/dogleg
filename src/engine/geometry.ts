@@ -217,6 +217,22 @@ export const OSM_BEND: Record<string, number[]> = {
   'torrey-pines-south:15': [0, -1, -2, -3, -4, -5, -6, -7, -8, -8, -8, -6, 0],
   'torrey-pines-south:17': [0, -2, -4, -6, -8, -9, -10, -10, -9, -7, -5, -3, 0],
   'torrey-pines-south:18': [0, 3, 6, 9, 11, 13, 13, 12, 9, 5, 1, -1, 0],
+  // Pacific Dunes. The hand-set `dogleg` flags in courses.ts are INVERTED on
+  // six of these (3, 6, 9, 12, 15, 18) and absent on four more (1, 8, 13, 16);
+  // `bend` overrides the flag, and the direction was verified independently of
+  // the importer (midpoint offset from the tee->green chord) plus a tee view of
+  // 18, the biggest turn at -52 yd, which visibly swings right round the waste.
+  'pacific-dunes:1': [0, 1, 3, 4, 5, 6, 7, 8, 8, 7, 5, 2, 0],
+  'pacific-dunes:3': [0, -5, -9, -14, -18, -22, -25, -26, -26, -25, -20, -11, 0],
+  'pacific-dunes:6': [0, 1, 2, 4, 5, 6, 7, 8, 8, 8, 6, 3, 0],
+  'pacific-dunes:7': [0, 4, 7, 11, 14, 17, 19, 19, 19, 16, 11, 5, 0],
+  'pacific-dunes:8': [0, 6, 12, 17, 20, 21, 20, 18, 15, 11, 8, 4, 0],
+  'pacific-dunes:9': [0, 1, 3, 4, 5, 7, 8, 10, 10, 8, 5, 3, 0],
+  'pacific-dunes:12': [0, -9, -19, -26, -32, -35, -36, -36, -35, -32, -26, -14, 0],
+  'pacific-dunes:13': [0, -2, -4, -6, -7, -9, -10, -10, -10, -9, -6, -3, 0],
+  'pacific-dunes:15': [0, 3, 5, 8, 10, 11, 13, 14, 15, 14, 11, 6, 0],
+  'pacific-dunes:16': [0, 6, 12, 19, 25, 30, 34, 35, 34, 29, 20, 10, 0],
+  'pacific-dunes:18': [0, -7, -15, -22, -29, -36, -43, -44, -40, -33, -22, -11, 0],
 }
 
 export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
@@ -4146,6 +4162,361 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
       { id: 'z5', kind: 'water', from: 518, to: 556, side: 'left' },
       { id: 'z6', kind: 'bunker', from: 556, to: 570, side: 'left' },
       { id: 'z7', kind: 'bunker', from: 560, to: 570, side: 'right' },
+    ],
+  },
+
+  // ---------------------------------------------------------------------------
+  // Pacific Dunes (Bandon, OR) — Tom Doak, 2001. Imported from OSM; all 18
+  // centrelines are mapped. Pure geometry: the shipped tuple already matched
+  // the club's BLACK card (6633 yd, par 71) on par, yardage AND stroke index
+  // for all 18, so nothing in courses.ts moved.
+  //
+  // IDENTITY. Pacific Dunes has no golf_course polygon of its own — it shares
+  // way 362513477 ("Bandon Dunes Golf Resort") with the Bandon Dunes course
+  // and Old Macdonald, 54 hole ways under three complete sets of ref=1..18.
+  // `osmHolePrefix` is doing the whole identity check, and it deliberately
+  // stops before "Hole" because five ways carry a DOUBLE SPACE ("Pacific
+  // Dunes  Hole 5", likewise 8/9/10/11). See COURSE_GEO in scripts/import-osm.ts.
+  //
+  // YARDAGE. Every centreline is drawn from a FORWARD pad, so all 18 imported
+  // short — by 3 to 110 yd, wildly unevenly, exactly the per-hole spread
+  // Seminole warned about. Diagnosed at the tee end rather than assumed:
+  // every line starts inside a `golf=tee` polygon and ends within 9 yd of its
+  // green's CENTROID, so nothing is missing at the green and the whole deficit
+  // sits behind the tee. Corroborated twice — 13 of 18 gaps land within ~10 yd
+  // of a real mapped back-tee pad (15 and 16 dead-on), and ProVisualizer's own
+  // yardages confirm the four biggest shifts (h8 402 vs card 400, h15 544/539,
+  // h16 341/338, h17 210/208). So zones are SHIFTED by (card - import), never
+  // scaled. `fairwayFrom`/`fairwayTo` are DERIVED from length in the importer
+  // (0.35*L; L - greenDepth/2 - 2), not measured, so they are recomputed from
+  // the card length rather than shifted.
+  //
+  // THE OCEAN, which imported as NOTHING. This is the course named for the
+  // Pacific and the raw import had zero water or ocean zones on all 18 holes —
+  // the red flag from scripts/README.md at its loudest. Cause: the
+  // `natural=coastline` way is drawn at the WATERLINE, 103-210 yd out across a
+  // beach, so no rake sample ever lands seaward of it, and the importer's
+  // outward OCEAN_REACH probe only runs once a near-rake hit exists. The real
+  // hazard at Bandon is the BLUFF, and OSM maps no cliff here at all (one
+  // `natural=beach` polygon, no `natural=cliff`).
+  // So the rims were MEASURED, by the Torrey Pines recipe exactly: USGS NED
+  // 10m (3DEP) transects every 10 yd along each centreline, sampling +/-20..60
+  // yd, taking the nearest offset whose ground sits >= 6 m below the playing
+  // line, authoring a zone only where that rim falls inside the importer's own
+  // 50-yd corridor and spanning exactly the measured run. These ARE the runs,
+  // in import coordinates before the shift:
+  //   h4  right 0-390  (rim 20-40)   h11 left 0-100  (rim 20-30)
+  //   h13 left  0-410  (rim 30-50)
+  // The ground falls MONOTONICALLY from ~31 m on the playing line to ~7 m at
+  // 60 yd and keeps going to a sea-level beach — h11 drops 22 m inside 60 yd —
+  // which is what separates a bluff from a dune hollow, and the rim side
+  // matches the measured ocean side on all three.
+  // It declined the other fifteen, which is the point of measuring. Hole 10
+  // is the one that matters: its tuple declares `hazard: 'ocean'`, but its
+  // nearest drop is at 60 yd, OUTSIDE the corridor, and the tee view shows the
+  // Pacific sitting beyond the green behind a wide dune shelf — the same call
+  // that cleared whistling-straits:9/18. Hole 3 likewise declares `ocean` and
+  // measures out. Both are left alone: `hazard` only feeds the PROCEDURAL
+  // layout, so it is inert once a hole has real geometry, and no `signature`
+  // on this course names water on 3 or 10. Do not "fix" the geometry to match
+  // that field. Hole 18 has a 5-station drop at 40-50 yd right over 0-40 yd —
+  // a dune swale beside the tee, 813 yd from the ocean and unreachable, so not
+  // authored. Nothing is extrapolated: h4's zone starts at 68, the shifted
+  // position of the mapped tee, because the 68 yd behind it were never sampled.
+  // `ocean` (not `deeprough`) is the honest kind here — over the rim is the
+  // beach and the Pacific, a lost ball, and KIND_BUCKET puts ocean in the
+  // penalty-carrying `water` bucket where Torrey's recoverable scrub canyons
+  // sit in `trees`. It is also what makes h11's and h13's `signature` strings
+  // true; before this pass both named an ocean the map did not contain.
+  //
+  // HAND-FIXES, both the same artifact: a single polygon that reaches only the
+  // FIRST rake offset past the centreline (-2 yd) earns `cross` off that one
+  // sample, which reads as a full-width forced carry.
+  //   h3  the 46-76 `trees` cross is way/1098554089, a scrub mass spanning
+  //       lateral -2..46 — i.e. entirely LEFT bar 2 yd — and a forced carry
+  //       50 yd off the tee of a 499-yd par 5 is a hole nobody plays. The tee
+  //       view shows clear ground there. Folded into the left flank, which
+  //       merges with its neighbours into one 0-100 left zone.
+  //   h11 the 112-118 `bunker` cross is way/1098412203, lateral -2..10.
+  //       Folded into the adjoining left bunker (112-126); the right-flank
+  //       zone at 104-130 already covers the other side, which is the ordinary
+  //       two-flanking-bunkers shape the importer's own rule is built for.
+  // No `osmIgnore`: the Seminole mis-tagged-scrub check was run and came back
+  // clean — the giant `golf=bunker`+`natural=sand` polygons here (6.4, 2.0,
+  // 0.9 acres against a 0.017 median) touch ZERO Pacific Dunes corridors, and
+  // only 2 bunkers straddle 3+ corridors. No `packed` either: of the 105
+  // bunkers reaching a corridor, none is nearer a neighbouring course's line.
+  // No landmark — the course has no built structure anyone would recognise.
+  // Data (c) OpenStreetMap contributors, ODbL. Terrain: USGS 3DEP/NED.
+  'pacific-dunes:1': {
+    length: 370,
+    fairwayFrom: 130,
+    fairwayTo: 352,
+    greenDepth: 33,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 157, to: 249, side: 'right' },
+      { id: 'z2', kind: 'bunker', from: 279, to: 299, side: 'right' },
+      { id: 'z3', kind: 'trees', from: 345, to: 370, side: 'left' },
+      { id: 'z4', kind: 'bunker', from: 349, to: 361, side: 'right' },
+      { id: 'z5', kind: 'bunker', from: 363, to: 370, side: 'left' },
+    ],
+  },
+  'pacific-dunes:2': {
+    length: 368,
+    fairwayFrom: 129,
+    fairwayTo: 346,
+    greenDepth: 39,
+    zones: [
+      { id: 'z1', kind: 'trees', from: 31, to: 65, side: 'right' },
+      { id: 'z2', kind: 'bunker', from: 47, to: 61, side: 'left' },
+      { id: 'z3', kind: 'bunker', from: 61, to: 99, side: 'right' },
+      { id: 'z4', kind: 'bunker', from: 95, to: 109, side: 'left' },
+      { id: 'z5', kind: 'bunker', from: 111, to: 121, side: 'right' },
+      { id: 'z6', kind: 'bunker', from: 215, to: 243, side: 'left' },
+      { id: 'z7', kind: 'trees', from: 275, to: 319, side: 'right' },
+      { id: 'z8', kind: 'bunker', from: 319, to: 343, side: 'right' },
+    ],
+  },
+  // z1: the raw import split this into left 0-46 / cross 46-76 / left 72-100 —
+  // one scrub mass, folded back into a single left zone (see HAND-FIXES above).
+  'pacific-dunes:3': {
+    length: 499,
+    fairwayFrom: 175,
+    fairwayTo: 485,
+    greenDepth: 25,
+    zones: [
+      { id: 'z1', kind: 'trees', from: 0, to: 100, side: 'left' },
+      { id: 'z2', kind: 'trees', from: 102, to: 178, side: 'right' },
+      { id: 'z3', kind: 'trees', from: 130, to: 174, side: 'left' },
+      { id: 'z4', kind: 'bunker', from: 174, to: 188, side: 'right' },
+      { id: 'z5', kind: 'bunker', from: 230, to: 256, side: 'left' },
+      { id: 'z6', kind: 'trees', from: 232, to: 270, side: 'right' },
+      { id: 'z7', kind: 'bunker', from: 296, to: 326, side: 'left' },
+      { id: 'z8', kind: 'trees', from: 360, to: 394, side: 'right' },
+      { id: 'z9', kind: 'bunker', from: 376, to: 404, side: 'left' },
+      { id: 'z10', kind: 'trees', from: 436, to: 456, side: 'right' },
+      { id: 'z11', kind: 'trees', from: 458, to: 476, side: 'left' },
+      { id: 'z12', kind: 'trees', from: 472, to: 499, side: 'right' },
+      { id: 'z13', kind: 'bunker', from: 474, to: 499, side: 'right' },
+    ],
+  },
+  // z1: hand-authored bluff, 3DEP-measured (see THE OCEAN above).
+  'pacific-dunes:4': {
+    length: 463,
+    fairwayFrom: 162,
+    fairwayTo: 439,
+    greenDepth: 45,
+    zones: [
+      { id: 'z1', kind: 'ocean', from: 68, to: 458, side: 'right' },
+      { id: 'z2', kind: 'bunker', from: 246, to: 296, side: 'left' },
+      { id: 'z3', kind: 'bunker', from: 406, to: 424, side: 'left' },
+      { id: 'z4', kind: 'bunker', from: 434, to: 446, side: 'left' },
+    ],
+  },
+  'pacific-dunes:5': {
+    length: 199,
+    fairwayFrom: 70,
+    fairwayTo: 175,
+    greenDepth: 45,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 63, to: 75, side: 'right' },
+      { id: 'z2', kind: 'bunker', from: 131, to: 159, side: 'left' },
+      { id: 'z3', kind: 'bunker', from: 155, to: 173, side: 'right' },
+      { id: 'z4', kind: 'bunker', from: 189, to: 199, side: 'left' },
+      { id: 'z5', kind: 'bunker', from: 191, to: 199, side: 'right' },
+    ],
+  },
+  'pacific-dunes:6': {
+    length: 316,
+    fairwayFrom: 111,
+    fairwayTo: 304,
+    greenDepth: 21,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 15, to: 43, side: 'left' },
+      { id: 'z2', kind: 'trees', from: 97, to: 143, side: 'left' },
+      { id: 'z3', kind: 'bunker', from: 193, to: 213, side: 'right' },
+      { id: 'z4', kind: 'bunker', from: 279, to: 309, side: 'left' },
+      { id: 'z5', kind: 'bunker', from: 281, to: 309, side: 'right' },
+    ],
+  },
+  'pacific-dunes:7': {
+    length: 464,
+    fairwayFrom: 162,
+    fairwayTo: 440,
+    greenDepth: 44,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 32, to: 46, side: 'left' },
+      { id: 'z2', kind: 'bunker', from: 44, to: 54, side: 'right' },
+      { id: 'z3', kind: 'bunker', from: 72, to: 80, side: 'right' },
+      { id: 'z4', kind: 'trees', from: 136, to: 250, side: 'left' },
+      { id: 'z5', kind: 'trees', from: 168, to: 218, side: 'right' },
+      { id: 'z6', kind: 'bunker', from: 410, to: 464, side: 'left' },
+      { id: 'z7', kind: 'bunker', from: 414, to: 438, side: 'right' },
+    ],
+  },
+  'pacific-dunes:8': {
+    length: 400,
+    fairwayFrom: 140,
+    fairwayTo: 387,
+    greenDepth: 22,
+    zones: [
+      { id: 'z1', kind: 'trees', from: 110, to: 164, side: 'right' },
+      { id: 'z2', kind: 'trees', from: 110, to: 214, side: 'left' },
+      { id: 'z3', kind: 'bunker', from: 194, to: 222, side: 'right' },
+      { id: 'z4', kind: 'trees', from: 250, to: 300, side: 'right' },
+      { id: 'z5', kind: 'trees', from: 286, to: 338, side: 'left' },
+      { id: 'z6', kind: 'bunker', from: 384, to: 396, side: 'right' },
+    ],
+  },
+  'pacific-dunes:9': {
+    length: 406,
+    fairwayFrom: 142,
+    fairwayTo: 382,
+    greenDepth: 45,
+    zones: [
+      { id: 'z1', kind: 'trees', from: 39, to: 57, side: 'right' },
+      { id: 'z2', kind: 'bunker', from: 97, to: 123, side: 'left' },
+      { id: 'z3', kind: 'bunker', from: 185, to: 205, side: 'left' },
+      { id: 'z4', kind: 'trees', from: 189, to: 209, side: 'left' },
+      { id: 'z5', kind: 'bunker', from: 225, to: 247, side: 'left' },
+      { id: 'z6', kind: 'bunker', from: 345, to: 357, side: 'right' },
+      { id: 'z7', kind: 'bunker', from: 355, to: 395, side: 'left' },
+      { id: 'z8', kind: 'bunker', from: 397, to: 406, side: 'right' },
+    ],
+  },
+  // No ocean: the bluff here is 60 yd out, outside the corridor, and the tuple's
+  // `hazard: 'ocean'` is inert once real geometry exists. See THE OCEAN above.
+  // One zone on a 206-yd par 3 is bare but checked, not dropped: every
+  // `golf=bunker` within 80 yd of this centreline was enumerated, and the sand
+  // that looks greenside from above (ways 1098412203/04/05) hugs hole 11's line
+  // and is assigned there — it sits BEYOND this green, between the two. OSM has
+  // no bunker of hole 10's own inside the corridor. The dune sand around the
+  // green is untagged terrain, and from directly overhead Bandon's dunes are not
+  // reliably distinguishable from bunkers, so nothing was hand-authored here.
+  // Compare tpc-potomac:15, which is simply that bare too.
+  'pacific-dunes:10': {
+    length: 206,
+    fairwayFrom: 72,
+    fairwayTo: 185,
+    greenDepth: 38,
+    zones: [
+      { id: 'z1', kind: 'trees', from: 74, to: 128, side: 'left' },
+    ],
+  },
+  // z1: hand-authored bluff, 3DEP-measured. z3 absorbed the 112-118 `cross`.
+  'pacific-dunes:11': {
+    length: 148,
+    fairwayFrom: 52,
+    fairwayTo: 130,
+    greenDepth: 32,
+    zones: [
+      { id: 'z1', kind: 'ocean', from: 40, to: 140, side: 'left' },
+      { id: 'z2', kind: 'bunker', from: 104, to: 130, side: 'right' },
+      { id: 'z3', kind: 'bunker', from: 112, to: 126, side: 'left' },
+      { id: 'z4', kind: 'bunker', from: 140, to: 148, side: 'left' },
+    ],
+  },
+  'pacific-dunes:12': {
+    length: 529,
+    fairwayFrom: 185,
+    fairwayTo: 507,
+    greenDepth: 39,
+    zones: [
+      { id: 'z1', kind: 'trees', from: 76, to: 128, side: 'right' },
+      { id: 'z2', kind: 'bunker', from: 196, to: 216, side: 'left' },
+      { id: 'z3', kind: 'trees', from: 226, to: 250, side: 'right' },
+      { id: 'z4', kind: 'bunker', from: 380, to: 392, side: 'right' },
+      { id: 'z5', kind: 'bunker', from: 394, to: 410, side: 'left' },
+      { id: 'z6', kind: 'bunker', from: 490, to: 508, side: 'left' },
+      { id: 'z7', kind: 'trees', from: 512, to: 528, side: 'left' },
+    ],
+  },
+  // z2: hand-authored bluff, 3DEP-measured — this is the hole whose `signature`
+  // says the ocean shoulders the whole fairway, and now it does. z5 is a chain
+  // of seven mapped bunkers down the inland (right) side, merged by the
+  // importer's own 8-yd rule and confirmed near-continuous in the tee view.
+  'pacific-dunes:13': {
+    length: 444,
+    fairwayFrom: 155,
+    fairwayTo: 420,
+    greenDepth: 45,
+    zones: [
+      { id: 'z1', kind: 'trees', from: 30, to: 156, side: 'right' },
+      { id: 'z2', kind: 'ocean', from: 30, to: 440, side: 'left' },
+      { id: 'z3', kind: 'trees', from: 168, to: 194, side: 'right' },
+      { id: 'z4', kind: 'bunker', from: 248, to: 278, side: 'right' },
+      { id: 'z5', kind: 'bunker', from: 318, to: 444, side: 'right' },
+      { id: 'z6', kind: 'trees', from: 376, to: 398, side: 'right' },
+      { id: 'z7', kind: 'trees', from: 440, to: 444, side: 'right' },
+    ],
+  },
+  'pacific-dunes:14': {
+    length: 145,
+    fairwayFrom: 51,
+    fairwayTo: 125,
+    greenDepth: 37,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 46, to: 72, side: 'right' },
+      { id: 'z2', kind: 'trees', from: 46, to: 74, side: 'left' },
+      { id: 'z3', kind: 'bunker', from: 82, to: 112, side: 'right' },
+      { id: 'z4', kind: 'trees', from: 96, to: 145, side: 'left' },
+      { id: 'z5', kind: 'bunker', from: 136, to: 145, side: 'right' },
+      { id: 'z6', kind: 'bunker', from: 140, to: 145, side: 'left' },
+    ],
+  },
+  'pacific-dunes:15': {
+    length: 539,
+    fairwayFrom: 189,
+    fairwayTo: 520,
+    greenDepth: 34,
+    zones: [
+      { id: 'z1', kind: 'trees', from: 101, to: 131, side: 'right' },
+      { id: 'z2', kind: 'trees', from: 153, to: 189, side: 'left' },
+      { id: 'z3', kind: 'trees', from: 201, to: 255, side: 'right' },
+      { id: 'z4', kind: 'trees', from: 215, to: 223, side: 'left' },
+      { id: 'z5', kind: 'trees', from: 245, to: 283, side: 'left' },
+      { id: 'z6', kind: 'bunker', from: 315, to: 361, side: 'right' },
+      { id: 'z7', kind: 'bunker', from: 381, to: 401, side: 'left' },
+      { id: 'z8', kind: 'bunker', from: 445, to: 463, side: 'right' },
+      { id: 'z9', kind: 'trees', from: 467, to: 539, side: 'right' },
+    ],
+  },
+  'pacific-dunes:16': {
+    length: 338,
+    fairwayFrom: 118,
+    fairwayTo: 320,
+    greenDepth: 32,
+    zones: [
+      { id: 'z1', kind: 'trees', from: 126, to: 220, side: 'right' },
+      { id: 'z2', kind: 'bunker', from: 200, to: 212, side: 'left' },
+      { id: 'z3', kind: 'bunker', from: 260, to: 274, side: 'left' },
+    ],
+  },
+  'pacific-dunes:17': {
+    length: 208,
+    fairwayFrom: 73,
+    fairwayTo: 194,
+    greenDepth: 25,
+    zones: [
+      { id: 'z1', kind: 'trees', from: 79, to: 115, side: 'right' },
+      { id: 'z2', kind: 'trees', from: 83, to: 189, side: 'left' },
+      { id: 'z3', kind: 'bunker', from: 115, to: 149, side: 'right' },
+      { id: 'z4', kind: 'bunker', from: 181, to: 187, side: 'right' },
+      { id: 'z5', kind: 'bunker', from: 189, to: 208, side: 'left' },
+    ],
+  },
+  'pacific-dunes:18': {
+    length: 591,
+    fairwayFrom: 207,
+    fairwayTo: 574,
+    greenDepth: 30,
+    zones: [
+      { id: 'z1', kind: 'trees', from: 5, to: 39, side: 'right' },
+      { id: 'z2', kind: 'trees', from: 5, to: 275, side: 'left' },
+      { id: 'z3', kind: 'bunker', from: 193, to: 247, side: 'left' },
+      { id: 'z4', kind: 'bunker', from: 287, to: 375, side: 'left' },
+      { id: 'z5', kind: 'bunker', from: 373, to: 441, side: 'right' },
+      { id: 'z6', kind: 'bunker', from: 569, to: 591, side: 'right' },
     ],
   },
 }

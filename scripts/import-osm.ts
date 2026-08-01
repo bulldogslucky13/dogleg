@@ -779,23 +779,31 @@ async function main() {
   // naming every green and its span so a human decides. Never let this pass
   // quietly: a plausible-looking depth off the wrong green is worse than an
   // obviously wrong one.
-  const onGreen: { a: number; id: number; type: OsmElement['type'] }[] = []
-  for (let a = 0; a <= length; a += STEP_YD) {
-    const p = pointAtArc(center, cum, toMeters(a)).p
-    const hit = rings.find((r) => r.kind === 'green' && pointInRing(r.ring, p))
-    if (hit) onGreen.push({ a, id: hit.id, type: hit.type })
-  }
   // Identity is TYPE + ID, never the id alone: OSM way and relation ids are
   // separate namespaces, so way/123 and relation/123 are different objects and
   // keying on the number could fuse two greens into one — suppressing the
-  // warning below and letting the run-continuity check bridge them, which is
-  // exactly the inflated depth this whole block exists to prevent. Same reason
-  // the Ring type carries `type` for hazard reporting.
+  // warning below and letting the run bridge them, which is exactly the
+  // inflated depth this whole block exists to prevent. Same reason the Ring
+  // type carries `type` for hazard reporting.
   const greenKey = (g: { id: number; type: OsmElement['type'] }) => `${g.type}/${g.id}`
-  const greensTouched = [...new Set(onGreen.map(greenKey))]
+  // EVERY green containing each station, sorted — not the first `find` hit.
+  // Where two green polygons OVERLAP, taking the first match makes both the
+  // warning and the measured run depend on the order `rings` happens to be in,
+  // which is the ordering-dependent wrong-green result this guard exists to
+  // expose. Sorting also makes the target choice below deterministic.
+  const onGreen: { a: number; keys: string[] }[] = []
+  for (let a = 0; a <= length; a += STEP_YD) {
+    const p = pointAtArc(center, cum, toMeters(a)).p
+    const keys = rings
+      .filter((r) => r.kind === 'green' && pointInRing(r.ring, p))
+      .map(greenKey)
+      .sort()
+    if (keys.length) onGreen.push({ a, keys: [...new Set(keys)] })
+  }
+  const greensTouched = [...new Set(onGreen.flatMap((g) => g.keys))].sort()
   if (greensTouched.length > 1) {
     const spans = greensTouched.map((key) => {
-      const hits = onGreen.filter((g) => greenKey(g) === key)
+      const hits = onGreen.filter((g) => g.keys.includes(key))
       return `    ${key}  ${hits[0].a}-${hits[hits.length - 1].a} yd`
     })
     console.error(
@@ -807,17 +815,24 @@ async function main() {
         `    (Normal cause: the tee sits beside the PREVIOUS hole's green — cypress-point:1.)`,
     )
   }
+  // The green this hole is played TO is the one its line ends on. `keys` is
+  // sorted, so keys[0] is the same choice whatever order `rings` came in; if
+  // the last station sits on more than one green they genuinely overlap at the
+  // pin, which no rule can disambiguate, so say so.
+  const targetKey = onGreen.length ? onGreen[onGreen.length - 1].keys[0] : ''
+  if (onGreen.length && onGreen[onGreen.length - 1].keys.length > 1) {
+    console.error(
+      `  ! hole ${holeNo}: the pin sits on ${onGreen[onGreen.length - 1].keys.length} OVERLAPPING greens ` +
+        `(${onGreen[onGreen.length - 1].keys.join(', ')}); measuring ${targetKey}. Check the mapping.`,
+    )
+  }
   let greenLo = Infinity
   let greenHi = -Infinity
   if (onGreen.length) {
-    // last contiguous run, and only within ONE polygon — a run that changes
-    // green id mid-stride is two greens touching, not one deep green
+    // walk back over the last contiguous run of stations still ON THE TARGET —
+    // a station that has left it is a different green touching, not more depth
     let lo = onGreen.length - 1
-    while (
-      lo > 0 &&
-      onGreen[lo].a - onGreen[lo - 1].a <= STEP_YD * 2 &&
-      greenKey(onGreen[lo]) === greenKey(onGreen[lo - 1])
-    )
+    while (lo > 0 && onGreen[lo].a - onGreen[lo - 1].a <= STEP_YD * 2 && onGreen[lo - 1].keys.includes(targetKey))
       lo--
     greenLo = onGreen[lo].a
     greenHi = onGreen[onGreen.length - 1].a
@@ -845,7 +860,6 @@ async function main() {
     // rebuilding the very inflated depth this block exists to stop, and doing it
     // where the multi-green warning above cannot see it, since that is computed
     // only from samples on the original centreline.
-    const targetKey = greenKey(onGreen[onGreen.length - 1])
     const endP = pointAtArc(center, cum, toMeters(length)).p
     const backP = pointAtArc(center, cum, toMeters(Math.max(0, length - 25))).p
     const app = sub(endP, backP)
@@ -854,17 +868,24 @@ async function main() {
     for (let a = length + STEP_YD; a <= length + 60; a += STEP_YD) {
       const d = toMeters(a - length)
       const q: Vec = [endP[0] + appDir[0] * d, endP[1] + appDir[1] * d]
-      const hit = rings.find((r) => r.kind === 'green' && pointInRing(r.ring, q))
-      if (!hit) break
-      if (greenKey(hit) !== targetKey) {
+      // Ask "am I still on the TARGET", never "which green did find() hit
+      // first" — where a neighbour overlaps the target past the pin, the first
+      // hit can be the neighbour while q is still inside the target, and
+      // truncating there would make the depth depend on ring order rather than
+      // on the target green's own edge.
+      if (rings.some((r) => r.kind === 'green' && greenKey(r) === targetKey && pointInRing(r.ring, q))) {
+        greenHi = a
+        continue
+      }
+      const other = rings.find((r) => r.kind === 'green' && pointInRing(r.ring, q))
+      if (other) {
         console.error(
           `  ! hole ${holeNo}: past the pin the approach leaves ${targetKey} and enters ` +
-            `${greenKey(hit)} at ${a} yd — greenDepth stops at the target green's own edge. ` +
+            `${greenKey(other)} at ${a} yd — greenDepth stops at the target green's own edge. ` +
             `Two greens touching here is worth a look.`,
         )
-        break
       }
-      greenHi = a
+      break
     }
   }
 

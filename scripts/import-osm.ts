@@ -15,6 +15,10 @@
  *   pnpm import:osm sawgrass 17 --raw      # dump matched OSM features
  *   pnpm import:osm sawgrass 17 --debug    # ring counts + per-ring extents
  *   pnpm import:osm sawgrass 17 --fresh    # bypass the per-course Overpass cache
+ *   pnpm import:osm sawgrass 17 --shift 110  # centreline starts at a forward pad:
+ *                                          # prepend the missing tee run so length,
+ *                                          # zones AND the bend profile come out in
+ *                                          # card coordinates (see --shift below)
  *
  * Registry: COURSE_GEO below maps a short slug → course center, the exact
  * golf_course polygon name (osmName), and the engine slug (for --compare).
@@ -202,6 +206,31 @@ const COURSE_GEO: Record<string, CourseGeo> = {
   // hole 15 par above). A matching `handicap`/`par` row is a useful second
   // opinion on a card, nothing more.
   torrey: { name: 'Torrey Pines — South', center: [32.8971, -117.2477], radius: 1400, osmName: '^Torrey Pines South Course$', engineSlug: 'torrey-pines-south' },
+  // Pacific Dunes has NO golf_course polygon of its own. It shares way
+  // 362513477 ("Bandon Dunes Golf Resort") with the Bandon Dunes course and
+  // Old Macdonald — 54 hole ways, three complete sets of ref=1..18 — so
+  // map_to_area alone would mix three courses under one ref and osmHolePrefix
+  // is carrying the whole identity check. Sheep Ranch, Bandon Trails, Bandon
+  // Preserve and Shortys are separate polygons with their own names, so the
+  // anchored name keeps them out.
+  // **The prefix deliberately stops before "Hole".** Five of the eighteen ways
+  // are named with a DOUBLE SPACE — "Pacific Dunes  Hole 5", and likewise
+  // 8/9/10/11 — so /^Pacific Dunes Hole/ would silently drop a quarter of the
+  // course, the same shape of trap as Whistling Straits' misspelled hole 1.
+  // No `packed` clause: of the 105 bunkers that reach a Pacific Dunes
+  // corridor, ZERO are nearer a neighbouring course's centreline (the three
+  // courses sit in separate dune blocks), so ownsHazard's default rule is safe
+  // here even though the polygon holds three courses' sand.
+  // Radius 1600 covers the 790 x 1383 m course block (796 m half-diagonal) and
+  // reaches the Pacific coastline west of the bluff holes.
+  pacificdunes: {
+    name: 'Pacific Dunes',
+    center: [43.2005, -124.3923],
+    radius: 1600,
+    osmName: '^Bandon Dunes Golf Resort$',
+    osmHolePrefix: '^Pacific Dunes',
+    engineSlug: 'pacific-dunes',
+  },
 }
 
 // ---------- Overpass ----------
@@ -377,6 +406,12 @@ function pointAtArc(pts: Vec[], cum: number[], a: number): { p: Vec; dir: Vec } 
 /**
  * Cosmetic dogleg profile: signed lateral deviation (yards, >0 = golfer-left)
  * of the smoothed centreline from the straight tee→green chord, sampled at
+ *
+ * NOTE THE SIGN IS THE BULGE, NOT THE TURN, and they are OPPOSITE: a hole that
+ * doglegs RIGHT bows golfer-LEFT of its own tee→green chord (the chord cuts the
+ * corner), so a POSITIVE profile is a RIGHT dogleg. src/ui/panels.tsx makes
+ * exactly that conversion for the chip (`m < 0 ? 'L' : 'R'`). Read the printed
+ * label below, not the raw sign, or you will document the hole backwards.
  * BEND_SAMPLES+1 evenly-spaced fractions. Endpoints are ~0 by construction; the
  * max-magnitude sample marks where — and how hard — the hole actually turns.
  * Map-only: the odds engine works in 1-D and never sees this, so it is not
@@ -538,8 +573,28 @@ async function main() {
   if (geo.osmHolePrefix) {
     const re = new RegExp(geo.osmHolePrefix, 'i')
     const named = candidates.filter((e) => re.test(e.tags?.name ?? ''))
-    if (named.length) candidates = named
-    else console.error(`  no hole name matched /${geo.osmHolePrefix}/i; falling back to nearest-center`)
+    // FATAL, deliberately, rather than falling through to nearest-centre. A
+    // prefix is only ever set where several courses share ONE golf_course
+    // polygon and therefore share hole `ref`s — Bandon's 54 ways across three
+    // courses, Sawgrass Stadium against Dye's Valley, Carnoustie against its
+    // three siblings — so it is the ONLY thing telling them apart. If an OSM
+    // rename breaks the match, nearest-centre would quietly hand back a
+    // NEIGHBOURING course's hole and emit it under this slug: geometry that
+    // claims to be the real place and isn't, which step 0 of the freeze process
+    // in scripts/README.md calls worse than shipping nothing at all. Stop and
+    // make a human re-pin the prefix.
+    if (!named.length) {
+      const names = candidates.map((e) => JSON.stringify(e.tags?.name ?? null)).join(', ')
+      console.error(
+        `hole ${holeNo}: no golf=hole way matched /${geo.osmHolePrefix}/i on ${geo.name}.\n` +
+          `  ${candidates.length} way(s) share ref=${holeNo} here, named: ${names}\n` +
+          `  That prefix is this course's only identity check against the others on the site,\n` +
+          `  so this refuses to guess. Re-pin osmHolePrefix in COURSE_GEO against the current\n` +
+          `  OSM names before importing.`,
+      )
+      process.exit(2)
+    }
+    candidates = named
   }
   const holeWay = candidates.sort((a, b) => {
     const da = len(sub(centerProj(a.geometry![0]), c0))
@@ -551,7 +606,33 @@ async function main() {
   // reference frame anchored at the tee end of the hole line
   const line = holeWay.geometry
   const proj = projector(line[0].lat, line[0].lon)
-  const center: Vec[] = chaikin(line.map(proj), 2)
+  // --shift <yd>: the centreline starts at a FORWARD pad, so prepend the
+  // missing tee run as a straight segment back along the opening heading —
+  // the same assumption the zone shift already makes ("the real tee is N yards
+  // straight back"), applied to the geometry instead of to the numbers
+  // afterwards. Everything downstream then comes out in CARD coordinates for
+  // free: `length`, every zone's from/to, fairwayFrom/To — and, crucially, the
+  // BEND PROFILE, which cannot be shifted after the fact. Its 13 samples are
+  // evenly spaced fractions of the hole, and HoleMap replays them at the same
+  // fractions of the final card length, so a profile measured on the short raw
+  // line gets STRETCHED over the long one and draws the corner yards early
+  // (64 yd early on pacific-dunes:8, whose pad is 110 yd forward). Re-measuring
+  // on the extended line also re-bases the deviations on the real back-tee ->
+  // green chord, which a resample of the old numbers could not do.
+  const rawPts = line.map(proj)
+  const shiftIdx = flags.indexOf('--shift')
+  const shiftYd = shiftIdx >= 0 ? Number(flags[shiftIdx + 1]) : 0
+  if (shiftIdx >= 0 && !Number.isFinite(shiftYd)) {
+    console.error('--shift needs a yardage, e.g. --shift 110')
+    process.exit(2)
+  }
+  if (shiftYd > 0 && rawPts.length >= 2) {
+    const [p0, p1] = rawPts
+    const back = sub(p0, p1)
+    const bl = len(back) || 1
+    rawPts.unshift([p0[0] + (back[0] / bl) * toMeters(shiftYd), p0[1] + (back[1] / bl) * toMeters(shiftYd)])
+  }
+  const center: Vec[] = chaikin(rawPts, 2)
   const cum = arcLengths(center)
   const holeLenM = cum[cum.length - 1]
   const length = Math.round(toYards(holeLenM))
@@ -677,17 +758,134 @@ async function main() {
   }
   const coastReach = toMeters(CORRIDOR_YD + 120)
 
-  // green depth: the along span where the centre line runs through a green
-  let greenLo = Infinity
-  let greenHi = -Infinity
+  // green depth: the along span where the centre line runs through a green —
+  // specifically the LAST contiguous run of it. Taking min/max across every hit
+  // is what made cypress-point:1 read 402 yd deep: that centreline passes a
+  // NEIGHBOURING green at 28-54 yd before reaching its own at 400, so the span
+  // stretched between two different greens and pinned the 45 clamp. That is the
+  // artifact scripts/README.md says to suspect whenever greenDepth reads exactly
+  // 45, and it is silent whenever the stray green inflates the number without
+  // reaching the clamp. The green a hole is played TO is the one its line ends
+  // on, so only the run that reaches the end counts.
+  // Carry the polygon id per sample so a line touching MORE THAN ONE green is
+  // reported rather than silently resolved. There is no automatic way to pick
+  // the right one: the tell-tale is which green the hole is played TO, and for
+  // a way drawn tee->pin that is the one its end sits in — but if a way
+  // OVERSHOOTS its own green into a neighbour's, "the green at the end" is the
+  // neighbour, so polygon identity picks the same wrong green the last run
+  // does. What the old min/max at least did was fail LOUDLY (a conspicuous
+  // clamped 45). So the heuristic stays — it is right for every tee->pin way,
+  // which is all 246 shipped holes — and the ambiguity is made loud instead,
+  // naming every green and its span so a human decides. Never let this pass
+  // quietly: a plausible-looking depth off the wrong green is worse than an
+  // obviously wrong one.
+  // Identity is TYPE + ID, never the id alone: OSM way and relation ids are
+  // separate namespaces, so way/123 and relation/123 are different objects and
+  // keying on the number could fuse two greens into one — suppressing the
+  // warning below and letting the run bridge them, which is exactly the
+  // inflated depth this whole block exists to prevent. Same reason the Ring
+  // type carries `type` for hazard reporting.
+  const greenKey = (g: { id: number; type: OsmElement['type'] }) => `${g.type}/${g.id}`
+  // EVERY green containing each station, sorted — not the first `find` hit.
+  // Where two green polygons OVERLAP, taking the first match makes both the
+  // warning and the measured run depend on the order `rings` happens to be in,
+  // which is the ordering-dependent wrong-green result this guard exists to
+  // expose. Sorting also makes the target choice below deterministic.
+  const onGreen: { a: number; keys: string[] }[] = []
   for (let a = 0; a <= length; a += STEP_YD) {
     const p = pointAtArc(center, cum, toMeters(a)).p
-    for (const { kind, ring } of rings) {
-      if (kind === 'green' && pointInRing(ring, p)) {
-        greenLo = Math.min(greenLo, a)
-        greenHi = Math.max(greenHi, a)
-        break
+    const keys = rings
+      .filter((r) => r.kind === 'green' && pointInRing(r.ring, p))
+      .map(greenKey)
+      .sort()
+    if (keys.length) onGreen.push({ a, keys: [...new Set(keys)] })
+  }
+  const greensTouched = [...new Set(onGreen.flatMap((g) => g.keys))].sort()
+  if (greensTouched.length > 1) {
+    const spans = greensTouched.map((key) => {
+      const hits = onGreen.filter((g) => g.keys.includes(key))
+      return `    ${key}  ${hits[0].a}-${hits[hits.length - 1].a} yd`
+    })
+    console.error(
+      `  ! hole ${holeNo}: the centreline runs through ${greensTouched.length} DIFFERENT greens:\n` +
+        spans.join('\n') +
+        `\n    greenDepth is measured from the LAST run (the green a tee->pin line ends on).\n` +
+        `    Check that is this hole's green — a line that overshoots into a neighbour's\n` +
+        `    would measure the neighbour here, and it would look perfectly plausible.\n` +
+        `    (Normal cause: the tee sits beside the PREVIOUS hole's green — cypress-point:1.)`,
+    )
+  }
+  // The green this hole is played TO is the one its line ends on. `keys` is
+  // sorted, so keys[0] is the same choice whatever order `rings` came in; if
+  // the last station sits on more than one green they genuinely overlap at the
+  // pin, which no rule can disambiguate, so say so.
+  const targetKey = onGreen.length ? onGreen[onGreen.length - 1].keys[0] : ''
+  if (onGreen.length && onGreen[onGreen.length - 1].keys.length > 1) {
+    console.error(
+      `  ! hole ${holeNo}: the pin sits on ${onGreen[onGreen.length - 1].keys.length} OVERLAPPING greens ` +
+        `(${onGreen[onGreen.length - 1].keys.join(', ')}); measuring ${targetKey}. Check the mapping.`,
+    )
+  }
+  let greenLo = Infinity
+  let greenHi = -Infinity
+  if (onGreen.length) {
+    // walk back over the last contiguous run of stations still ON THE TARGET —
+    // a station that has left it is a different green touching, not more depth
+    let lo = onGreen.length - 1
+    while (lo > 0 && onGreen[lo].a - onGreen[lo - 1].a <= STEP_YD * 2 && onGreen[lo - 1].keys.includes(targetKey))
+      lo--
+    greenLo = onGreen[lo].a
+    greenHi = onGreen[onGreen.length - 1].a
+  }
+
+  // A centreline that STOPS AT THE PIN runs through only the FRONT HALF of its
+  // green, so the walk above measures half a green and the clamp floors it at
+  // 20 — SHALLOWER than the procedural default (28-36) the import is supposed
+  // to improve on. That is not cosmetic: greenDepth sets `fairwayTo` and feeds
+  // isGreenside() in the odds. Bandon maps every hole this way (all 18 Pacific
+  // Dunes lines end within 9 yd of their green's centroid, and 11 of 18
+  // floored), and it is the mirror of the greenDepth-45 mode in the README:
+  // there the line runs on to the WRONG green, here it stops at the right one.
+  // So where the walk is STILL INSIDE a green when the way runs out, keep
+  // walking along the approach direction until it actually leaves. Same test,
+  // same yardstick — the only thing that changes is that the way ending is no
+  // longer mistaken for the green ending. Do NOT substitute the ring's own
+  // extent along that axis: on a green set across the shot (hole 3 is 42 yd
+  // wide against 32 deep) the bounding extent reads corner-to-corner and
+  // invents depth. Lines that exit their green before the end are untouched.
+  if (isFinite(greenHi) && greenHi >= length - STEP_YD) {
+    // Pinned to the run's OWN polygon, not "any green". Two greens that touch or
+    // overlap would otherwise let the ray walk straight out of the target and on
+    // through its neighbour without ever landing a sample on open ground —
+    // rebuilding the very inflated depth this block exists to stop, and doing it
+    // where the multi-green warning above cannot see it, since that is computed
+    // only from samples on the original centreline.
+    const endP = pointAtArc(center, cum, toMeters(length)).p
+    const backP = pointAtArc(center, cum, toMeters(Math.max(0, length - 25))).p
+    const app = sub(endP, backP)
+    const appLen = len(app) || 1
+    const appDir: Vec = [app[0] / appLen, app[1] / appLen]
+    for (let a = length + STEP_YD; a <= length + 60; a += STEP_YD) {
+      const d = toMeters(a - length)
+      const q: Vec = [endP[0] + appDir[0] * d, endP[1] + appDir[1] * d]
+      // Ask "am I still on the TARGET", never "which green did find() hit
+      // first" — where a neighbour overlaps the target past the pin, the first
+      // hit can be the neighbour while q is still inside the target, and
+      // truncating there would make the depth depend on ring order rather than
+      // on the target green's own edge.
+      if (rings.some((r) => r.kind === 'green' && greenKey(r) === targetKey && pointInRing(r.ring, q))) {
+        greenHi = a
+        continue
       }
+      const other = rings.find((r) => r.kind === 'green' && pointInRing(r.ring, q))
+      if (other) {
+        console.error(
+          `  ! hole ${holeNo}: past the pin the approach leaves ${targetKey} and enters ` +
+            `${greenKey(other)} at ${a} yd — greenDepth stops at the target green's own edge. ` +
+            `Two greens touching here is worth a look.`,
+        )
+      }
+      break
     }
   }
 
@@ -755,7 +953,14 @@ async function main() {
         (!geo.osmHolePrefix || new RegExp(geo.osmHolePrefix, 'i').test(e.tags?.name ?? '')),
     )
     .map((e) => {
-      const l = e.geometry!.map(proj)
+      // The TARGET's line must be the SHIFTED one (rawPts carries the prepended
+      // tee run), or --shift half-works: the corridor rake reaches hazards
+      // beside the new back-tee segment, but ownership still measures them
+      // against the forward pad, so a neighbouring hole's line is nearer and
+      // they get culled — silently dropping exactly the hazards --shift exists
+      // to find. Neighbours keep their own raw geometry; only the hole being
+      // imported grows a tee.
+      const l = e === holeWay ? rawPts : e.geometry!.map(proj)
       return { isTarget: e === holeWay, line: l, cum: arcLengths(l) }
     })
   const distToLine = (hl: { line: Vec[]; cum: number[] }, q: Vec) => Math.abs(projectToPolyline(hl.line, hl.cum, q).lateral)
@@ -1019,7 +1224,7 @@ async function main() {
   if (Math.abs(bendMax) >= 8) {
     const cornerFrac = bend.indexOf(bendMax) / BEND_SAMPLES
     console.log(
-      `bend: max ${bendMax > 0 ? '+' : ''}${bendMax} yd ${bendMax > 0 ? '(left)' : '(right)'} near ${Math.round(cornerFrac * length)} yd — [${bend.join(', ')}]`,
+      `bend: dogleg ${bendMax > 0 ? 'RIGHT' : 'LEFT'} — bows ${bendMax > 0 ? '+' : ''}${bendMax} yd golfer-${bendMax > 0 ? 'left' : 'right'} of the chord (the bulge is OPPOSITE the turn) near ${Math.round(cornerFrac * length)} yd — [${bend.join(', ')}]`,
     )
   } else {
     console.log(`bend: straight (max ${bendMax} yd, not persisted)`)

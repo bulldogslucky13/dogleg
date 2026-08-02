@@ -80,4 +80,43 @@
 // 3/4/6/13/17 are hand-authored `deeprough` from USGS NED 10m terrain
 // transects, because OSM has no scrub or wood polygon anywhere on the
 // property and the import read five canyon flanks as open ground.
-export const ENGINE_VERSION = 12
+// v13 = Pacific Dunes real geometry (OSM, every hole shifted to the club's
+// BLACK card). Pure geometry like Potomac and Seminole — the shipped tuple
+// already matched the card on par, yardage AND stroke index for all 18 — but
+// the layout a seed replays into moves on every hole. Two parts are hand-work,
+// both documented at the block in geometry.ts: the bluff on 4/11/13 is
+// hand-authored `ocean` from USGS NED 10m transects (the coastline way is
+// drawn at the WATERLINE, 103-210 yd out across a beach, so the course named
+// for the Pacific imported with zero water on all 18), and two `cross` bands
+// that were single polygons clipping the centreline by 2 yd are folded into
+// their flanks. v13 also carries an importer greenDepth fix that changes what
+// future imports produce: a centreline drawn tee->PIN was measuring only the
+// FRONT HALF of its green, so the clamp floored greenDepth at 20 — shallower
+// than the procedural default — and greenDepth sets `fairwayTo` and feeds
+// isGreenside() in the odds. Pacific Dunes is the first course to ship from
+// the fixed importer, so the two go out together.
+// v13 ALSO carries the re-measure of every previously imported course against
+// that fixed importer — 199 holes across 15 courses, greenDepth only (zones,
+// length and fairwayFrom are untouched). It is one version, not two, because
+// v13 has never been deployed: the referee has never seen it, so the geometry
+// and the re-measure ship as one generation, the same call made for v5, v8 and
+// v10.
+// Scope, stated precisely because the first draft of this note overstated it:
+// for an IMPORTED hole `fairwayTo` is passed straight through to the layout and
+// read only by the map (layout.ts uses it to place zones on PROCEDURAL holes
+// only), so it is cosmetic here. The one path from greenDepth into what a seed
+// replays into is isGreenside() -> the `sideW` weight in odds.ts, which touches
+// BUNKERS whose end lands within 8 yd of the green front. So the odds move on
+// the holes where a bunker changes greenside classification and nowhere else,
+// and the measured effect is small — every course's Play Rating holds its
+// integer value and PLAY_INDEX drifts by at most 0.006. Small is not zero, and
+// a replay that resolves differently is a bump either way.
+// The re-measure also fixed a second, older artifact at source. greenDepth took
+// min/max across EVERY green the centreline touched, so cypress-point:1 — whose
+// line clips a NEIGHBOURING green at 28-54 yd before reaching its own at 400 —
+// spanned 402 yd and pinned the 45 clamp. It now keeps only the last contiguous
+// run, the green the hole is actually played to. That is the artifact the README
+// says to suspect at exactly 45; the other seven holes at the clamp (carnoustie
+// 2/16, oakmont 3/4/9/14/15) were each checked and are single greens that really
+// do run 45+ yd along the line of play.
+export const ENGINE_VERSION = 13

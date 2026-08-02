@@ -38,11 +38,39 @@ export interface OsmHoleGeometry {
  * straight. © OpenStreetMap contributors, ODbL.
  */
 export const OSM_BEND: Record<string, number[]> = {
+  // MEASURED ON THE SHIFTED CENTRELINE, everywhere below — `pnpm import:osm
+  // <course> <hole> --shift N`, where N is the shipped `length` in OSM_GEOMETRY
+  // minus the raw length the importer prints without the flag. Where OSM drew a
+  // hole from a forward pad, the raw line is short by N.
+  //
+  // That matters because a profile is 13 evenly spaced FRACTIONS of the hole,
+  // and HoleMap replays it at the same fractions of the FINAL card length. A
+  // profile measured on the short raw line therefore gets STRETCHED over the
+  // longer card hole and draws the corner early — 64 yd early on pacific-dunes:8,
+  // whose pad is 110 yd forward. Zones can be shifted after the fact; a bend
+  // profile cannot, because its samples are positions, not lengths. `--shift`
+  // prepends the missing tee run and re-measures, which also re-bases every
+  // deviation on the real back-tee -> green chord.
+  //
+  // Earlier notes here said the tee-end shift "does not apply" to these, being
+  // lateral yards. The magnitudes are indeed nearly unmoved (a yard or three);
+  // the read was wrong about what the shift moves, which is WHERE along the hole
+  // each sample sits — and that is the whole of what the map draws.
+  //
+  // EXCEPTION — holes whose centreline imports LONGER than the card (a negative
+  // shift) keep their raw profile: there is no missing tee run to prepend, and
+  // the excess is usually curvature in a wandering polyline rather than a pad
+  // offset — the case measured and documented for torrey-pines-south:6 in
+  // OSM_GEOMETRY below. Those are carnoustie 4 (-30), 6 (-53), 9 (-49), 14 (-33)
+  // and 18 (-42); kings-creek 18 (-66); torrey-pines-south 6 (-22); plus a tail
+  // under 15 yd led by tpc-potomac 10 (-13) and cypress-point 11 (-12).
+  // kings-creek:18 is the largest and wants a look of its own.
+  //
   // Harbour Town Golf Links — real centreline curvature. Note how the signs
   // correct the tuple flags: 5/8/15 bend LEFT (tuple said R), 6 bends RIGHT
   // (tuple said L), 2 is a right dogleg the "straight" flag missed.
   'harbour-town:2': [0, 6, 12, 18, 24, 28, 31, 32, 31, 27, 23, 15, 0],
-  'harbour-town:3': [0, -3, -7, -10, -13, -17, -19, -20, -20, -19, -14, -7, 0],
+  'harbour-town:3': [0, -3, -7, -10, -13, -17, -19, -21, -21, -20, -16, -8, 0],
   'harbour-town:5': [0, -14, -29, -43, -55, -63, -65, -58, -43, -30, -18, -9, 0],
   'harbour-town:6': [0, 6, 12, 17, 23, 29, 33, 36, 36, 34, 25, 12, 0],
   'harbour-town:8': [0, -9, -18, -27, -37, -44, -49, -51, -49, -43, -29, -14, 0],
@@ -52,7 +80,7 @@ export const OSM_BEND: Record<string, number[]> = {
   'harbour-town:12': [0, 5, 11, 16, 22, 27, 31, 34, 34, 31, 24, 12, 0],
   'harbour-town:13': [0, -3, -6, -9, -13, -16, -18, -20, -20, -19, -15, -8, 0],
   'harbour-town:15': [0, -6, -12, -18, -24, -30, -35, -40, -44, -46, -43, -29, 0],
-  'harbour-town:16': [0, -10, -20, -29, -39, -49, -58, -64, -67, -66, -53, -27, 0],
+  'harbour-town:16': [0, -10, -20, -29, -39, -49, -59, -65, -70, -69, -57, -29, 0],
   'harbour-town:18': [0, -4, -8, -13, -17, -21, -23, -25, -25, -22, -16, -8, 0],
 
   // Carnoustie — Championship — real centreline curvature. Signs contradict
@@ -62,7 +90,7 @@ export const OSM_BEND: Record<string, number[]> = {
   // persistence threshold (tuple said R), 11 bends LEFT (tuple said S), 15
   // bends RIGHT (tuple said S), 18 bends RIGHT (tuple said S). Only 3 (L),
   // 6 (L), 12 (L), and 14 (R) agree with their flag.
-  'carnoustie:2': [0, 5, 10, 14, 19, 22, 24, 24, 21, 18, 12, 6, 0],
+  'carnoustie:2': [0, 5, 10, 14, 19, 23, 25, 25, 24, 20, 13, 7, 0],
   'carnoustie:3': [0, 7, 12, 18, 23, 27, 29, 30, 28, 23, 15, 8, 0],
   'carnoustie:4': [0, 9, 18, 27, 34, 40, 42, 41, 37, 30, 20, 10, 0],
   'carnoustie:5': [0, 8, 17, 25, 33, 39, 43, 44, 43, 38, 27, 14, 0],
@@ -75,52 +103,54 @@ export const OSM_BEND: Record<string, number[]> = {
   'carnoustie:15': [0, -6, -13, -19, -26, -30, -33, -33, -30, -25, -17, -8, 0],
   'carnoustie:18': [0, -2, -3, -5, -6, -7, -8, -8, -7, -6, -4, -2, 0],
 
-  // Royal Portrush — Dunluce — real centreline curvature. Lateral yards are
-  // unaffected by the tee-end shift applied to the zones (see OSM_GEOMETRY),
-  // so these are the raw import values. Signs correct the tuple again: 5 and
+  // Royal Portrush — Dunluce — real centreline curvature, re-measured on the
+  // shifted line (see the note at the top of this map). Signs correct the
+  // tuple again: 5 and
   // 10 bend LEFT hard (tuple said R and S), 11 and 18 bend LEFT (tuple said L
   // and S), 8 and 9 bend RIGHT (tuple said S and R), 15 bends RIGHT (tuple
   // said L). 10's 75-yd bend is the Himalayas dogleg.
-  'royal-portrush-dunluce:2': [0, -10, -20, -30, -38, -43, -45, -43, -38, -29, -20, -10, 0],
-  'royal-portrush-dunluce:4': [0, -6, -12, -18, -24, -28, -30, -30, -26, -21, -14, -7, 0],
-  'royal-portrush-dunluce:5': [0, 14, 29, 43, 55, 63, 66, 61, 53, 43, 29, 15, 0],
-  'royal-portrush-dunluce:6': [0, 1, 3, 4, 5, 7, 7, 8, 8, 7, 5, 2, 0],
-  'royal-portrush-dunluce:8': [0, -10, -20, -30, -39, -44, -46, -45, -40, -31, -20, -10, 0],
-  'royal-portrush-dunluce:9': [0, -8, -15, -23, -30, -34, -35, -33, -30, -23, -15, -8, 0],
+  'royal-portrush-dunluce:2': [0, -10, -20, -30, -39, -44, -46, -45, -39, -31, -20, -10, 0],
+  'royal-portrush-dunluce:4': [0, -6, -12, -18, -24, -28, -30, -30, -27, -21, -14, -7, 0],
+  'royal-portrush-dunluce:5': [0, 14, 29, 43, 55, 63, 66, 62, 54, 43, 29, 15, 0],
+  'royal-portrush-dunluce:6': [0, 1, 3, 4, 5, 7, 8, 8, 8, 7, 5, 3, 0],
+  'royal-portrush-dunluce:8': [0, -10, -20, -30, -40, -45, -47, -46, -41, -32, -21, -11, 0],
+  'royal-portrush-dunluce:9': [0, -8, -15, -23, -30, -34, -35, -34, -30, -23, -15, -8, 0],
   'royal-portrush-dunluce:10': [0, 13, 26, 39, 52, 63, 71, 75, 72, 64, 48, 25, 0],
-  'royal-portrush-dunluce:11': [0, 8, 15, 23, 30, 35, 38, 38, 35, 28, 19, 9, 0],
-  'royal-portrush-dunluce:14': [0, -1, -3, -4, -6, -7, -8, -9, -9, -8, -6, -3, 0],
-  'royal-portrush-dunluce:15': [0, -9, -17, -26, -34, -42, -47, -49, -48, -42, -28, -14, 0],
-  'royal-portrush-dunluce:18': [0, 11, 21, 32, 43, 51, 57, 57, 53, 44, 30, 15, 0],
-  // Oakmont Country Club — real centreline curvature. Lateral yards, so the
-  // tee-end shift does not apply.
+  'royal-portrush-dunluce:11': [0, 8, 15, 23, 30, 36, 40, 40, 37, 31, 20, 10, 0],
+  'royal-portrush-dunluce:14': [0, -1, -3, -4, -6, -7, -9, -10, -10, -9, -7, -4, 0],
+  'royal-portrush-dunluce:15': [0, -9, -17, -26, -34, -43, -48, -50, -50, -43, -30, -15, 0],
+  'royal-portrush-dunluce:18': [0, 11, 21, 32, 43, 52, 58, 59, 56, 47, 32, 16, 0],
+  // Oakmont Country Club — real centreline curvature, re-measured on the
+  // shifted line (see the note at the top of this map). Holes 1 and 8 import
+  // long (-8 and -3 yd) and keep their raw profiles.
   'oakmont:1': [0, -1, -2, -3, -5, -6, -7, -7, -8, -8, -7, -4, 0],
-  'oakmont:4': [0, 13, 26, 39, 51, 57, 59, 57, 50, 39, 26, 13, 0],
+  'oakmont:4': [0, 13, 26, 39, 52, 60, 63, 62, 55, 43, 29, 14, 0],
   'oakmont:8': [0, -3, -6, -9, -12, -15, -18, -21, -22, -22, -18, -9, 0],
-  'oakmont:11': [0, 2, 3, 5, 7, 9, 10, 11, 11, 10, 7, 4, 0],
-  'oakmont:12': [0, 5, 11, 16, 22, 26, 29, 30, 29, 26, 17, 9, 0],
-  'oakmont:14': [0, -1, -2, -4, -5, -6, -7, -8, -8, -7, -6, -3, 0],
-  'oakmont:15': [0, 2, 4, 5, 7, 9, 10, 10, 9, 8, 5, 3, 0],
-  'oakmont:16': [0, 1, 2, 4, 5, 6, 7, 8, 8, 8, 7, 4, 0],
+  'oakmont:11': [0, 2, 3, 5, 7, 9, 10, 11, 11, 10, 8, 4, 0],
+  'oakmont:12': [0, 5, 11, 16, 22, 27, 30, 32, 31, 27, 19, 9, 0],
+  'oakmont:14': [0, -1, -2, -4, -5, -6, -7, -8, -8, -8, -7, -4, 0],
+  'oakmont:15': [0, 2, 4, 5, 7, 9, 10, 10, 10, 9, 6, 3, 0],
+  'oakmont:16': [0, 1, 2, 4, 5, 6, 7, 8, 9, 9, 7, 4, 0],
   'oakmont:17': [0, -4, -8, -12, -16, -20, -24, -28, -30, -28, -22, -11, 0],
 
-  // Cypress Point — real centreline curvature. Lateral yards are unaffected by
-  // the tee-end shift applied to the zones (see OSM_GEOMETRY), so these are the
-  // raw import values. Signs correct the tuple again: 2, 5 and 6 bend RIGHT
+  // Cypress Point — real centreline curvature, re-measured on the shifted line
+  // (see the note at the top of this map); 11 imports 12 yd long and 16 is
+  // hand-authored, so both keep their own numbers. Signs correct the tuple
+  // again: 2, 5 and 6 bend RIGHT
   // (tuple said S, S and R), 8, 12 and 14 bend LEFT (tuple said L, L and R),
   // 17 bends LEFT (tuple said L). 12's 61-yd bend and 5's 70-yd are the two
   // real doglegs; 9's 9-yd sits right on the persistence threshold.
   'cypress-point:1': [0, 2, 4, 6, 9, 11, 12, 14, 14, 13, 10, 5, 0],
-  'cypress-point:2': [0, -11, -21, -32, -41, -47, -49, -47, -41, -32, -23, -13, 0],
+  'cypress-point:2': [0, -11, -21, -32, -41, -47, -49, -47, -41, -33, -24, -13, 0],
   'cypress-point:4': [0, 1, 3, 4, 6, 7, 8, 9, 9, 8, 6, 3, 0],
-  'cypress-point:5': [0, -15, -29, -44, -57, -66, -70, -68, -59, -47, -34, -18, 0],
+  'cypress-point:5': [0, -15, -29, -44, -57, -67, -72, -70, -61, -49, -35, -18, 0],
   'cypress-point:6': [0, -10, -21, -31, -41, -48, -52, -53, -50, -43, -34, -21, 0],
-  'cypress-point:8': [0, 6, 12, 18, 24, 29, 35, 39, 41, 41, 35, 18, 0],
+  'cypress-point:8': [0, 6, 12, 18, 23, 29, 35, 39, 43, 42, 37, 20, 0],
   'cypress-point:9': [0, -1, -2, -4, -5, -6, -7, -8, -9, -9, -9, -6, 0],
   'cypress-point:10': [0, 4, 8, 11, 15, 18, 20, 20, 19, 16, 12, 7, 0],
   'cypress-point:11': [0, 3, 6, 10, 13, 15, 17, 18, 17, 15, 10, 5, 0],
-  'cypress-point:12': [0, 10, 21, 31, 42, 52, 58, 61, 60, 52, 35, 18, 0],
-  'cypress-point:14': [0, 4, 8, 12, 16, 19, 22, 24, 25, 23, 18, 9, 0],
+  'cypress-point:12': [0, 10, 21, 31, 42, 52, 58, 62, 62, 53, 37, 19, 0],
+  'cypress-point:14': [0, 4, 8, 12, 16, 19, 22, 25, 25, 23, 19, 9, 0],
   // 16 is the one hand-authored profile in this map. Its OSM centreline is a
   // straight tee→pin chord across the cove, which is the line you play only if
   // you take the hole on; the hole itself doglegs RIGHT round the water to the
@@ -128,29 +158,30 @@ export const OSM_BEND: Record<string, number[]> = {
   // the middle of the measured landing area). Positive = golfer-left = the
   // path bows left = "Dogleg right" on the chip, per the sign note above.
   'cypress-point:16': [0, 10, 20, 29, 37, 44, 49, 53, 55, 54, 43, 24, 0],
-  'cypress-point:17': [0, 7, 14, 21, 28, 36, 40, 43, 43, 39, 28, 14, 0],
+  'cypress-point:17': [0, 7, 14, 21, 28, 36, 41, 45, 45, 41, 31, 15, 0],
   'cypress-point:18': [0, 3, 6, 10, 13, 16, 18, 20, 20, 18, 14, 7, 0],
-  // Whistling Straits — Straits — real centreline curvature. Lateral yards,
-  // so the tee-end shift applied to the zones (see OSM_GEOMETRY) does not
-  // apply. Signs correct a tuple that shipped 15 of 18 holes as 'S': 5 and 11
+  // Whistling Straits — Straits — real centreline curvature, re-measured on the
+  // shifted line (see the note at the top of this map); hole 1's pad is 85 yd
+  // forward, the largest on any course here. Signs correct a tuple that shipped
+  // 15 of 18 holes as 'S': 5 and 11
   // are the two big Dye swings (109 and 82 yd), and 1, 6, 8, 10, 13 and 14
   // all turn hard enough to earn a chip the tuple never gave them. 16 shipped
   // BACKWARDS (tuple 'R', the centreline bends left), and 15's tuple 'L' is a
   // real but gentle 11-yd lean that stays under the 20-yd chip threshold.
-  'whistling-straits:1': [0, -6, -12, -18, -24, -29, -33, -34, -33, -29, -20, -10, 0],
-  'whistling-straits:2': [0, 3, 6, 9, 11, 14, 16, 16, 16, 14, 10, 5, 0],
-  'whistling-straits:4': [0, -4, -8, -12, -15, -18, -21, -21, -20, -17, -12, -6, 0],
-  'whistling-straits:5': [0, 21, 42, 63, 84, 100, 109, 104, 81, 46, 14, -1, 0],
-  'whistling-straits:6': [0, 4, 9, 13, 18, 22, 26, 28, 29, 28, 24, 12, 0],
-  'whistling-straits:8': [0, 8, 17, 25, 33, 39, 44, 45, 42, 36, 24, 12, 0],
+  'whistling-straits:1': [0, -6, -12, -18, -24, -30, -36, -39, -39, -35, -26, -13, 0],
+  'whistling-straits:2': [0, 3, 6, 9, 11, 14, 16, 17, 17, 14, 10, 5, 0],
+  'whistling-straits:4': [0, -4, -8, -12, -15, -19, -21, -21, -21, -18, -12, -6, 0],
+  'whistling-straits:5': [0, 21, 42, 63, 84, 105, 117, 118, 99, 61, 23, 1, 0],
+  'whistling-straits:6': [0, 4, 9, 13, 18, 22, 26, 28, 30, 29, 25, 12, 0],
+  'whistling-straits:8': [0, 8, 17, 25, 33, 41, 45, 46, 45, 39, 26, 13, 0],
   'whistling-straits:9': [0, 2, 5, 7, 10, 12, 14, 15, 15, 14, 11, 5, 0],
-  'whistling-straits:10': [0, -8, -16, -24, -32, -40, -45, -50, -50, -47, -35, -18, 0],
-  'whistling-straits:11': [0, 17, 34, 51, 66, 77, 82, 78, 62, 47, 31, 16, 0],
-  'whistling-straits:13': [0, 6, 13, 19, 26, 30, 33, 33, 31, 26, 17, 9, 0],
-  'whistling-straits:14': [0, -6, -13, -19, -26, -32, -38, -42, -43, -42, -35, -17, 0],
+  'whistling-straits:10': [0, -8, -16, -24, -32, -40, -46, -51, -52, -48, -37, -19, 0],
+  'whistling-straits:11': [0, 17, 34, 51, 68, 79, 84, 81, 67, 50, 33, 17, 0],
+  'whistling-straits:13': [0, 6, 13, 19, 26, 31, 34, 34, 32, 27, 18, 9, 0],
+  'whistling-straits:14': [0, -6, -13, -19, -26, -32, -38, -42, -44, -43, -36, -18, 0],
   'whistling-straits:15': [0, 2, 4, 6, 8, 10, 11, 11, 11, 9, 6, 3, 0],
-  'whistling-straits:16': [0, -6, -11, -17, -22, -28, -33, -39, -45, -48, -43, -24, 0],
-  'whistling-straits:18': [0, -10, -20, -31, -41, -49, -55, -56, -54, -47, -31, -16, 0],
+  'whistling-straits:16': [0, -6, -11, -17, -22, -28, -33, -39, -45, -49, -45, -26, 0],
+  'whistling-straits:18': [0, -10, -20, -31, -41, -51, -57, -60, -59, -51, -35, -18, 0],
   // TPC Potomac — 12 of 18 turn hard enough to persist, 10 the big one at
   // 92 yd. Reading these against the tuple (positive bend ⇒ dogleg RIGHT — the
   // path bows opposite the turn, see the chip note in ui/panels.tsx): 2, 6 and
@@ -164,7 +195,7 @@ export const OSM_BEND: Record<string, number[]> = {
   'tpc-potomac:7': [0, 5, 10, 15, 20, 24, 27, 28, 28, 24, 17, 9, 0],
   'tpc-potomac:8': [0, -3, -5, -8, -10, -13, -14, -15, -14, -12, -9, -4, 0],
   'tpc-potomac:10': [0, -17, -35, -52, -67, -80, -88, -92, -90, -80, -62, -32, 0],
-  'tpc-potomac:11': [0, -12, -25, -37, -49, -57, -63, -63, -57, -46, -31, -15, 0],
+  'tpc-potomac:11': [0, -12, -25, -37, -49, -58, -64, -64, -58, -48, -32, -16, 0],
   'tpc-potomac:13': [0, 1, 2, 3, 5, 6, 7, 8, 8, 8, 7, 4, 0],
   'tpc-potomac:14': [0, 3, 5, 8, 10, 13, 15, 16, 17, 16, 14, 7, 0],
   'tpc-potomac:15': [0, 3, 5, 8, 10, 13, 15, 15, 15, 14, 10, 5, 0],
@@ -173,27 +204,27 @@ export const OSM_BEND: Record<string, number[]> = {
   // Seminole — 10 of 18 bend hard enough to persist. 3 is the big one (75 yd
   // left), with 15 and 16 close behind; 18 turns 50 yd right into the home
   // green. The eight straight holes include all four par 3s.
-  'seminole:1': [0, 2, 5, 7, 9, 11, 14, 15, 17, 17, 16, 11, 0],
-  'seminole:2': [0, -2, -4, -6, -8, -10, -12, -13, -14, -14, -12, -6, 0],
-  'seminole:3': [0, 13, 26, 40, 53, 65, 72, 75, 73, 63, 42, 21, 0],
+  'seminole:1': [0, 2, 5, 7, 9, 11, 14, 16, 17, 18, 17, 12, 0],
+  'seminole:2': [0, -2, -4, -6, -8, -10, -12, -14, -15, -15, -13, -8, 0],
+  'seminole:3': [0, 13, 26, 39, 53, 66, 77, 84, 83, 74, 53, 26, 0],
   'seminole:6': [0, -3, -7, -10, -13, -16, -18, -18, -17, -14, -9, -5, 0],
-  'seminole:7': [0, 2, 4, 5, 7, 9, 10, 11, 11, 11, 9, 4, 0],
+  'seminole:7': [0, 2, 4, 5, 7, 9, 11, 12, 12, 12, 10, 5, 0],
   'seminole:9': [0, -3, -7, -10, -13, -17, -19, -20, -20, -18, -14, -7, 0],
   'seminole:12': [0, 2, 4, 6, 8, 10, 11, 13, 13, 12, 9, 5, 0],
-  'seminole:15': [0, 10, 20, 30, 40, 50, 56, 60, 60, 53, 37, 19, 0],
-  'seminole:16': [0, 10, 21, 31, 41, 50, 56, 58, 56, 49, 33, 16, 0],
+  'seminole:15': [0, 10, 20, 30, 40, 50, 57, 62, 61, 55, 39, 20, 0],
+  'seminole:16': [0, 10, 21, 31, 41, 52, 57, 61, 60, 51, 35, 17, 0],
   'seminole:18': [0, -8, -16, -24, -32, -40, -46, -50, -50, -46, -35, -17, 0],
 
   // Kings Creek CC (see OSM_GEOMETRY note)
-  'kings-creek:1': [0, -1, -2, -4, -5, -6, -7, -8, -8, -8, -6, -3, 0],
-  'kings-creek:2': [0, -3, -7, -10, -13, -17, -20, -22, -23, -23, -20, -10, 0],
-  'kings-creek:4': [0, 6, 11, 17, 22, 28, 31, 33, 33, 29, 20, 10, 0],
-  'kings-creek:5': [0, 8, 16, 24, 32, 38, 43, 43, 40, 34, 23, 11, 0],
-  'kings-creek:7': [0, -5, -11, -16, -21, -25, -27, -28, -26, -23, -18, -11, 0],
-  'kings-creek:9': [0, -12, -23, -35, -46, -56, -64, -68, -68, -60, -47, -25, 0],
-  'kings-creek:13': [0, -5, -9, -14, -19, -23, -26, -27, -27, -24, -17, -9, 0],
-  'kings-creek:14': [0, 4, 8, 13, 17, 21, 24, 26, 27, 25, 20, 10, 0],
-  'kings-creek:15': [0, 3, 6, 8, 11, 14, 16, 17, 17, 15, 11, 6, 0],
+  'kings-creek:1': [0, -1, -2, -4, -5, -6, -7, -8, -8, -8, -7, -3, 0],
+  'kings-creek:2': [0, -3, -7, -10, -13, -17, -20, -22, -24, -24, -21, -12, 0],
+  'kings-creek:4': [0, 6, 11, 17, 22, 28, 31, 33, 33, 29, 21, 10, 0],
+  'kings-creek:5': [0, 8, 16, 24, 32, 38, 43, 43, 41, 35, 23, 12, 0],
+  'kings-creek:7': [0, -5, -11, -16, -22, -25, -28, -28, -27, -23, -18, -11, 0],
+  'kings-creek:9': [0, -12, -23, -35, -46, -56, -64, -69, -69, -61, -48, -26, 0],
+  'kings-creek:13': [0, -5, -9, -14, -19, -23, -26, -28, -28, -25, -18, -9, 0],
+  'kings-creek:14': [0, 4, 8, 13, 17, 21, 24, 27, 27, 26, 21, 10, 0],
+  'kings-creek:15': [0, 3, 6, 8, 11, 14, 16, 17, 17, 16, 12, 6, 0],
   'kings-creek:16': [0, 2, 5, 7, 10, 12, 14, 16, 16, 14, 11, 6, 0],
   'kings-creek:18': [0, -24, -48, -72, -96, -116, -131, -138, -129, -103, -74, -39, 0],
   // Torrey Pines — South. Unusually, the tuple's dogleg flags were all RIGHT
@@ -205,18 +236,47 @@ export const OSM_BEND: Record<string, number[]> = {
   // them — which is also what retires hole 12's and 17's overstated 'R' flags.
   // Hole 4's flag said 'L' on a centreline that bends 4 yd; its tuple is now
   // 'S', since with no entry here the stale flag would have been the chip.
-  'torrey-pines-south:1': [0, 4, 9, 13, 17, 20, 23, 23, 22, 19, 12, 6, 0],
+  'torrey-pines-south:1': [0, 4, 9, 13, 17, 21, 23, 23, 22, 19, 13, 6, 0],
   'torrey-pines-south:2': [0, 4, 9, 13, 17, 21, 24, 25, 25, 22, 16, 8, 0],
   'torrey-pines-south:5': [0, 3, 7, 10, 14, 17, 19, 21, 21, 19, 14, 7, 0],
   'torrey-pines-south:6': [0, 13, 26, 40, 52, 61, 65, 64, 56, 45, 32, 17, 0],
   'torrey-pines-south:7': [0, 8, 17, 25, 34, 40, 44, 46, 44, 38, 29, 16, 0],
-  'torrey-pines-south:10': [0, -2, -4, -7, -9, -11, -12, -12, -12, -10, -7, -3, 0],
-  'torrey-pines-south:12': [0, 3, 6, 9, 11, 14, 15, 16, 16, 14, 9, 5, 0],
-  'torrey-pines-south:13': [0, -9, -18, -27, -34, -38, -38, -36, -31, -23, -16, -8, 0],
+  'torrey-pines-south:10': [0, -2, -4, -7, -9, -11, -12, -13, -13, -11, -8, -4, 0],
+  'torrey-pines-south:12': [0, 3, 6, 9, 11, 14, 16, 16, 16, 14, 9, 5, 0],
+  'torrey-pines-south:13': [0, -9, -18, -27, -34, -38, -38, -36, -31, -24, -16, -8, 0],
   'torrey-pines-south:14': [0, -4, -9, -13, -18, -22, -26, -29, -31, -30, -25, -14, 0],
   'torrey-pines-south:15': [0, -1, -2, -3, -4, -5, -6, -7, -8, -8, -8, -6, 0],
   'torrey-pines-south:17': [0, -2, -4, -6, -8, -9, -10, -10, -9, -7, -5, -3, 0],
   'torrey-pines-south:18': [0, 3, 6, 9, 11, 13, 13, 12, 9, 5, 1, -1, 0],
+  // Pacific Dunes. `bend` is the signed BULGE of the centreline off the
+  // tee->green chord, not the turn, and the two are OPPOSITE: a hole doglegging
+  // RIGHT bows golfer-LEFT of its own chord, because the chord cuts the corner.
+  // So positive = right turn, which is the conversion panels.tsx makes for the
+  // chip (`m < 0 ? 'L' : 'R'`). Verified label-free on all eleven by comparing
+  // the centreline's heading over the first third of the hole against the last
+  // third; every one agrees with the chip.
+  // Against that measurement the hand-set `dogleg` flags in courses.ts are
+  // RIGHT on 3, 6, 9, 12, 15 and 18; absent (S) on 1, 8, 13 and 16, which do
+  // turn; and wrong on exactly one hole — 7 is tagged L and turns right by 14
+  // degrees. `bend` overrides the flag either way, so every chip reads true.
+  // (An earlier draft of this note had it backwards, reading the importer's
+  // console label — which names the bulge — as the turn. Hence the sign note.)
+  // Measured on the shifted line, per the note at the top of this map — these
+  // were the first profiles done that way, and hole 8 (pad 110 yd forward, corner
+  // drawn 64 yd early) is the hole that found the stretch. Hole 3 is the
+  // exception: its shift is -4 yd, too small to prepend and worth 0.8% of the
+  // hole, so it keeps its raw profile.
+  'pacific-dunes:1': [0, 1, 3, 4, 5, 7, 8, 9, 9, 8, 6, 3, 0],
+  'pacific-dunes:3': [0, -5, -9, -14, -18, -22, -25, -26, -26, -25, -20, -11, 0],
+  'pacific-dunes:6': [0, 1, 2, 4, 5, 6, 7, 8, 8, 8, 7, 3, 0],
+  'pacific-dunes:7': [0, 4, 7, 11, 14, 18, 19, 20, 20, 17, 12, 6, 0],
+  'pacific-dunes:8': [0, 6, 12, 18, 23, 29, 33, 32, 28, 22, 15, 7, 0],
+  'pacific-dunes:9': [0, 1, 3, 4, 5, 7, 8, 10, 10, 9, 6, 3, 0],
+  'pacific-dunes:12': [0, -9, -19, -28, -37, -42, -44, -44, -43, -39, -32, -18, 0],
+  'pacific-dunes:13': [0, -2, -4, -6, -7, -9, -10, -11, -11, -10, -7, -4, 0],
+  'pacific-dunes:15': [0, 3, 5, 8, 10, 13, 14, 16, 17, 16, 14, 8, 0],
+  'pacific-dunes:16': [0, 6, 12, 19, 25, 31, 37, 42, 43, 40, 30, 15, 0],
+  'pacific-dunes:18': [0, -7, -15, -22, -29, -36, -43, -45, -41, -33, -22, -11, 0],
 }
 
 export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
@@ -224,8 +284,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'tpc-sawgrass:1': {
     length: 427,
     fairwayFrom: 149,
-    fairwayTo: 415,
-    greenDepth: 20,
+    fairwayTo: 408,
+    greenDepth: 33,
     zones: [
       { id: 'z1', kind: 'water', from: 106, to: 258, side: 'right' },
       { id: 'z2', kind: 'bunker', from: 216, to: 280, side: 'right' },
@@ -243,8 +303,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'tpc-sawgrass:2': {
     length: 536,
     fairwayFrom: 188,
-    fairwayTo: 523,
-    greenDepth: 22,
+    fairwayTo: 518,
+    greenDepth: 32,
     zones: [
       { id: 'z1', kind: 'bunker', from: 300, to: 430, side: 'right' }, // waste bunker up the right
       { id: 'z2', kind: 'water', from: 402, to: 486, side: 'right' }, // pond right, closer to the green
@@ -257,8 +317,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'tpc-sawgrass:3': {
     length: 181,
     fairwayFrom: 63,
-    fairwayTo: 169,
-    greenDepth: 20,
+    fairwayTo: 166,
+    greenDepth: 25,
     zones: [
       { id: 'z1', kind: 'water', from: 72, to: 124, side: 'cross' },
       { id: 'z2', kind: 'water', from: 124, to: 176, side: 'left' },
@@ -271,8 +331,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'tpc-sawgrass:4': {
     length: 392,
     fairwayFrom: 137,
-    fairwayTo: 380,
-    greenDepth: 20,
+    fairwayTo: 378,
+    greenDepth: 24,
     zones: [
       { id: 'z1', kind: 'water', from: 0, to: 144, side: 'right' },
       { id: 'z2', kind: 'water', from: 144, to: 162, side: 'cross' },
@@ -288,8 +348,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'tpc-sawgrass:5': {
     length: 463,
     fairwayFrom: 162,
-    fairwayTo: 451,
-    greenDepth: 20,
+    fairwayTo: 445,
+    greenDepth: 31,
     zones: [
       { id: 'z1', kind: 'water', from: 0, to: 82, side: 'right' },
       { id: 'z2', kind: 'water', from: 82, to: 168, side: 'cross' },
@@ -307,8 +367,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'tpc-sawgrass:6': {
     length: 390,
     fairwayFrom: 137,
-    fairwayTo: 378,
-    greenDepth: 20,
+    fairwayTo: 374,
+    greenDepth: 28,
     zones: [
       { id: 'z1', kind: 'water', from: 18, to: 64, side: 'left' },
       { id: 'z2', kind: 'water', from: 64, to: 72, side: 'cross' },
@@ -328,8 +388,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'tpc-sawgrass:7': {
     length: 450,
     fairwayFrom: 158,
-    fairwayTo: 438,
-    greenDepth: 20,
+    fairwayTo: 433,
+    greenDepth: 30,
     zones: [
       { id: 'z1', kind: 'water', from: 0, to: 4, side: 'right' },
       { id: 'z2', kind: 'water', from: 50, to: 74, side: 'left' },
@@ -350,8 +410,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'tpc-sawgrass:8': {
     length: 237,
     fairwayFrom: 83,
-    fairwayTo: 225,
-    greenDepth: 20,
+    fairwayTo: 220,
+    greenDepth: 29,
     zones: [
       { id: 'z1', kind: 'water', from: 10, to: 24, side: 'left' },
       { id: 'z2', kind: 'bunker', from: 208, to: 218, side: 'right' },
@@ -363,8 +423,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'tpc-sawgrass:9': {
     length: 577,
     fairwayFrom: 202,
-    fairwayTo: 565,
-    greenDepth: 20,
+    fairwayTo: 560,
+    greenDepth: 29,
     zones: [
       { id: 'z1', kind: 'water', from: 18, to: 90, side: 'right' },
       { id: 'z2', kind: 'water', from: 136, to: 348, side: 'right' },
@@ -381,8 +441,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'tpc-sawgrass:10': {
     length: 410,
     fairwayFrom: 144,
-    fairwayTo: 398,
-    greenDepth: 20,
+    fairwayTo: 393,
+    greenDepth: 30,
     zones: [
       { id: 'z1', kind: 'water', from: 50, to: 54, side: 'right' },
       { id: 'z2', kind: 'water', from: 54, to: 78, side: 'cross' },
@@ -406,8 +466,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'tpc-sawgrass:12': {
     length: 335,
     fairwayFrom: 117,
-    fairwayTo: 323,
-    greenDepth: 20,
+    fairwayTo: 314,
+    greenDepth: 37,
     zones: [
       { id: 'z1', kind: 'water', from: 52, to: 66, side: 'right' },
       { id: 'z2', kind: 'water', from: 66, to: 116, side: 'cross' },
@@ -420,8 +480,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'tpc-sawgrass:13': {
     length: 176,
     fairwayFrom: 62,
-    fairwayTo: 164,
-    greenDepth: 20,
+    fairwayTo: 160,
+    greenDepth: 28,
     zones: [
       { id: 'z1', kind: 'water', from: 18, to: 58, side: 'left' },
       { id: 'z2', kind: 'water', from: 58, to: 92, side: 'cross' },
@@ -433,8 +493,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'tpc-sawgrass:14': {
     length: 470,
     fairwayFrom: 165,
-    fairwayTo: 458,
-    greenDepth: 20,
+    fairwayTo: 450,
+    greenDepth: 36,
     zones: [
       { id: 'z1', kind: 'water', from: 0, to: 58, side: 'left' },
       { id: 'z2', kind: 'water', from: 58, to: 140, side: 'cross' },
@@ -452,8 +512,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'tpc-sawgrass:15': {
     length: 461,
     fairwayFrom: 161,
-    fairwayTo: 449,
-    greenDepth: 20,
+    fairwayTo: 440,
+    greenDepth: 37,
     zones: [
       { id: 'z1', kind: 'water', from: 62, to: 78, side: 'left' },
       { id: 'z2', kind: 'water', from: 78, to: 196, side: 'cross' },
@@ -467,8 +527,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'tpc-sawgrass:16': {
     length: 521,
     fairwayFrom: 182,
-    fairwayTo: 509,
-    greenDepth: 20,
+    fairwayTo: 504,
+    greenDepth: 29,
     zones: [
       { id: 'z1', kind: 'water', from: 6, to: 74, side: 'left' },
       { id: 'z2', kind: 'water', from: 74, to: 120, side: 'cross' },
@@ -485,8 +545,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'tpc-sawgrass:17': {
     length: 138,
     fairwayFrom: 48,
-    fairwayTo: 126,
-    greenDepth: 20,
+    fairwayTo: 123,
+    greenDepth: 26,
     zones: [
       { id: 'z1', kind: 'water', from: 12, to: 16, side: 'left' },
       { id: 'z2', kind: 'water', from: 16, to: 138, side: 'cross' },
@@ -497,8 +557,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'tpc-sawgrass:18': {
     length: 446,
     fairwayFrom: 156,
-    fairwayTo: 434,
-    greenDepth: 20,
+    fairwayTo: 427,
+    greenDepth: 34,
     zones: [
       { id: 'z1', kind: 'water', from: 0, to: 102, side: 'left' },
       { id: 'z2', kind: 'water', from: 102, to: 132, side: 'cross' },
@@ -509,8 +569,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'augusta-national:11': {
     length: 530,
     fairwayFrom: 186,
-    fairwayTo: 517,
-    greenDepth: 22,
+    fairwayTo: 509,
+    greenDepth: 37,
     zones: [{ id: 'z1', kind: 'water', from: 486, to: 530, side: 'left' }],
   },
   // Augusta National — Golden Bell, the par-3 12th over Rae's Creek
@@ -576,7 +636,7 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
     length: 167,
     fairwayFrom: 0,
     fairwayTo: 0,
-    greenDepth: 20,
+    greenDepth: 40,
     zones: [
       { id: 'z1', kind: 'water', from: 0, to: 167, side: 'right' },
       { id: 'z2', kind: 'bunker', from: 49, to: 67, side: 'left' },
@@ -589,7 +649,7 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
     length: 126,
     fairwayFrom: 0,
     fairwayTo: 0,
-    greenDepth: 20,
+    greenDepth: 33,
     zones: [
       { id: 'z1', kind: 'water', from: 0, to: 96, side: 'left' },
       { id: 'z2', kind: 'bunker', from: 8, to: 123, side: 'left' },
@@ -600,7 +660,7 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
     length: 196,
     fairwayFrom: 0,
     fairwayTo: 0,
-    greenDepth: 20,
+    greenDepth: 29,
     zones: [
       { id: 'z1', kind: 'bunker', from: 17, to: 55, side: 'left' },
       { id: 'z2', kind: 'bunker', from: 73, to: 92, side: 'left' },
@@ -613,7 +673,7 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
     length: 211,
     fairwayFrom: 0,
     fairwayTo: 0,
-    greenDepth: 20,
+    greenDepth: 29,
     zones: [
       { id: 'z1', kind: 'ocean', from: 0, to: 211, side: 'left' },
       { id: 'z2', kind: 'bunker', from: 0, to: 6, side: 'cross' },
@@ -626,7 +686,7 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
     length: 176,
     fairwayFrom: 0,
     fairwayTo: 0,
-    greenDepth: 20,
+    greenDepth: 23,
     zones: [
       { id: 'z1', kind: 'ocean', from: 0, to: 176, side: 'left' },
       { id: 'z2', kind: 'bunker', from: 42, to: 65, side: 'right' },
@@ -637,7 +697,7 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
     length: 128,
     fairwayFrom: 0,
     fairwayTo: 0,
-    greenDepth: 20,
+    greenDepth: 33,
     zones: [
       { id: 'z1', kind: 'ocean', from: 0, to: 128, side: 'left' },
       { id: 'z2', kind: 'bunker', from: 0, to: 19, side: 'left' },
@@ -651,7 +711,7 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
     length: 108,
     fairwayFrom: 0,
     fairwayTo: 0,
-    greenDepth: 20,
+    greenDepth: 31,
     zones: [
       { id: 'z1', kind: 'ocean', from: 0, to: 108, side: 'right' },
       { id: 'z2', kind: 'bunker', from: 0, to: 13, side: 'left' },
@@ -663,7 +723,7 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
     length: 133,
     fairwayFrom: 0,
     fairwayTo: 0,
-    greenDepth: 20,
+    greenDepth: 25,
     zones: [
       { id: 'z1', kind: 'ocean', from: 0, to: 133, side: 'right' },
       { id: 'z2', kind: 'bunker', from: 0, to: 30, side: 'left' },
@@ -675,7 +735,7 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
     length: 81,
     fairwayFrom: 0,
     fairwayTo: 0,
-    greenDepth: 20,
+    greenDepth: 30,
     zones: [
       { id: 'z1', kind: 'bunker', from: 55, to: 63, side: 'right' },
     ],
@@ -685,7 +745,7 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
     length: 112,
     fairwayFrom: 0,
     fairwayTo: 0,
-    greenDepth: 20,
+    greenDepth: 31,
     zones: [
       { id: 'z1', kind: 'bunker', from: 0, to: 10, side: 'right' },
       { id: 'z2', kind: 'bunker', from: 75, to: 112, side: 'right' },
@@ -696,7 +756,7 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
     length: 108,
     fairwayFrom: 0,
     fairwayTo: 0,
-    greenDepth: 20,
+    greenDepth: 30,
     zones: [
       { id: 'z1', kind: 'bunker', from: 0, to: 91, side: 'right' },
       { id: 'z2', kind: 'bunker', from: 86, to: 97, side: 'cross' },
@@ -707,7 +767,7 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
     length: 126,
     fairwayFrom: 0,
     fairwayTo: 0,
-    greenDepth: 20,
+    greenDepth: 33,
     zones: [
       { id: 'z1', kind: 'bunker', from: 0, to: 24, side: 'cross' },
       { id: 'z2', kind: 'bunker', from: 24, to: 126, side: 'right' },
@@ -718,7 +778,7 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
     length: 171,
     fairwayFrom: 0,
     fairwayTo: 0,
-    greenDepth: 20,
+    greenDepth: 34,
     zones: [
       { id: 'z1', kind: 'bunker', from: 0, to: 6, side: 'right' },
     ],
@@ -728,7 +788,7 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
     length: 129,
     fairwayFrom: 0,
     fairwayTo: 0,
-    greenDepth: 20,
+    greenDepth: 34,
     zones: [
     ],
   },
@@ -737,7 +797,7 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
     length: 156,
     fairwayFrom: 0,
     fairwayTo: 0,
-    greenDepth: 20,
+    greenDepth: 33,
     zones: [
       { id: 'z1', kind: 'water', from: 53, to: 68, side: 'left' },
       { id: 'z2', kind: 'water', from: 68, to: 108, side: 'cross' },
@@ -749,7 +809,7 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
     length: 117,
     fairwayFrom: 0,
     fairwayTo: 0,
-    greenDepth: 20,
+    greenDepth: 30,
     zones: [
       { id: 'z1', kind: 'water', from: 61, to: 117, side: 'left' },
     ],
@@ -772,7 +832,7 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
     length: 179,
     fairwayFrom: 0,
     fairwayTo: 0,
-    greenDepth: 20,
+    greenDepth: 36,
     zones: [
       { id: 'z1', kind: 'water', from: 68, to: 127, side: 'right' },
     ],
@@ -782,7 +842,7 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
     length: 176,
     fairwayFrom: 0,
     fairwayTo: 0,
-    greenDepth: 20,
+    greenDepth: 29,
     zones: [
       { id: 'z1', kind: 'bunker', from: 122, to: 133, side: 'left' },
       { id: 'z2', kind: 'bunker', from: 151, to: 157, side: 'right' },
@@ -793,7 +853,7 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
     length: 150,
     fairwayFrom: 0,
     fairwayTo: 0,
-    greenDepth: 22,
+    greenDepth: 34,
     zones: [
       { id: 'z1', kind: 'bunker', from: 144, to: 150, side: 'right' },
     ],
@@ -803,7 +863,7 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
     length: 168,
     fairwayFrom: 0,
     fairwayTo: 0,
-    greenDepth: 20,
+    greenDepth: 39,
     zones: [
       { id: 'z1', kind: 'bunker', from: 151, to: 168, side: 'left' },
     ],
@@ -826,7 +886,7 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
     length: 108,
     fairwayFrom: 0,
     fairwayTo: 0,
-    greenDepth: 20,
+    greenDepth: 33,
     zones: [
     ],
   },
@@ -835,7 +895,7 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
     length: 150,
     fairwayFrom: 0,
     fairwayTo: 0,
-    greenDepth: 20,
+    greenDepth: 32,
     zones: [
       { id: 'z1', kind: 'water', from: 19, to: 43, side: 'left' },
       { id: 'z2', kind: 'water', from: 43, to: 103, side: 'cross' },
@@ -849,7 +909,7 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
     length: 185,
     fairwayFrom: 0,
     fairwayTo: 0,
-    greenDepth: 20,
+    greenDepth: 30,
     zones: [
       { id: 'z1', kind: 'bunker', from: 157, to: 161, side: 'right' },
       { id: 'z2', kind: 'bunker', from: 177, to: 183, side: 'right' },
@@ -860,7 +920,7 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
     length: 92,
     fairwayFrom: 0,
     fairwayTo: 0,
-    greenDepth: 20,
+    greenDepth: 29,
     zones: [
       { id: 'z1', kind: 'bunker', from: 72, to: 77, side: 'left' },
     ],
@@ -870,7 +930,7 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
     length: 225,
     fairwayFrom: 0,
     fairwayTo: 0,
-    greenDepth: 20,
+    greenDepth: 27,
     zones: [
       { id: 'z1', kind: 'bunker', from: 153, to: 163, side: 'right' },
       { id: 'z2', kind: 'bunker', from: 198, to: 212, side: 'left' },
@@ -887,8 +947,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'harbour-town:1': {
     length: 407,
     fairwayFrom: 142,
-    fairwayTo: 395,
-    greenDepth: 20,
+    fairwayTo: 394,
+    greenDepth: 21,
     zones: [
       { id: 'z1', kind: 'water', from: 14, to: 36, side: 'left' },
       { id: 'z2', kind: 'water', from: 36, to: 52, side: 'cross' },
@@ -900,8 +960,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'harbour-town:2': {
     length: 501,
     fairwayFrom: 175,
-    fairwayTo: 489,
-    greenDepth: 20,
+    fairwayTo: 488,
+    greenDepth: 21,
     zones: [
       { id: 'z1', kind: 'water', from: 188, to: 200, side: 'right' },
       { id: 'z2', kind: 'bunker', from: 232, to: 274, side: 'left' },
@@ -914,8 +974,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'harbour-town:3': {
     length: 469,
     fairwayFrom: 165,
-    fairwayTo: 456,
-    greenDepth: 20,
+    fairwayTo: 453,
+    greenDepth: 26,
     zones: [
       { id: 'z1', kind: 'bunker', from: 34, to: 43, side: 'left' },
       { id: 'z2', kind: 'bunker', from: 65, to: 80, side: 'left' },
@@ -945,8 +1005,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'harbour-town:5': {
     length: 538,
     fairwayFrom: 188,
-    fairwayTo: 526,
-    greenDepth: 20,
+    fairwayTo: 524,
+    greenDepth: 24,
     zones: [
       { id: 'z1', kind: 'water', from: 202, to: 486, side: 'left' },
       { id: 'z2', kind: 'bunker', from: 220, to: 238, side: 'right' },
@@ -963,8 +1023,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'harbour-town:6': {
     length: 412,
     fairwayFrom: 144,
-    fairwayTo: 400,
-    greenDepth: 20,
+    fairwayTo: 395,
+    greenDepth: 30,
     zones: [
       { id: 'z1', kind: 'bunker', from: 32, to: 70, side: 'left' },
       { id: 'z2', kind: 'bunker', from: 162, to: 236, side: 'left' },
@@ -979,8 +1039,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'harbour-town:7': {
     length: 196,
     fairwayFrom: 69,
-    fairwayTo: 184,
-    greenDepth: 20,
+    fairwayTo: 178,
+    greenDepth: 32,
     zones: [
       { id: 'z1', kind: 'water', from: 18, to: 126, side: 'right' },
       { id: 'z2', kind: 'water', from: 126, to: 142, side: 'cross' },
@@ -994,8 +1054,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'harbour-town:8': {
     length: 467,
     fairwayFrom: 163,
-    fairwayTo: 455,
-    greenDepth: 20,
+    fairwayTo: 452,
+    greenDepth: 25,
     zones: [
       { id: 'z1', kind: 'bunker', from: 8, to: 28, side: 'right' },
       { id: 'z2', kind: 'water', from: 246, to: 288, side: 'left' },
@@ -1019,8 +1079,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'harbour-town:10': {
     length: 447,
     fairwayFrom: 156,
-    fairwayTo: 435,
-    greenDepth: 20,
+    fairwayTo: 426,
+    greenDepth: 37,
     zones: [
       { id: 'z1', kind: 'bunker', from: 90, to: 100, side: 'left' },
       { id: 'z2', kind: 'water', from: 106, to: 376, side: 'left' },
@@ -1031,8 +1091,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'harbour-town:11': {
     length: 434,
     fairwayFrom: 152,
-    fairwayTo: 422,
-    greenDepth: 20,
+    fairwayTo: 419,
+    greenDepth: 26,
     zones: [
       { id: 'z1', kind: 'water', from: 90, to: 114, side: 'right' },
       { id: 'z2', kind: 'water', from: 192, to: 224, side: 'left' },
@@ -1045,8 +1105,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'harbour-town:12': {
     length: 425,
     fairwayFrom: 149,
-    fairwayTo: 413,
-    greenDepth: 20,
+    fairwayTo: 409,
+    greenDepth: 27,
     zones: [
       { id: 'z1', kind: 'water', from: 128, to: 168, side: 'left' },
       { id: 'z2', kind: 'bunker', from: 178, to: 290, side: 'left' },
@@ -1073,8 +1133,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'harbour-town:14': {
     length: 188,
     fairwayFrom: 66,
-    fairwayTo: 176,
-    greenDepth: 20,
+    fairwayTo: 172,
+    greenDepth: 28,
     zones: [
       { id: 'z1', kind: 'water', from: 0, to: 116, side: 'left' },
       { id: 'z2', kind: 'bunker', from: 32, to: 72, side: 'right' },
@@ -1086,8 +1146,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'harbour-town:15': {
     length: 577,
     fairwayFrom: 202,
-    fairwayTo: 565,
-    greenDepth: 20,
+    fairwayTo: 563,
+    greenDepth: 23,
     zones: [
       { id: 'z1', kind: 'bunker', from: 222, to: 246, side: 'right' },
       { id: 'z2', kind: 'bunker', from: 246, to: 260, side: 'cross' },
@@ -1104,8 +1164,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'harbour-town:16': {
     length: 434,
     fairwayFrom: 152,
-    fairwayTo: 421,
-    greenDepth: 20,
+    fairwayTo: 417,
+    greenDepth: 27,
     zones: [
       { id: 'z1', kind: 'bunker', from: 248, to: 297, side: 'left' },
       { id: 'z2', kind: 'bunker', from: 297, to: 354, side: 'cross' },
@@ -1121,8 +1181,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'harbour-town:17': {
     length: 185,
     fairwayFrom: 65,
-    fairwayTo: 175,
-    greenDepth: 20,
+    fairwayTo: 171,
+    greenDepth: 28,
     zones: [
       { id: 'z1', kind: 'bunker', from: 2, to: 19, side: 'left' },
       { id: 'z2', kind: 'bunker', from: 38, to: 41, side: 'cross' },
@@ -1147,8 +1207,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'harbour-town:18': {
     length: 470,
     fairwayFrom: 165,
-    fairwayTo: 458,
-    greenDepth: 20,
+    fairwayTo: 455,
+    greenDepth: 26,
     zones: [
       { id: 'z1', kind: 'ocean', from: 0, to: 470, side: 'left' }, // the Sound down the entire left, wrapping behind the green
       { id: 'z2', kind: 'trees', from: 150, to: 400, side: 'right' }, // live-oak treeline framing the right of the corridor
@@ -1216,8 +1276,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'carnoustie:1': {
     length: 401,
     fairwayFrom: 141,
-    fairwayTo: 388,
-    greenDepth: 20,
+    fairwayTo: 382,
+    greenDepth: 31,
     zones: [
       { id: 'z1', kind: 'bunker', from: 265, to: 275, side: 'right' },
       { id: 'z2', kind: 'bunker', from: 347, to: 360, side: 'right' },
@@ -1228,8 +1288,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'carnoustie:2': {
     length: 435,
     fairwayFrom: 153,
-    fairwayTo: 418,
-    greenDepth: 28,
+    fairwayTo: 409,
+    greenDepth: 45,
     zones: [
       { id: 'z1', kind: 'bunker', from: 165, to: 174, side: 'left' },
       { id: 'z2', kind: 'bunker', from: 217, to: 221, side: 'right' },
@@ -1249,8 +1309,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'carnoustie:3': {
     length: 344,
     fairwayFrom: 120,
-    fairwayTo: 330,
-    greenDepth: 24,
+    fairwayTo: 323,
+    greenDepth: 38,
     zones: [
       { id: 'z1', kind: 'bunker', from: 46, to: 60, side: 'left' },
       { id: 'z2', kind: 'bunker', from: 210, to: 214, side: 'left' },
@@ -1267,8 +1327,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'carnoustie:4': {
     length: 375,
     fairwayFrom: 131,
-    fairwayTo: 364,
-    greenDepth: 20,
+    fairwayTo: 359,
+    greenDepth: 29,
     zones: [
       { id: 'z1', kind: 'bunker', from: 6, to: 9, side: 'left' },
       { id: 'z2', kind: 'bunker', from: 30, to: 39, side: 'right' },
@@ -1288,8 +1348,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'carnoustie:5': {
     length: 379,
     fairwayFrom: 133,
-    fairwayTo: 367,
-    greenDepth: 20,
+    fairwayTo: 359,
+    greenDepth: 35,
     zones: [
       { id: 'z1', kind: 'bunker', from: 90, to: 96, side: 'right' },
       { id: 'z2', kind: 'bunker', from: 206, to: 220, side: 'left' },
@@ -1304,8 +1364,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'carnoustie:6': {
     length: 520,
     fairwayFrom: 182,
-    fairwayTo: 509,
-    greenDepth: 20,
+    fairwayTo: 497,
+    greenDepth: 43,
     zones: [
       { id: 'z1', kind: 'bunker', from: 20, to: 33, side: 'right' },
       { id: 'z2', kind: 'bunker', from: 82, to: 85, side: 'right' },
@@ -1319,8 +1379,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'carnoustie:7': {
     length: 400,
     fairwayFrom: 140,
-    fairwayTo: 388,
-    greenDepth: 20,
+    fairwayTo: 386,
+    greenDepth: 24,
     zones: [
       { id: 'z1', kind: 'bunker', from: 2, to: 6, side: 'right' },
       { id: 'z2', kind: 'bunker', from: 32, to: 50, side: 'right' },
@@ -1334,8 +1394,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'carnoustie:8': {
     length: 167,
     fairwayFrom: 58,
-    fairwayTo: 154,
-    greenDepth: 20,
+    fairwayTo: 147,
+    greenDepth: 33,
     zones: [
       { id: 'z1', kind: 'bunker', from: 151, to: 162, side: 'right' },
       { id: 'z2', kind: 'bunker', from: 162, to: 166, side: 'left' },
@@ -1345,8 +1405,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'carnoustie:9': {
     length: 416,
     fairwayFrom: 146,
-    fairwayTo: 404,
-    greenDepth: 22,
+    fairwayTo: 394,
+    greenDepth: 41,
     zones: [
       { id: 'z1', kind: 'bunker', from: 7, to: 16, side: 'left' },
       { id: 'z2', kind: 'bunker', from: 227, to: 233, side: 'right' },
@@ -1361,8 +1421,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'carnoustie:10': {
     length: 443,
     fairwayFrom: 155,
-    fairwayTo: 431,
-    greenDepth: 20,
+    fairwayTo: 424,
+    greenDepth: 33,
     zones: [
       { id: 'z1', kind: 'bunker', from: 206, to: 230, side: 'right' },
       { id: 'z2', kind: 'bunker', from: 252, to: 262, side: 'right' },
@@ -1386,8 +1446,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'carnoustie:11': {
     length: 368,
     fairwayFrom: 129,
-    fairwayTo: 356,
-    greenDepth: 20,
+    fairwayTo: 347,
+    greenDepth: 38,
     zones: [
       { id: 'z1', kind: 'bunker', from: 52, to: 56, side: 'right' },
       { id: 'z2', kind: 'bunker', from: 218, to: 222, side: 'left' },
@@ -1421,8 +1481,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'carnoustie:13': {
     length: 161,
     fairwayFrom: 57,
-    fairwayTo: 148,
-    greenDepth: 20,
+    fairwayTo: 139,
+    greenDepth: 38,
     zones: [
       { id: 'z1', kind: 'bunker', from: 4, to: 11, side: 'right' },
       { id: 'z2', kind: 'bunker', from: 126, to: 135, side: 'cross' },
@@ -1435,8 +1495,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'carnoustie:14': {
     length: 476,
     fairwayFrom: 166,
-    fairwayTo: 464,
-    greenDepth: 22,
+    fairwayTo: 455,
+    greenDepth: 39,
     zones: [
       { id: 'z1', kind: 'bunker', from: 2, to: 7, side: 'right' },
       { id: 'z2', kind: 'bunker', from: 56, to: 64, side: 'right' },
@@ -1454,8 +1514,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'carnoustie:15': {
     length: 459,
     fairwayFrom: 161,
-    fairwayTo: 447,
-    greenDepth: 20,
+    fairwayTo: 439,
+    greenDepth: 35,
     zones: [
       { id: 'z1', kind: 'bunker', from: 78, to: 86, side: 'right' },
       { id: 'z2', kind: 'bunker', from: 228, to: 234, side: 'right' },
@@ -1470,8 +1530,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'carnoustie:16': {
     length: 235,
     fairwayFrom: 82,
-    fairwayTo: 221,
-    greenDepth: 24,
+    fairwayTo: 210,
+    greenDepth: 45,
     zones: [
       { id: 'z1', kind: 'bunker', from: 190, to: 194, side: 'right' },
       { id: 'z2', kind: 'bunker', from: 204, to: 208, side: 'left' },
@@ -1491,8 +1551,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'carnoustie:17': {
     length: 433,
     fairwayFrom: 170,
-    fairwayTo: 422,
-    greenDepth: 20,
+    fairwayTo: 417,
+    greenDepth: 30,
     zones: [
       { id: 'z1', kind: 'bunker', from: 47, to: 78, side: 'right' },
       { id: 'z2', kind: 'bunker', from: 78, to: 84, side: 'cross' },
@@ -1517,8 +1577,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'carnoustie:18': {
     length: 444,
     fairwayFrom: 176,
-    fairwayTo: 431,
-    greenDepth: 24,
+    fairwayTo: 421,
+    greenDepth: 44,
     zones: [
       { id: 'z1', kind: 'water', from: 30, to: 243, side: 'right' },
       { id: 'z2', kind: 'water', from: 166, to: 176, side: 'cross' },
@@ -1568,8 +1628,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'royal-portrush-dunluce:1': {
     length: 421,
     fairwayFrom: 154,
-    fairwayTo: 409,
-    greenDepth: 20,
+    fairwayTo: 401,
+    greenDepth: 35,
     zones: [
       { id: 'z1', kind: 'bunker', from: 274, to: 280, side: 'right' },
       { id: 'z2', kind: 'bunker', from: 300, to: 308, side: 'left' },
@@ -1580,8 +1640,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'royal-portrush-dunluce:2': {
     length: 574,
     fairwayFrom: 209,
-    fairwayTo: 561,
-    greenDepth: 22,
+    fairwayTo: 555,
+    greenDepth: 34,
     zones: [
       { id: 'z1', kind: 'bunker', from: 250, to: 258, side: 'right' },
       { id: 'z2', kind: 'bunker', from: 268, to: 288, side: 'right' },
@@ -1594,8 +1654,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'royal-portrush-dunluce:3': {
     length: 177,
     fairwayFrom: 65,
-    fairwayTo: 165,
-    greenDepth: 20,
+    fairwayTo: 159,
+    greenDepth: 31,
     zones: [
       { id: 'z1', kind: 'bunker', from: 144, to: 154, side: 'left' },
     ],
@@ -1603,8 +1663,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'royal-portrush-dunluce:4': {
     length: 482,
     fairwayFrom: 171,
-    fairwayTo: 470,
-    greenDepth: 20,
+    fairwayTo: 467,
+    greenDepth: 26,
     zones: [
       { id: 'z1', kind: 'bunker', from: 250, to: 256, side: 'left' },
       { id: 'z2', kind: 'bunker', from: 278, to: 284, side: 'left' },
@@ -1615,8 +1675,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'royal-portrush-dunluce:5': {
     length: 374,
     fairwayFrom: 132,
-    fairwayTo: 357,
-    greenDepth: 30,
+    fairwayTo: 352,
+    greenDepth: 40,
     zones: [
       { id: 'z1', kind: 'bunker', from: 324, to: 328, side: 'right' },
     ],
@@ -1624,15 +1684,15 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'royal-portrush-dunluce:6': {
     length: 194,
     fairwayFrom: 76,
-    fairwayTo: 182,
-    greenDepth: 20,
+    fairwayTo: 170,
+    greenDepth: 44,
     zones: [],
   },
   'royal-portrush-dunluce:7': {
     length: 592,
     fairwayFrom: 212,
-    fairwayTo: 580,
-    greenDepth: 20,
+    fairwayTo: 573,
+    greenDepth: 33,
     zones: [
       { id: 'z1', kind: 'bunker', from: 265, to: 281, side: 'right' },
       { id: 'z2', kind: 'bunker', from: 315, to: 321, side: 'left' },
@@ -1644,8 +1704,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'royal-portrush-dunluce:8': {
     length: 434,
     fairwayFrom: 156,
-    fairwayTo: 422,
-    greenDepth: 20,
+    fairwayTo: 413,
+    greenDepth: 37,
     zones: [
       { id: 'z1', kind: 'bunker', from: 269, to: 277, side: 'right' },
       { id: 'z2', kind: 'bunker', from: 305, to: 311, side: 'right' },
@@ -1655,8 +1715,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'royal-portrush-dunluce:9': {
     length: 432,
     fairwayFrom: 154,
-    fairwayTo: 418,
-    greenDepth: 24,
+    fairwayTo: 412,
+    greenDepth: 36,
     zones: [
       { id: 'z1', kind: 'bunker', from: 246, to: 252, side: 'right' },
       { id: 'z2', kind: 'bunker', from: 300, to: 306, side: 'right' },
@@ -1667,15 +1727,15 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'royal-portrush-dunluce:10': {
     length: 447,
     fairwayFrom: 157,
-    fairwayTo: 434,
-    greenDepth: 22,
+    fairwayTo: 423,
+    greenDepth: 44,
     zones: [],
   },
   'royal-portrush-dunluce:11': {
     length: 474,
     fairwayFrom: 178,
-    fairwayTo: 462,
-    greenDepth: 20,
+    fairwayTo: 457,
+    greenDepth: 29,
     zones: [
       { id: 'z1', kind: 'bunker', from: 463, to: 471, side: 'left' },
     ],
@@ -1683,8 +1743,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'royal-portrush-dunluce:12': {
     length: 532,
     fairwayFrom: 188,
-    fairwayTo: 520,
-    greenDepth: 20,
+    fairwayTo: 514,
+    greenDepth: 32,
     zones: [
       { id: 'z1', kind: 'bunker', from: 244, to: 254, side: 'right' },
       { id: 'z2', kind: 'bunker', from: 288, to: 294, side: 'right' },
@@ -1706,8 +1766,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'royal-portrush-dunluce:14': {
     length: 473,
     fairwayFrom: 209,
-    fairwayTo: 461,
-    greenDepth: 20,
+    fairwayTo: 452,
+    greenDepth: 38,
     zones: [
       { id: 'z1', kind: 'bunker', from: 253, to: 259, side: 'right' },
       { id: 'z2', kind: 'bunker', from: 313, to: 321, side: 'right' },
@@ -1717,8 +1777,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'royal-portrush-dunluce:15': {
     length: 426,
     fairwayFrom: 157,
-    fairwayTo: 414,
-    greenDepth: 20,
+    fairwayTo: 408,
+    greenDepth: 32,
     zones: [
       { id: 'z1', kind: 'bunker', from: 258, to: 264, side: 'right' },
       { id: 'z2', kind: 'bunker', from: 296, to: 300, side: 'right' },
@@ -1747,8 +1807,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'royal-portrush-dunluce:18': {
     length: 474,
     fairwayFrom: 178,
-    fairwayTo: 462,
-    greenDepth: 20,
+    fairwayTo: 453,
+    greenDepth: 37,
     zones: [
       { id: 'z1', kind: 'bunker', from: 297, to: 307, side: 'right' },
       { id: 'z2', kind: 'bunker', from: 399, to: 403, side: 'left' },
@@ -1793,8 +1853,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'oakmont:1': {
     length: 482,
     fairwayFrom: 164,
-    fairwayTo: 468,
-    greenDepth: 24,
+    fairwayTo: 463,
+    greenDepth: 34,
     zones: [
       { id: 'z1', kind: 'bunker', from: 66, to: 98, side: 'left' },
       { id: 'z2', kind: 'bunker', from: 120, to: 166, side: 'left' },
@@ -1811,8 +1871,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'oakmont:2': {
     length: 346,
     fairwayFrom: 123,
-    fairwayTo: 334,
-    greenDepth: 20,
+    fairwayTo: 331,
+    greenDepth: 25,
     zones: [
       { id: 'z1', kind: 'bunker', from: 193, to: 261, side: 'right' },
       { id: 'z2', kind: 'bunker', from: 295, to: 303, side: 'right' },
@@ -1823,8 +1883,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'oakmont:3': {
     length: 467,
     fairwayFrom: 183,
-    fairwayTo: 452,
-    greenDepth: 26,
+    fairwayTo: 442,
+    greenDepth: 45,
     zones: [
       // The Church Pews — the ladder of sand up the left, and the hole's
       // signature line names it, so it draws as the real thing (see ZoneStyle).
@@ -1836,8 +1896,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'oakmont:4': {
     length: 612,
     fairwayFrom: 234,
-    fairwayTo: 599,
-    greenDepth: 22,
+    fairwayTo: 587,
+    greenDepth: 45,
     zones: [
       { id: 'z1', kind: 'bunker', from: 149, to: 153, side: 'left' },
       { id: 'z2', kind: 'bunker', from: 163, to: 171, side: 'left' },
@@ -1861,8 +1921,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'oakmont:5': {
     length: 410,
     fairwayFrom: 160,
-    fairwayTo: 398,
-    greenDepth: 20,
+    fairwayTo: 391,
+    greenDepth: 33,
     zones: [
       { id: 'z1', kind: 'bunker', from: 91, to: 123, side: 'right' },
       { id: 'z2', kind: 'bunker', from: 135, to: 165, side: 'right' },
@@ -1878,8 +1938,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'oakmont:6': {
     length: 203,
     fairwayFrom: 72,
-    fairwayTo: 191,
-    greenDepth: 20,
+    fairwayTo: 186,
+    greenDepth: 29,
     zones: [
       { id: 'z1', kind: 'bunker', from: 76, to: 84, side: 'right' },
       { id: 'z2', kind: 'bunker', from: 166, to: 176, side: 'right' },
@@ -1890,8 +1950,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'oakmont:7': {
     length: 487,
     fairwayFrom: 176,
-    fairwayTo: 473,
-    greenDepth: 24,
+    fairwayTo: 465,
+    greenDepth: 40,
     zones: [
       { id: 'z1', kind: 'trees', from: 13, to: 223, side: 'right' },
       { id: 'z2', kind: 'bunker', from: 167, to: 187, side: 'left' },
@@ -1904,8 +1964,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'oakmont:8': {
     length: 293,
     fairwayFrom: 101,
-    fairwayTo: 281,
-    greenDepth: 20,
+    fairwayTo: 274,
+    greenDepth: 34,
     zones: [
       { id: 'z1', kind: 'bunker', from: 41, to: 89, side: 'right' },
       { id: 'z2', kind: 'trees', from: 201, to: 229, side: 'right' },
@@ -1915,8 +1975,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'oakmont:9': {
     length: 471,
     fairwayFrom: 160,
-    fairwayTo: 450,
-    greenDepth: 38,
+    fairwayTo: 446,
+    greenDepth: 45,
     zones: [
       { id: 'z1', kind: 'bunker', from: 170, to: 188, side: 'left' },
       { id: 'z2', kind: 'bunker', from: 190, to: 196, side: 'right' },
@@ -1935,8 +1995,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'oakmont:10': {
     length: 460,
     fairwayFrom: 161,
-    fairwayTo: 448,
-    greenDepth: 20,
+    fairwayTo: 441,
+    greenDepth: 34,
     zones: [
       { id: 'z1', kind: 'bunker', from: 208, to: 222, side: 'right' },
       { id: 'z2', kind: 'bunker', from: 226, to: 232, side: 'left' },
@@ -1954,8 +2014,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'oakmont:11': {
     length: 398,
     fairwayFrom: 153,
-    fairwayTo: 386,
-    greenDepth: 20,
+    fairwayTo: 380,
+    greenDepth: 31,
     zones: [
       { id: 'z1', kind: 'bunker', from: 243, to: 295, side: 'left' },
       { id: 'z2', kind: 'bunker', from: 363, to: 373, side: 'cross' },
@@ -1966,8 +2026,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'oakmont:12': {
     length: 663,
     fairwayFrom: 255,
-    fairwayTo: 650,
-    greenDepth: 22,
+    fairwayTo: 641,
+    greenDepth: 39,
     zones: [
       { id: 'z1', kind: 'bunker', from: 114, to: 120, side: 'right' },
       { id: 'z2', kind: 'bunker', from: 120, to: 134, side: 'cross' },
@@ -1989,8 +2049,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'oakmont:13': {
     length: 186,
     fairwayFrom: 70,
-    fairwayTo: 174,
-    greenDepth: 20,
+    fairwayTo: 165,
+    greenDepth: 37,
     zones: [
       { id: 'z1', kind: 'bunker', from: 99, to: 107, side: 'left' },
       { id: 'z2', kind: 'bunker', from: 151, to: 155, side: 'right' },
@@ -2001,8 +2061,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'oakmont:14': {
     length: 381,
     fairwayFrom: 160,
-    fairwayTo: 367,
-    greenDepth: 24,
+    fairwayTo: 356,
+    greenDepth: 45,
     zones: [
       { id: 'z1', kind: 'bunker', from: 189, to: 197, side: 'left' },
       { id: 'z2', kind: 'bunker', from: 219, to: 239, side: 'left' },
@@ -2020,8 +2080,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'oakmont:15': {
     length: 509,
     fairwayFrom: 192,
-    fairwayTo: 495,
-    greenDepth: 24,
+    fairwayTo: 484,
+    greenDepth: 45,
     zones: [
       { id: 'z1', kind: 'bunker', from: 21, to: 77, side: 'right' },
       { id: 'z2', kind: 'bunker', from: 93, to: 121, side: 'left' },
@@ -2035,8 +2095,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'oakmont:16': {
     length: 237,
     fairwayFrom: 91,
-    fairwayTo: 225,
-    greenDepth: 20,
+    fairwayTo: 217,
+    greenDepth: 36,
     zones: [
       { id: 'z1', kind: 'bunker', from: 55, to: 85, side: 'left' },
       { id: 'z2', kind: 'bunker', from: 193, to: 199, side: 'left' },
@@ -2047,8 +2107,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'oakmont:17': {
     length: 317,
     fairwayFrom: 114,
-    fairwayTo: 305,
-    greenDepth: 20,
+    fairwayTo: 303,
+    greenDepth: 23,
     zones: [
       { id: 'z1', kind: 'bunker', from: 218, to: 273, side: 'left' },
       { id: 'z2', kind: 'bunker', from: 296, to: 317, side: 'right' },
@@ -2058,8 +2118,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'oakmont:18': {
     length: 505,
     fairwayFrom: 188,
-    fairwayTo: 493,
-    greenDepth: 20,
+    fairwayTo: 486,
+    greenDepth: 34,
     zones: [
       { id: 'z1', kind: 'bunker', from: 55, to: 95, side: 'right' },
       { id: 'z2', kind: 'bunker', from: 253, to: 283, side: 'right' },
@@ -2128,8 +2188,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'cypress-point:1': {
     length: 417,
     fairwayFrom: 147,
-    fairwayTo: 405,
-    greenDepth: 20,
+    fairwayTo: 400,
+    greenDepth: 30,
     zones: [
       { id: 'z1', kind: 'bunker', from: 265, to: 311, side: 'left' },
       { id: 'z2', kind: 'bunker', from: 359, to: 381, side: 'left' },
@@ -2141,8 +2201,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'cypress-point:2': {
     length: 555,
     fairwayFrom: 196,
-    fairwayTo: 543,
-    greenDepth: 20,
+    fairwayTo: 537,
+    greenDepth: 32,
     zones: [
       { id: 'z1', kind: 'bunker', from: 391, to: 405, side: 'right' },
       { id: 'z2', kind: 'bunker', from: 405, to: 421, side: 'cross' },
@@ -2153,8 +2213,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'cypress-point:3': {
     length: 156,
     fairwayFrom: 55,
-    fairwayTo: 144,
-    greenDepth: 20,
+    fairwayTo: 143,
+    greenDepth: 22,
     zones: [
       { id: 'z1', kind: 'bunker', from: 90, to: 98, side: 'left' },
       { id: 'z2', kind: 'bunker', from: 98, to: 108, side: 'cross' },
@@ -2164,8 +2224,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'cypress-point:4': {
     length: 390,
     fairwayFrom: 137,
-    fairwayTo: 378,
-    greenDepth: 20,
+    fairwayTo: 373,
+    greenDepth: 30,
     zones: [
       { id: 'z1', kind: 'bunker', from: 154, to: 160, side: 'right' },
       { id: 'z2', kind: 'bunker', from: 160, to: 210, side: 'left' },
@@ -2178,8 +2238,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'cypress-point:5': {
     length: 487,
     fairwayFrom: 176,
-    fairwayTo: 475,
-    greenDepth: 20,
+    fairwayTo: 471,
+    greenDepth: 28,
     zones: [
       { id: 'z1', kind: 'bunker', from: 167, to: 191, side: 'left' },
       { id: 'z2', kind: 'bunker', from: 241, to: 249, side: 'cross' },
@@ -2193,8 +2253,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'cypress-point:6': {
     length: 523,
     fairwayFrom: 184,
-    fairwayTo: 511,
-    greenDepth: 20,
+    fairwayTo: 510,
+    greenDepth: 21,
     zones: [
       { id: 'z1', kind: 'bunker', from: 66, to: 78, side: 'left' },
       { id: 'z2', kind: 'bunker', from: 170, to: 214, side: 'right' },
@@ -2219,8 +2279,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'cypress-point:8': {
     length: 356,
     fairwayFrom: 142,
-    fairwayTo: 344,
-    greenDepth: 20,
+    fairwayTo: 343,
+    greenDepth: 21,
     zones: [
       { id: 'z1', kind: 'bunker', from: 311, to: 353, side: 'left' },
     ],
@@ -2239,8 +2299,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'cypress-point:10': {
     length: 477,
     fairwayFrom: 167,
-    fairwayTo: 465,
-    greenDepth: 20,
+    fairwayTo: 464,
+    greenDepth: 21,
     zones: [
       { id: 'z1', kind: 'bunker', from: 68, to: 104, side: 'right' },
       { id: 'z2', kind: 'bunker', from: 118, to: 152, side: 'left' },
@@ -2253,8 +2313,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'cypress-point:11': {
     length: 437,
     fairwayFrom: 145,
-    fairwayTo: 425,
-    greenDepth: 20,
+    fairwayTo: 418,
+    greenDepth: 33,
     zones: [
       { id: 'z1', kind: 'bunker', from: 86, to: 118, side: 'right' },
       { id: 'z2', kind: 'bunker', from: 142, to: 172, side: 'right' },
@@ -2267,8 +2327,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'cypress-point:12': {
     length: 408,
     fairwayFrom: 151,
-    fairwayTo: 396,
-    greenDepth: 20,
+    fairwayTo: 391,
+    greenDepth: 30,
     zones: [
       { id: 'z1', kind: 'bunker', from: 78, to: 118, side: 'left' },
       { id: 'z2', kind: 'bunker', from: 214, to: 224, side: 'left' },
@@ -2280,8 +2340,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'cypress-point:13': {
     length: 388,
     fairwayFrom: 136,
-    fairwayTo: 376,
-    greenDepth: 20,
+    fairwayTo: 371,
+    greenDepth: 30,
     zones: [
       { id: 'z1', kind: 'bunker', from: 326, to: 346, side: 'left' },
       { id: 'z2', kind: 'bunker', from: 356, to: 388, side: 'left' },
@@ -2290,8 +2350,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'cypress-point:14': {
     length: 394,
     fairwayFrom: 142,
-    fairwayTo: 382,
-    greenDepth: 20,
+    fairwayTo: 380,
+    greenDepth: 24,
     zones: [
       { id: 'z1', kind: 'bunker', from: 48, to: 78, side: 'left' },
       { id: 'z2', kind: 'bunker', from: 136, to: 178, side: 'left' },
@@ -2335,8 +2395,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'cypress-point:16': {
     length: 232,
     fairwayFrom: 106,
-    fairwayTo: 210,
-    greenDepth: 20,
+    fairwayTo: 203,
+    greenDepth: 34,
     zones: [
       { id: 'z1', kind: 'ocean', from: 14, to: 106, side: 'cross' },
       { id: 'z2', kind: 'ocean', from: 106, to: 204, side: 'right' },
@@ -2349,8 +2409,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'cypress-point:17': {
     length: 391,
     fairwayFrom: 152,
-    fairwayTo: 379,
-    greenDepth: 20,
+    fairwayTo: 378,
+    greenDepth: 22,
     zones: [
       { id: 'z1', kind: 'ocean', from: 0, to: 79, side: 'right' },
       { id: 'z2', kind: 'ocean', from: 79, to: 135, side: 'cross' },
@@ -2365,8 +2425,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'cypress-point:18': {
     length: 343,
     fairwayFrom: 121,
-    fairwayTo: 331,
-    greenDepth: 20,
+    fairwayTo: 329,
+    greenDepth: 24,
     zones: [
       { id: 'z1', kind: 'bunker', from: 123, to: 129, side: 'cross' },
       { id: 'z2', kind: 'bunker', from: 129, to: 139, side: 'left' },
@@ -2405,8 +2465,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'whistling-straits:1': {
     length: 493,
     fairwayFrom: 228,
-    fairwayTo: 481,
-    greenDepth: 20,
+    fairwayTo: 479,
+    greenDepth: 24,
     zones: [
       { id: 'z1', kind: 'bunker', from: 87, to: 95, side: 'left' },
       { id: 'z2', kind: 'bunker', from: 111, to: 125, side: 'left' },
@@ -2431,8 +2491,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'whistling-straits:2': {
     length: 597,
     fairwayFrom: 214,
-    fairwayTo: 585,
-    greenDepth: 20,
+    fairwayTo: 581,
+    greenDepth: 28,
     zones: [
       { id: 'z1', kind: 'bunker', from: 11, to: 17, side: 'right' },
       { id: 'z2', kind: 'bunker', from: 27, to: 55, side: 'right' },
@@ -2469,8 +2529,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'whistling-straits:3': {
     length: 188,
     fairwayFrom: 69,
-    fairwayTo: 176,
-    greenDepth: 20,
+    fairwayTo: 168,
+    greenDepth: 35,
     zones: [
       { id: 'z1', kind: 'bunker', from: 21, to: 27, side: 'right' },
       { id: 'z2', kind: 'bunker', from: 53, to: 61, side: 'right' },
@@ -2489,8 +2549,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'whistling-straits:4': {
     length: 494,
     fairwayFrom: 182,
-    fairwayTo: 482,
-    greenDepth: 20,
+    fairwayTo: 474,
+    greenDepth: 36,
     zones: [
       { id: 'z1', kind: 'bunker', from: 14, to: 20, side: 'cross' },
       { id: 'z2', kind: 'water', from: 14, to: 46, side: 'left' },
@@ -2513,8 +2573,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'whistling-straits:5': {
     length: 603,
     fairwayFrom: 244,
-    fairwayTo: 591,
-    greenDepth: 20,
+    fairwayTo: 586,
+    greenDepth: 30,
     zones: [
       { id: 'z1', kind: 'bunker', from: 63, to: 89, side: 'left' },
       { id: 'z2', kind: 'bunker', from: 93, to: 151, side: 'right' },
@@ -2560,8 +2620,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'whistling-straits:7': {
     length: 221,
     fairwayFrom: 77,
-    fairwayTo: 209,
-    greenDepth: 20,
+    fairwayTo: 202,
+    greenDepth: 34,
     zones: [
       { id: 'z1', kind: 'water', from: 0, to: 221, side: 'right' },
       { id: 'z2', kind: 'bunker', from: 47, to: 53, side: 'left' },
@@ -2579,8 +2639,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'whistling-straits:8': {
     length: 506,
     fairwayFrom: 190,
-    fairwayTo: 494,
-    greenDepth: 20,
+    fairwayTo: 486,
+    greenDepth: 36,
     zones: [
       { id: 'z1', kind: 'water', from: 20, to: 102, side: 'right' },
       { id: 'z2', kind: 'bunker', from: 20, to: 36, side: 'left' },
@@ -2606,8 +2666,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'whistling-straits:9': {
     length: 442,
     fairwayFrom: 154,
-    fairwayTo: 430,
-    greenDepth: 20,
+    fairwayTo: 423,
+    greenDepth: 33,
     zones: [
       { id: 'z1', kind: 'bunker', from: 0, to: 11, side: 'cross' },
       { id: 'z2', kind: 'bunker', from: 1, to: 5, side: 'right' },
@@ -2631,8 +2691,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'whistling-straits:10': {
     length: 391,
     fairwayFrom: 147,
-    fairwayTo: 379,
-    greenDepth: 20,
+    fairwayTo: 377,
+    greenDepth: 23,
     zones: [
       { id: 'z1', kind: 'bunker', from: 190, to: 196, side: 'left' },
       { id: 'z2', kind: 'bunker', from: 238, to: 244, side: 'left' },
@@ -2644,8 +2704,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'whistling-straits:11': {
     length: 645,
     fairwayFrom: 239,
-    fairwayTo: 633,
-    greenDepth: 20,
+    fairwayTo: 630,
+    greenDepth: 25,
     zones: [
       { id: 'z1', kind: 'bunker', from: 30, to: 52, side: 'right' },
       { id: 'z2', kind: 'bunker', from: 64, to: 76, side: 'right' },
@@ -2683,8 +2743,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'whistling-straits:13': {
     length: 402,
     fairwayFrom: 148,
-    fairwayTo: 390,
-    greenDepth: 20,
+    fairwayTo: 382,
+    greenDepth: 35,
     zones: [
       { id: 'z1', kind: 'water', from: 11, to: 101, side: 'right' },
       { id: 'z2', kind: 'bunker', from: 21, to: 25, side: 'left' },
@@ -2701,8 +2761,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'whistling-straits:14': {
     length: 396,
     fairwayFrom: 147,
-    fairwayTo: 384,
-    greenDepth: 20,
+    fairwayTo: 379,
+    greenDepth: 29,
     zones: [
       { id: 'z1', kind: 'bunker', from: 209, to: 213, side: 'left' },
       { id: 'z2', kind: 'bunker', from: 281, to: 309, side: 'left' },
@@ -2718,8 +2778,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'whistling-straits:15': {
     length: 503,
     fairwayFrom: 177,
-    fairwayTo: 489,
-    greenDepth: 24,
+    fairwayTo: 481,
+    greenDepth: 39,
     zones: [
       { id: 'z1', kind: 'bunker', from: 4, to: 40, side: 'left' },
       { id: 'z2', kind: 'bunker', from: 16, to: 22, side: 'cross' },
@@ -2751,8 +2811,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'whistling-straits:16': {
     length: 568,
     fairwayFrom: 214,
-    fairwayTo: 556,
-    greenDepth: 20,
+    fairwayTo: 548,
+    greenDepth: 35,
     zones: [
       { id: 'z1', kind: 'water', from: 23, to: 65, side: 'left' },
       { id: 'z2', kind: 'bunker', from: 113, to: 137, side: 'right' },
@@ -2796,8 +2856,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'whistling-straits:17': {
     length: 249,
     fairwayFrom: 90,
-    fairwayTo: 237,
-    greenDepth: 20,
+    fairwayTo: 233,
+    greenDepth: 27,
     zones: [
       { id: 'z1', kind: 'bunker', from: 24, to: 30, side: 'right' },
       { id: 'z2', kind: 'bunker', from: 46, to: 70, side: 'right' },
@@ -2816,8 +2876,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'whistling-straits:18': {
     length: 520,
     fairwayFrom: 206,
-    fairwayTo: 508,
-    greenDepth: 20,
+    fairwayTo: 507,
+    greenDepth: 21,
     zones: [
       { id: 'z1', kind: 'bunker', from: 109, to: 151, side: 'right' },
       { id: 'z2', kind: 'bunker', from: 233, to: 355, side: 'left' },
@@ -2866,8 +2926,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'tpc-potomac:1': {
     length: 440,
     fairwayFrom: 152,
-    fairwayTo: 428,
-    greenDepth: 20,
+    fairwayTo: 423,
+    greenDepth: 29,
     zones: [
       { id: 'z1', kind: 'bunker', from: 9, to: 15, side: 'left' },
       { id: 'z2', kind: 'water', from: 59, to: 71, side: 'left' },
@@ -2887,8 +2947,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'tpc-potomac:2': {
     length: 619,
     fairwayFrom: 212,
-    fairwayTo: 607,
-    greenDepth: 20,
+    fairwayTo: 604,
+    greenDepth: 26,
     zones: [
       { id: 'z1', kind: 'bunker', from: 273, to: 311, side: 'right' },
       { id: 'z2', kind: 'bunker', from: 573, to: 584, side: 'right' },
@@ -2900,8 +2960,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'tpc-potomac:3': {
     length: 225,
     fairwayFrom: 75,
-    fairwayTo: 213,
-    greenDepth: 20,
+    fairwayTo: 204,
+    greenDepth: 37,
     zones: [
       { id: 'z1', kind: 'water', from: 178, to: 182, side: 'left' },
       { id: 'z2', kind: 'water', from: 182, to: 218, side: 'right' },
@@ -2936,8 +2996,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'tpc-potomac:5': {
     length: 365,
     fairwayFrom: 125,
-    fairwayTo: 353,
-    greenDepth: 20,
+    fairwayTo: 349,
+    greenDepth: 27,
     zones: [
       { id: 'z1', kind: 'water', from: 106, to: 236, side: 'left' },
       { id: 'z2', kind: 'bunker', from: 224, to: 240, side: 'left' },
@@ -2960,8 +3020,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'tpc-potomac:6': {
     length: 484,
     fairwayFrom: 165,
-    fairwayTo: 472,
-    greenDepth: 20,
+    fairwayTo: 465,
+    greenDepth: 33,
     zones: [
       { id: 'z1', kind: 'water', from: 61, to: 140, side: 'right' },
       { id: 'z2', kind: 'water', from: 140, to: 164, side: 'cross' },
@@ -2974,8 +3034,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'tpc-potomac:7': {
     length: 452,
     fairwayFrom: 153,
-    fairwayTo: 440,
-    greenDepth: 20,
+    fairwayTo: 433,
+    greenDepth: 34,
     zones: [
       { id: 'z1', kind: 'water', from: 92, to: 106, side: 'left' },
       { id: 'z2', kind: 'water', from: 106, to: 150, side: 'cross' },
@@ -2992,8 +3052,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'tpc-potomac:8': {
     length: 467,
     fairwayFrom: 160,
-    fairwayTo: 455,
-    greenDepth: 20,
+    fairwayTo: 450,
+    greenDepth: 29,
     zones: [
       { id: 'z1', kind: 'bunker', from: 254, to: 262, side: 'left' },
       { id: 'z2', kind: 'bunker', from: 304, to: 318, side: 'right' },
@@ -3007,8 +3067,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'tpc-potomac:9': {
     length: 201,
     fairwayFrom: 70,
-    fairwayTo: 189,
-    greenDepth: 20,
+    fairwayTo: 184,
+    greenDepth: 30,
     zones: [
       { id: 'z1', kind: 'water', from: 131, to: 137, side: 'left' },
       { id: 'z2', kind: 'water', from: 137, to: 179, side: 'right' },
@@ -3026,8 +3086,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'tpc-potomac:10': {
     length: 560,
     fairwayFrom: 188,
-    fairwayTo: 548,
-    greenDepth: 20,
+    fairwayTo: 539,
+    greenDepth: 37,
     zones: [
       { id: 'z1', kind: 'water', from: 41, to: 123, side: 'right' },
       { id: 'z2', kind: 'water', from: 123, to: 127, side: 'cross' },
@@ -3048,8 +3108,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'tpc-potomac:11': {
     length: 470,
     fairwayFrom: 170,
-    fairwayTo: 458,
-    greenDepth: 20,
+    fairwayTo: 454,
+    greenDepth: 28,
     zones: [
       { id: 'z1', kind: 'trees', from: 8, to: 178, side: 'right' },
       { id: 'z2', kind: 'water', from: 8, to: 408, side: 'left' },
@@ -3070,8 +3130,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'tpc-potomac:12': {
     length: 168,
     fairwayFrom: 57,
-    fairwayTo: 156,
-    greenDepth: 20,
+    fairwayTo: 150,
+    greenDepth: 32,
     zones: [
       { id: 'z1', kind: 'trees', from: 26, to: 108, side: 'right' },
       { id: 'z2', kind: 'bunker', from: 117, to: 123, side: 'right' },
@@ -3093,8 +3153,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'tpc-potomac:13': {
     length: 360,
     fairwayFrom: 123,
-    fairwayTo: 348,
-    greenDepth: 20,
+    fairwayTo: 346,
+    greenDepth: 23,
     zones: [
       { id: 'z1', kind: 'water', from: 1, to: 261, side: 'left' },
       { id: 'z2', kind: 'bunker', from: 11, to: 23, side: 'right' },
@@ -3114,8 +3174,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'tpc-potomac:14': {
     length: 299,
     fairwayFrom: 103,
-    fairwayTo: 287,
-    greenDepth: 20,
+    fairwayTo: 284,
+    greenDepth: 25,
     zones: [
       { id: 'z1', kind: 'bunker', from: 4, to: 18, side: 'left' },
       { id: 'z2', kind: 'water', from: 24, to: 106, side: 'left' },
@@ -3134,8 +3194,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'tpc-potomac:15': {
     length: 490,
     fairwayFrom: 168,
-    fairwayTo: 478,
-    greenDepth: 20,
+    fairwayTo: 473,
+    greenDepth: 29,
     zones: [
       { id: 'z1', kind: 'bunker', from: 51, to: 57, side: 'left' },
       { id: 'z2', kind: 'bunker', from: 485, to: 490, side: 'right' },
@@ -3165,8 +3225,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'tpc-potomac:17': {
     length: 222,
     fairwayFrom: 93,
-    fairwayTo: 210,
-    greenDepth: 20,
+    fairwayTo: 208,
+    greenDepth: 24,
     zones: [
       { id: 'z1', kind: 'bunker', from: 38, to: 56, side: 'left' },
       { id: 'z2', kind: 'water', from: 126, to: 130, side: 'right' },
@@ -3184,8 +3244,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'tpc-potomac:18': {
     length: 465,
     fairwayFrom: 163,
-    fairwayTo: 453,
-    greenDepth: 20,
+    fairwayTo: 447,
+    greenDepth: 31,
     zones: [
       { id: 'z1', kind: 'bunker', from: 34, to: 46, side: 'right' },
       { id: 'z2', kind: 'water', from: 70, to: 150, side: 'right' },
@@ -3269,8 +3329,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'seminole:1': {
     length: 405,
     fairwayFrom: 169,
-    fairwayTo: 392,
-    greenDepth: 22,
+    fairwayTo: 382,
+    greenDepth: 41,
     zones: [
       { id: 'z1', kind: 'bunker', from: 62, to: 82, side: 'left' },
       { id: 'z2', kind: 'bunker', from: 150, to: 174, side: 'left' },
@@ -3289,8 +3349,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'seminole:2': {
     length: 456,
     fairwayFrom: 225,
-    fairwayTo: 444,
-    greenDepth: 20,
+    fairwayTo: 436,
+    greenDepth: 35,
     zones: [
       { id: 'z1', kind: 'bunker', from: 73, to: 85, side: 'right' },
       { id: 'z2', kind: 'water', from: 73, to: 159, side: 'left' },
@@ -3307,8 +3367,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'seminole:3': {
     length: 558,
     fairwayFrom: 246,
-    fairwayTo: 546,
-    greenDepth: 20,
+    fairwayTo: 539,
+    greenDepth: 34,
     zones: [
       { id: 'z1', kind: 'bunker', from: 78, to: 194, side: 'left' },
       { id: 'z2', kind: 'bunker', from: 86, to: 108, side: 'right' },
@@ -3330,8 +3390,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'seminole:4': {
     length: 500,
     fairwayFrom: 201,
-    fairwayTo: 488,
-    greenDepth: 20,
+    fairwayTo: 482,
+    greenDepth: 32,
     zones: [
       { id: 'z1', kind: 'bunker', from: 40, to: 58, side: 'left' },
       { id: 'z2', kind: 'bunker', from: 44, to: 58, side: 'right' },
@@ -3353,8 +3413,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'seminole:5': {
     length: 204,
     fairwayFrom: 73,
-    fairwayTo: 192,
-    greenDepth: 20,
+    fairwayTo: 187,
+    greenDepth: 29,
     zones: [
       { id: 'z1', kind: 'bunker', from: 3, to: 39, side: 'left' },
       { id: 'z2', kind: 'bunker', from: 55, to: 65, side: 'left' },
@@ -3381,8 +3441,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'seminole:6': {
     length: 400,
     fairwayFrom: 138,
-    fairwayTo: 388,
-    greenDepth: 20,
+    fairwayTo: 382,
+    greenDepth: 31,
     zones: [
       { id: 'z1', kind: 'bunker', from: 0, to: 17, side: 'left' },
       { id: 'z2', kind: 'bunker', from: 113, to: 207, side: 'left' },
@@ -3399,8 +3459,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'seminole:7': {
     length: 440,
     fairwayFrom: 180,
-    fairwayTo: 428,
-    greenDepth: 20,
+    fairwayTo: 422,
+    greenDepth: 32,
     zones: [
       { id: 'z1', kind: 'bunker', from: 40, to: 56, side: 'left' },
       { id: 'z2', kind: 'bunker', from: 174, to: 196, side: 'left' },
@@ -3417,8 +3477,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'seminole:8': {
     length: 256,
     fairwayFrom: 131,
-    fairwayTo: 244,
-    greenDepth: 20,
+    fairwayTo: 236,
+    greenDepth: 35,
     zones: [
       { id: 'z1', kind: 'bunker', from: 13, to: 23, side: 'right' },
       { id: 'z2', kind: 'bunker', from: 19, to: 51, side: 'left' },
@@ -3435,8 +3495,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'seminole:9': {
     length: 549,
     fairwayFrom: 191,
-    fairwayTo: 537,
-    greenDepth: 20,
+    fairwayTo: 533,
+    greenDepth: 27,
     zones: [
       { id: 'z1', kind: 'bunker', from: 90, to: 100, side: 'left' },
       { id: 'z2', kind: 'bunker', from: 114, to: 124, side: 'left' },
@@ -3459,8 +3519,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'seminole:10': {
     length: 417,
     fairwayFrom: 160,
-    fairwayTo: 405,
-    greenDepth: 20,
+    fairwayTo: 398,
+    greenDepth: 33,
     zones: [
       { id: 'z1', kind: 'bunker', from: 184, to: 200, side: 'right' },
       { id: 'z2', kind: 'bunker', from: 192, to: 212, side: 'left' },
@@ -3484,8 +3544,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'seminole:11': {
     length: 463,
     fairwayFrom: 159,
-    fairwayTo: 450,
-    greenDepth: 22,
+    fairwayTo: 441,
+    greenDepth: 40,
     zones: [
       { id: 'z1', kind: 'bunker', from: 17, to: 41, side: 'left' },
       { id: 'z2', kind: 'water', from: 89, to: 355, side: 'right' },
@@ -3500,8 +3560,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'seminole:12': {
     length: 368,
     fairwayFrom: 131,
-    fairwayTo: 356,
-    greenDepth: 20,
+    fairwayTo: 352,
+    greenDepth: 27,
     zones: [
       { id: 'z1', kind: 'bunker', from: 3, to: 41, side: 'left' },
       { id: 'z2', kind: 'bunker', from: 13, to: 85, side: 'right' },
@@ -3517,8 +3577,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'seminole:13': {
     length: 172,
     fairwayFrom: 61,
-    fairwayTo: 160,
-    greenDepth: 20,
+    fairwayTo: 154,
+    greenDepth: 31,
     zones: [
       { id: 'z1', kind: 'bunker', from: 1, to: 41, side: 'right' },
       { id: 'z2', kind: 'bunker', from: 67, to: 73, side: 'right' },
@@ -3530,8 +3590,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'seminole:14': {
     length: 513,
     fairwayFrom: 181,
-    fairwayTo: 501,
-    greenDepth: 20,
+    fairwayTo: 496,
+    greenDepth: 29,
     zones: [
       { id: 'z1', kind: 'bunker', from: 4, to: 10, side: 'left' },
       { id: 'z2', kind: 'bunker', from: 10, to: 104, side: 'right' },
@@ -3554,8 +3614,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'seminole:15': {
     length: 535,
     fairwayFrom: 225,
-    fairwayTo: 523,
-    greenDepth: 20,
+    fairwayTo: 521,
+    greenDepth: 24,
     zones: [
       { id: 'z1', kind: 'bunker', from: 19, to: 71, side: 'right' },
       { id: 'z2', kind: 'bunker', from: 27, to: 63, side: 'left' },
@@ -3572,8 +3632,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'seminole:16': {
     length: 403,
     fairwayFrom: 152,
-    fairwayTo: 391,
-    greenDepth: 20,
+    fairwayTo: 386,
+    greenDepth: 30,
     zones: [
       { id: 'z1', kind: 'bunker', from: 17, to: 23, side: 'left' },
       { id: 'z2', kind: 'bunker', from: 43, to: 57, side: 'left' },
@@ -3589,8 +3649,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'seminole:17': {
     length: 181,
     fairwayFrom: 70,
-    fairwayTo: 169,
-    greenDepth: 20,
+    fairwayTo: 158,
+    greenDepth: 41,
     zones: [
       { id: 'z1', kind: 'bunker', from: 10, to: 40, side: 'right' },
       { id: 'z2', kind: 'bunker', from: 56, to: 72, side: 'right' },
@@ -3601,8 +3661,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'seminole:18': {
     length: 439,
     fairwayFrom: 151,
-    fairwayTo: 427,
-    greenDepth: 20,
+    fairwayTo: 417,
+    greenDepth: 39,
     zones: [
       { id: 'z1', kind: 'bunker', from: 14, to: 74, side: 'right' },
       { id: 'z2', kind: 'bunker', from: 214, to: 220, side: 'right' },
@@ -3631,8 +3691,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'kings-creek:1': {
     length: 351,
     fairwayFrom: 127,
-    fairwayTo: 339,
-    greenDepth: 20,
+    fairwayTo: 335,
+    greenDepth: 27,
     zones: [
       { id: 'z1', kind: 'water', from: 118, to: 146, side: 'left' },
       { id: 'z2', kind: 'water', from: 250, to: 351, side: 'left' },
@@ -3641,8 +3701,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'kings-creek:2': {
     length: 340,
     fairwayFrom: 140,
-    fairwayTo: 328,
-    greenDepth: 20,
+    fairwayTo: 324,
+    greenDepth: 28,
     zones: [
       { id: 'z1', kind: 'water', from: 54, to: 340, side: 'left' },
     ],
@@ -3664,8 +3724,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'kings-creek:4': {
     length: 393,
     fairwayFrom: 143,
-    fairwayTo: 381,
-    greenDepth: 20,
+    fairwayTo: 380,
+    greenDepth: 22,
     zones: [
       { id: 'z1', kind: 'bunker', from: 9, to: 17, side: 'left' },
       { id: 'z2', kind: 'water', from: 63, to: 139, side: 'left' },
@@ -3689,8 +3749,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'kings-creek:6': {
     length: 164,
     fairwayFrom: 61,
-    fairwayTo: 152,
-    greenDepth: 20,
+    fairwayTo: 151,
+    greenDepth: 21,
     zones: [
       { id: 'z1', kind: 'water', from: 5, to: 9, side: 'right' },
     ],
@@ -3698,8 +3758,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'kings-creek:7': {
     length: 515,
     fairwayFrom: 185,
-    fairwayTo: 503,
-    greenDepth: 20,
+    fairwayTo: 500,
+    greenDepth: 25,
     zones: [
       { id: 'z1', kind: 'water', from: 8, to: 102, side: 'right' },
       { id: 'z2', kind: 'bunker', from: 480, to: 492, side: 'right' },
@@ -3733,8 +3793,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'kings-creek:10': {
     length: 443,
     fairwayFrom: 160,
-    fairwayTo: 431,
-    greenDepth: 20,
+    fairwayTo: 427,
+    greenDepth: 28,
     zones: [
       { id: 'z1', kind: 'water', from: 397, to: 443, side: 'right' },
     ],
@@ -3742,8 +3802,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'kings-creek:11': {
     length: 151,
     fairwayFrom: 52,
-    fairwayTo: 139,
-    greenDepth: 20,
+    fairwayTo: 138,
+    greenDepth: 21,
     zones: [
       { id: 'z1', kind: 'water', from: 44, to: 64, side: 'right' },
       { id: 'z2', kind: 'water', from: 92, to: 138, side: 'right' },
@@ -3768,8 +3828,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'kings-creek:13': {
     length: 415,
     fairwayFrom: 155,
-    fairwayTo: 403,
-    greenDepth: 20,
+    fairwayTo: 401,
+    greenDepth: 24,
     zones: [
       { id: 'z1', kind: 'water', from: 15, to: 89, side: 'left' },
       { id: 'z2', kind: 'water', from: 33, to: 179, side: 'right' },
@@ -3811,8 +3871,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'kings-creek:16': {
     length: 276,
     fairwayFrom: 95,
-    fairwayTo: 264,
-    greenDepth: 20,
+    fairwayTo: 261,
+    greenDepth: 26,
     zones: [
       { id: 'z1', kind: 'water', from: 0, to: 82, side: 'right' },
       { id: 'z2', kind: 'water', from: 82, to: 126, side: 'cross' },
@@ -3825,8 +3885,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'kings-creek:17': {
     length: 191,
     fairwayFrom: 68,
-    fairwayTo: 179,
-    greenDepth: 20,
+    fairwayTo: 176,
+    greenDepth: 25,
     zones: [
       { id: 'z1', kind: 'water', from: 46, to: 86, side: 'right' },
       { id: 'z2', kind: 'water', from: 106, to: 128, side: 'right' },
@@ -3838,8 +3898,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'kings-creek:18': {
     length: 575,
     fairwayFrom: 158,
-    fairwayTo: 563,
-    greenDepth: 20,
+    fairwayTo: 558,
+    greenDepth: 29,
     zones: [
       { id: 'z1', kind: 'water', from: 0, to: 340, side: 'left' },
       { id: 'z2', kind: 'water', from: 22, to: 116, side: 'right' },
@@ -3931,8 +3991,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'torrey-pines-south:1': {
     length: 451,
     fairwayFrom: 161,
-    fairwayTo: 439,
-    greenDepth: 20,
+    fairwayTo: 435,
+    greenDepth: 28,
     zones: [
       { id: 'z1', kind: 'bunker', from: 55, to: 75, side: 'left' },
       { id: 'z2', kind: 'bunker', from: 281, to: 297, side: 'right' },
@@ -3945,8 +4005,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'torrey-pines-south:2': {
     length: 389,
     fairwayFrom: 136,
-    fairwayTo: 377,
-    greenDepth: 20,
+    fairwayTo: 372,
+    greenDepth: 30,
     zones: [
       { id: 'z1', kind: 'bunker', from: 261, to: 281, side: 'right' },
       { id: 'z2', kind: 'bunker', from: 267, to: 313, side: 'left' },
@@ -3967,8 +4027,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'torrey-pines-south:4': {
     length: 490,
     fairwayFrom: 173,
-    fairwayTo: 478,
-    greenDepth: 20,
+    fairwayTo: 474,
+    greenDepth: 28,
     zones: [
       { id: 'z1', kind: 'deeprough', from: 10, to: 480, side: 'left' },
       { id: 'z2', kind: 'bunker', from: 276, to: 328, side: 'right' },
@@ -3978,8 +4038,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'torrey-pines-south:5': {
     length: 454,
     fairwayFrom: 160,
-    fairwayTo: 442,
-    greenDepth: 20,
+    fairwayTo: 438,
+    greenDepth: 27,
     zones: [
       { id: 'z1', kind: 'bunker', from: 279, to: 315, side: 'right' },
       { id: 'z2', kind: 'bunker', from: 279, to: 321, side: 'left' },
@@ -3990,8 +4050,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'torrey-pines-south:6': {
     length: 564,
     fairwayFrom: 200,
-    fairwayTo: 552,
-    greenDepth: 20,
+    fairwayTo: 545,
+    greenDepth: 34,
     zones: [
       { id: 'z1', kind: 'deeprough', from: 5, to: 255, side: 'right' },
       { id: 'z2', kind: 'bunker', from: 95, to: 121, side: 'left' },
@@ -4005,8 +4065,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'torrey-pines-south:7': {
     length: 462,
     fairwayFrom: 162,
-    fairwayTo: 450,
-    greenDepth: 20,
+    fairwayTo: 446,
+    greenDepth: 28,
     zones: [
       { id: 'z1', kind: 'bunker', from: 54, to: 74, side: 'right' },
       { id: 'z2', kind: 'bunker', from: 268, to: 298, side: 'left' },
@@ -4026,8 +4086,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'torrey-pines-south:9': {
     length: 615,
     fairwayFrom: 214,
-    fairwayTo: 603,
-    greenDepth: 20,
+    fairwayTo: 600,
+    greenDepth: 25,
     zones: [
       { id: 'z1', kind: 'bunker', from: 298, to: 314, side: 'right' },
       { id: 'z2', kind: 'bunker', from: 304, to: 322, side: 'left' },
@@ -4042,8 +4102,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'torrey-pines-south:10': {
     length: 454,
     fairwayFrom: 182,
-    fairwayTo: 442,
-    greenDepth: 20,
+    fairwayTo: 439,
+    greenDepth: 26,
     zones: [
       { id: 'z1', kind: 'bunker', from: 36, to: 72, side: 'right' },
       { id: 'z2', kind: 'bunker', from: 278, to: 302, side: 'left' },
@@ -4055,8 +4115,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'torrey-pines-south:11': {
     length: 225,
     fairwayFrom: 81,
-    fairwayTo: 213,
-    greenDepth: 20,
+    fairwayTo: 208,
+    greenDepth: 30,
     zones: [
       { id: 'z1', kind: 'bunker', from: 201, to: 211, side: 'left' },
       { id: 'z2', kind: 'bunker', from: 207, to: 225, side: 'right' },
@@ -4066,8 +4126,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'torrey-pines-south:12': {
     length: 505,
     fairwayFrom: 179,
-    fairwayTo: 493,
-    greenDepth: 20,
+    fairwayTo: 487,
+    greenDepth: 32,
     zones: [
       { id: 'z1', kind: 'bunker', from: 279, to: 311, side: 'right' },
       { id: 'z2', kind: 'bunker', from: 305, to: 333, side: 'left' },
@@ -4078,8 +4138,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'torrey-pines-south:13': {
     length: 621,
     fairwayFrom: 218,
-    fairwayTo: 609,
-    greenDepth: 20,
+    fairwayTo: 607,
+    greenDepth: 24,
     zones: [
       { id: 'z1', kind: 'deeprough', from: 10, to: 230, side: 'left' },
       { id: 'z2', kind: 'bunker', from: 279, to: 293, side: 'left' },
@@ -4092,8 +4152,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'torrey-pines-south:14': {
     length: 437,
     fairwayFrom: 155,
-    fairwayTo: 425,
-    greenDepth: 20,
+    fairwayTo: 424,
+    greenDepth: 22,
     zones: [
       { id: 'z1', kind: 'bunker', from: 273, to: 305, side: 'left' },
       { id: 'z2', kind: 'bunker', from: 403, to: 429, side: 'left' },
@@ -4103,8 +4163,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'torrey-pines-south:15': {
     length: 517,
     fairwayFrom: 182,
-    fairwayTo: 505,
-    greenDepth: 20,
+    fairwayTo: 502,
+    greenDepth: 25,
     zones: [
       { id: 'z1', kind: 'bunker', from: 220, to: 242, side: 'right' },
       { id: 'z2', kind: 'bunker', from: 498, to: 517, side: 'right' },
@@ -4113,8 +4173,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'torrey-pines-south:16': {
     length: 227,
     fairwayFrom: 80,
-    fairwayTo: 215,
-    greenDepth: 20,
+    fairwayTo: 212,
+    greenDepth: 26,
     zones: [
       { id: 'z1', kind: 'bunker', from: 197, to: 227, side: 'left' },
       { id: 'z2', kind: 'bunker', from: 211, to: 227, side: 'right' },
@@ -4123,8 +4183,8 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   'torrey-pines-south:17': {
     length: 443,
     fairwayFrom: 159,
-    fairwayTo: 431,
-    greenDepth: 20,
+    fairwayTo: 429,
+    greenDepth: 23,
     zones: [
       { id: 'z1', kind: 'deeprough', from: 10, to: 120, side: 'left' },
       { id: 'z2', kind: 'deeprough', from: 210, to: 340, side: 'left' },
@@ -4146,6 +4206,361 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
       { id: 'z5', kind: 'water', from: 518, to: 556, side: 'left' },
       { id: 'z6', kind: 'bunker', from: 556, to: 570, side: 'left' },
       { id: 'z7', kind: 'bunker', from: 560, to: 570, side: 'right' },
+    ],
+  },
+
+  // ---------------------------------------------------------------------------
+  // Pacific Dunes (Bandon, OR) — Tom Doak, 2001. Imported from OSM; all 18
+  // centrelines are mapped. Pure geometry: the shipped tuple already matched
+  // the club's BLACK card (6633 yd, par 71) on par, yardage AND stroke index
+  // for all 18, so nothing in courses.ts moved.
+  //
+  // IDENTITY. Pacific Dunes has no golf_course polygon of its own — it shares
+  // way 362513477 ("Bandon Dunes Golf Resort") with the Bandon Dunes course
+  // and Old Macdonald, 54 hole ways under three complete sets of ref=1..18.
+  // `osmHolePrefix` is doing the whole identity check, and it deliberately
+  // stops before "Hole" because five ways carry a DOUBLE SPACE ("Pacific
+  // Dunes  Hole 5", likewise 8/9/10/11). See COURSE_GEO in scripts/import-osm.ts.
+  //
+  // YARDAGE. Every centreline is drawn from a FORWARD pad, so all 18 imported
+  // short — by 3 to 110 yd, wildly unevenly, exactly the per-hole spread
+  // Seminole warned about. Diagnosed at the tee end rather than assumed:
+  // every line starts inside a `golf=tee` polygon and ends within 9 yd of its
+  // green's CENTROID, so nothing is missing at the green and the whole deficit
+  // sits behind the tee. Corroborated twice — 13 of 18 gaps land within ~10 yd
+  // of a real mapped back-tee pad (15 and 16 dead-on), and ProVisualizer's own
+  // yardages confirm the four biggest shifts (h8 402 vs card 400, h15 544/539,
+  // h16 341/338, h17 210/208). So zones are SHIFTED by (card - import), never
+  // scaled. `fairwayFrom`/`fairwayTo` are DERIVED from length in the importer
+  // (0.35*L; L - greenDepth/2 - 2), not measured, so they are recomputed from
+  // the card length rather than shifted.
+  //
+  // THE OCEAN, which imported as NOTHING. This is the course named for the
+  // Pacific and the raw import had zero water or ocean zones on all 18 holes —
+  // the red flag from scripts/README.md at its loudest. Cause: the
+  // `natural=coastline` way is drawn at the WATERLINE, 103-210 yd out across a
+  // beach, so no rake sample ever lands seaward of it, and the importer's
+  // outward OCEAN_REACH probe only runs once a near-rake hit exists. The real
+  // hazard at Bandon is the BLUFF, and OSM maps no cliff here at all (one
+  // `natural=beach` polygon, no `natural=cliff`).
+  // So the rims were MEASURED, by the Torrey Pines recipe exactly: USGS NED
+  // 10m (3DEP) transects every 10 yd along each centreline, sampling +/-20..60
+  // yd, taking the nearest offset whose ground sits >= 6 m below the playing
+  // line, authoring a zone only where that rim falls inside the importer's own
+  // 50-yd corridor and spanning exactly the measured run. These ARE the runs,
+  // in import coordinates before the shift:
+  //   h4  right 0-390  (rim 20-40)   h11 left 0-100  (rim 20-30)
+  //   h13 left  0-410  (rim 30-50)
+  // The ground falls MONOTONICALLY from ~31 m on the playing line to ~7 m at
+  // 60 yd and keeps going to a sea-level beach — h11 drops 22 m inside 60 yd —
+  // which is what separates a bluff from a dune hollow, and the rim side
+  // matches the measured ocean side on all three.
+  // It declined the other fifteen, which is the point of measuring. Hole 10
+  // is the one that matters: its tuple declares `hazard: 'ocean'`, but its
+  // nearest drop is at 60 yd, OUTSIDE the corridor, and the tee view shows the
+  // Pacific sitting beyond the green behind a wide dune shelf — the same call
+  // that cleared whistling-straits:9/18. Hole 3 likewise declares `ocean` and
+  // measures out. Both are left alone: `hazard` only feeds the PROCEDURAL
+  // layout, so it is inert once a hole has real geometry, and no `signature`
+  // on this course names water on 3 or 10. Do not "fix" the geometry to match
+  // that field. Hole 18 has a 5-station drop at 40-50 yd right over 0-40 yd —
+  // a dune swale beside the tee, 813 yd from the ocean and unreachable, so not
+  // authored. Nothing is extrapolated: h4's zone starts at 68, the shifted
+  // position of the mapped tee, because the 68 yd behind it were never sampled.
+  // `ocean` (not `deeprough`) is the honest kind here — over the rim is the
+  // beach and the Pacific, a lost ball, and KIND_BUCKET puts ocean in the
+  // penalty-carrying `water` bucket where Torrey's recoverable scrub canyons
+  // sit in `trees`. It is also what makes h11's and h13's `signature` strings
+  // true; before this pass both named an ocean the map did not contain.
+  //
+  // HAND-FIXES, both the same artifact: a single polygon that reaches only the
+  // FIRST rake offset past the centreline (-2 yd) earns `cross` off that one
+  // sample, which reads as a full-width forced carry.
+  //   h3  the 46-76 `trees` cross is way/1098554089, a scrub mass spanning
+  //       lateral -2..46 — i.e. entirely LEFT bar 2 yd — and a forced carry
+  //       50 yd off the tee of a 499-yd par 5 is a hole nobody plays. The tee
+  //       view shows clear ground there. Folded into the left flank, which
+  //       merges with its neighbours into one 0-100 left zone.
+  //   h11 the 112-118 `bunker` cross is way/1098412203, lateral -2..10.
+  //       Folded into the adjoining left bunker (112-126); the right-flank
+  //       zone at 104-130 already covers the other side, which is the ordinary
+  //       two-flanking-bunkers shape the importer's own rule is built for.
+  // No `osmIgnore`: the Seminole mis-tagged-scrub check was run and came back
+  // clean — the giant `golf=bunker`+`natural=sand` polygons here (6.4, 2.0,
+  // 0.9 acres against a 0.017 median) touch ZERO Pacific Dunes corridors, and
+  // only 2 bunkers straddle 3+ corridors. No `packed` either: of the 105
+  // bunkers reaching a corridor, none is nearer a neighbouring course's line.
+  // No landmark — the course has no built structure anyone would recognise.
+  // Data (c) OpenStreetMap contributors, ODbL. Terrain: USGS 3DEP/NED.
+  'pacific-dunes:1': {
+    length: 370,
+    fairwayFrom: 130,
+    fairwayTo: 352,
+    greenDepth: 33,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 157, to: 249, side: 'right' },
+      { id: 'z2', kind: 'bunker', from: 279, to: 299, side: 'right' },
+      { id: 'z3', kind: 'trees', from: 345, to: 370, side: 'left' },
+      { id: 'z4', kind: 'bunker', from: 349, to: 361, side: 'right' },
+      { id: 'z5', kind: 'bunker', from: 363, to: 370, side: 'left' },
+    ],
+  },
+  'pacific-dunes:2': {
+    length: 368,
+    fairwayFrom: 129,
+    fairwayTo: 346,
+    greenDepth: 39,
+    zones: [
+      { id: 'z1', kind: 'trees', from: 31, to: 65, side: 'right' },
+      { id: 'z2', kind: 'bunker', from: 47, to: 61, side: 'left' },
+      { id: 'z3', kind: 'bunker', from: 61, to: 99, side: 'right' },
+      { id: 'z4', kind: 'bunker', from: 95, to: 109, side: 'left' },
+      { id: 'z5', kind: 'bunker', from: 111, to: 121, side: 'right' },
+      { id: 'z6', kind: 'bunker', from: 215, to: 243, side: 'left' },
+      { id: 'z7', kind: 'trees', from: 275, to: 319, side: 'right' },
+      { id: 'z8', kind: 'bunker', from: 319, to: 343, side: 'right' },
+    ],
+  },
+  // z1: the raw import split this into left 0-46 / cross 46-76 / left 72-100 —
+  // one scrub mass, folded back into a single left zone (see HAND-FIXES above).
+  'pacific-dunes:3': {
+    length: 499,
+    fairwayFrom: 175,
+    fairwayTo: 485,
+    greenDepth: 25,
+    zones: [
+      { id: 'z1', kind: 'trees', from: 0, to: 100, side: 'left' },
+      { id: 'z2', kind: 'trees', from: 102, to: 178, side: 'right' },
+      { id: 'z3', kind: 'trees', from: 130, to: 174, side: 'left' },
+      { id: 'z4', kind: 'bunker', from: 174, to: 188, side: 'right' },
+      { id: 'z5', kind: 'bunker', from: 230, to: 256, side: 'left' },
+      { id: 'z6', kind: 'trees', from: 232, to: 270, side: 'right' },
+      { id: 'z7', kind: 'bunker', from: 296, to: 326, side: 'left' },
+      { id: 'z8', kind: 'trees', from: 360, to: 394, side: 'right' },
+      { id: 'z9', kind: 'bunker', from: 376, to: 404, side: 'left' },
+      { id: 'z10', kind: 'trees', from: 436, to: 456, side: 'right' },
+      { id: 'z11', kind: 'trees', from: 458, to: 476, side: 'left' },
+      { id: 'z12', kind: 'trees', from: 472, to: 499, side: 'right' },
+      { id: 'z13', kind: 'bunker', from: 474, to: 499, side: 'right' },
+    ],
+  },
+  // z1: hand-authored bluff, 3DEP-measured (see THE OCEAN above).
+  'pacific-dunes:4': {
+    length: 463,
+    fairwayFrom: 162,
+    fairwayTo: 439,
+    greenDepth: 45,
+    zones: [
+      { id: 'z1', kind: 'ocean', from: 68, to: 458, side: 'right' },
+      { id: 'z2', kind: 'bunker', from: 246, to: 296, side: 'left' },
+      { id: 'z3', kind: 'bunker', from: 406, to: 424, side: 'left' },
+      { id: 'z4', kind: 'bunker', from: 434, to: 446, side: 'left' },
+    ],
+  },
+  'pacific-dunes:5': {
+    length: 199,
+    fairwayFrom: 70,
+    fairwayTo: 175,
+    greenDepth: 45,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 63, to: 75, side: 'right' },
+      { id: 'z2', kind: 'bunker', from: 131, to: 159, side: 'left' },
+      { id: 'z3', kind: 'bunker', from: 155, to: 173, side: 'right' },
+      { id: 'z4', kind: 'bunker', from: 189, to: 199, side: 'left' },
+      { id: 'z5', kind: 'bunker', from: 191, to: 199, side: 'right' },
+    ],
+  },
+  'pacific-dunes:6': {
+    length: 316,
+    fairwayFrom: 111,
+    fairwayTo: 304,
+    greenDepth: 21,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 15, to: 43, side: 'left' },
+      { id: 'z2', kind: 'trees', from: 97, to: 143, side: 'left' },
+      { id: 'z3', kind: 'bunker', from: 193, to: 213, side: 'right' },
+      { id: 'z4', kind: 'bunker', from: 279, to: 309, side: 'left' },
+      { id: 'z5', kind: 'bunker', from: 281, to: 309, side: 'right' },
+    ],
+  },
+  'pacific-dunes:7': {
+    length: 464,
+    fairwayFrom: 162,
+    fairwayTo: 440,
+    greenDepth: 44,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 32, to: 46, side: 'left' },
+      { id: 'z2', kind: 'bunker', from: 44, to: 54, side: 'right' },
+      { id: 'z3', kind: 'bunker', from: 72, to: 80, side: 'right' },
+      { id: 'z4', kind: 'trees', from: 136, to: 250, side: 'left' },
+      { id: 'z5', kind: 'trees', from: 168, to: 218, side: 'right' },
+      { id: 'z6', kind: 'bunker', from: 410, to: 464, side: 'left' },
+      { id: 'z7', kind: 'bunker', from: 414, to: 438, side: 'right' },
+    ],
+  },
+  'pacific-dunes:8': {
+    length: 400,
+    fairwayFrom: 140,
+    fairwayTo: 387,
+    greenDepth: 22,
+    zones: [
+      { id: 'z1', kind: 'trees', from: 110, to: 164, side: 'right' },
+      { id: 'z2', kind: 'trees', from: 110, to: 214, side: 'left' },
+      { id: 'z3', kind: 'bunker', from: 194, to: 222, side: 'right' },
+      { id: 'z4', kind: 'trees', from: 250, to: 300, side: 'right' },
+      { id: 'z5', kind: 'trees', from: 286, to: 338, side: 'left' },
+      { id: 'z6', kind: 'bunker', from: 384, to: 396, side: 'right' },
+    ],
+  },
+  'pacific-dunes:9': {
+    length: 406,
+    fairwayFrom: 142,
+    fairwayTo: 382,
+    greenDepth: 45,
+    zones: [
+      { id: 'z1', kind: 'trees', from: 39, to: 57, side: 'right' },
+      { id: 'z2', kind: 'bunker', from: 97, to: 123, side: 'left' },
+      { id: 'z3', kind: 'bunker', from: 185, to: 205, side: 'left' },
+      { id: 'z4', kind: 'trees', from: 189, to: 209, side: 'left' },
+      { id: 'z5', kind: 'bunker', from: 225, to: 247, side: 'left' },
+      { id: 'z6', kind: 'bunker', from: 345, to: 357, side: 'right' },
+      { id: 'z7', kind: 'bunker', from: 355, to: 395, side: 'left' },
+      { id: 'z8', kind: 'bunker', from: 397, to: 406, side: 'right' },
+    ],
+  },
+  // No ocean: the bluff here is 60 yd out, outside the corridor, and the tuple's
+  // `hazard: 'ocean'` is inert once real geometry exists. See THE OCEAN above.
+  // One zone on a 206-yd par 3 is bare but checked, not dropped: every
+  // `golf=bunker` within 80 yd of this centreline was enumerated, and the sand
+  // that looks greenside from above (ways 1098412203/04/05) hugs hole 11's line
+  // and is assigned there — it sits BEYOND this green, between the two. OSM has
+  // no bunker of hole 10's own inside the corridor. The dune sand around the
+  // green is untagged terrain, and from directly overhead Bandon's dunes are not
+  // reliably distinguishable from bunkers, so nothing was hand-authored here.
+  // Compare tpc-potomac:15, which is simply that bare too.
+  'pacific-dunes:10': {
+    length: 206,
+    fairwayFrom: 72,
+    fairwayTo: 185,
+    greenDepth: 38,
+    zones: [
+      { id: 'z1', kind: 'trees', from: 74, to: 128, side: 'left' },
+    ],
+  },
+  // z1: hand-authored bluff, 3DEP-measured. z3 absorbed the 112-118 `cross`.
+  'pacific-dunes:11': {
+    length: 148,
+    fairwayFrom: 52,
+    fairwayTo: 130,
+    greenDepth: 32,
+    zones: [
+      { id: 'z1', kind: 'ocean', from: 40, to: 140, side: 'left' },
+      { id: 'z2', kind: 'bunker', from: 104, to: 130, side: 'right' },
+      { id: 'z3', kind: 'bunker', from: 112, to: 126, side: 'left' },
+      { id: 'z4', kind: 'bunker', from: 140, to: 148, side: 'left' },
+    ],
+  },
+  'pacific-dunes:12': {
+    length: 529,
+    fairwayFrom: 185,
+    fairwayTo: 507,
+    greenDepth: 39,
+    zones: [
+      { id: 'z1', kind: 'trees', from: 76, to: 128, side: 'right' },
+      { id: 'z2', kind: 'bunker', from: 196, to: 216, side: 'left' },
+      { id: 'z3', kind: 'trees', from: 226, to: 250, side: 'right' },
+      { id: 'z4', kind: 'bunker', from: 380, to: 392, side: 'right' },
+      { id: 'z5', kind: 'bunker', from: 394, to: 410, side: 'left' },
+      { id: 'z6', kind: 'bunker', from: 490, to: 508, side: 'left' },
+      { id: 'z7', kind: 'trees', from: 512, to: 528, side: 'left' },
+    ],
+  },
+  // z2: hand-authored bluff, 3DEP-measured — this is the hole whose `signature`
+  // says the ocean shoulders the whole fairway, and now it does. z5 is a chain
+  // of seven mapped bunkers down the inland (right) side, merged by the
+  // importer's own 8-yd rule and confirmed near-continuous in the tee view.
+  'pacific-dunes:13': {
+    length: 444,
+    fairwayFrom: 155,
+    fairwayTo: 420,
+    greenDepth: 45,
+    zones: [
+      { id: 'z1', kind: 'trees', from: 30, to: 156, side: 'right' },
+      { id: 'z2', kind: 'ocean', from: 30, to: 440, side: 'left' },
+      { id: 'z3', kind: 'trees', from: 168, to: 194, side: 'right' },
+      { id: 'z4', kind: 'bunker', from: 248, to: 278, side: 'right' },
+      { id: 'z5', kind: 'bunker', from: 318, to: 444, side: 'right' },
+      { id: 'z6', kind: 'trees', from: 376, to: 398, side: 'right' },
+      { id: 'z7', kind: 'trees', from: 440, to: 444, side: 'right' },
+    ],
+  },
+  'pacific-dunes:14': {
+    length: 145,
+    fairwayFrom: 51,
+    fairwayTo: 125,
+    greenDepth: 37,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 46, to: 72, side: 'right' },
+      { id: 'z2', kind: 'trees', from: 46, to: 74, side: 'left' },
+      { id: 'z3', kind: 'bunker', from: 82, to: 112, side: 'right' },
+      { id: 'z4', kind: 'trees', from: 96, to: 145, side: 'left' },
+      { id: 'z5', kind: 'bunker', from: 136, to: 145, side: 'right' },
+      { id: 'z6', kind: 'bunker', from: 140, to: 145, side: 'left' },
+    ],
+  },
+  'pacific-dunes:15': {
+    length: 539,
+    fairwayFrom: 189,
+    fairwayTo: 520,
+    greenDepth: 34,
+    zones: [
+      { id: 'z1', kind: 'trees', from: 101, to: 131, side: 'right' },
+      { id: 'z2', kind: 'trees', from: 153, to: 189, side: 'left' },
+      { id: 'z3', kind: 'trees', from: 201, to: 255, side: 'right' },
+      { id: 'z4', kind: 'trees', from: 215, to: 223, side: 'left' },
+      { id: 'z5', kind: 'trees', from: 245, to: 283, side: 'left' },
+      { id: 'z6', kind: 'bunker', from: 315, to: 361, side: 'right' },
+      { id: 'z7', kind: 'bunker', from: 381, to: 401, side: 'left' },
+      { id: 'z8', kind: 'bunker', from: 445, to: 463, side: 'right' },
+      { id: 'z9', kind: 'trees', from: 467, to: 539, side: 'right' },
+    ],
+  },
+  'pacific-dunes:16': {
+    length: 338,
+    fairwayFrom: 118,
+    fairwayTo: 320,
+    greenDepth: 32,
+    zones: [
+      { id: 'z1', kind: 'trees', from: 126, to: 220, side: 'right' },
+      { id: 'z2', kind: 'bunker', from: 200, to: 212, side: 'left' },
+      { id: 'z3', kind: 'bunker', from: 260, to: 274, side: 'left' },
+    ],
+  },
+  'pacific-dunes:17': {
+    length: 208,
+    fairwayFrom: 73,
+    fairwayTo: 194,
+    greenDepth: 25,
+    zones: [
+      { id: 'z1', kind: 'trees', from: 79, to: 115, side: 'right' },
+      { id: 'z2', kind: 'trees', from: 83, to: 189, side: 'left' },
+      { id: 'z3', kind: 'bunker', from: 115, to: 149, side: 'right' },
+      { id: 'z4', kind: 'bunker', from: 181, to: 187, side: 'right' },
+      { id: 'z5', kind: 'bunker', from: 189, to: 208, side: 'left' },
+    ],
+  },
+  'pacific-dunes:18': {
+    length: 591,
+    fairwayFrom: 207,
+    fairwayTo: 574,
+    greenDepth: 30,
+    zones: [
+      { id: 'z1', kind: 'trees', from: 5, to: 39, side: 'right' },
+      { id: 'z2', kind: 'trees', from: 5, to: 275, side: 'left' },
+      { id: 'z3', kind: 'bunker', from: 193, to: 247, side: 'left' },
+      { id: 'z4', kind: 'bunker', from: 287, to: 375, side: 'left' },
+      { id: 'z5', kind: 'bunker', from: 373, to: 441, side: 'right' },
+      { id: 'z6', kind: 'bunker', from: 569, to: 591, side: 'right' },
     ],
   },
 }

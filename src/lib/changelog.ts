@@ -63,6 +63,12 @@ export const CHANGE_KIND_LABEL: Record<ChangeKind, string> = {
 
 export const CHANGELOG: ChangeEntry[] = [
   {
+    date: '2026-08-01',
+    kind: 'odds',
+    title: 'Real greens were being measured at half their size',
+    note: 'Every course drawn from real-world maps had its greens come out about half as deep as they really are. That put the front edge too close to the pin, so sand guarding the front of a green was not always counted as guarding it, and those bunkers read as slightly less dangerous than they are. All 199 holes are re-measured against the real green. No course changed its difficulty rating.',
+  },
+  {
     date: '2026-07-27',
     kind: 'feature',
     title: 'Achievements',

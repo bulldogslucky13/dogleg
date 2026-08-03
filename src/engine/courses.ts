@@ -570,23 +570,28 @@ export const COURSES: CourseSpec[] = [
       // it tags no `handicap` here, unlike Torrey.
       // Yardages are the card's; they auto-reconcile to the imported geometry
       // below, which was shifted onto the card hole by hole.
-      // The dogleg flags were wrong more often than right — the real
-      // centrelines turn the OPPOSITE way on 6, 9, 11, 13 and 15, and 7, 8,
-      // 12, 16 and 17 were flagged straight but bend well past the chip's
-      // threshold. All ten are corrected here to match OSM_BEND, which
-      // overrides this flag on the map anyway; the flag still drives the
-      // procedural fallback, so leaving it backwards would be a trap.
+      // The dogleg flags are re-derived from the real centrelines, against the
+      // SAME >=20 yd threshold the caddy chip uses (panels.tsx) — so the flag
+      // and the chip can never disagree about whether a hole is a dogleg.
+      // Eight change: 6, 13 and 15 turned the opposite way to the shipped flag;
+      // 12, 16 and 17 were flagged straight but bend 51, 54 and 27 yd; and 9
+      // and 11 were flagged 'R' and 'L' on centrelines that bend only 10 yd,
+      // which is straight by this threshold. 7 and 8 bend 17 and 19 — real
+      // turns the map still draws from OSM_BEND, but under the threshold, so
+      // they stay 'S' rather than claiming a dogleg the chip won't show.
+      // OSM_BEND overrides this flag on the map wherever an entry exists; the
+      // flag still drives the procedural fallback, so a backwards one is a trap.
       [4, 421, 3, 'R', 'sand'],
       [4, 368, 9, 'S', 'sand'],
       [3, 198, 17, 'S', 'sand'],
       [4, 499, 5, 'R', 'sand'],
       [3, 238, 11, 'S', 'sand', 'The par 3 they call the hardest hole in the world'],
       [4, 444, 13, 'R', 'sand'],
-      [5, 636, 1, 'R', 'sand', 'Hell’s Half Acre — a hundred yards of sand to cross on the second'],
-      [4, 326, 15, 'L', 'sand'],
-      [4, 458, 7, 'L', 'sand'],
+      [5, 636, 1, 'S', 'sand', 'Hell’s Half Acre — a hundred yards of sand to cross on the second'],
+      [4, 326, 15, 'S', 'sand'],
+      [4, 458, 7, 'S', 'sand'],
       [3, 161, 18, 'S', 'sand', 'A tiny par 3 over a pit you don’t climb out of'],
-      [4, 397, 10, 'R', 'sand'],
+      [4, 397, 10, 'S', 'sand'],
       [4, 358, 14, 'L', 'sand'],
       [4, 486, 4, 'L', 'sand'],
       [3, 220, 16, 'S', 'sand'],

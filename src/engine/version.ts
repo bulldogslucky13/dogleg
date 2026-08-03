@@ -135,9 +135,10 @@
 // nine cross bands are folded, dropped or trimmed (edge slivers of one waste,
 // two tee chutes, two front bunkers overrunning the green edge, and three
 // laterals with mapped fairway beside them).
-// The dogleg flags in courses.ts are corrected on ten holes to match the real
-// centrelines. That is cosmetic for Pine Valley itself — OSM_BEND overrides the
-// flag on the map, and layout.ts reads it only for procedural holes, which this
-// course no longer has — so it is not what earns the bump; the card and the
-// geometry are.
+// The dogleg flags in courses.ts are re-derived from the real centrelines
+// against the same >=20 yd threshold the caddy chip uses, so flag and chip
+// cannot disagree; eight holes change. That is cosmetic for Pine Valley itself
+// — OSM_BEND overrides the flag on the map, and layout.ts reads it only for
+// procedural holes, which this course no longer has — so it is not what earns
+// the bump; the card and the geometry are.
 export const ENGINE_VERSION = 14

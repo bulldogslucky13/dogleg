@@ -277,10 +277,16 @@ export const OSM_BEND: Record<string, number[]> = {
   'pacific-dunes:15': [0, 3, 5, 8, 10, 13, 14, 16, 17, 16, 14, 8, 0],
   'pacific-dunes:16': [0, 6, 12, 19, 25, 31, 37, 42, 43, 40, 30, 15, 0],
   'pacific-dunes:18': [0, -7, -15, -22, -29, -36, -43, -45, -41, -33, -22, -11, 0],
-  // Pine Valley. The tuple's flags were wrong more often than right here: 6,
-  // 9, 11, 13 and 15 all turn the OPPOSITE way to the shipped flag, and 7, 8,
-  // 16 and 17 were flagged straight but bend past the chip's threshold. Holes
-  // 1 and 6 bow 77 and 80 yd — the biggest in the library — and both are
+  // Pine Valley. Entries are persisted at the importer's >=8 yd bar so the map
+  // curves every real turn; the tuple's `dogleg` flags are set separately, at
+  // the caddy chip's >=20 yd bar (see the note on the holes in courses.ts).
+  // Those two bars disagree ON PURPOSE for 7, 8, 9 and 11, which bend 17, 19,
+  // 10 and 10 yd: drawn as the gentle curves they are, but not called doglegs.
+  // Don't "fix" that by promoting their flags — the flag would then claim a
+  // chip the UI won't show, which is what an earlier draft of this note got
+  // wrong. Of the flags that DO change, 6, 13 and 15 turn the opposite way to
+  // the shipped tuple and 12, 16, 17 were flagged straight at 51, 54 and 27 yd.
+  // Holes 1 and 6 bow 77 and 80 yd — the biggest in the library — and both are
   // corroborated by ProVisualizer, whose routed legs imply corners ~117 and
   // ~106 yd off the chord, so the coarse OSM lines are if anything
   // understating them. 6 and 17 are measured on the SHIFTED back-tee line.

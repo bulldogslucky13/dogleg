@@ -594,11 +594,29 @@ function resolveApproach(
   // exception and this isn't it. Deep rough's cost is priced where the player
   // can see it: fewer greens hit, scaled by distance (see JUNK_MAX_BITE).
   const zone = bucket === 'sand' ? pickZone(detail.missShares, 'sand', rng) : null
+  const pos = Math.min(L - 8 - rng() * 18, L - 5)
+  // The share pick says which sand the shot FOUND; the line above puts the ball
+  // greenside by construction. Those two disagree more often than you'd think,
+  // because missShares is weighted over every sand zone in the approach window
+  // — a fairway waste 100 yd short can win the roll. zoneId is what HoleMap
+  // anchors the ball sprite to, and it takes priority over the "greenside but
+  // unmapped" placement below it, so the losing case drew the ball down in that
+  // far bunker under a "Greenside bunker" banner quoting the real greenside
+  // yardage. Seen on pine-valley:18 (ball 460, zone 229-383) but worst on
+  // royal-portrush-dunluce and carnoustie, where it hit ~70% of sand lies.
+  //
+  // Only claim the zone when it actually spans where the ball came to rest.
+  // Deliberately DROP the id rather than re-pick a containing zone: dropping
+  // lets HoleMap fall through to its own greenside placement, and it keeps
+  // `pos`, `lie`, `side` and the rng draw sequence byte-identical to before, so
+  // this is a drawing fix and not a replay-affecting one. (`zoneId` is read
+  // only by HoleMap and SideMap — it never reaches odds.ts.)
+  const anchoring = zone && pos >= zone.from && pos <= zone.to ? zone : null
   h.ball = {
-    pos: Math.min(L - 8 - rng() * 18, L - 5),
+    pos,
     lie: bucket === 'sand' ? 'sand' : 'fringe',
     side: zone && zone.side !== 'cross' && zone.side !== 'green' ? zone.side : rng() < 0.5 ? 'left' : 'right',
-    zoneId: zone?.id,
+    zoneId: anchoring?.id,
   }
   h.stage = 'shortgame'
   h.status =

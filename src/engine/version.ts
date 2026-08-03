@@ -119,4 +119,26 @@
 // says to suspect at exactly 45; the other seven holes at the clamp (carnoustie
 // 2/16, oakmont 3/4/9/14/15) were each checked and are single greens that really
 // do run 45+ yd along the line of play.
-export const ENGINE_VERSION = 13
+// v14 = Pine Valley real geometry (OSM way 820204638, every hole landed on the
+// club's BACK card) plus that card's yardage AND stroke index. The shipped
+// tuple was the club's historic ~6,765 card, so 13 of 18 yardages and 16 of 18
+// stroke indices move — and SI feeds pressure() in the odds, so the card half
+// changes replays as much as the geometry does. Hole 7 goes from SI 5 to the
+// card's No. 1, hole 5 from SI 1 to 11.
+// Four parts are hand-work rather than raw import, all documented at the block
+// in geometry.ts: holes 6 and 17 are re-imported through `--shift` off forward
+// pads (confirmed by ProVisualizer's tee sitting 28 and 67 yd behind the
+// centreline start); hole 1 is remapped smoothed-arc -> RAW-arc because Chaikin
+// rounds 24 yd off a 3-point line around a corner that is genuinely ~117 yd off
+// the chord; holes 13 and 16 are remapped arc -> straight-line-from-tee, the
+// torrey-pines-south:6 call, their centrelines wandering 21 and 15 yd long; and
+// nine cross bands are folded, dropped or trimmed (edge slivers of one waste,
+// two tee chutes, two front bunkers overrunning the green edge, and three
+// laterals with mapped fairway beside them).
+// The dogleg flags in courses.ts are re-derived from the real centrelines
+// against the same >=20 yd threshold the caddy chip uses, so flag and chip
+// cannot disagree; eight holes change. That is cosmetic for Pine Valley itself
+// — OSM_BEND overrides the flag on the map, and layout.ts reads it only for
+// procedural holes, which this course no longer has — so it is not what earns
+// the bump; the card and the geometry are.
+export const ENGINE_VERSION = 14

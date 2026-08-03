@@ -554,24 +554,51 @@ export const COURSES: CourseSpec[] = [
     wind: 8,
     blurb: 'Often ranked the best in the world — sandy waste and forced carries everywhere.',
     holes: holes([
-      [4, 421, 11, 'R', 'sand'],
-      [4, 367, 15, 'S', 'sand'],
-      [3, 198, 9, 'S', 'sand'],
-      [4, 461, 3, 'R', 'sand'],
-      [3, 232, 1, 'S', 'sand', 'The par 3 they call the hardest hole in the world'],
-      [4, 388, 13, 'L', 'sand'],
-      [5, 585, 5, 'S', 'sand', 'Hell’s Half Acre — a hundred yards of sand to cross on the second'],
-      [4, 327, 17, 'S', 'sand'],
-      [4, 432, 7, 'R', 'sand'],
-      [3, 145, 14, 'S', 'sand', 'A tiny par 3 over a pit you don’t climb out of'],
-      [4, 397, 12, 'L', 'sand'],
-      [4, 337, 18, 'S', 'sand'],
-      [4, 486, 2, 'R', 'sand'],
-      [3, 184, 10, 'S', 'sand'],
-      [5, 603, 6, 'L', 'sand'],
-      [4, 436, 8, 'S', 'sand'],
-      [4, 345, 16, 'S', 'sand'],
-      [4, 483, 4, 'R', 'sand'],
+      // Card = the BACK tees (`pinevalley`): par 70, 7197 yd, 76.6/155 — the
+      // longest of the three men's sets BlueGolf publishes, and the one that
+      // fits a difficulty-10 course. The shipped tuple was the club's historic
+      // ~6,765 card, which is why 13 of 18 yardages moved.
+      // strokeIndex is the card's HCP row. It disagreed with the shipped tuple
+      // on 16 of 18 holes and feeds pressure() in the odds, so this is the
+      // consequential half of the card pull: 7 was shipped SI 5 and is the
+      // card's No. 1, while 5 was shipped SI 1 and is really 11. BlueGolf
+      // publishes an IDENTICAL HCP row for the BACK and REGULAR sets, which is
+      // the corroboration — stroke index is a property of the course, not the
+      // tee. (The reputation of 5 as the hardest par 3 in golf is about the
+      // shot, not the stroke index; the signature copy still stands.)
+      // OSM carries `par` on all 18 hole ways and it matches the card exactly;
+      // it tags no `handicap` here, unlike Torrey.
+      // Yardages are the card's; they auto-reconcile to the imported geometry
+      // below, which was shifted onto the card hole by hole.
+      // The dogleg flags are re-derived from the real centrelines, against the
+      // SAME >=20 yd threshold the caddy chip uses (panels.tsx) — so the flag
+      // and the chip can never disagree about whether a hole is a dogleg.
+      // Eight change: 6, 13 and 15 turned the opposite way to the shipped flag;
+      // 12, 16 and 17 were flagged straight but bend 51, 54 and 27 yd; and 9
+      // and 11 were flagged 'R' and 'L' on centrelines that bend only 10 yd,
+      // which is straight by this threshold. 7 and 8 bend 17 and 19 — real
+      // turns the map still draws from OSM_BEND, but under the threshold, so
+      // they stay 'S' rather than claiming a dogleg the chip won't show.
+      // OSM_BEND overrides this flag on the map wherever an entry exists; the
+      // flag still drives the procedural fallback, so a backwards one is a trap.
+      [4, 421, 3, 'R', 'sand'],
+      [4, 368, 9, 'S', 'sand'],
+      [3, 198, 17, 'S', 'sand'],
+      [4, 499, 5, 'R', 'sand'],
+      [3, 238, 11, 'S', 'sand', 'The par 3 they call the hardest hole in the world'],
+      [4, 444, 13, 'R', 'sand'],
+      [5, 636, 1, 'S', 'sand', 'Hell’s Half Acre — a hundred yards of sand to cross on the second'],
+      [4, 326, 15, 'S', 'sand'],
+      [4, 458, 7, 'S', 'sand'],
+      [3, 161, 18, 'S', 'sand', 'A tiny par 3 over a pit you don’t climb out of'],
+      [4, 397, 10, 'S', 'sand'],
+      [4, 358, 14, 'L', 'sand'],
+      [4, 486, 4, 'L', 'sand'],
+      [3, 220, 16, 'S', 'sand'],
+      [5, 615, 2, 'R', 'sand'],
+      [4, 475, 8, 'R', 'sand'],
+      [4, 414, 12, 'R', 'sand'],
+      [4, 483, 6, 'R', 'sand'],
     ]),
   },
   {

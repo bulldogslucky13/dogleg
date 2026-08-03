@@ -140,6 +140,35 @@ find the polygon name for a new course, query Overpass for
   are a useful *corroborator* of a card even though its geometry is only ever
   ground truth for shape.
 
+- **Pine Valley (all 18)** — the course that shows `osmHolePrefix` is not always
+  available when you need it. Pine Valley's 10-hole Short Course sits INSIDE the
+  same `golf_course` polygon with `ref=1..10`, colliding with the championship
+  holes, and **not one of the 28 hole ways is named** — so the prefix mechanism
+  has nothing to match and nearest-centre carries the identity check alone. What
+  made that safe was checking the MARGIN rather than trusting the rule: measured
+  from the championship centroid, the right hole wins every colliding ref by
+  465-961 m, because the two courses sit in blocks ~1 km apart. Where a margin
+  like that doesn't exist, don't import. Two independent per-hole checks then
+  confirmed it — all 18 centrelines start on a `golf=tee` and end on a DISTINCT
+  `golf=green` (the Potomac check), and ProVisualizer's own tee coordinate sits
+  within 3 yd of the centreline start on 16 of 18.
+  Worth copying: **the 3D planner exposes its tee, pin and dogleg-target
+  coordinates as page globals** (`tempHoleTeeLat/Lon`, `tempHolePinLat/Lon`,
+  `tempHoleTargetLat/Lon`), so the whole course can be compared to OSM
+  numerically instead of by eye. That is what separated this course's three
+  length problems, which look identical in a length column and need opposite
+  fixes: holes 6 and 17 sit on FORWARD pads (PV's tee 28 and 67 yd behind the
+  centreline start → `--shift`); hole 1's endpoints are both right but Chaikin
+  rounds 24 yd off a 3-point line around a genuinely sharp corner (remap
+  smoothed-arc → RAW-arc); holes 13 and 16 are the torrey-6 case, endpoints
+  right and the line wandering long (remap arc → straight-line).
+  Also the first course where `cross` bands are mostly REAL — Pine Valley is
+  wall-to-wall sand and you carry waste to reach the fairway on most holes, so
+  `--profile` ruling every band REAL CARRY is the course being honest. The
+  discriminator that still worked is the mapped-fairway test: four bands had
+  `golf=fairway` running beside them for 27-50% of their span and were folded to
+  flanks, and the rest had none at all.
+
 ### Known gaps & importer artifact modes
 
 - **Coverage** — obscure courses may lack `golf=hole` centerlines, and many

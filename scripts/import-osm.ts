@@ -231,6 +231,48 @@ const COURSE_GEO: Record<string, CourseGeo> = {
     osmHolePrefix: '^Pacific Dunes',
     engineSlug: 'pacific-dunes',
   },
+  // Pine Valley is way 820204638. **OSM names it "Pine Valley Country Club"**,
+  // which is NOT the club's name (Pine Valley Golf Club) — the same shape of
+  // trap as TPC Potomac's misspelled "Avanel Farm", so the regex has to match
+  // OSM's string, not reality. Identity is nailed down by the polygon's own
+  // `wikipedia=en:Pine Valley Golf Club` tag plus the location (Pine Valley
+  // Borough, Camden County NJ). Anchored because "Pine Valley" names courses
+  // in a dozen states; the two unnamed golf_course ways 2 km west inside a
+  // wider radius are Pine Hill / Trump National Philly, which also carry ref=N
+  // holes (their ref=2 and ref=3 show up in an unscoped query).
+  //
+  // **The site holds a SECOND course and osmHolePrefix cannot separate them.**
+  // Pine Valley's 10-hole Short Course sits INSIDE the same polygon with
+  // `ref=1..10`, so map_to_area passes it through and every one of those refs
+  // collides with a championship hole. Neither set is NAMED — all 28 ways
+  // carry a bare ref — so the prefix mechanism has nothing to match on and the
+  // nearest-centre tie-break is doing the identity work here, which is exactly
+  // the situation its own comment warns about. What makes it safe is the
+  // MARGIN, not the rule: the Short Course is a compact block ~1 km NW of the
+  // championship routing, so measured from the centre below the championship
+  // tee wins every colliding ref by 465-961 m (worst case ref=8: 288 m vs
+  // 753 m). That is not a tie-break, it is a rout. It was verified ref by ref
+  // before importing, and every imported centreline was then checked to start
+  // on a `golf=tee` polygon and finish on the `golf=green` whose hole matches
+  // the card's par — the potomac endpoint check, which is what actually proves
+  // the right 18 came through rather than the ordering rule promising it.
+  // The centre is therefore the centroid of the CHAMPIONSHIP hole ways
+  // (39.7875, -74.9703), not the polygon's — the polygon centroid sits ~150 m
+  // toward the Short Course and shrinks the margins for no benefit.
+  // No `packed` clause: the Short Course's sand is ~1 km from the nearest
+  // championship corridor, so none of it is nearer a championship centreline
+  // than its own, and the championship holes are separated by mature pine
+  // forest rather than packed side by side.
+  // Radius 1200 covers the 1171 x 1079 m championship block (796 m
+  // half-diagonal) and the six tagged water hazards inside it, while stopping
+  // well short of Pine Hill's ponds 2 km west. No coastline here.
+  pinevalley: {
+    name: 'Pine Valley Golf Club',
+    center: [39.7875, -74.9703],
+    radius: 1200,
+    osmName: '^Pine Valley Country Club$',
+    engineSlug: 'pine-valley',
+  },
 }
 
 // ---------- Overpass ----------

@@ -100,7 +100,7 @@ export const PLAY_INDEX: Record<string, number> = {
   'torrey-pines-south': 1.420,
   'pacific-dunes': 0.919,
   'pine-valley': 2.667,
-  'bandon-dunes': 0.812,
+  'bandon-dunes': 0.833,
   'muirfield': 1.053,
   'quail-hollow': 1.704,
   'shinnecock-hills': 2.527,

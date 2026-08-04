@@ -317,8 +317,8 @@ export const OSM_BEND: Record<string, number[]> = {
   // 1 is measured on the arc->straight remap, and 9, 10, 13, 14, 16, 18 on the
   // SHIFTED back-tee line.
   'bandon-dunes:1': [0, 9, 18, 28, 37, 46, 51, 54, 54, 46, 32, 16, 0],
-  'bandon-dunes:3': [0, 4, 7, 11, 15, 18, 20, 21, 20, 17, 12, 6, 0],
-  'bandon-dunes:4': [0, 8, 16, 24, 32, 40, 44, 47, 47, 42, 30, 15, 0],
+  'bandon-dunes:3': [0, 4, 7, 11, 15, 18, 20, 21, 20, 18, 12, 6, 0],
+  'bandon-dunes:4': [0, 8, 16, 24, 32, 40, 44, 48, 48, 42, 30, 15, 0],
   'bandon-dunes:5': [0, -3, -6, -9, -12, -15, -17, -18, -17, -15, -10, -5, 0],
   'bandon-dunes:8': [0, 6, 12, 18, 23, 28, 32, 33, 32, 28, 19, 10, 0],
   'bandon-dunes:9': [0, 14, 28, 42, 56, 68, 77, 81, 75, 62, 44, 22, 0],
@@ -5082,11 +5082,25 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
   // have dropped a quarter of Pacific Dunes does not recur on this set. Checked
   // way by way against all 54. See COURSE_GEO in scripts/import-osm.ts.
   //
-  // YARDAGE. Eight holes imported more than 10 yd SHORT off forward pads and
-  // are re-imported with `--shift` (5 +40, 7 +28, 9 +16, 10 +27, 13 +13,
-  // 14 +71, 16 +65, 18 +11), which prepends the missing tee run and re-measures
-  // zones, fairway and bend in card coordinates. The remaining seven sit within
-  // 6 yd of the card — tee-box variance, left alone.
+  // YARDAGE. EVERY hole lands on the card, because `courses.ts` reconciles each
+  // hole's `yards` to the imported `length` at load — so a length left at its
+  // raw import value does not sit quietly beside the card, it REPLACES it on
+  // the scorecard. A first pass here shipped seven holes at raw import (2, 3,
+  // 4, 6, 8, 11, 15, each within 6 yd) on the reasoning that tee-box variance
+  // is not worth chasing; that silently rewrote seven published yardages and
+  // made the course play 7249 against a 7266 card. "Within variance" is a
+  // statement about which SHIFT to apply, never a licence to skip one.
+  // Thirteen holes imported SHORT off forward pads and are re-imported with
+  // `--shift` (2 +4, 3 +4, 4 +6, 5 +40, 7 +28, 8 +1, 9 +16, 10 +27, 11 +5,
+  // 13 +13, 14 +71, 16 +16, 18 +11), which prepends the missing tee run and
+  // re-measures zones, fairway and bend in card coordinates in one pass.
+  // Holes 6 and 15 import 2 and 1 yd LONG. `--shift` takes only a positive
+  // yardage, and neither wants one: both are dead straight (bend max -2 and 1),
+  // so there is no curvature to remap the way hole 1 needs, and both endpoints
+  // are right, so there is no tee run to prepend. Every coordinate simply moves
+  // back by that constant — the exact mirror of a positive shift, which
+  // preserves each zone's distance from the GREEN and so keeps greenside
+  // features greenside.
   // Hole 1 is the OPPOSITE case and the reason "shift, don't scale" is a rule
   // about a diagnosis: it imports 21 yd LONG. Its endpoints are both correct
   // (line start -> green measures 388 against the card's 386, while the two
@@ -5188,40 +5202,40 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
     ],
   },
   'bandon-dunes:2': {
-    length: 216,
-    fairwayFrom: 76,
-    fairwayTo: 197,
+    length: 220,
+    fairwayFrom: 77,
+    fairwayTo: 201,
     greenDepth: 34,
     zones: [
-      { id: 'z1', kind: 'bunker', from: 80, to: 100, side: 'right' },
-      { id: 'z2', kind: 'bunker', from: 144, to: 180, side: 'right' },
-      { id: 'z3', kind: 'bunker', from: 186, to: 212, side: 'left' },
+      { id: 'z1', kind: 'bunker', from: 84, to: 104, side: 'right' },
+      { id: 'z2', kind: 'bunker', from: 148, to: 184, side: 'right' },
+      { id: 'z3', kind: 'bunker', from: 190, to: 216, side: 'left' },
     ],
   },
   'bandon-dunes:3': {
-    length: 559,
-    fairwayFrom: 196,
-    fairwayTo: 537,
+    length: 563,
+    fairwayFrom: 197,
+    fairwayTo: 541,
     greenDepth: 39,
     zones: [
-      { id: 'z1', kind: 'bunker', from: 60, to: 92, side: 'left' },
-      { id: 'z2', kind: 'bunker', from: 126, to: 136, side: 'left' },
-      { id: 'z3', kind: 'bunker', from: 328, to: 346, side: 'right' },
-      { id: 'z4', kind: 'bunker', from: 368, to: 374, side: 'left' },
-      { id: 'z5', kind: 'bunker', from: 432, to: 446, side: 'left' },
-      { id: 'z6', kind: 'bunker', from: 462, to: 474, side: 'right' },
-      { id: 'z7', kind: 'bunker', from: 530, to: 538, side: 'left' },
-      { id: 'z8', kind: 'bunker', from: 536, to: 546, side: 'right' },
+      { id: 'z1', kind: 'bunker', from: 64, to: 96, side: 'left' },
+      { id: 'z2', kind: 'bunker', from: 130, to: 140, side: 'left' },
+      { id: 'z3', kind: 'bunker', from: 332, to: 350, side: 'right' },
+      { id: 'z4', kind: 'bunker', from: 372, to: 378, side: 'left' },
+      { id: 'z5', kind: 'bunker', from: 436, to: 450, side: 'left' },
+      { id: 'z6', kind: 'bunker', from: 466, to: 478, side: 'right' },
+      { id: 'z7', kind: 'bunker', from: 534, to: 542, side: 'left' },
+      { id: 'z8', kind: 'bunker', from: 540, to: 550, side: 'right' },
     ],
   },
   'bandon-dunes:4': {
-    length: 437,
-    fairwayFrom: 153,
-    fairwayTo: 412,
+    length: 443,
+    fairwayFrom: 155,
+    fairwayTo: 418,
     greenDepth: 45,
     zones: [
-      { id: 'z1', kind: 'bunker', from: 312, to: 318, side: 'left' },
-      { id: 'z2', kind: 'bunker', from: 410, to: 418, side: 'left' },
+      { id: 'z1', kind: 'bunker', from: 318, to: 324, side: 'left' },
+      { id: 'z2', kind: 'bunker', from: 416, to: 424, side: 'left' },
     ],
   },
   'bandon-dunes:5': {
@@ -5236,13 +5250,13 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
     ],
   },
   'bandon-dunes:6': {
-    length: 219,
-    fairwayFrom: 77,
-    fairwayTo: 194,
+    length: 217,
+    fairwayFrom: 76,
+    fairwayTo: 192,
     greenDepth: 45,
     zones: [
-      { id: 'z1', kind: 'ocean', from: 0, to: 210, side: 'left' },
-      { id: 'z2', kind: 'bunker', from: 166, to: 208, side: 'left' },
+      { id: 'z1', kind: 'ocean', from: 0, to: 208, side: 'left' },
+      { id: 'z2', kind: 'bunker', from: 164, to: 206, side: 'left' },
     ],
   },
   'bandon-dunes:7': {
@@ -5258,14 +5272,14 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
     ],
   },
   'bandon-dunes:8': {
-    length: 384,
-    fairwayFrom: 134,
+    length: 385,
+    fairwayFrom: 135,
     fairwayTo: 363,
-    greenDepth: 38,
+    greenDepth: 39,
     zones: [
       { id: 'z1', kind: 'bunker', from: 202, to: 218, side: 'left' },
-      { id: 'z2', kind: 'bunker', from: 274, to: 302, side: 'right' },
-      { id: 'z3', kind: 'bunker', from: 354, to: 368, side: 'left' },
+      { id: 'z2', kind: 'bunker', from: 276, to: 304, side: 'right' },
+      { id: 'z3', kind: 'bunker', from: 356, to: 366, side: 'left' },
     ],
   },
   'bandon-dunes:9': {
@@ -5295,14 +5309,14 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
     ],
   },
   'bandon-dunes:11': {
-    length: 464,
-    fairwayFrom: 162,
-    fairwayTo: 439,
+    length: 469,
+    fairwayFrom: 164,
+    fairwayTo: 444,
     greenDepth: 45,
     zones: [
-      { id: 'z1', kind: 'bunker', from: 358, to: 362, side: 'right' },
-      { id: 'z2', kind: 'bunker', from: 388, to: 394, side: 'right' },
-      { id: 'z3', kind: 'bunker', from: 438, to: 444, side: 'right' },
+      { id: 'z1', kind: 'bunker', from: 359, to: 366, side: 'right' },
+      { id: 'z2', kind: 'bunker', from: 394, to: 400, side: 'right' },
+      { id: 'z3', kind: 'bunker', from: 442, to: 448, side: 'right' },
     ],
   },
   // z1 is HAND-ADDED — the dropped-greenside-bunker mode (harbour-town:4).
@@ -5348,12 +5362,12 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
     ],
   },
   'bandon-dunes:15': {
-    length: 207,
+    length: 206,
     fairwayFrom: 72,
-    fairwayTo: 185,
+    fairwayTo: 184,
     greenDepth: 39,
     zones: [
-      { id: 'z1', kind: 'bunker', from: 190, to: 198, side: 'right' },
+      { id: 'z1', kind: 'bunker', from: 189, to: 197, side: 'right' },
     ],
   },
   // THE ONE HOLE WHERE THE SHIPPED CARD WAS WRONG — see the YARDAGE CONFLICT

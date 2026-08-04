@@ -303,6 +303,32 @@ export const OSM_BEND: Record<string, number[]> = {
   'pine-valley:16': [0, 11, 22, 34, 44, 52, 54, 38, 18, 5, 1, 0, 0],
   'pine-valley:17': [0, 4, 7, 11, 15, 18, 22, 25, 27, 27, 24, 14, 0],
   'pine-valley:18': [0, 4, 8, 12, 16, 19, 22, 24, 24, 23, 18, 9, 0],
+  // Bandon Dunes. The shipped flags were wrong on ELEVEN of eighteen holes —
+  // the worst run in the library — so this map is doing more correcting here
+  // than anywhere else. Two of them, 4 and 8, were flagged 'L' on centrelines
+  // that turn RIGHT 47 and 33 yd; 1, 9, 14, 16 and 18 were flagged straight and
+  // bend 54, 81, 40, 48 and 32. The tuple is updated to match (see courses.ts),
+  // at the caddy chip's >=20 yd bar rather than this map's >=8 yd persist bar —
+  // so 5, 10, 11, 13 and 17 keep an entry here (they bend 15-19 yd and the map
+  // should curve them) while their flags go 'S', the same deliberate
+  // disagreement documented for Pine Valley above. Hole 7 gets NO entry and its
+  // 'R' flag becomes 'S': the line is dead straight, and with nothing here to
+  // override it the stale flag would have been the chip (torrey-pines-south:4).
+  // 1 is measured on the arc->straight remap, and 9, 10, 13, 14, 16, 18 on the
+  // SHIFTED back-tee line.
+  'bandon-dunes:1': [0, 9, 18, 28, 37, 46, 51, 54, 54, 46, 32, 16, 0],
+  'bandon-dunes:3': [0, 4, 7, 11, 15, 18, 20, 21, 20, 17, 12, 6, 0],
+  'bandon-dunes:4': [0, 8, 16, 24, 32, 40, 44, 47, 47, 42, 30, 15, 0],
+  'bandon-dunes:5': [0, -3, -6, -9, -12, -15, -17, -18, -17, -15, -10, -5, 0],
+  'bandon-dunes:8': [0, 6, 12, 18, 23, 28, 32, 33, 32, 28, 19, 10, 0],
+  'bandon-dunes:9': [0, 14, 28, 42, 56, 68, 77, 81, 75, 62, 44, 22, 0],
+  'bandon-dunes:10': [0, 3, 7, 10, 13, 16, 18, 19, 19, 17, 12, 6, 0],
+  'bandon-dunes:11': [0, -3, -5, -8, -10, -13, -14, -15, -15, -14, -10, -5, 0],
+  'bandon-dunes:13': [0, -4, -8, -12, -16, -17, -18, -17, -15, -11, -7, -4, 0],
+  'bandon-dunes:14': [0, 6, 12, 18, 24, 30, 36, 39, 40, 37, 28, 14, 0],
+  'bandon-dunes:16': [0, 7, 13, 20, 26, 33, 39, 42, 44, 44, 36, 18, 0],
+  'bandon-dunes:17': [0, -2, -4, -6, -8, -10, -11, -12, -12, -10, -7, -4, 0],
+  'bandon-dunes:18': [0, 6, 13, 19, 26, 30, 32, 32, 29, 23, 15, 8, 0],
 }
 
 export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
@@ -5037,6 +5063,338 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
       { id: 'z16', kind: 'bunker', from: 435, to: 445, side: 'cross' },
       { id: 'z17', kind: 'bunker', from: 439, to: 481, side: 'right' },
       { id: 'z18', kind: 'bunker', from: 439, to: 483, side: 'left' },
+    ],
+  },
+  // Bandon Dunes (Bandon, OR) — David McLay Kidd, 1999. Imported from OSM; all
+  // 18 centrelines are mapped. Pure geometry: the shipped tuple already matched
+  // the club's TOURNAMENT card (7315 yd, par 72, 75.9/145) on par, yardage AND
+  // stroke index for all 18, so no yardage or SI moved in courses.ts. What did
+  // move there is eleven `dogleg` flags and two `signature` strings — see below
+  // and the OSM_BEND note above.
+  //
+  // IDENTITY. Same shared polygon as Pacific Dunes: way 362513477 ("Bandon
+  // Dunes Golf Resort") holds this course, Pacific Dunes and Old Macdonald —
+  // 54 hole ways, three complete sets of ref=1..18. `osmHolePrefix` is the
+  // whole identity check. It is safe here for a reason worth recording: Old
+  // Macdonald's eighteen ways are entirely UNNAMED (bare ref, no name), so
+  // /^Bandon Dunes/ cannot reach them, and all 18 of this course's ways use
+  // plain single-space "Bandon Dunes Hole N" — the double-space trap that would
+  // have dropped a quarter of Pacific Dunes does not recur on this set. Checked
+  // way by way against all 54. See COURSE_GEO in scripts/import-osm.ts.
+  //
+  // YARDAGE. Eight holes imported more than 10 yd SHORT off forward pads and
+  // are re-imported with `--shift` (5 +40, 7 +28, 9 +16, 10 +27, 13 +13,
+  // 14 +71, 16 +65, 18 +11), which prepends the missing tee run and re-measures
+  // zones, fairway and bend in card coordinates. The remaining seven sit within
+  // 6 yd of the card — tee-box variance, left alone.
+  // Hole 1 is the OPPOSITE case and the reason "shift, don't scale" is a rule
+  // about a diagnosis: it imports 21 yd LONG. Its endpoints are both correct
+  // (line start -> green measures 388 against the card's 386, while the two
+  // other tee pads in reach measure 444 and 396), so there is no missing tee
+  // run to prepend and a shift would be meaningless. The excess is curvature in
+  // a 3-node polyline that bows 54 yd. The torrey-pines-south:6 tell confirms
+  // where it accumulates: arc and straight-line distance from the tee agree to
+  // 0 yd out to 200, diverge by 4 at 300 and 17 by the green. So hole 1 is
+  // remapped arc -> straight-line on the importer's own chaikin(2) centreline
+  // and scaled the last 0.4% to the card, which walks its sand from 286/340/346
+  // to 282/329/334 rather than leaving it 17 yd long at the green.
+  //
+  // YARDAGE CONFLICT — read this before "correcting" any length here. Four
+  // sources were compared per hole: the club's own hole-by-hole
+  // (bandondunesgolf.com, 7212), BlueGolf's TOURNAMENT card (7315),
+  // ProVisualizer's measured tee->pin (7255), and the OSM line itself. They
+  // agree within ~20 yd on fifteen holes. Three do not:
+  //   h1  club 398 / BG 386 / PV 421 / OSM chord 388 — spread 35, no majority
+  //   h5  club 445 / BG 473 / PV 465 / OSM 433       — spread 28, no majority
+  //   h16 club 363 / BG 412 / PV 358 / OSM 347       — spread 54, and here
+  //       THREE sources cluster at 347-363 against BlueGolf's lone 412.
+  // Only 16 was changed. 50 yd is far outside tee-set variance, and the shipped
+  // tuple carried BlueGolf's number, so the tuple was wrong: it is now 363 (the
+  // only yardage this import moved) and the hole is shifted +16 rather than the
+  // +65 the bad card implied. 1 and 5 keep their shipped BlueGolf values —
+  // their spreads are ordinary tee-set disagreement with no source clearly
+  // right, and inventing a fourth answer would be worse than either. This is
+  // why "the card is ground truth" is a rule about a SOURCE, not a file: when
+  // the club's own card and two independent measurements all disagree with the
+  // third-party database, the database is what gives.
+  //
+  // THE OCEAN, which again imported as NOTHING — same cause as Pacific Dunes,
+  // and the check that matters most on this course. The `natural=coastline` way
+  // is drawn at the WATERLINE across a wide beach, 113-158 yd from the nearest
+  // centreline, so no rake sample lands seaward of it and the importer's
+  // outward OCEAN_REACH probe never seeds. OSM maps no cliff on the property.
+  // Rims were MEASURED by the Torrey Pines recipe: USGS NED 10m (3DEP)
+  // transects every 10 yd along each centreline at +/-20..60 yd, nearest offset
+  // sitting >= 6 m below the playing line is the rim, author only where that rim
+  // falls inside the importer's own 50-yd corridor, span exactly the measured
+  // run, extrapolate nothing. Stations are built on the SHIFTED, chaikin(2)
+  // line so they share the importer's coordinates — a first pass on the raw
+  // line put hole 16's numbers 9 yd out.
+  // Authored, all three monotonic to a sea-level beach:
+  //   h5  left  0-310 (rim 20-50)   h6  left 0-210 (rim 30)
+  //   h16 right 0-190  (rim 20-50)  — re-measured on the CORRECTED 363 line;
+  //       the first pass, on the bad 412 card, put this run at 20-240.
+  // DECLINED, and this is the half that earns the measurement:
+  //   h17 tripped the rim test TWICE (right 0-50 and 280-330) and is not the
+  //       sea either time — the ground dips to 7 m and RISES back to 21, a dune
+  //       hollow between the hole and a ridge. It plays EAST, away from a
+  //       Pacific that is 158 deg behind it. Its tuple says `hazard: 'ocean'`.
+  //   h11 flat at 31-32 m for 100 yd; h15's ground RISES seaward to a dune
+  //       crest. Both tuples say 'ocean'; neither has any.
+  //   h12 (right 220-230) and h16's second run (right 400-410) DO reach sea
+  //       level, but their rim sits AT 50 yd — the corridor edge, not inside
+  //       it — over 10-yd runs. Same call that cleared whistling-straits:9/18
+  //       and torrey's 55-70 yd flanks. h16's 160-yd gap is left open rather
+  //       than merged: too long to be the wander a merge is for.
+  // `hazard: 'ocean'` on 5/11/15/17 is left untouched — it only feeds the
+  // PROCEDURAL layout and is inert once a hole has real geometry. Do not "fix"
+  // geometry to match it. The `signature` strings are a different matter,
+  // because those are shown to the player, and two were false: hole 5 promised
+  // "the Pacific down the entire right" when the sea is down its LEFT (the hole
+  // plays due north, west is 108 deg left), and hole 15 promised "a green
+  // teetering above the beach" on an inland dune par 3 whose ground climbs away
+  // from the water. Both rewritten in courses.ts to what the map now contains.
+  //
+  // HAND-FIX, one. Hole 10's 214-220 `cross` is way/1057044353 alone — a ~12-yd
+  // bunker lying lateral -2..10, i.e. just LEFT of the line it clips — and a
+  // 6-yd full-width forced carry at 214 yd is not what that is. Re-sided to
+  // left, NOT dropped: the bunker is real, only the carry was invented. Worth
+  // noting that the catalog's usual discriminator was unavailable here — Bandon
+  // Dunes has NO `golf=fairway` polygons mapped at all (0 of 18 centrelines run
+  // on one), so "is there mapped fairway beside the hazard" could not be asked,
+  // and the ring profile had to settle it alone. It was the only `cross` on the
+  // course.
+  // GREENS. Six holes read greenDepth exactly 45, the clamp the README says to
+  // suspect. Not the cypress-point:1 artifact here: no centreline touches two
+  // greens (the importer's multi-green warning is silent on all 18), all 18 end
+  // on 18 DISTINCT green polygons, and an independent measure of each target
+  // green along its own approach axis agrees within 1-2 yd everywhere except
+  // where it exceeds the clamp — 5 (51), 6 (58), 13 (51), 17 (65). These are
+  // simply enormous links greens.
+  // No `osmIgnore`, no `packed`: of the 69 bunkers reaching a corridor, none is
+  // nearer a neighbouring course's centreline. No landmark — nothing built here
+  // that a golfer would recognise from a map.
+  // Data (c) OpenStreetMap contributors, ODbL. Terrain: USGS 3DEP/NED.
+  'bandon-dunes:1': {
+    length: 386,
+    fairwayFrom: 135,
+    fairwayTo: 363,
+    greenDepth: 41,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 282, to: 288, side: 'left' },
+      { id: 'z2', kind: 'bunker', from: 329, to: 337, side: 'right' },
+      { id: 'z3', kind: 'bunker', from: 334, to: 346, side: 'left' },
+      { id: 'z4', kind: 'bunker', from: 370, to: 377, side: 'left' },
+    ],
+  },
+  'bandon-dunes:2': {
+    length: 216,
+    fairwayFrom: 76,
+    fairwayTo: 197,
+    greenDepth: 34,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 80, to: 100, side: 'right' },
+      { id: 'z2', kind: 'bunker', from: 144, to: 180, side: 'right' },
+      { id: 'z3', kind: 'bunker', from: 186, to: 212, side: 'left' },
+    ],
+  },
+  'bandon-dunes:3': {
+    length: 559,
+    fairwayFrom: 196,
+    fairwayTo: 537,
+    greenDepth: 39,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 60, to: 92, side: 'left' },
+      { id: 'z2', kind: 'bunker', from: 126, to: 136, side: 'left' },
+      { id: 'z3', kind: 'bunker', from: 328, to: 346, side: 'right' },
+      { id: 'z4', kind: 'bunker', from: 368, to: 374, side: 'left' },
+      { id: 'z5', kind: 'bunker', from: 432, to: 446, side: 'left' },
+      { id: 'z6', kind: 'bunker', from: 462, to: 474, side: 'right' },
+      { id: 'z7', kind: 'bunker', from: 530, to: 538, side: 'left' },
+      { id: 'z8', kind: 'bunker', from: 536, to: 546, side: 'right' },
+    ],
+  },
+  'bandon-dunes:4': {
+    length: 437,
+    fairwayFrom: 153,
+    fairwayTo: 412,
+    greenDepth: 45,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 312, to: 318, side: 'left' },
+      { id: 'z2', kind: 'bunker', from: 410, to: 418, side: 'left' },
+    ],
+  },
+  'bandon-dunes:5': {
+    length: 473,
+    fairwayFrom: 166,
+    fairwayTo: 448,
+    greenDepth: 45,
+    zones: [
+      { id: 'z1', kind: 'ocean', from: 0, to: 310, side: 'left' },
+      { id: 'z2', kind: 'bunker', from: 350, to: 370, side: 'right' },
+      { id: 'z3', kind: 'bunker', from: 434, to: 473, side: 'right' },
+    ],
+  },
+  'bandon-dunes:6': {
+    length: 219,
+    fairwayFrom: 77,
+    fairwayTo: 194,
+    greenDepth: 45,
+    zones: [
+      { id: 'z1', kind: 'ocean', from: 0, to: 210, side: 'left' },
+      { id: 'z2', kind: 'bunker', from: 166, to: 208, side: 'left' },
+    ],
+  },
+  'bandon-dunes:7': {
+    length: 411,
+    fairwayFrom: 144,
+    fairwayTo: 392,
+    greenDepth: 33,
+    zones: [
+      { id: 'z1', kind: 'trees', from: 42, to: 180, side: 'left' },
+      { id: 'z2', kind: 'bunker', from: 158, to: 162, side: 'left' },
+      { id: 'z3', kind: 'bunker', from: 178, to: 186, side: 'left' },
+      { id: 'z4', kind: 'trees', from: 350, to: 390, side: 'left' },
+    ],
+  },
+  'bandon-dunes:8': {
+    length: 384,
+    fairwayFrom: 134,
+    fairwayTo: 363,
+    greenDepth: 38,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 202, to: 218, side: 'left' },
+      { id: 'z2', kind: 'bunker', from: 274, to: 302, side: 'right' },
+      { id: 'z3', kind: 'bunker', from: 354, to: 368, side: 'left' },
+    ],
+  },
+  'bandon-dunes:9': {
+    length: 605,
+    fairwayFrom: 212,
+    fairwayTo: 583,
+    greenDepth: 39,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 274, to: 280, side: 'right' },
+      { id: 'z2', kind: 'bunker', from: 320, to: 332, side: 'right' },
+      { id: 'z3', kind: 'bunker', from: 356, to: 366, side: 'left' },
+      { id: 'z4', kind: 'bunker', from: 448, to: 452, side: 'left' },
+      { id: 'z5', kind: 'bunker', from: 456, to: 460, side: 'right' },
+      { id: 'z6', kind: 'bunker', from: 530, to: 540, side: 'left' },
+    ],
+  },
+  'bandon-dunes:10': {
+    length: 380,
+    fairwayFrom: 133,
+    fairwayTo: 363,
+    greenDepth: 30,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 202, to: 214, side: 'right' },
+      { id: 'z2', kind: 'bunker', from: 214, to: 220, side: 'left' },
+      { id: 'z3', kind: 'bunker', from: 240, to: 244, side: 'left' },
+      { id: 'z4', kind: 'bunker', from: 332, to: 338, side: 'left' },
+    ],
+  },
+  'bandon-dunes:11': {
+    length: 464,
+    fairwayFrom: 162,
+    fairwayTo: 439,
+    greenDepth: 45,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 358, to: 362, side: 'right' },
+      { id: 'z2', kind: 'bunker', from: 388, to: 394, side: 'right' },
+      { id: 'z3', kind: 'bunker', from: 438, to: 444, side: 'right' },
+    ],
+  },
+  // z1 is HAND-ADDED — the dropped-greenside-bunker mode (harbour-town:4).
+  // way/1057045714 is a 6 x 5 yd pot at along 223-229, lateral 4-9 LEFT, and
+  // the +/-50 yd rake steps in 6-yd offsets, so between -2 and +4 it stepped
+  // clean over a bunker sitting 4 yd off the line: ZERO rake hits, and the hole
+  // imported with no zones at all. Not a culling question — ownsHazard keeps it
+  // at 4 yd — and not a mapping one either: 0 of its 13 vertices are inside the
+  // green. Imagery shows the sand short-left of the green where the projection
+  // puts it.
+  'bandon-dunes:12': {
+    length: 238,
+    fairwayFrom: 83,
+    fairwayTo: 216,
+    greenDepth: 40,
+    zones: [{ id: 'z1', kind: 'bunker', from: 223, to: 229, side: 'left' }],
+  },
+  // Genuinely bare, verified rather than assumed: the nearest bunker to this
+  // centreline is 65 yd off it — outside the corridor — and the tee view shows
+  // an open dune corridor the whole way. Same shape as tpc-potomac:15: a hard
+  // hole (SI 6) whose difficulty is length and the scrub off-line, which the
+  // course-wide Rough dial carries rather than hazard zones. Nothing authored
+  // here because nothing measured; hand-drawing gorse would be invention.
+  'bandon-dunes:13': {
+    length: 554,
+    fairwayFrom: 194,
+    fairwayTo: 529,
+    greenDepth: 45,
+    zones: [
+    ],
+  },
+  'bandon-dunes:14': {
+    length: 390,
+    fairwayFrom: 137,
+    fairwayTo: 375,
+    greenDepth: 26,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 264, to: 270, side: 'left' },
+      { id: 'z2', kind: 'bunker', from: 296, to: 314, side: 'right' },
+      { id: 'z3', kind: 'bunker', from: 298, to: 304, side: 'left' },
+      { id: 'z4', kind: 'bunker', from: 342, to: 354, side: 'left' },
+      { id: 'z5', kind: 'bunker', from: 376, to: 390, side: 'right' },
+    ],
+  },
+  'bandon-dunes:15': {
+    length: 207,
+    fairwayFrom: 72,
+    fairwayTo: 185,
+    greenDepth: 39,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 190, to: 198, side: 'right' },
+    ],
+  },
+  // THE ONE HOLE WHERE THE SHIPPED CARD WAS WRONG — see the YARDAGE CONFLICT
+  // note in the course header. BlueGolf says 412; the club's own hole-by-hole
+  // says 363, ProVisualizer measures 358 and the OSM tee->green line 347.
+  // Shifted +16 to the club's 363, not +65 to BlueGolf's 412, which would have
+  // walked all four bunkers ~49 yd back from where they are and stretched the
+  // ocean 50 yd past the bluff. Rim re-measured on the corrected line.
+  'bandon-dunes:16': {
+    length: 363,
+    fairwayFrom: 127,
+    fairwayTo: 343,
+    greenDepth: 35,
+    zones: [
+      { id: 'z1', kind: 'ocean', from: 0, to: 190, side: 'right' },
+      { id: 'z2', kind: 'bunker', from: 238, to: 254, side: 'right' },
+      { id: 'z3', kind: 'bunker', from: 266, to: 282, side: 'right' },
+      { id: 'z4', kind: 'bunker', from: 294, to: 302, side: 'right' },
+      { id: 'z5', kind: 'bunker', from: 320, to: 326, side: 'left' },
+    ],
+  },
+  'bandon-dunes:17': {
+    length: 405,
+    fairwayFrom: 142,
+    fairwayTo: 380,
+    greenDepth: 45,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 256, to: 262, side: 'left' },
+      { id: 'z2', kind: 'bunker', from: 284, to: 300, side: 'right' },
+    ],
+  },
+  'bandon-dunes:18': {
+    length: 558,
+    fairwayFrom: 195,
+    fairwayTo: 539,
+    greenDepth: 34,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 248, to: 256, side: 'left' },
+      { id: 'z2', kind: 'bunker', from: 310, to: 338, side: 'right' },
+      { id: 'z3', kind: 'bunker', from: 336, to: 340, side: 'left' },
+      { id: 'z4', kind: 'bunker', from: 530, to: 544, side: 'right' },
     ],
   },
 }

@@ -609,25 +609,50 @@ export const COURSES: CourseSpec[] = [
     greens: 'Firm',
     wind: 20,
     blurb: 'The course that started a pilgrimage — raw Oregon coast, firm and fast.',
+    // Card = the TOURNAMENT tees (BlueGolf `bandondunesgresort`): par 72,
+    // 7315 yd, 75.9/145. Par, yardage and stroke index already matched on all
+    // 18, so the import moved seventeen of eighteen yardages not at all — and
+    // hole 16, where four sources were compared and BlueGolf lost. See the
+    // YARDAGE CONFLICT note in src/engine/geometry.ts before touching any
+    // number here: the club's own card differs from BlueGolf on six holes
+    // (1, 5, 9, 11, 13, 16) and only 16 is outside tee-set variance.
+    // The `dogleg` flags are another story — ELEVEN were wrong against the real
+    // centrelines, and 4 and 8 pointed the opposite way (flagged 'L' on holes
+    // that turn right 47 and 33 yd). Flags below are set at the caddy chip's
+    // >=20 yd bar; holes 5, 10, 11, 13 and 17 bend 15-19 yd, so they read 'S'
+    // here while keeping a profile in OSM_BEND that curves them on the map.
+    // The `hazard` column is left EXACTLY as shipped, both ways: it only feeds
+    // the procedural layout and is inert once a hole has real geometry, so 11
+    // and 17 keep an 'ocean' the measurements say they don't have, and 6 and 16
+    // keep 'sand' next to a signature naming the Pacific they do.
+    // See the Bandon Dunes notes in src/engine/geometry.ts.
     holes: holes([
-      [4, 386, 13, 'S', 'sand'],
+      [4, 386, 13, 'R', 'sand'],
       [3, 220, 15, 'S', 'sand'],
       [5, 563, 3, 'R', 'sand'],
-      [4, 443, 5, 'L', 'sand'],
-      [4, 473, 1, 'S', 'ocean', 'Along the cliff’s edge — the Pacific down the entire right'],
-      [3, 217, 17, 'S', 'sand'],
-      [4, 411, 7, 'R', 'sand'],
-      [4, 385, 11, 'L', 'sand'],
-      [5, 605, 9, 'S', 'sand'],
-      [4, 380, 8, 'R', 'sand'],
-      [4, 469, 2, 'L', 'ocean'],
+      [4, 443, 5, 'R', 'sand'],
+      // The sea is down the LEFT here, not the right: the hole plays due north
+      // and the Pacific is 108° left of that. Measured rim runs 0-310 yd.
+      [4, 473, 1, 'S', 'ocean', 'Along the cliff’s edge — the Pacific down the whole left side'],
+      [3, 217, 17, 'S', 'sand', 'A long one-shotter with the beach falling away all down the left'],
+      [4, 411, 7, 'S', 'sand'],
+      [4, 385, 11, 'R', 'sand'],
+      [5, 605, 9, 'R', 'sand'],
+      [4, 380, 8, 'S', 'sand'],
+      [4, 469, 2, 'S', 'ocean'],
       [3, 238, 18, 'S', 'sand'],
-      [5, 554, 6, 'R', 'sand'],
-      [4, 390, 16, 'S', 'sand'],
-      [3, 206, 14, 'S', 'ocean', 'A par 3 to a green teetering above the beach'],
-      [4, 412, 10, 'L', 'sand'],
-      [4, 405, 12, 'R', 'ocean'],
-      [5, 558, 4, 'S', 'sand'],
+      [5, 554, 6, 'S', 'sand'],
+      [4, 390, 16, 'R', 'sand'],
+      // Was "a green teetering above the beach" — it isn't. This is an inland
+      // dune par 3 whose ground CLIMBS away from the water; 3DEP found no rim
+      // within the corridor and the imagery shows no ocean on the hole at all.
+      [3, 206, 14, 'S', 'ocean', 'A long par 3 into a bowl in the dunes, one bunker guarding right'],
+      // 412 was BlueGolf's number and it is wrong: the club's own hole-by-hole
+      // says 363, ProVisualizer measures 358, the OSM tee->green line 347. The
+      // one hole where the shipped card lost to the geography.
+      [4, 363, 10, 'R', 'sand', 'The Pacific shoulders the whole tee shot down the right'],
+      [4, 405, 12, 'S', 'ocean'],
+      [5, 558, 4, 'R', 'sand'],
     ]),
   },
   {

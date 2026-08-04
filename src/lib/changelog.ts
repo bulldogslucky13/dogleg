@@ -71,8 +71,8 @@ export const CHANGELOG: ChangeEntry[] = [
   {
     date: '2026-08-03',
     kind: 'fix',
-    title: 'Daily rounds count for course records now',
-    note: 'They always should have. Post a daily that beats the best score ever shot on that course and the record is yours — season and all-time both. Past daily rounds have been counted back in, so a few names on the wall just changed.',
+    title: 'Daily rounds now count for course records',
+    note: 'They always should have. Post a daily that beats the best score ever shot on that course and the record is yours — season and all-time both. We made it right: past daily rounds have been counted back in. Win a CR during a daily round and your score gets a crown in unlimited play.',
   },
   {
     date: '2026-08-01',

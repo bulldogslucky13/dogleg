@@ -343,6 +343,9 @@ Deno.serve(async (req) => {
     set_at: new Date().toISOString(),
     seed,
     decisions,
+    // which mode set it — daily records are the harder feat (one attempt,
+    // fixed conditions) and the UI crowns them for it
+    mode: info.mode,
   }
   // null → the database predates season_records (the schema update is manual,
   // the function deploy automatic). Practice submissions must keep working
@@ -427,6 +430,7 @@ Deno.serve(async (req) => {
     character: character ?? null,
     to_par: replay.toPar,
     set_at: new Date().toISOString(),
+    mode: info.mode,
   }
   // the record ROUND rides along — the referee just replayed and verified
   // this exact seed + decision list, so keeping it costs nothing and lets

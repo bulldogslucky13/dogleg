@@ -79,6 +79,13 @@ create table if not exists course_records (
 alter table course_records add column if not exists seed text;
 alter table course_records add column if not exists decisions jsonb;
 
+-- Which mode set the record. Daily-set records are the harder feat — one
+-- attempt, fixed conditions — and the UI crowns them for it. The default is
+-- historically accurate: every record set before dailies counted (2026-08)
+-- came from unlimited play, by the very bug the backfill below repairs.
+-- (season_records gets the same column after its create, below.)
+alter table course_records add column if not exists mode text not null default 'practice';
+
 -- SEASON course records: one holder per (scope, season, course). Seasons
 -- follow the fixed ET calendar in src/engine/season.ts; the referee stamps
 -- season_key at submission time, which is what makes rollover need no cron
@@ -104,6 +111,9 @@ create table if not exists season_records (
 alter table season_records enable row level security;
 drop policy if exists "anyone can read season records" on season_records;
 create policy "anyone can read season records" on season_records for select using (true);
+
+-- which mode set the record — see the note at course_records' matching column
+alter table season_records add column if not exists mode text not null default 'practice';
 
 -- One row per record-steal email actually attempted, keyed by day. The row is
 -- inserted BEFORE the send, so a duplicate key means "already emailed today"
@@ -272,7 +282,8 @@ begin
         to_par = bd.to_par,
         set_at = bd.created_at,
         seed = null,
-        decisions = null
+        decisions = null,
+        mode = 'daily'
     from best_daily bd
     where bd.course_slug = cr.course_slug
       and (bd.to_par < cr.to_par or (bd.to_par = cr.to_par and bd.created_at < cr.set_at));
@@ -283,8 +294,8 @@ begin
       from daily_scores
       order by course_slug, to_par asc, created_at asc
     )
-    insert into course_records (course_slug, player_id, player_name, "character", to_par, set_at)
-    select bd.course_slug, bd.player_id, bd.player_name, bd."character", bd.to_par, bd.created_at
+    insert into course_records (course_slug, player_id, player_name, "character", to_par, set_at, mode)
+    select bd.course_slug, bd.player_id, bd.player_name, bd."character", bd.to_par, bd.created_at, 'daily'
     from best_daily bd
     where not exists (select from course_records cr where cr.course_slug = bd.course_slug);
 
@@ -315,7 +326,8 @@ begin
         to_par = bd.to_par,
         set_at = bd.created_at,
         seed = null,
-        decisions = null
+        decisions = null,
+        mode = 'daily'
     from best_daily_season bd
     where sr.scope = 'global'
       and sr.season_key = bd.season_key
@@ -338,8 +350,8 @@ begin
       from keyed
       order by season_key, course_slug, to_par asc, created_at asc
     )
-    insert into season_records (scope, season_key, course_slug, player_id, player_name, "character", to_par, set_at)
-    select 'global', bd.season_key, bd.course_slug, bd.player_id, bd.player_name, bd."character", bd.to_par, bd.created_at
+    insert into season_records (scope, season_key, course_slug, player_id, player_name, "character", to_par, set_at, mode)
+    select 'global', bd.season_key, bd.course_slug, bd.player_id, bd.player_name, bd."character", bd.to_par, bd.created_at, 'daily'
     from best_daily_season bd
     where not exists (
       select from season_records sr

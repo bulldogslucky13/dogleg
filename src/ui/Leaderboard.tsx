@@ -26,6 +26,23 @@ import { SyncCta } from './RoundsScreen'
  * rounds contend for the course record. First-time players pick a clubhouse
  * name inline — no account, the device remembers them.
  */
+
+/** Daily-set records wear the crown: one attempt, fixed conditions, the whole
+ * field on the same card — the harder way onto the wall. Drawn inline (not the
+ * emoji) so it renders in the theme's record gold everywhere, instead of
+ * whatever olive the platform's emoji font feels like. Practice-set records
+ * (and rows from before the mode column existed) stay unmarked. */
+export function RecordCrown({ rec }: { rec: Pick<CourseRecord, 'mode'> }) {
+  if (rec.mode !== 'daily') return null
+  return (
+    <span className="rec-crown" title="Set in daily play – one attempt, one record-setting round." aria-label="set in daily play">
+      <svg viewBox="0 0 16 13" aria-hidden>
+        <path d="M1 4.2l3.4 2.6L8 1.6l3.6 5.2L15 4.2v5.2H1z" />
+        <rect x="1" y="10.6" width="14" height="1.8" rx="0.9" />
+      </svg>
+    </span>
+  )
+}
 /**
  * Competition scoreboard ranks, ties awarded: players on the same score share a
  * number and the next distinct score skips the places the tie consumed —
@@ -311,6 +328,13 @@ export function ScoreBoard(props: {
           season={seasonForDate()}
           onClose={() => setCelebrate(null)}
         />
+      )}
+      {result?.record?.broken && (
+        <div className="record-banner">
+          🏆 New course record — {toParLabel(result.record.toPar)}
+          <RecordCrown rec={{ mode: 'daily' }} /> by {player?.name ?? 'you'}
+          {round.character ? ` ${characterById(round.character)?.emoji ?? ''}` : ''}
+        </div>
       )}
       <div className="kicker">Today's board</div>
       {player && busy && (

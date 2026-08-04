@@ -109,6 +109,9 @@ export interface CourseRecord {
   player_name: string
   character: CharacterId | null
   to_par: number
+  /** which mode set it — 'daily' records wear the crown (one attempt, fixed
+   * conditions). Absent on rows read before the column deployed. */
+  mode?: 'daily' | 'practice' | null
 }
 
 /** The season board for one season (scope 'global'): course → holder. A
@@ -120,7 +123,7 @@ export async function fetchSeasonRecords(seasonKey: string): Promise<Map<string,
     const url =
       `${SUPABASE_URL}/rest/v1/season_records` +
       `?scope=eq.global&season_key=eq.${encodeURIComponent(seasonKey)}` +
-      `&select=course_slug,player_name,character,to_par`
+      `&select=course_slug,player_name,character,to_par,mode`
     const res = await fetch(url, { headers: REST_HEADERS })
     if (!res.ok) return null
     const rows = (await res.json()) as CourseRecord[]
@@ -161,7 +164,7 @@ export async function fetchRecordReplay(courseSlug: string): Promise<RecordRepla
 export async function fetchCourseRecords(): Promise<Map<string, CourseRecord> | null> {
   if (!backendEnabled) return null
   try {
-    const url = `${SUPABASE_URL}/rest/v1/course_records?select=course_slug,player_name,character,to_par`
+    const url = `${SUPABASE_URL}/rest/v1/course_records?select=course_slug,player_name,character,to_par,mode`
     const res = await fetch(url, { headers: REST_HEADERS })
     if (!res.ok) return null
     const rows = (await res.json()) as CourseRecord[]

@@ -388,6 +388,13 @@
   color: var(--text-mid);
 }
 
+/* the crown keeps the broadcast theme's record gold on the dark surface —
+   the second selector outranks the .course-row span text rule above */
+.screen.home .rec-crown,
+.screen.home .course-row span.rec-crown {
+  color: var(--record-gold);
+}
+
 .screen.home .course-cr.open {
   color: var(--success);
 }

@@ -69,6 +69,12 @@ export const CHANGELOG: ChangeEntry[] = [
     note: 'When an approach found trouble, the game picked which bunker or lake off a list that treated every one in range as equally likely, so one eighty yards short of the green came up about as often as the one beside it. Then it ignored that pick: sand always dropped you greenside, which is why a bunker shot sometimes drew your ball on open grass beside the green, and a lateral water penalty always dropped you a fixed distance out, which could hand you a free forty yards. Now the odds weight hazards by how likely that miss really is, and you finish where you actually went in. Greenside sand is still a splash; sand out in the fairway leaves you a full shot, and a water drop goes back to the water rather than up the hole. Twenty-two courses moved a point of difficulty, most of them down.',
   },
   {
+    date: '2026-08-03',
+    kind: 'fix',
+    title: 'Daily rounds count for course records now',
+    note: 'They always should have. Post a daily that beats the best score ever shot on that course and the record is yours — season and all-time both. Past daily rounds have been counted back in, so a few names on the wall just changed.',
+  },
+  {
     date: '2026-08-01',
     kind: 'odds',
     title: 'Real greens were being measured at half their size',

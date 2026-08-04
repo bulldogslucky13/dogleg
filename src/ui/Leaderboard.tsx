@@ -285,6 +285,33 @@ export function ScoreBoard(props: {
 
   return (
     <div className="board-block">
+      {/* daily rounds contend for the record boards too — a daily that takes
+          one celebrates exactly like an unlimited round would, same tiering
+          (all-time outranks and absorbs the season title) */}
+      {celebrate?.tier === 'alltime' && (
+        <AllTimeSplash
+          courseName={courseBySlug(round.courseSlug)?.name ?? round.courseSlug}
+          courseSlug={round.courseSlug}
+          dateKey={round.dateKey}
+          toPar={roundToPar(round)}
+          character={round.character}
+          season={seasonForDate()}
+          previousHolder={celebrate.previousHolder ?? undefined}
+          tookSeason={celebrate.tookSeason}
+          onClose={() => setCelebrate(null)}
+        />
+      )}
+      {celebrate?.tier === 'season' && (
+        <RecordSplash
+          courseName={courseBySlug(round.courseSlug)?.name ?? round.courseSlug}
+          courseSlug={round.courseSlug}
+          dateKey={round.dateKey}
+          toPar={roundToPar(round)}
+          character={round.character}
+          season={seasonForDate()}
+          onClose={() => setCelebrate(null)}
+        />
+      )}
       <div className="kicker">Today's board</div>
       {player && busy && (
         <p className="fine">

@@ -42,7 +42,7 @@ export const MISFORTUNE_CONFIG = {
 } as const
 
 /** Dailies dealt before this date replay uncursed, exactly as played. */
-export const MISFORTUNE_FROM_DATEKEY = '2026-07-29'
+export const MISFORTUNE_FROM_DATEKEY = '2026-08-12'
 
 /** Is mis-fortune live for this seed at all? Dailies gate on the cutover
  * date; practice gates on the seed prefix (practice3: and later). */

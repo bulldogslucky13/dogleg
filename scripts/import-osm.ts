@@ -231,6 +231,36 @@ const COURSE_GEO: Record<string, CourseGeo> = {
     osmHolePrefix: '^Pacific Dunes',
     engineSlug: 'pacific-dunes',
   },
+  // Bandon Dunes shares way 362513477 ("Bandon Dunes Golf Resort") with Pacific
+  // Dunes and Old Macdonald — 54 hole ways, three complete sets of ref=1..18 —
+  // so osmHolePrefix is carrying the whole identity check, exactly as for
+  // pacificdunes above. Sheep Ranch, Bandon Trails, Bandon Preserve and Shortys
+  // are separate polygons with their own names, so the anchored name keeps them
+  // out.
+  // The third set — Old Macdonald's — is entirely UNNAMED (18 ways with a bare
+  // ref and no name), which is what makes the prefix safe here: /^Bandon Dunes/
+  // cannot accidentally match them, and the prefix miss is fatal rather than
+  // falling through to nearest-centre. All 18 Bandon Dunes ways use plain
+  // single-space "Bandon Dunes Hole N" — the double-space trap that would have
+  // dropped a quarter of Pacific Dunes does NOT recur on this set (verified way
+  // by way against the 54).
+  // No `packed` clause: of the 69 bunkers that reach a Bandon Dunes corridor,
+  // ZERO are nearer a Pacific Dunes or Old Macdonald centreline (the three
+  // courses sit in separate dune blocks), so ownsHazard's default rule is safe
+  // even though the polygon holds all 423 of the site's bunkers.
+  // Radius 1400 covers the 974 x 1313 m course block (818 m half-diagonal —
+  // farthest centreline node 722 m from centre) and reaches the Pacific
+  // coastline, which runs 114-795 m west of the holes and is `natural=coastline`
+  // here, so it imports as `ocean` rather than needing the whistling-straits
+  // relabel. Centre is the centroid of the 18 championship centrelines.
+  bandondunes: {
+    name: 'Bandon Dunes',
+    center: [43.1897, -124.3953],
+    radius: 1400,
+    osmName: '^Bandon Dunes Golf Resort$',
+    osmHolePrefix: '^Bandon Dunes',
+    engineSlug: 'bandon-dunes',
+  },
   // Pine Valley is way 820204638. **OSM names it "Pine Valley Country Club"**,
   // which is NOT the club's name (Pine Valley Golf Club) — the same shape of
   // trap as TPC Potomac's misspelled "Avanel Farm", so the regex has to match

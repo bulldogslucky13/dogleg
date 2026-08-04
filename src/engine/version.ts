@@ -141,4 +141,36 @@
 // — OSM_BEND overrides the flag on the map, and layout.ts reads it only for
 // procedural holes, which this course no longer has — so it is not what earns
 // the bump; the card and the geometry are.
-export const ENGINE_VERSION = 14
+// v15 = Bandon Dunes real geometry (OSM way 362513477, the shared resort
+// polygon it splits with Pacific Dunes and Old Macdonald; eight holes shifted
+// to the card off forward pads). Near-pure geometry: the shipped tuple already
+// matched BlueGolf's TOURNAMENT card on par, yardage and stroke index for all
+// 18, so no SI moves and the odds inputs are untouched — but the layout a seed
+// replays into moves on every hole.
+// ONE yardage does move, and it is a card bug rather than a tee-set choice:
+// hole 16 shipped BlueGolf's 412 against the club's own 363, ProVisualizer's
+// measured 358 and the OSM tee->green line's 347. Three sources against one, 50
+// yd outside any tee-set variance, so the tuple goes to 363 and the hole is
+// shifted +16 instead of the +65 the bad number implied — which would have put
+// its four bunkers ~49 yd behind where they sit. Holes 1 and 5 have 28-35 yd
+// spreads across the same four sources with no majority; those keep their
+// shipped values rather than inventing a fourth answer. All of it is laid out
+// in the YARDAGE CONFLICT note at the block in geometry.ts.
+// Two parts are hand-work, both documented there: the bluff on 5/6/16 is
+// hand-authored `ocean` from USGS NED 10m transects (same cause as Pacific
+// Dunes — the coastline way sits at the WATERLINE 113-158 yd out across a
+// beach, so the course on the Pacific imported with zero water on all 18), and
+// hole 12's greenside pot is hand-added after the 6-yd rake stepped clean over
+// a bunker 4 yd off the line and left the hole with no zones at all. The
+// measurement declined more than it authored: 11, 15 and 17 all carry
+// `hazard: 'ocean'` and have no rim inside the corridor, 17 twice tripping the
+// drop test on a dune hollow that climbs back up.
+// Hole 1 is remapped arc -> straight-line rather than shifted (it imports 21 yd
+// LONG off a correct pair of endpoints — the torrey-pines-south:6 call), and
+// hole 10's lone `cross` is re-sided to left, being one ~12-yd bunker clipping
+// the line rather than a carry.
+// The dogleg flags in courses.ts are re-derived from the real centrelines at
+// the caddy chip's >=20 yd bar; eleven of eighteen were wrong, two of them
+// pointing the opposite way. Like Pine Valley that is cosmetic and not what
+// earns the bump — the geometry and hole 16's yardage are.
+export const ENGINE_VERSION = 15

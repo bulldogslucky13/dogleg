@@ -424,6 +424,54 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
     expect(screen.queryByText(/already earned/)).toBeNull()
   })
 
+  it('the Records tab count is records HELD, never the row total', () => {
+    // two personal bests, ZERO records held — the tab must read 0, not 2.
+    // (The count used to bind to records + personal bests, so a player with
+    // a locker full of PBs read as a record baron.)
+    const arch = (slug: string, toPar: number) => ({
+      seed: `practice2:${slug}:t${toPar}`,
+      mode: 'practice',
+      courseSlug: slug,
+      character: 'dart',
+      dateKey: '2026-07-20',
+      toPar,
+      strokes: 71 + toPar,
+      results: Array(18).fill('par'),
+      decisions: Array(18).fill(['normal']),
+      playedAt: Date.now(),
+    })
+    localStorage.setItem(
+      'dogleg:archive:v1',
+      JSON.stringify([{ ...arch('pebble-beach', -3), mode: 'daily' }, arch('st-andrews-old', -1)]),
+    )
+    localStorage.setItem('dogleg:records:v1', JSON.stringify({ v: 1, held: {}, stolen: {}, reclaimed: {} }))
+    render(<App />)
+    fireEvent.click(screen.getByText(/Clubhouse/))
+    fireEvent.click(screen.getByRole('tab', { name: 'Records · 0' }))
+    expect(screen.getByText(/Personal bests/)).toBeTruthy()
+    expect(screen.getAllByText('PB')).toHaveLength(2)
+    expect(screen.queryByText(/Course records you hold/)).toBeNull()
+    cleanup()
+
+    // one of those courses becomes a HELD record — the count reads exactly 1
+    // and matches the CR list; the other course stays a PB
+    localStorage.setItem(
+      'dogleg:records:v1',
+      JSON.stringify({ v: 1, held: { 'pebble-beach': { toPar: -3, since: 1 } }, stolen: {}, reclaimed: {} }),
+    )
+    render(<App />)
+    fireEvent.click(screen.getByText(/Clubhouse/))
+    fireEvent.click(screen.getByRole('tab', { name: 'Records · 1' }))
+    // section headers carry their own counts, and they always sum to the rows
+    expect(screen.getByText(/Course records you hold \(1\)/)).toBeTruthy()
+    expect(screen.getByText(/Personal bests \(1\)/)).toBeTruthy()
+    expect(screen.getAllByText('CR')).toHaveLength(1)
+    expect(screen.getAllByText('PB')).toHaveLength(1)
+    // the pebble record was set in DAILY play — its row wears the crown; the
+    // practice-set PB row does not
+    expect(document.querySelectorAll('.round-row .rec-crown')).toHaveLength(1)
+  })
+
   it('a device whose history arrived by sync can still reach its Awards', () => {
     // The shape account sync leaves behind: daily history and a round log, and
     // an EMPTY replay archive — the decisions never leave the device that
@@ -1388,8 +1436,9 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
     // Recent is the default tab; every row offers Scorecard (+ Replay while archived)
     expect(screen.getByText(/Last 1 round/)).toBeTruthy()
     expect(screen.getByText(/St Andrews/)).toBeTruthy()
-    fireEvent.click(screen.getByText(/Records · 1/))
-    expect(screen.getByText('Personal bests')).toBeTruthy()
+    // the count is records HELD (none here) — the PB on the list doesn't count
+    fireEvent.click(screen.getByText(/Records · 0/))
+    expect(screen.getByText(/Personal bests/)).toBeTruthy()
 
     // the universal scorecard opens from any row, with Replay beside it
     fireEvent.click(screen.getAllByText('Scorecard')[0])
@@ -1434,8 +1483,8 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
 
     render(<App />)
     fireEvent.click(screen.getByText(/🏆 Clubhouse/))
-    // two distinct courses, one row each — never one CR per record-ever
-    fireEvent.click(screen.getByText(/Records · 2/))
+    // two distinct courses on the tab, ONE record held — the count says 1
+    fireEvent.click(screen.getByText(/Records · 1/))
 
     expect(screen.getByText(/Course records you hold/)).toBeTruthy()
     // exactly one CR badge (Oakmont), not two — the +2 round is deduped away,
@@ -1443,7 +1492,7 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
     expect(screen.getAllByText('CR')).toHaveLength(1)
     expect(screen.getAllByText(/Oakmont/)).toHaveLength(1)
     // the lost record drops to Personal bests instead of vanishing
-    expect(screen.getByText('Personal bests')).toBeTruthy()
+    expect(screen.getByText(/Personal bests/)).toBeTruthy()
     expect(screen.getByText(/St Andrews/)).toBeTruthy()
   })
 
@@ -1475,12 +1524,14 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
 
     render(<App />)
     fireEvent.click(screen.getByText(/🏆 Clubhouse/))
-    fireEvent.click(screen.getByText(/Records · 1/))
+    // the -6 record round lives on the other device, so no CR row can render
+    // here — and the count matches the list it heads, honestly reading 0
+    fireEvent.click(screen.getByText(/Records · 0/))
 
     // the +1 local round doesn't match the -6 held score → no CR, stays a PR
     expect(screen.queryByText('CR')).toBeNull()
     expect(screen.queryByText(/Course records you hold/)).toBeNull()
-    expect(screen.getByText('Personal bests')).toBeTruthy()
+    expect(screen.getByText(/Personal bests/)).toBeTruthy()
     expect(screen.getAllByText(/Oakmont/)).toHaveLength(1)
   })
 

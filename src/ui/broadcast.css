@@ -388,10 +388,12 @@
   color: var(--text-mid);
 }
 
-/* the crown keeps the broadcast theme's record gold on the dark surface —
-   the second selector outranks the .course-row span text rule above */
-.screen.home .rec-crown,
-.screen.home .course-row span.rec-crown {
+/* the crown keeps the broadcast theme's record gold on EVERY dark surface —
+   the span-qualified selectors outrank the `… span` text rules that would
+   otherwise wash it to the row's muted ink (course rows on home, round rows
+   in the Clubhouse, the wrap's record banner) */
+:is(.screen.home, .screen.rounds, .screen.result) .rec-crown,
+:is(.screen.home, .screen.rounds, .screen.result) :is(.course-row, .round-row-text, .record-banner) span.rec-crown {
   color: var(--record-gold);
 }
 

@@ -329,6 +329,19 @@ export const OSM_BEND: Record<string, number[]> = {
   'bandon-dunes:16': [0, 7, 13, 20, 26, 33, 39, 42, 44, 44, 36, 18, 0],
   'bandon-dunes:17': [0, -2, -4, -6, -8, -10, -11, -12, -12, -10, -7, -4, 0],
   'bandon-dunes:18': [0, 6, 13, 19, 26, 30, 32, 32, 29, 23, 15, 8, 0],
+  // Muirfield — measured on the TRIMMED centreline where the hole was cut back
+  // to the white card (holes 15 and 17 here); see the Muirfield note in
+  // OSM_GEOMETRY. Same reason the shifted holes are re-measured rather than
+  // rescaled: a profile is positions, not lengths.
+  'muirfield:1': [0, 5, 11, 16, 22, 25, 28, 28, 26, 22, 15, 7, 0],
+  'muirfield:5': [0, 4, 8, 11, 15, 17, 19, 19, 17, 14, 9, 5, 0],
+  'muirfield:6': [0, -12, -24, -37, -49, -56, -61, -61, -54, -43, -29, -14, 0],
+  'muirfield:8': [0, 8, 16, 25, 33, 41, 46, 49, 49, 43, 31, 15, 0],
+  'muirfield:9': [0, -5, -9, -14, -19, -22, -25, -25, -23, -20, -13, -7, 0],
+  'muirfield:10': [0, 2, 4, 6, 8, 10, 11, 11, 11, 10, 7, 3, 0],
+  'muirfield:14': [0, -2, -5, -7, -9, -11, -11, -11, -10, -8, -5, -3, 0],
+  'muirfield:15': [0, 7, 15, 22, 28, 32, 33, 31, 28, 21, 14, 7, 0],
+  'muirfield:17': [0, -13, -26, -40, -51, -58, -60, -57, -51, -39, -26, -13, 0],
 }
 
 export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
@@ -5409,6 +5422,313 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
       { id: 'z2', kind: 'bunker', from: 310, to: 338, side: 'right' },
       { id: 'z3', kind: 'bunker', from: 336, to: 340, side: 'left' },
       { id: 'z4', kind: 'bunker', from: 530, to: 544, side: 'right' },
+    ],
+  },
+  // ---- Muirfield (OSM way 101336384, Gullane) ----------------------------
+  // Pure geometry import: the shipped tuple already matched the club's WHITE
+  // card (par 71 / 6728 yd) on par, yardage AND stroke index for all 18, so
+  // nothing in courses.ts moved. OSM's own `handicap` tags disagree with that
+  // card on 12 holes — the reverse of Torrey Pines, and a reminder that OSM
+  // hole tags corroborate a card, they never arbitrate one.
+  //
+  // TEN HOLES ARE TRIMMED, which is the one course-wide deviation from the raw
+  // import. OSM traced those centrelines from the CHAMPIONSHIP pads (7089 yd
+  // of centreline against the white card's 6728), so each was cut at the front
+  // with `--shift -N` to start at the tee we actually play from. Two
+  // independent sources agree the untrimmed start is the back pad, not the
+  // white one: ProVisualizer's published tee sits within 1-7 yd of it on 17 of
+  // 18 holes, and its tee-to-pin distance tracks the OSM length rather than
+  // the card on exactly the ten holes trimmed here. The trims then land on a
+  // mapped `golf=tee` polygon — 9 of 10 within 12 yd of one, most within 2-8.
+  // Hole 15 is the exception and is called out on its own entry.
+  // Trimming discards measured line rather than inventing a straight run, so
+  // it is the safer half of --shift; hazards beside the discarded stretch drop
+  // out with it, correctly, since they sit behind the tee.
+  //
+  // Untrimmed holes come in 5-14 yd off the card, inside tee-box variance;
+  // courses.ts reconciles the yardage tuple to these lengths. Hole 8 is the
+  // widest gap (429 vs 443) and is NOT a pad problem — its endpoints check out
+  // and the hole doglegs hard, so Chaikin rounds the corner off (the
+  // pine-valley:1 case). Shifting it would have walked its fairway sand
+  // backwards for nothing.
+  //
+  // Imported at rake 3 (see COURSE_GEO.rake): Muirfield's ~150 revetted pots
+  // are small enough that the default 6-yd lateral rake stepped over greenside
+  // sand on 14 of 18 holes. No water anywhere (correct — the course has none
+  // in play), and no `cross` zones on any hole, which is the links being
+  // honest: there is nothing here you cannot run the ball up to.
+    'muirfield:1': {
+    length: 441,
+    fairwayFrom: 154,
+    fairwayTo: 420,
+    greenDepth: 37,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 212, to: 234, side: 'left' },
+      { id: 'z2', kind: 'bunker', from: 296, to: 300, side: 'left' },
+      { id: 'z3', kind: 'bunker', from: 350, to: 370, side: 'left' },
+      { id: 'z4', kind: 'bunker', from: 398, to: 408, side: 'right' },
+      { id: 'z5', kind: 'bunker', from: 422, to: 432, side: 'right' },
+    ],
+  },
+    'muirfield:2': {
+    length: 359,
+    fairwayFrom: 126,
+    fairwayTo: 339,
+    greenDepth: 35,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 20, to: 28, side: 'right' },
+      { id: 'z2', kind: 'bunker', from: 192, to: 198, side: 'right' },
+      { id: 'z3', kind: 'bunker', from: 230, to: 236, side: 'right' },
+      { id: 'z4', kind: 'bunker', from: 238, to: 242, side: 'left' },
+      { id: 'z5', kind: 'trees', from: 258, to: 359, side: 'left' },
+      { id: 'z6', kind: 'bunker', from: 312, to: 318, side: 'left' },
+      { id: 'z7', kind: 'bunker', from: 326, to: 352, side: 'right' },
+    ],
+  },
+    'muirfield:3': {
+    length: 367,
+    fairwayFrom: 128,
+    fairwayTo: 344,
+    greenDepth: 41,
+    zones: [
+      { id: 'z1', kind: 'trees', from: 0, to: 38, side: 'left' },
+      { id: 'z2', kind: 'bunker', from: 70, to: 102, side: 'right' },
+      { id: 'z3', kind: 'bunker', from: 164, to: 168, side: 'right' },
+      { id: 'z4', kind: 'bunker', from: 280, to: 284, side: 'right' },
+      { id: 'z5', kind: 'bunker', from: 280, to: 288, side: 'left' },
+      { id: 'z6', kind: 'bunker', from: 342, to: 354, side: 'right' },
+      { id: 'z7', kind: 'bunker', from: 350, to: 356, side: 'left' },
+    ],
+  },
+  // trimmed -42 yd to the WHITE card (see the course note above)
+  'muirfield:4': {
+    length: 182,
+    fairwayFrom: 64,
+    fairwayTo: 162,
+    greenDepth: 36,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 150, to: 164, side: 'right' },
+      { id: 'z2', kind: 'bunker', from: 168, to: 172, side: 'left' },
+    ],
+  },
+  // trimmed -40 yd to the WHITE card (see the course note above)
+  'muirfield:5': {
+    length: 510,
+    fairwayFrom: 179,
+    fairwayTo: 490,
+    greenDepth: 36,
+    zones: [
+      { id: 'z1', kind: 'trees', from: 0, to: 60, side: 'left' },
+      { id: 'z2', kind: 'bunker', from: 162, to: 180, side: 'right' },
+      { id: 'z3', kind: 'bunker', from: 208, to: 216, side: 'right' },
+      { id: 'z4', kind: 'bunker', from: 242, to: 246, side: 'right' },
+      { id: 'z5', kind: 'bunker', from: 252, to: 258, side: 'left' },
+      { id: 'z6', kind: 'bunker', from: 262, to: 266, side: 'right' },
+      { id: 'z7', kind: 'bunker', from: 296, to: 300, side: 'left' },
+      { id: 'z8', kind: 'bunker', from: 394, to: 402, side: 'left' },
+      { id: 'z9', kind: 'bunker', from: 454, to: 462, side: 'right' },
+      { id: 'z10', kind: 'bunker', from: 482, to: 510, side: 'right' },
+      { id: 'z11', kind: 'bunker', from: 494, to: 510, side: 'left' },
+    ],
+  },
+    'muirfield:6': {
+    length: 450,
+    fairwayFrom: 158,
+    fairwayTo: 427,
+    greenDepth: 42,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 214, to: 226, side: 'left' },
+      { id: 'z2', kind: 'bunker', from: 226, to: 230, side: 'right' },
+      { id: 'z3', kind: 'bunker', from: 240, to: 244, side: 'left' },
+      { id: 'z4', kind: 'bunker', from: 254, to: 258, side: 'left' },
+      { id: 'z5', kind: 'trees', from: 308, to: 320, side: 'left' },
+      { id: 'z6', kind: 'bunker', from: 410, to: 418, side: 'right' },
+      { id: 'z7', kind: 'bunker', from: 428, to: 434, side: 'right' },
+      { id: 'z8', kind: 'bunker', from: 444, to: 450, side: 'left' },
+    ],
+  },
+  // trimmed -37 yd to the WHITE card (see the course note above)
+  'muirfield:7': {
+    length: 147,
+    fairwayFrom: 51,
+    fairwayTo: 127,
+    greenDepth: 35,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 124, to: 128, side: 'left' },
+      { id: 'z2', kind: 'bunker', from: 128, to: 132, side: 'right' },
+      { id: 'z3', kind: 'bunker', from: 138, to: 144, side: 'left' },
+    ],
+  },
+    'muirfield:8': {
+    length: 429,
+    fairwayFrom: 150,
+    fairwayTo: 413,
+    greenDepth: 27,
+    zones: [
+      { id: 'z1', kind: 'trees', from: 0, to: 14, side: 'right' },
+      { id: 'z2', kind: 'bunker', from: 0, to: 24, side: 'left' },
+      { id: 'z3', kind: 'bunker', from: 222, to: 252, side: 'right' },
+      { id: 'z4', kind: 'trees', from: 254, to: 358, side: 'right' },
+      { id: 'z5', kind: 'bunker', from: 316, to: 320, side: 'right' },
+      { id: 'z6', kind: 'bunker', from: 358, to: 386, side: 'left' },
+      { id: 'z7', kind: 'bunker', from: 378, to: 382, side: 'right' },
+      { id: 'z8', kind: 'bunker', from: 396, to: 400, side: 'right' },
+    ],
+  },
+  // trimmed -43 yd to the WHITE card (see the course note above)
+  'muirfield:9': {
+    length: 505,
+    fairwayFrom: 177,
+    fairwayTo: 489,
+    greenDepth: 27,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 34, to: 40, side: 'right' },
+      { id: 'z2', kind: 'bunker', from: 64, to: 68, side: 'right' },
+      { id: 'z3', kind: 'bunker', from: 222, to: 230, side: 'right' },
+      { id: 'z4', kind: 'bunker', from: 262, to: 272, side: 'left' },
+      { id: 'z5', kind: 'bunker', from: 326, to: 338, side: 'left' },
+      { id: 'z6', kind: 'bunker', from: 424, to: 440, side: 'right' },
+      { id: 'z7', kind: 'bunker', from: 432, to: 444, side: 'left' },
+      { id: 'z8', kind: 'bunker', from: 462, to: 470, side: 'right' },
+      { id: 'z9', kind: 'bunker', from: 482, to: 490, side: 'right' },
+      { id: 'z10', kind: 'trees', from: 494, to: 505, side: 'left' },
+    ],
+  },
+    'muirfield:10': {
+    length: 465,
+    fairwayFrom: 163,
+    fairwayTo: 447,
+    greenDepth: 31,
+    zones: [
+      { id: 'z1', kind: 'trees', from: 0, to: 14, side: 'right' },
+      { id: 'z2', kind: 'bunker', from: 234, to: 240, side: 'right' },
+      { id: 'z3', kind: 'bunker', from: 264, to: 270, side: 'right' },
+      { id: 'z4', kind: 'bunker', from: 288, to: 294, side: 'right' },
+      { id: 'z5', kind: 'bunker', from: 346, to: 352, side: 'left' },
+      { id: 'z6', kind: 'bunker', from: 352, to: 358, side: 'right' },
+      { id: 'z7', kind: 'bunker', from: 440, to: 458, side: 'right' },
+    ],
+  },
+  // trimmed -31 yd to the WHITE card (see the course note above)
+  'muirfield:11': {
+    length: 354,
+    fairwayFrom: 124,
+    fairwayTo: 340,
+    greenDepth: 24,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 14, to: 18, side: 'right' },
+      { id: 'z2', kind: 'bunker', from: 252, to: 258, side: 'right' },
+      { id: 'z3', kind: 'bunker', from: 268, to: 272, side: 'left' },
+      { id: 'z4', kind: 'bunker', from: 278, to: 282, side: 'right' },
+      { id: 'z5', kind: 'bunker', from: 342, to: 354, side: 'right' },
+      { id: 'z6', kind: 'bunker', from: 346, to: 354, side: 'left' },
+    ],
+  },
+    'muirfield:12': {
+    length: 374,
+    fairwayFrom: 131,
+    fairwayTo: 353,
+    greenDepth: 38,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 10, to: 16, side: 'right' },
+      { id: 'z2', kind: 'bunker', from: 174, to: 182, side: 'right' },
+      { id: 'z3', kind: 'bunker', from: 256, to: 260, side: 'left' },
+      { id: 'z4', kind: 'bunker', from: 324, to: 338, side: 'right' },
+      { id: 'z5', kind: 'bunker', from: 348, to: 364, side: 'right' },
+      { id: 'z6', kind: 'bunker', from: 358, to: 370, side: 'left' },
+    ],
+  },
+  // trimmed -31 yd to the WHITE card (see the course note above)
+  'muirfield:13': {
+    length: 156,
+    fairwayFrom: 55,
+    fairwayTo: 137,
+    greenDepth: 34,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 138, to: 154, side: 'right' },
+      { id: 'z2', kind: 'bunker', from: 144, to: 156, side: 'left' },
+    ],
+  },
+  // trimmed -22 yd to the WHITE card (see the course note above)
+  'muirfield:14': {
+    length: 449,
+    fairwayFrom: 157,
+    fairwayTo: 432,
+    greenDepth: 29,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 48, to: 64, side: 'right' },
+      { id: 'z2', kind: 'bunker', from: 234, to: 278, side: 'left' },
+      { id: 'z3', kind: 'bunker', from: 238, to: 242, side: 'right' },
+      { id: 'z4', kind: 'bunker', from: 364, to: 372, side: 'right' },
+      { id: 'z5', kind: 'bunker', from: 374, to: 382, side: 'left' },
+      { id: 'z6', kind: 'bunker', from: 416, to: 422, side: 'left' },
+      { id: 'z7', kind: 'bunker', from: 432, to: 438, side: 'right' },
+    ],
+  },
+  // trimmed -49 yd to the WHITE card. THE ONE TRIM WITHOUT A PAD UNDER IT: the
+  // other nine land within 12 yd of a mapped `golf=tee`, but 15 has only two
+  // pads mapped (0 and 32 yd) and the card needs 49. The card is ground truth
+  // for distance and OSM has simply not mapped this hole's forward tee, so the
+  // trim follows the card and this comment is the deviation.
+  'muirfield:15': {
+    length: 394,
+    fairwayFrom: 138,
+    fairwayTo: 374,
+    greenDepth: 36,
+    zones: [
+      { id: 'z1', kind: 'trees', from: 0, to: 28, side: 'right' },
+      { id: 'z2', kind: 'bunker', from: 150, to: 184, side: 'left' },
+      { id: 'z3', kind: 'bunker', from: 232, to: 236, side: 'right' },
+      { id: 'z4', kind: 'bunker', from: 260, to: 264, side: 'left' },
+      { id: 'z5', kind: 'bunker', from: 318, to: 322, side: 'left' },
+      { id: 'z6', kind: 'bunker', from: 324, to: 330, side: 'right' },
+      { id: 'z7', kind: 'bunker', from: 344, to: 348, side: 'right' },
+      { id: 'z8', kind: 'bunker', from: 372, to: 378, side: 'left' },
+      { id: 'z9', kind: 'bunker', from: 376, to: 394, side: 'right' },
+      { id: 'z10', kind: 'bunker', from: 392, to: 394, side: 'left' },
+    ],
+  },
+    'muirfield:16': {
+    length: 181,
+    fairwayFrom: 63,
+    fairwayTo: 163,
+    greenDepth: 31,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 160, to: 181, side: 'right' },
+      { id: 'z2', kind: 'bunker', from: 160, to: 176, side: 'left' },
+    ],
+  },
+  // trimmed -61 yd to the WHITE card (see the course note above)
+  'muirfield:17': {
+    length: 506,
+    fairwayFrom: 177,
+    fairwayTo: 487,
+    greenDepth: 34,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 20, to: 42, side: 'left' },
+      { id: 'z2', kind: 'bunker', from: 52, to: 62, side: 'left' },
+      { id: 'z3', kind: 'bunker', from: 198, to: 220, side: 'left' },
+      { id: 'z4', kind: 'bunker', from: 238, to: 244, side: 'left' },
+      { id: 'z5', kind: 'bunker', from: 276, to: 284, side: 'left' },
+      { id: 'z6', kind: 'bunker', from: 360, to: 396, side: 'right' },
+      { id: 'z7', kind: 'bunker', from: 364, to: 380, side: 'left' },
+      { id: 'z8', kind: 'bunker', from: 480, to: 484, side: 'right' },
+      { id: 'z9', kind: 'bunker', from: 484, to: 488, side: 'left' },
+    ],
+  },
+  // trimmed -47 yd to the WHITE card (see the course note above)
+  'muirfield:18': {
+    length: 418,
+    fairwayFrom: 146,
+    fairwayTo: 400,
+    greenDepth: 32,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 212, to: 220, side: 'right' },
+      { id: 'z2', kind: 'bunker', from: 232, to: 252, side: 'left' },
+      { id: 'z3', kind: 'bunker', from: 364, to: 372, side: 'right' },
+      { id: 'z4', kind: 'bunker', from: 384, to: 388, side: 'left' },
+      { id: 'z5', kind: 'bunker', from: 406, to: 418, side: 'left' },
+      { id: 'z6', kind: 'bunker', from: 408, to: 418, side: 'right' },
     ],
   },
 }

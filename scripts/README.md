@@ -169,6 +169,47 @@ find the polygon name for a new course, query Overpass for
   `golf=fairway` running beside them for 27-50% of their span and were folded to
   flanks, and the rest had none at all.
 
+- **Muirfield (all 18)** — the course that added the negative `--shift` and the
+  per-course rake. Its shipped tuple already matched the club's WHITE card
+  (par 71 / 6728) on par, stroke index *and* yardage for all 18, so it was pure
+  geometry, and notable for three things.
+  First, **the tee problem ran the other way.** Every previous course that
+  missed its card imported SHORT off a forward pad; Muirfield imports LONG on
+  ten holes because OSM traced them from the CHAMPIONSHIP tees (7089 yd of
+  centreline against the card's 6728). `--shift` now takes a negative, which
+  trims that run off the front instead of prepending a missing one — and
+  trimming is the *stronger* operation, because it only discards measured line
+  where the positive path invents a straight one. Diagnose before reaching for
+  it: the tell is that ProVisualizer's published tee sat within 1-7 yd of the
+  untrimmed OSM start on 17 of 18 holes, and PV's tee-to-pin distance tracked
+  the OSM length rather than the card on exactly the ten long holes. Then check
+  the trim lands somewhere real — 9 of 10 came down within 12 yd of a mapped
+  `golf=tee`, most within 2-8. (Hole 15 is the one that didn't: only two pads
+  are mapped and the card needs 49 yd, so the card wins and the entry says so.)
+  Second, **the 6-yd lateral rake is not fine enough for every course.** This
+  is `bandon-dunes:12` generalised — there, one bunker 4 yd off the line
+  vanished under the rake and was hand-added back. Muirfield's ~150 revetted
+  pots are frequently under 6 yd across, and the default rake stepped over
+  greenside sand on 14 of 18 holes, including both walls of the 13th, which the
+  hole's own `signature` names. `COURSE_GEO.rake` lowers it per course (3 here);
+  it is per-course rather than global so every already-imported course keeps the
+  resolution it was QA'd at. Check for this with the polygons rather than by
+  eye: count the bunkers whose ring comes within ~30 yd of the hole's green and
+  compare against the greenside zones you actually shipped. 81 touch a green at
+  Muirfield and the 6-yd pass left 28 of them with no zone at all.
+  Third, **a `cross` band must be wide enough to be worth carrying.** Lateral
+  continuity across the line is necessary, not sufficient: a 3-yd pot sitting on
+  the centreline satisfies it while blocking three yards of a hundred-yard
+  corridor. Sand now needs to span >=12 yd to earn `cross`; water and trees keep
+  the old rule, because a burn crossing a fairway is narrow and IS a forced
+  carry. Muirfield ends with zero cross zones on any hole, which is the links
+  being honest rather than a bug.
+  Worth knowing: its OSM `handicap` tags disagree with the club card on 12 of 18
+  holes — the exact reverse of Torrey Pines, where they matched on all 18. OSM's
+  hole tags corroborate a card; they never arbitrate one. And `golf=rough` is
+  useless here for the reason it usually is: one course-wide multipolygon
+  spanning the whole corridor (the default surface), correctly dropped.
+
 ### Known gaps & importer artifact modes
 
 - **Coverage** — obscure courses may lack `golf=hole` centerlines, and many

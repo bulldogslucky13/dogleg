@@ -173,4 +173,28 @@
 // the caddy chip's >=20 yd bar; eleven of eighteen were wrong, two of them
 // pointing the opposite way. Like Pine Valley that is cosmetic and not what
 // earns the bump — the geometry and hole 16's yardage are.
-export const ENGINE_VERSION = 15
+// v16 = Muirfield real geometry (OSM way 101336384). Pure geometry: the
+// shipped tuple already matched the club's WHITE card on par, yardage AND
+// stroke index for all 18, so courses.ts is untouched — the bump is the zones.
+// Ten holes are TRIMMED rather than shifted, the first course to need the
+// negative half of --shift: OSM traced them from the championship pads (7089
+// yd of centreline against the card's 6728), so the run behind the white tee
+// is cut off the front instead of a missing one being prepended. Two sources
+// agree the untrimmed start is the back pad — ProVisualizer's published tee is
+// within 1-7 yd of it on 17 of 18, and its tee-to-pin distance tracks OSM
+// rather than the card on exactly the ten holes trimmed — and 9 of the 10
+// trims land within 12 yd of a mapped `golf=tee` (hole 15 is the exception and
+// says so at its entry).
+// Imported at rake 3, the first use of the per-course rake knob. This is the
+// bandon-dunes:12 problem generalised: there, ONE bunker 4 yd off the line
+// vanished under the 6-yd lateral rake and was hand-added back. Muirfield's
+// ~150 revetted pots are small enough that the same gap swallowed greenside
+// sand on 14 of 18 holes, which is too many to hand-fix and too many to leave
+// — including both walls of the 13th, which the hole's own signature names.
+// Also tightens `cross` for SAND only: a crossing must now span >=12 yd
+// laterally, because a 3-yd pot sitting on the centreline satisfied "laterally
+// continuous" while blocking three yards of a hundred-yard corridor, and
+// `cross` means you must carry it. Water keeps the old rule — a burn crossing
+// a fairway is narrow and IS a forced carry. Muirfield ends with zero cross
+// zones, which is the links being honest: nothing here you can't run up to.
+export const ENGINE_VERSION = 16

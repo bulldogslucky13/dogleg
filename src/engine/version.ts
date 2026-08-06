@@ -197,4 +197,25 @@
 // `cross` means you must carry it. Water keeps the old rule — a burn crossing
 // a fairway is narrow and IS a forced carry. Muirfield ends with zero cross
 // zones, which is the links being honest: nothing here you can't run up to.
+//
+// v16 ALSO carries Quail Hollow (OSM way 877659537), imported in the same PR
+// and sharing this one bump — both are geometry, neither has shipped, so a
+// second generation would buy nothing. Notable for its CARD rather than the
+// tooling: BlueGolf holds Quail Hollow only as its MEMBER course (par 72, the
+// 1st played as a par 5), which is a different golf course from the one this
+// game ships, so the house source is the wrong source here and the 2025 PGA
+// Championship card (par 71 / 7,626) is used instead. The shipped par sequence
+// and OSM's own par tags both match that card on all 18, which is what says
+// the members' card is the outlier rather than us. Par is untouched; four
+// yardages move and courses.ts reconciles them from the imported lengths.
+// Ten holes shift and they go BOTH ways — 1 and 3 trim, the other eight
+// prepend — because 82 tee pads are mapped over 18 holes and the mapper picked
+// a different one per hole (the seminole pattern). Three hand-fixes: a dropped
+// greenside bunker on 2, a water cross running 16 yd INTO the green on 17, and
+// the creek on 18, which is a waterway LINESTRING and so never reaches the
+// polygon rasterizer — the carnoustie mode, landing on the one hole whose
+// signature promises "creek all down the left".
+// Rake stays at the 6-yd default here, one course after Muirfield needed 3:
+// not one of Quail Hollow's 74 bunkers is under 6 yd across (min 6.7, median
+// 12.8). That contrast is the argument for the knob being per-course.
 export const ENGINE_VERSION = 16

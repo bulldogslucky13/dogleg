@@ -210,6 +210,41 @@ find the polygon name for a new course, query Overpass for
   useless here for the reason it usually is: one course-wide multipolygon
   spanning the whole corridor (the default surface), correctly dropped.
 
+- **Quail Hollow Club (all 18)** — the course where **the house scorecard
+  source is the wrong source**. BlueGolf carries Quail Hollow only as its MEMBER
+  configuration (par 72 / 7,546, the 1st played as a par 5), which is a
+  different golf course from the tournament setup the game ships. Pulling the
+  card first, per step 1, would therefore have produced a par mismatch on hole 1
+  and read as "a data bug, full stop" when the tuple was right all along. What
+  settled it: the shipped par sequence AND OSM's own per-hole `par` tags both
+  match the 2025 PGA Championship card (par 71 / 7,626) on all 18, so the
+  members' card is the outlier. **Check what CONFIGURATION a card describes
+  before treating a par mismatch as a bug** — for a tournament venue the club's
+  everyday card and its championship card can differ by a par and 80 yards, and
+  the championship's own scorecard PDF is the better source. Par ended up
+  untouched; four yardages moved.
+  Second, its shifts go **both directions on the same course** — 1 and 3 trim,
+  eight others prepend. 82 tee pads over 18 holes and the mapper picked a
+  different one per hole, the seminole pattern, so per-hole diagnosis is the
+  only way through. Projecting ProVisualizer's published tee onto each hole's
+  HEADING (a signed along-distance, not the raw point distance) is what sorted
+  them: it agrees within 12 yd on seven of the ten. Raw distance would not have
+  worked — hole 15's PV tee is 104 yd away but sits 79 yd off the hole's line,
+  so it corroborates nothing, and only the projection reveals that.
+  Third, it is a clean example of the **carnoustie linestring mode** biting the
+  one hole that could least afford it: `waterway=stream` never reaches the
+  polygon rasterizer, so 18 — whose signature reads "creek all down the left" —
+  imported with no water whatsoever. Projecting the stream onto the hole's own
+  shifted centreline gives the creek crossing at ~190 and then running up the
+  left at 1-23 yd off, unbroken, to the green. The crossing was deliberately not
+  laid as a `cross`: at 190 yd on a 494-yd par 4 it is far short of the landing
+  area, and a forced carry there would be invented.
+  Worth copying: **check bunker SIZE against the rake before assuming you need a
+  finer one.** Muirfield needed rake 3 immediately before this; Quail Hollow
+  keeps the 6-yd default because not one of its 74 bunkers is under 6 yd across
+  (min 6.7, median 12.8). One number decides it, and it is the reason the rake
+  is a per-course knob and not a new global.
+
 ### Known gaps & importer artifact modes
 
 - **Coverage** — obscure courses may lack `golf=hole` centerlines, and many

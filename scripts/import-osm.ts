@@ -350,6 +350,19 @@ const COURSE_GEO: Record<string, CourseGeo> = {
     engineSlug: 'muirfield',
     rake: 3,
   },
+  // Quail Hollow Club, Charlotte NC (way 877659537). NAME-COLLISION WARNING:
+  // "Quail Hollow" is a common club name and BlueGolf alone carries five more
+  // (quailhollow, quailhollowgcc1, quailhollowccweiskop, quailhollowgolfcourse,
+  // …) in other states. The Charlotte club is `quailhollowclub` there and the
+  // only golf_course polygon named "Quail Hollow" anywhere in a 0.3-degree box
+  // around the city here.
+  quailhollow: {
+    name: 'Quail Hollow Club',
+    center: [35.1141, -80.8423],
+    radius: 1500,
+    osmName: '^Quail Hollow Club$',
+    engineSlug: 'quail-hollow',
+  },
 }
 
 // ---------- Overpass ----------

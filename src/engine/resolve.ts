@@ -16,6 +16,7 @@ import type { Rng } from './rng'
 import { pickWeighted } from './rng'
 import { approachAdvantage, longAdvantage, puttAdvantage } from './advantage'
 import { approachOdds, longOdds, puttOdds, shortOdds, type ApproachMode, type FortuneShotOdds, type ZoneShare } from './odds'
+import { playsAsGreensideSand } from './layout'
 
 /** What a made putt scores relative to par — accounts for every stroke already
  * taken, penalties included. A "birdie look" is only a birdie look if holing out
@@ -167,6 +168,91 @@ export function aceEligible(h: HoleInPlay, choice: Choice): boolean {
   return aceFiringChoice(h.layout.bailout, choice)
 }
 
+/**
+ * Where a water penalty puts the ball, for BOTH the long game and the approach.
+ *
+ * Exported for the same reason `secondGoMode` is: grade.ts values this drop
+ * when it prices the `water` bucket, and if the two formulas drift the model
+ * prices a drop the player never gets, which the telescoping identity reports
+ * as luck. One function, every caller.
+ *
+ * - **cross** — drop short of the hazard you had to carry (the yellow-stake
+ *   line-of-flight option), never behind where you played from.
+ * - **lateral** — drop at the middle of the stretch of that lake the shot could
+ *   actually have reached: the honest proxy for where the ball crossed the
+ *   margin, and what red-stake relief actually is. Uses the same clamped span
+ *   the sand branch samples (`from` pushed ahead of the ball, `to` as-is).
+ * - **no zone** — nothing mapped won the roll; keep the historical fallback.
+ *
+ * THE LATERAL BRANCH IS THE FIX. Both stages used to ignore the zone the roll
+ * had just chosen: the approach dropped at a fixed `length - 44`, the tee shot
+ * at `max(ballPos + 40, windowMid * 0.8)`. Laterals are ~80% of water outcomes,
+ * and the lake named by the roll sat on average 47 yd (approach) and 39 yd
+ * (long) away from where the ball was actually placed — more than 40 yd away a
+ * third of the time. The tee-shot version at least scaled with the drive; the
+ * approach's constant was related to nothing at all.
+ *
+ * `floor` is deliberately kept, and it makes the change strongly asymmetric: on
+ * approaches the drop moves BACK 16.7 yd on average and forward only 3.2,
+ * because a lake 150 yd short stops advancing you to wedge range while a lake
+ * beside the green is already against the floor. Not perfectly one-way though —
+ * where a lateral lake's reachable middle sits past the old fixed point, the
+ * floor lets the drop come up to 9 yd FORWARD of where it used to be. That is
+ * the honest answer for water you cross right at the green, and it is bounded.
+ *
+ * The per-stage constants stay at the call sites (`WATER_DROP_LONG` /
+ * `WATER_DROP_APPROACH`) because they encode genuinely different things: a tee
+ * shot has to travel before it can find anything, an approach does not.
+ */
+export interface WaterDropRule {
+  /** how far short of a `cross` hazard the drop sits */
+  crossBack: number
+  /** the drop must advance at least this far past where the shot was played */
+  minAdvance: number
+  /** fallback when nothing mapped won the roll */
+  noZone: (length: number, windowMid: number, ballPos: number) => number
+  /** never drop nearer the hole than `length - floor` */
+  floor: number
+}
+
+export const WATER_DROP_LONG: WaterDropRule = {
+  crossBack: 8,
+  minAdvance: 30,
+  noZone: (_l, mid, ballPos) => Math.max(ballPos + 40, mid * 0.8),
+  floor: 30,
+}
+
+export const WATER_DROP_APPROACH: WaterDropRule = {
+  crossBack: 10,
+  minAdvance: 0,
+  noZone: (l) => l - 44,
+  floor: 35,
+}
+
+export function waterDropPos(
+  zone: HazardZone | null,
+  ballPos: number,
+  length: number,
+  rule: WaterDropRule,
+  windowMid = 0,
+): number {
+  let raw: number
+  if (!zone) raw = rule.noZone(length, windowMid, ballPos)
+  else if (zone.side === 'cross') raw = Math.max(ballPos + rule.minAdvance, zone.from - rule.crossBack)
+  else {
+    const lo = Math.max(zone.from, ballPos + Math.max(rule.minAdvance, 6))
+    const hi = Math.max(lo, zone.to)
+    raw = (lo + hi) / 2
+  }
+  // The floor must never walk the ball BACKWARDS, which it could when the shot
+  // was played from nearer the green than the floor itself — a latent bug older
+  // than this change and worse before it (whistling-straits:7, ball at 188 on a
+  // 221-yд par 3, dropped at 177 under the old fixed formula and 186 under the
+  // floor alone). A penalty costs a stroke; it does not also march you back down
+  // the hole.
+  return Math.max(Math.min(raw, length - rule.floor), ballPos)
+}
+
 function approachMode(h: HoleInPlay): ApproachMode {
   const { par } = h.layout.spec
   if (par === 3 && h.ball.lie === 'tee') return 'par3tee'
@@ -307,11 +393,14 @@ export function playShot(h: HoleInPlay, choice: Choice, rng: Rng, destiny?: 'ace
         h.penalties += 1
         h.strokes += 1
         const zone = pickZone(detail.zoneShares, 'water', rng)
-        const dropPos =
-          zone && zone.side === 'cross'
-            ? Math.max(h.ball.pos + 30, zone.from - 8)
-            : Math.max(h.ball.pos + 40, mid * 0.8)
-        after = { pos: Math.min(dropPos, L - 30), lie: 'rough', side: zone?.side === 'left' ? 'left' : zone?.side === 'right' ? 'right' : 'center' }
+        // Same rule as the approach drop — see `waterDropPos`. The tee shot's
+        // lateral case had the identical flaw: it ignored the lake the roll
+        // named and dropped at a fraction of the drive window instead.
+        after = {
+          pos: waterDropPos(zone, h.ball.pos, L, WATER_DROP_LONG, mid),
+          lie: 'rough',
+          side: zone?.side === 'left' ? 'left' : zone?.side === 'right' ? 'right' : 'center',
+        }
       } else if (bucket === 'sand') {
         const zone = pickZone(detail.zoneShares, 'sand', rng)
         after = {
@@ -575,9 +664,22 @@ function resolveApproach(
     penalty = true
     h.penalties += 1
     h.strokes += 1
+    // YOU DROP WHERE YOU WENT IN — the same rule the sand branch below now
+    // follows, for the same reason. A CROSS hazard has always used the zone the
+    // roll picked (drop short of it, which is the yellow-stake option). A
+    // LATERAL one ignored it completely and dropped at a fixed `L - 44`, and
+    // laterals are 80% of approach-water outcomes: the lake the roll named
+    // averaged 47 yd from where the ball was actually put, and a third of the
+    // time it was more than 40 yd away. Worse, it was generous in the wrong
+    // direction — find a lake 150 yd short and you were advanced to 44 yd out,
+    // where golf's red-stake relief is a drop back at the crossing.
+    //
+    // So a lateral drop is now the middle of the stretch of that lake the shot
+    // could actually have reached, which is the honest proxy for where the ball
+    // crossed the margin. Same clamped span the sand branch samples, so the two
+    // hazards agree about what "the zone the roll chose" means.
     const zone = pickZone(detail.missShares, 'water', rng)
-    const dropPos = zone && zone.side === 'cross' ? Math.max(h.ball.pos, zone.from - 10) : L - 44
-    h.ball = { pos: Math.min(dropPos, L - 35), lie: 'fairway', side: 'center' }
+    h.ball = { pos: waterDropPos(zone, h.ball.pos, L, WATER_DROP_APPROACH), lie: 'fairway', side: 'center' }
     h.stage = 'approach'
     h.status = { tone: 'bad', title: 'In the water', note: 'One-stroke penalty — playing from the drop.' }
     h.shots.push({ stage: stageWas, choice, outcome: bucket, penalty, faced, after: h.ball, strokesAfter: h.strokes })
@@ -594,34 +696,65 @@ function resolveApproach(
   // exception and this isn't it. Deep rough's cost is priced where the player
   // can see it: fewer greens hit, scaled by distance (see JUNK_MAX_BITE).
   const zone = bucket === 'sand' ? pickZone(detail.missShares, 'sand', rng) : null
-  const pos = Math.min(L - 8 - rng() * 18, L - 5)
-  // The share pick says which sand the shot FOUND; the line above puts the ball
-  // greenside by construction. Those two disagree more often than you'd think,
-  // because missShares is weighted over every sand zone in the approach window
-  // — a fairway waste 100 yd short can win the roll. zoneId is what HoleMap
-  // anchors the ball sprite to, and it takes priority over the "greenside but
-  // unmapped" placement below it, so the losing case drew the ball down in that
-  // far bunker under a "Greenside bunker" banner quoting the real greenside
-  // yardage. Seen on pine-valley:18 (ball 460, zone 229-383) but worst on
-  // royal-portrush-dunluce and carnoustie, where it hit ~70% of sand lies.
+  // THE BALL FINISHES IN THE BUNKER THE ROLL CHOSE — the same rule the tee shot
+  // has always followed (see the `sand` branch of resolveLong, which puts the
+  // ball at the middle of the zone it found and lets the next shot be an
+  // approach from sand). This path used to pick a zone and then ignore it,
+  // pinning the ball greenside at `L - 8 - rng()*18` whatever it had picked and
+  // always entering the short game. That made three things disagree at once:
+  // the share pick, the yardage, and the sprite.
   //
-  // Only claim the zone when it actually spans where the ball came to rest.
-  // Deliberately DROP the id rather than re-pick a containing zone: dropping
-  // lets HoleMap fall through to its own greenside placement, and it keeps
-  // `pos`, `lie`, `side` and the rng draw sequence byte-identical to before, so
-  // this is a drawing fix and not a replay-affecting one. (`zoneId` is read
-  // only by HoleMap and SideMap — it never reaches odds.ts.)
-  const anchoring = zone && pos >= zone.from && pos <= zone.to ? zone : null
+  // It mattered because `shortOdds` never reads `ball.pos` — it is a greenside
+  // table by construction — so a ball "in" a fairway bunker 96 yd out was being
+  // splashed out with a 24% up-and-down. And the displayed sand% counted those
+  // far bunkers while every one of them played as a greenside splash.
+  //
+  // Now: land in the zone, in its middle half so the lie has some variety, and
+  // let `isGreenside` — the SAME predicate the odds use to weight a bunker as
+  // one that guards the green — decide whether this is a splash or a swing.
+  // The two models cannot disagree about what a sand miss meant, because they
+  // now consult the same one. Dispersion weighting (see `approachFocus` in
+  // odds.ts) is what makes this safe: without it, landing in the zone the roll
+  // chose would strand players in far bunkers far too often.
+  // A zone only has to END ahead of the ball to be reachable, so its near edge
+  // can lie behind where we are playing from — sampling the whole span could
+  // walk the ball BACKWARDS, or leave it close enough to find the same bunker
+  // again next shot. Sample only the part that is genuinely ahead.
+  // The zone must also have room AHEAD of the ball to land in. A zone whose far
+  // edge is only a yard or two past us is "reachable" by the odds' rule but has
+  // nowhere to put the ball, and clamping into it would leave the ball outside
+  // the bunker it claims — the fallback below then handles it as an ordinary
+  // greenside miss.
+  const inZone = bucket === 'sand' && zone && zone.to > preBall.pos + 6 ? zone : null
+  const lo = inZone ? Math.max(inZone.from, preBall.pos + 6) : 0
+  const hi = inZone ? inZone.to : 0
+  const pos = inZone
+    ? Math.min(lo + (hi - lo) * (0.25 + rng() * 0.5), L - 5)
+    : Math.min(L - 8 - rng() * 18, L - 5)
+  // A zone the ball is genuinely inside always anchors the sprite, so HoleMap
+  // never falls through to its "greenside but unmapped" placement for sand —
+  // that fallback drew the ball on bare grass beside the green under a
+  // "Greenside bunker" banner whenever the winning zone sat elsewhere. The
+  // containment re-check is belt and braces for the clamp above: if pushing the
+  // ball ahead of the tee shot carried it out of the bunker, it is not in that
+  // bunker and must not claim it.
+  const anchored = inZone && pos >= inZone.from && pos <= inZone.to ? inZone : null
   h.ball = {
     pos,
     lie: bucket === 'sand' ? 'sand' : 'fringe',
     side: zone && zone.side !== 'cross' && zone.side !== 'green' ? zone.side : rng() < 0.5 ? 'left' : 'right',
-    zoneId: anchoring?.id,
+    zoneId: anchored?.id,
   }
-  h.stage = 'shortgame'
-  h.status =
-    bucket === 'sand'
+  const greenside = !anchored || playsAsGreensideSand(anchored, pos, L, h.layout.greenDepth)
+  h.stage = greenside ? 'shortgame' : 'approach'
+  h.status = greenside
+    ? bucket === 'sand'
       ? { tone: 'bad', title: 'Greenside bunker', note: 'Splash it out — save the par.' }
       : { tone: 'bad', title: 'Missed the green', note: 'Short-game test — get it up and down.' }
+    : // Deliberately NOT "fairway bunker": this branch is every bunker the
+      // green isn't guarded by, which includes a long waste bunker sitting 26
+      // yards from the flag. "In the sand" is true of all of them, and the
+      // yardage says the rest.
+      { tone: 'bad', title: 'In the sand', note: `${Math.round(L - pos)} yards to go — pick it clean.` }
   h.shots.push({ stage: stageWas, choice, outcome: bucket, penalty, faced, after: h.ball, strokesAfter: h.strokes })
 }

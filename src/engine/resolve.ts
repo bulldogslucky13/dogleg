@@ -253,6 +253,23 @@ export function waterDropPos(
   return Math.max(Math.min(raw, length - rule.floor), ballPos)
 }
 
+/**
+ * Which side of the hole a water drop sits on: the side of the lake you went
+ * into, because red-stake relief is taken beside the crossing point. A `cross`
+ * hazard spans the line and has no side to inherit, so those stay centre.
+ *
+ * Paired with `waterDropPos` for the same reason it exists: the tee shot has
+ * always propagated this and the approach always hard-coded `center`, which
+ * mattered little while the drop was a fixed distance unrelated to the lake,
+ * and matters now that it lands beside it — `HoleMap` positions an unanchored
+ * ball off `BallState.side`, so a centre drop is drawn in the middle of the
+ * fairway after a penalty taken down the left. Drawing only: `ball.side` is
+ * never read by odds.ts or layout.ts, and no roll depends on it.
+ */
+export function waterDropSide(zone: HazardZone | null): BallState['side'] {
+  return zone?.side === 'left' ? 'left' : zone?.side === 'right' ? 'right' : 'center'
+}
+
 function approachMode(h: HoleInPlay): ApproachMode {
   const { par } = h.layout.spec
   if (par === 3 && h.ball.lie === 'tee') return 'par3tee'
@@ -399,7 +416,7 @@ export function playShot(h: HoleInPlay, choice: Choice, rng: Rng, destiny?: 'ace
         after = {
           pos: waterDropPos(zone, h.ball.pos, L, WATER_DROP_LONG, mid),
           lie: 'rough',
-          side: zone?.side === 'left' ? 'left' : zone?.side === 'right' ? 'right' : 'center',
+          side: waterDropSide(zone),
         }
       } else if (bucket === 'sand') {
         const zone = pickZone(detail.zoneShares, 'sand', rng)
@@ -679,7 +696,7 @@ function resolveApproach(
     // crossed the margin. Same clamped span the sand branch samples, so the two
     // hazards agree about what "the zone the roll chose" means.
     const zone = pickZone(detail.missShares, 'water', rng)
-    h.ball = { pos: waterDropPos(zone, h.ball.pos, L, WATER_DROP_APPROACH), lie: 'fairway', side: 'center' }
+    h.ball = { pos: waterDropPos(zone, h.ball.pos, L, WATER_DROP_APPROACH), lie: 'fairway', side: waterDropSide(zone) }
     h.stage = 'approach'
     h.status = { tone: 'bad', title: 'In the water', note: 'One-stroke penalty — playing from the drop.' }
     h.shots.push({ stage: stageWas, choice, outcome: bucket, penalty, faced, after: h.ball, strokesAfter: h.strokes })

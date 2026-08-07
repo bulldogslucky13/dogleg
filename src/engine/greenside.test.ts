@@ -3,7 +3,7 @@ import type { Choice, HazardZone } from './types'
 import { buildLayout, isGreenside } from './layout'
 import { OSM_GEOMETRY } from './geometry'
 import { splitFortune } from './fortune'
-import { aceEligible, playShot, startHole, waterDropPos, WATER_DROP_APPROACH, WATER_DROP_LONG } from './resolve'
+import { aceEligible, playShot, startHole, waterDropPos, waterDropSide, WATER_DROP_APPROACH, WATER_DROP_LONG } from './resolve'
 import { rngFromString } from './rng'
 import { destinyPlan, fortuneOddsFor, replayRound, setupFromSeed } from './replay'
 
@@ -202,6 +202,39 @@ describe('waterDropPos', () => {
   it('falls back to the historical fixed drop when no zone won the roll', () => {
     expect(waterDropPos(null, 200, 500, WATER_DROP_APPROACH)).toBe(500 - 44)
   })
+
+  it('drops on the side of the lake it went into, on BOTH stages', () => {
+    // red-stake relief is taken beside the crossing, so the drop inherits the
+    // lake's side. HoleMap positions an unanchored ball off `side`, so a centre
+    // drop is drawn mid-fairway after a penalty taken down the left — which is
+    // what the approach used to do while the tee shot did this correctly.
+    expect(waterDropSide(lateral(260, 320))).toBe('left')
+    expect(waterDropSide({ ...lateral(260, 320), side: 'right' })).toBe('right')
+    // a crossing spans the line and has no side to inherit
+    expect(waterDropSide(cross(260, 320))).toBe('center')
+    expect(waterDropSide(null)).toBe('center')
+  })
+
+  it('records that side on a real approach water penalty', () => {
+    let checked = 0
+    for (const slug of ['doral-blue-monster', 'tpc-sawgrass']) {
+      for (let i = 0; i < 14; i++) {
+        const seed = `practice:${slug}:wside-${i}`
+        const outcome = replayRound(seed, undefined, genDecisions(seed, () => 'aggressive'))
+        if (!outcome.ok) continue
+        for (const score of outcome.scores) {
+          if (!score) continue
+          for (const shot of score.shots) {
+            if (shot.outcome !== 'water') continue
+            checked++
+            expect(['left', 'right', 'center']).toContain(shot.after.side)
+          }
+        }
+      }
+    }
+    // at least some of them must be off-centre, or the assignment is dead code
+    expect(checked).toBeGreaterThan(10)
+  }, 20000)
 
   it('never moves the ball backwards over real rounds', () => {
     let drops = 0

@@ -19,6 +19,9 @@
  *                                          # prepend the missing tee run so length,
  *                                          # zones AND the bend profile come out in
  *                                          # card coordinates (see --shift below)
+ *   pnpm import:osm muirfield 17 --shift -60 # NEGATIVE: centreline starts BEHIND
+ *                                          # the card's tee (traced from a back pad),
+ *                                          # so trim that run off the front instead
  *
  * Registry: COURSE_GEO below maps a short slug → course center, the exact
  * golf_course polygon name (osmName), and the engine slug (for --compare).
@@ -100,6 +103,19 @@ type CourseGeo = {
    * saying what it actually is and how that was established from imagery,
    * because this is the one hook that lets an import ignore real OSM data. */
   osmIgnore?: number[]
+  /** Lateral rake spacing in yards, overriding the 6-yd default. Lower it for
+   * a course whose hazards are SMALLER than the default assumes: the rake
+   * samples the corridor at fixed offsets, so a bunker narrower than the
+   * spacing can sit between two samples and never register — then die on the
+   * 4-yd minimum span. Muirfield is the case this was added for (its ~150
+   * revetted pots are frequently under 6 yd across, and a 6-yd rake dropped
+   * greenside sand on 14 of 18 holes, including both walls of the 13th that
+   * the hole's own signature copy names). Per-course rather than global so
+   * every already-imported course keeps the resolution it was QA'd at —
+   * committed geometry is static data, but re-importing one of them later
+   * should not silently change its zones. Costs one rake pass per step, so
+   * don't lower it without evidence that real hazards are being missed. */
+  rake?: number
 }
 
 const COURSE_GEO: Record<string, CourseGeo> = {
@@ -303,6 +319,50 @@ const COURSE_GEO: Record<string, CourseGeo> = {
     osmName: '^Pine Valley Country Club$',
     engineSlug: 'pine-valley',
   },
+  // Muirfield (Honourable Company of Edinburgh Golfers) is way 101336384,
+  // Gullane, East Lothian. NAME-COLLISION WARNING, and it bites twice: the
+  // library already contains `muirfield-village` (Dublin, Ohio) at rotation
+  // #47, and BlueGolf's bare `muirfield` id is a THIRD course — Muirfield GC
+  // in North Rocks, Australia (par 69, 6205 METERS), which is what you get if
+  // you guess the card URL. The Scottish card is `muirfieldsc`.
+  // Anchored `^Muirfield$` because the polygon's name is exactly that.
+  //
+  // Gullane's links are packed shoulder to shoulder, so the radius matters
+  // more than usual: five other courses sit inside 2.5 km — The Renaissance
+  // Club (1.3 km NE), Gullane No.1/2/3 as one 54-hole polygon (1.8 km SW),
+  // Archerfield's two 18s (2.4 km E), Luffness New (2.6 km SW). Radius 1400
+  // covers Muirfield's own ~1.2 km block and the sea to its north without
+  // reaching any of them. map_to_area then scopes the features anyway.
+  // No osmHolePrefix and none possible — all 18 hole ways are unnamed, bare
+  // `ref` — but unlike Pine Valley there is nothing to disambiguate: the
+  // polygon contains exactly 18 `golf=hole` ways carrying refs 1-18, one
+  // each, no second course inside the boundary.
+  // Rake 3, not the default 6 — see CourseGeo.rake. Muirfield's bunkers are
+  // small revetted pots, and at 6 yd the corridor rake stepped straight over
+  // greenside sand on 14 of 18 holes. Verified against the OSM polygons rather
+  // than by eye: 81 bunkers touch a green, and the 6-yd pass left 28 of them
+  // with no zone at all, including both walls of the 13th.
+  muirfield: {
+    name: 'Muirfield',
+    center: [56.0458, -2.8218],
+    radius: 1400,
+    osmName: '^Muirfield$',
+    engineSlug: 'muirfield',
+    rake: 3,
+  },
+  // Quail Hollow Club, Charlotte NC (way 877659537). NAME-COLLISION WARNING:
+  // "Quail Hollow" is a common club name and BlueGolf alone carries five more
+  // (quailhollow, quailhollowgcc1, quailhollowccweiskop, quailhollowgolfcourse,
+  // …) in other states. The Charlotte club is `quailhollowclub` there and the
+  // only golf_course polygon named "Quail Hollow" anywhere in a 0.3-degree box
+  // around the city here.
+  quailhollow: {
+    name: 'Quail Hollow Club',
+    center: [35.1141, -80.8423],
+    radius: 1500,
+    osmName: '^Quail Hollow Club$',
+    engineSlug: 'quail-hollow',
+  },
 }
 
 // ---------- Overpass ----------
@@ -310,6 +370,10 @@ const OVERPASS_ENDPOINTS = [
   'https://overpass-api.de/api/interpreter',
   'https://overpass.kumi.systems/api/interpreter',
   'https://overpass.private.coffee/api/interpreter',
+  // Fourth mirror, added during the Muirfield import when the first three all
+  // returned the "server is probably too busy" dispatcher timeout for ~15 min
+  // and this one answered every query first try.
+  'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
 ]
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
@@ -704,6 +768,40 @@ async function main() {
     const bl = len(back) || 1
     rawPts.unshift([p0[0] + (back[0] / bl) * toMeters(shiftYd), p0[1] + (back[1] / bl) * toMeters(shiftYd)])
   }
+  // A NEGATIVE --shift is the mirror image: the centreline starts BEHIND the
+  // card's tee (the mapper traced from a championship pad on a course we ship
+  // off a shorter card), so walk N yards down the existing line and start
+  // there. Muirfield is the case this was written for — OSM drew 10 of 18 from
+  // the back pads, and the club's WHITE card, which the shipped tuple already
+  // matched exactly, is 361 yd shorter in total.
+  //
+  // Trimming is the STRONGER half of the operation, not a grudging inverse:
+  // the positive path invents a straight run back from the tee, while this one
+  // only discards measured line, so the geometry that survives is all real.
+  // Do it here, on the raw points and before smoothing, for the same reason
+  // --shift prepends here — length, zones, fairwayFrom/To and the bend profile
+  // then all come out in card coordinates in one pass. Hazards beside the
+  // discarded run drop out with it, which is correct: they sit behind the tee
+  // we actually play from.
+  if (shiftYd < 0 && rawPts.length >= 2) {
+    let drop = toMeters(-shiftYd)
+    while (rawPts.length >= 2 && drop > 0) {
+      const seg = len(sub(rawPts[1], rawPts[0]))
+      if (seg > drop) {
+        // land mid-segment: move the first point forward along it
+        const d = sub(rawPts[1], rawPts[0])
+        const f = drop / (seg || 1)
+        rawPts[0] = [rawPts[0][0] + d[0] * f, rawPts[0][1] + d[1] * f]
+        break
+      }
+      drop -= seg
+      rawPts.shift()
+    }
+    if (rawPts.length < 2) {
+      console.error(`--shift ${shiftYd} trims the whole centreline away`)
+      process.exit(2)
+    }
+  }
   const center: Vec[] = chaikin(rawPts, 2)
   const cum = arcLengths(center)
   const holeLenM = cum[cum.length - 1]
@@ -725,7 +823,7 @@ async function main() {
   const CORRIDOR_YD = 50 // how far left/right we care about
   const OCEAN_REACH_YD = 160 // how far out to look for a set-back cliff line
   const STEP_YD = 2
-  const RAKE_YD = 6 // lateral sample spacing
+  const RAKE_YD = geo.rake ?? 6 // lateral sample spacing (see CourseGeo.rake)
   const CENTER_YD = 10 // |offset| within this counts as "on the line" → crossing
 
   // pre-project every hazard ring once, keep only rings near the corridor
@@ -1105,8 +1203,26 @@ async function main() {
       let run: number[] = []
       const flush = () => {
         if (!run.length) return
-        const spansLine = run.some((o) => o > 0) && run.some((o) => o < 0) && run.some((o) => Math.abs(o) <= CENTER_YD)
-        const side = spansLine ? 'cross' : run[0] > 0 ? 'left' : run[run.length - 1] < 0 ? 'right' : 'cross'
+        // A crossing must also be WIDE enough to be worth carrying. Continuity
+        // across the line is necessary but not sufficient: a small revetted pot
+        // sitting on the centreline satisfies it while blocking three yards of
+        // a hundred-yard corridor, and `cross` means "you must carry this".
+        // Muirfield produced three (6:224, 8:274, 18:364, spanning 9, 6 and 3
+        // yd laterally) once the rake was fine enough to see them at all.
+        // Width alone can't be the test, though — a burn crossing the fairway
+        // is narrow and IS a forced carry (Carnoustie, Rae's Creek). So the
+        // minimum applies to SAND only: a narrow bunker on the line is a pot
+        // you aim around, a narrow watercourse is a hazard you clear.
+        const MIN_CROSS_SAND_YD = 12
+        const spansLine =
+          run.some((o) => o > 0) &&
+          run.some((o) => o < 0) &&
+          run.some((o) => Math.abs(o) <= CENTER_YD) &&
+          (kind !== 'bunker' || run[run.length - 1] - run[0] >= MIN_CROSS_SAND_YD)
+        // Falls through to the flank holding most of the hazard's mass; a
+        // straddling run that isn't a crossing used to default to 'cross'.
+        const mass = run.reduce((s, o) => s + o, 0)
+        const side = spansLine ? 'cross' : run[0] > 0 ? 'left' : run[run.length - 1] < 0 ? 'right' : mass >= 0 ? 'left' : 'right'
         raws.push({ kind, from: a, to: a + STEP_YD, side })
         run = []
       }

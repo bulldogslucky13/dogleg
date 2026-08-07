@@ -169,6 +169,82 @@ find the polygon name for a new course, query Overpass for
   `golf=fairway` running beside them for 27-50% of their span and were folded to
   flanks, and the rest had none at all.
 
+- **Muirfield (all 18)** — the course that added the negative `--shift` and the
+  per-course rake. Its shipped tuple already matched the club's WHITE card
+  (par 71 / 6728) on par, stroke index *and* yardage for all 18, so it was pure
+  geometry, and notable for three things.
+  First, **the tee problem ran the other way.** Every previous course that
+  missed its card imported SHORT off a forward pad; Muirfield imports LONG on
+  ten holes because OSM traced them from the CHAMPIONSHIP tees (7089 yd of
+  centreline against the card's 6728). `--shift` now takes a negative, which
+  trims that run off the front instead of prepending a missing one — and
+  trimming is the *stronger* operation, because it only discards measured line
+  where the positive path invents a straight one. Diagnose before reaching for
+  it: the tell is that ProVisualizer's published tee sat within 1-7 yd of the
+  untrimmed OSM start on 17 of 18 holes, and PV's tee-to-pin distance tracked
+  the OSM length rather than the card on exactly the ten long holes. Then check
+  the trim lands somewhere real — 9 of 10 came down within 12 yd of a mapped
+  `golf=tee`, most within 2-8. (Hole 15 is the one that didn't: only two pads
+  are mapped and the card needs 49 yd, so the card wins and the entry says so.)
+  Second, **the 6-yd lateral rake is not fine enough for every course.** This
+  is `bandon-dunes:12` generalised — there, one bunker 4 yd off the line
+  vanished under the rake and was hand-added back. Muirfield's ~150 revetted
+  pots are frequently under 6 yd across, and the default rake stepped over
+  greenside sand on 14 of 18 holes, including both walls of the 13th, which the
+  hole's own `signature` names. `COURSE_GEO.rake` lowers it per course (3 here);
+  it is per-course rather than global so every already-imported course keeps the
+  resolution it was QA'd at. Check for this with the polygons rather than by
+  eye: count the bunkers whose ring comes within ~30 yd of the hole's green and
+  compare against the greenside zones you actually shipped. 81 touch a green at
+  Muirfield and the 6-yd pass left 28 of them with no zone at all.
+  Third, **a `cross` band must be wide enough to be worth carrying.** Lateral
+  continuity across the line is necessary, not sufficient: a 3-yd pot sitting on
+  the centreline satisfies it while blocking three yards of a hundred-yard
+  corridor. Sand now needs to span >=12 yd to earn `cross`; water and trees keep
+  the old rule, because a burn crossing a fairway is narrow and IS a forced
+  carry. Muirfield ends with zero cross zones on any hole, which is the links
+  being honest rather than a bug.
+  Worth knowing: its OSM `handicap` tags disagree with the club card on 12 of 18
+  holes — the exact reverse of Torrey Pines, where they matched on all 18. OSM's
+  hole tags corroborate a card; they never arbitrate one. And `golf=rough` is
+  useless here for the reason it usually is: one course-wide multipolygon
+  spanning the whole corridor (the default surface), correctly dropped.
+
+- **Quail Hollow Club (all 18)** — the course where **the house scorecard
+  source is the wrong source**. BlueGolf carries Quail Hollow only as its MEMBER
+  configuration (par 72 / 7,546, the 1st played as a par 5), which is a
+  different golf course from the tournament setup the game ships. Pulling the
+  card first, per step 1, would therefore have produced a par mismatch on hole 1
+  and read as "a data bug, full stop" when the tuple was right all along. What
+  settled it: the shipped par sequence AND OSM's own per-hole `par` tags both
+  match the 2025 PGA Championship card (par 71 / 7,626) on all 18, so the
+  members' card is the outlier. **Check what CONFIGURATION a card describes
+  before treating a par mismatch as a bug** — for a tournament venue the club's
+  everyday card and its championship card can differ by a par and 80 yards, and
+  the championship's own scorecard PDF is the better source. Par ended up
+  untouched; four yardages moved.
+  Second, its shifts go **both directions on the same course** — 1 and 3 trim,
+  eight others prepend. 82 tee pads over 18 holes and the mapper picked a
+  different one per hole, the seminole pattern, so per-hole diagnosis is the
+  only way through. Projecting ProVisualizer's published tee onto each hole's
+  HEADING (a signed along-distance, not the raw point distance) is what sorted
+  them: it agrees within 12 yd on seven of the ten. Raw distance would not have
+  worked — hole 15's PV tee is 104 yd away but sits 79 yd off the hole's line,
+  so it corroborates nothing, and only the projection reveals that.
+  Third, it is a clean example of the **carnoustie linestring mode** biting the
+  one hole that could least afford it: `waterway=stream` never reaches the
+  polygon rasterizer, so 18 — whose signature reads "creek all down the left" —
+  imported with no water whatsoever. Projecting the stream onto the hole's own
+  shifted centreline gives the creek crossing at ~190 and then running up the
+  left at 1-23 yd off, unbroken, to the green. The crossing was deliberately not
+  laid as a `cross`: at 190 yd on a 494-yd par 4 it is far short of the landing
+  area, and a forced carry there would be invented.
+  Worth copying: **check bunker SIZE against the rake before assuming you need a
+  finer one.** Muirfield needed rake 3 immediately before this; Quail Hollow
+  keeps the 6-yd default because not one of its 74 bunkers is under 6 yd across
+  (min 6.7, median 12.8). One number decides it, and it is the reason the rake
+  is a per-course knob and not a new global.
+
 ### Known gaps & importer artifact modes
 
 - **Coverage** — obscure courses may lack `golf=hole` centerlines, and many

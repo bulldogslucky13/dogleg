@@ -721,25 +721,32 @@ export const COURSES: CourseSpec[] = [
     greens: 'Firm',
     wind: 18,
     blurb: 'Windblown fescue and firm greens on Long Island’s eastern end.',
+    // Stroke indices are the club's men's handicap row, which BlueGolf prints
+    // IDENTICALLY on all five of its tee sets — so it is the course's, not a
+    // tee's, and it applies to the U.S. Open setup the yardages describe. The
+    // shipped tuple disagreed with it on 15 of 18 holes. Par (70) is unchanged:
+    // the card confirms it on all 18, so OSM's lone par=5 tag on the 12th is
+    // the outlier. Yardages are the 2018 U.S. Open card's; they auto-reconcile
+    // to the imported geometry below. Geometry: OSM_GEOMETRY 'shinnecock-hills:*'.
     holes: holes([
-      [4, 394, 17, 'S', 'sand'],
-      [3, 252, 5, 'S', 'sand'],
-      [4, 501, 1, 'R', 'sand'],
-      [4, 476, 9, 'S', 'sand'],
-      [5, 592, 11, 'L', 'sand'],
-      [4, 495, 3, 'S', 'water'],
-      [3, 187, 15, 'S', 'sand', 'The Redan seventh — feed it off the slope and let it chase'],
-      [4, 440, 13, 'S', 'sand'],
-      [4, 482, 7, 'R', 'sand'],
-      [4, 415, 10, 'S', 'sand'],
-      [3, 157, 16, 'S', 'sand'],
+      [4, 399, 15, 'S', 'sand'],
+      [3, 252, 17, 'S', 'sand'],
+      [4, 500, 5, 'R', 'sand'],
+      [4, 475, 7, 'S', 'sand'],
+      [5, 589, 11, 'L', 'sand'],
+      [4, 491, 1, 'S', 'water'],
+      [3, 189, 13, 'S', 'sand', 'The Redan seventh — feed it off the slope and let it chase'],
+      [4, 439, 9, 'S', 'sand'],
+      [4, 485, 3, 'R', 'sand'],
+      [4, 415, 2, 'S', 'sand'],
+      [3, 159, 16, 'S', 'sand'],
       [4, 469, 8, 'L', 'sand'],
-      [4, 371, 18, 'S', 'none'],
-      [4, 520, 2, 'R', 'sand'],
-      [4, 409, 12, 'S', 'sand'],
-      [5, 614, 6, 'R', 'sand'],
-      [3, 176, 14, 'S', 'sand'],
-      [4, 490, 4, 'S', 'sand', 'Uphill to the clubhouse — a windswept, brutal finish'],
+      [4, 374, 12, 'S', 'none'],
+      [4, 519, 4, 'R', 'sand'],
+      [4, 409, 6, 'S', 'sand'],
+      [5, 616, 10, 'R', 'sand'],
+      [3, 175, 18, 'S', 'sand'],
+      [4, 485, 14, 'S', 'sand', 'Uphill to the clubhouse — a windswept, brutal finish'],
     ]),
   },
   {
@@ -780,6 +787,21 @@ export const COURSES: CourseSpec[] = [
     greens: 'Fast',
     wind: 6,
     blurb: 'A Gil Hanse restoration of barrancas and bold greens in the heart of L.A.',
+    // Real geometry found 149 bunkers and not one tree polygon inside the
+    // boundary, so the odds' junk floor had nothing to name (see
+    // CourseSpec.junkLabel) and would have said the literal "junk". The
+    // barranca is what a wild one finds here — it is the course's own word for
+    // it, the blurb already uses it, and every one of LACC's `natural=sand`
+    // polygons doubles as a `golf=bunker`, which is exactly why the barrancas
+    // arrive as sand and leave nothing else for the junk bucket to point at.
+    junkLabel: 'barranca',
+    // PAR FIX: the 7th shipped as a par 4, making this course par 71. It is a
+    // par 3 — the club's card, OSM's own par tag and the 2023 U.S. Open card
+    // all agree, and at 326 yd off this Tournament tee (284 for the Open) it is
+    // among the longest par 3s ever used in a major. Course par is 70. Stroke
+    // indices already matched the card on all 18 and are untouched. Yardages are
+    // the card's Tournament tee; they auto-reconcile to the imported geometry.
+    // Geometry: OSM_GEOMETRY 'lacc-north:*'.
     holes: holes([
       [5, 578, 17, 'R', 'sand'],
       [4, 503, 1, 'L', 'sand'],
@@ -787,7 +809,7 @@ export const COURSES: CourseSpec[] = [
       [3, 234, 5, 'S', 'sand'],
       [4, 483, 3, 'R', 'sand'],
       [4, 335, 15, 'L', 'sand'],
-      [4, 326, 7, 'S', 'sand'],
+      [3, 326, 7, 'S', 'sand', 'A par 3 of more than 300 yards — the tee shot is a driver'],
       [5, 555, 13, 'R', 'sand'],
       [3, 181, 11, 'S', 'sand'],
       [4, 409, 10, 'L', 'sand'],
@@ -808,26 +830,36 @@ export const COURSES: CourseSpec[] = [
     difficulty: 7,
     greens: 'Firm',
     wind: 18,
-    blurb: 'True links on the Nova Scotia shore, every hole in view of the Atlantic.',
+    blurb: 'True links on the Nova Scotia shore, every hole in view of the sea.',
+    // REBUILT FROM THE CLUB CARD. The shipped tuple was not a transcription of
+    // any real card: its par sequence disagreed with the club's on six holes,
+    // its yardages matched no tee set, and it put the famous 100-yard short
+    // hole at 16 when the card has it at 14. OSM's own par tags match the BLACK
+    // card (6854, par 70) on all 18, so par, stroke index and yardage are all
+    // the card's now. Yardages auto-reconcile to the imported geometry.
+    // `hazard` is set from what actually imported: the sea only comes inside
+    // the corridor on the 6th (measured 14-31 yd off the line the whole way),
+    // so it is the one `ocean` hole — see the Cabot note in geometry.ts for the
+    // measurement that cleared the rest. Geometry: OSM_GEOMETRY 'cabot-links:*'.
     holes: holes([
-      [5, 506, 15, 'S', 'sand'],
-      [4, 410, 7, 'S', 'sand'],
-      [4, 300, 17, 'S', 'ocean'],
-      [3, 175, 9, 'S', 'sand'],
-      [4, 455, 3, 'S', 'sand'],
-      [4, 425, 5, 'R', 'ocean'],
-      [3, 160, 13, 'S', 'sand'],
-      [4, 470, 1, 'L', 'sand'],
-      [4, 405, 11, 'S', 'sand'],
-      [4, 415, 12, 'S', 'sand'],
-      [5, 560, 10, 'S', 'sand'],
-      [4, 430, 6, 'L', 'sand'],
-      [4, 445, 4, 'S', 'sand'],
-      [3, 200, 8, 'S', 'ocean'],
-      [4, 380, 16, 'S', 'sand'],
-      [3, 100, 18, 'S', 'ocean', 'A hundred-yard flick over the beach to the sea’s edge'],
-      [4, 415, 14, 'S', 'ocean', 'Along the Atlantic shore for home'],
-      [4, 470, 2, 'S', 'sand'],
+      [5, 540, 7, 'L', 'sand'],
+      [3, 247, 9, 'S', 'sand'],
+      [4, 330, 15, 'R', 'none'],
+      [4, 450, 3, 'S', 'sand'],
+      [3, 178, 12, 'S', 'sand'],
+      [4, 465, 4, 'L', 'ocean', 'The sea down the left the whole way — every yard of it in play'],
+      [3, 192, 16, 'S', 'sand'],
+      [5, 580, 8, 'L', 'sand'],
+      [4, 360, 17, 'L', 'sand'],
+      [4, 385, 13, 'S', 'sand'],
+      [5, 620, 1, 'R', 'sand'],
+      [4, 450, 5, 'R', 'sand'],
+      [4, 440, 11, 'S', 'sand'],
+      [3, 102, 18, 'S', 'sand', 'A hundred-yard flick — the shortest shot on the course'],
+      [4, 413, 10, 'S', 'sand'],
+      [4, 457, 6, 'L', 'sand'],
+      [3, 170, 14, 'S', 'sand'],
+      [4, 475, 2, 'S', 'sand'],
     ]),
   },
   {
@@ -881,6 +913,10 @@ export const COURSES: CourseSpec[] = [
     greens: 'Firm',
     wind: 8,
     blurb: 'A Seth Raynor gem of template holes and bold, geometric greens.',
+    // Untouched: the shipped tuple already matched the club's GOLD card on par,
+    // stroke index AND yardage for all 18 bar four yards on the 17th, so this
+    // import was pure geometry. Yardages auto-reconcile to it.
+    // Geometry: OSM_GEOMETRY 'camargo:*'.
     holes: holes([
       [4, 390, 17, 'S', 'none'],
       [5, 529, 5, 'L', 'sand'],
@@ -909,26 +945,36 @@ export const COURSES: CourseSpec[] = [
     difficulty: 9,
     greens: 'Firm',
     wind: 12,
-    blurb: 'Water down the right all day and a closing hole that has ended many rounds.',
+    blurb: 'Water down the left all day and a closing hole that has ended many rounds.',
+    // Stroke indices are BlueGolf's BLACK card, which OSM's own `handicap` tags
+    // match on ALL 18 (as do its `par` tags) — the torrey-pines corroboration.
+    // The shipped indices disagreed with both on 16 of 18. Yardages are that
+    // card's too; the shipped ones matched no published setup, missing the
+    // Black card by up to 65 yd a hole. They auto-reconcile to the imported
+    // geometry. Geometry: OSM_GEOMETRY 'doral-blue-monster:*'.
+    // The blurb said "water down the RIGHT all day" and the real course is the
+    // other way round — the import lays 3292 yd of water down the left against
+    // 1236 down the right, and the 18th's own signature already said left.
+    // Caught by the copy-vs-geometry check in the freeze process.
     holes: holes([
-      [5, 562, 9, 'S', 'water'],
-      [4, 407, 11, 'R', 'sand'],
-      [4, 434, 7, 'L', 'water'],
-      [3, 234, 13, 'S', 'sand'],
-      [4, 473, 3, 'R', 'water'],
-      [4, 447, 5, 'L', 'sand'],
-      [4, 430, 15, 'S', 'water'],
-      [5, 599, 1, 'R', 'water'],
-      [3, 178, 17, 'S', 'water'],
-      [5, 564, 8, 'L', 'water'],
-      [4, 440, 6, 'R', 'sand'],
-      [5, 603, 10, 'S', 'water'],
-      [3, 245, 12, 'S', 'sand'],
-      [4, 483, 2, 'L', 'water'],
-      [3, 175, 16, 'S', 'water'],
-      [4, 280, 14, 'R', 'sand'],
-      [4, 436, 4, 'L', 'water'],
-      [4, 473, 18, 'L', 'water', 'The Blue Monster’s bite — water clings to the left for home'],
+      [5, 582, 5, 'S', 'water'],
+      [4, 446, 17, 'R', 'sand'],
+      [4, 441, 3, 'L', 'water'],
+      [3, 206, 13, 'S', 'water'],
+      [4, 421, 15, 'R', 'water'],
+      [4, 432, 7, 'L', 'sand'],
+      [4, 474, 1, 'S', 'water'],
+      [5, 553, 9, 'R', 'water'],
+      [3, 210, 11, 'S', 'water'],
+      [5, 626, 4, 'L', 'water'],
+      [4, 423, 16, 'R', 'water'],
+      [5, 599, 8, 'S', 'water'],
+      [3, 245, 10, 'S', 'sand'],
+      [4, 482, 6, 'L', 'water'],
+      [3, 155, 18, 'S', 'water'],
+      [4, 345, 14, 'R', 'water'],
+      [4, 428, 12, 'L', 'water'],
+      [4, 477, 2, 'L', 'water', 'The Blue Monster’s bite — water clings to the left for home'],
     ]),
   },
   {

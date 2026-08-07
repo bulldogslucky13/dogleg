@@ -218,4 +218,47 @@
 // Rake stays at the 6-yd default here, one course after Muirfield needed 3:
 // not one of Quail Hollow's 74 bunkers is under 6 yd across (min 6.7, median
 // 12.8). That contrast is the argument for the knob being per-course.
-export const ENGINE_VERSION = 16
+// v17 = five courses in one PR, the next five real dailies: Shinnecock Hills
+// (OSM way 689056680), Los Angeles CC North (way 56135439), Cabot Links (way
+// 854966311), Camargo Club (way 30678974) and Doral's Blue Monster (way
+// 112673308). One bump covers all five — none has shipped, so a generation per
+// course would buy nothing, the call made for v5, v8, v10 and v16.
+// THREE OF THE FIVE MOVE THE ODDS AS WELL AS THE LAYOUT, because stroke index
+// feeds pressure():
+//  - LACC North had a PAR BUG. The 7th shipped as a par 4 and the course as par
+//    71; the club card, OSM's par tag and the 2023 U.S. Open card all say par 3
+//    (326 yd off the Tournament tee, 284 for the Open — among the longest par 3s
+//    ever used in a major). Par 70 now. Its stroke indices already matched.
+//  - Shinnecock's SI moves on 15 of 18 holes, to the club's men's handicap row.
+//    BlueGolf prints that row identically on all five tee sets, which is what
+//    says it is the course's and not a tee's, so it governs the 7440 U.S. Open
+//    setup the game ships even though BlueGolf carries only the members' 6940
+//    card (the quail-hollow "which configuration is this" check).
+//  - Cabot Links was REBUILT FROM ITS CARD. The shipped tuple transcribed no
+//    real card: six pars disagreed with the club's, the yardages matched no tee
+//    set, and the famous 100-yd short hole sat at 16 when the card has it at 14.
+//    OSM's par tags match the BLACK card on all 18, so par, SI and yardage are
+//    all the card's now.
+//  - Doral's SI moves on 16 of 18, to the BLACK card — which OSM's own
+//    `handicap` AND `par` tags match on all 18 (the torrey-pines
+//    corroboration). Its shipped yardages matched no published setup at all.
+//  - Camargo is pure geometry: its tuple already matched the GOLD card on par,
+//    SI and yardage bar four yards on the 17th.
+// v17 ALSO carries an importer fix that changes what future imports produce:
+// `golf=rough` is dropped wholesale at merge time, but it was still winning
+// sample points ahead of real hazards drawn inside it, so a course-wide rough
+// polygon silently deleted the sand beneath it. It emptied cabot-links:3 and
+// :5 — both greenside bunkers on a 186-yd par 3, 16 and 21 yd off the line,
+// gone. Committed geometry is static data and untouched; these five are the
+// first courses to ship from the fixed importer, so the two go out together.
+// Hand-work, all documented at the blocks in geometry.ts: two phantom water
+// crosses on Doral 10 and 16 (one lake running the whole hole, read as a
+// 272-yd carry on a 626-yd par 5 — confirmed from the tee in the 3D planner);
+// four greenside rings read as carries you cannot make (camargo 7/11,
+// lacc-north 15, doral 11); Camargo's 2nd remapped smoothed-arc -> RAW-arc
+// rather than shifted (the pine-valley:1 case); and Cabot's 16th losing an
+// over-claimed `ocean` after measuring the shore at 48-87 yd off the line, the
+// whistling-straits:9/18 call. Cabot imports at rake 3, the second course to
+// need it (33 of 109 bunkers under 6 yd across); the other four keep the
+// 6-yd default.
+export const ENGINE_VERSION = 17

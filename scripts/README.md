@@ -245,6 +245,54 @@ find the polygon name for a new course, query Overpass for
   (min 6.7, median 12.8). One number decides it, and it is the reason the rake
   is a per-course knob and not a new global.
 
+- **Shinnecock Hills / LACC North / Cabot Links / Camargo / Doral Blue Monster
+  (all 18 each)** — five courses frozen in one pass, and between them they show
+  every identity mechanism the registry has.
+  **Shinnecock** is the case where OSM's own hole NAMES are the identity check:
+  its 18 centrelines carry the club's hole names (Westward Ho, Plateau, Redan,
+  Eden, Home …) matching the published card name-for-name in order, which is
+  worth more than a polygon name with National Golf Links, Sebonack and
+  Southampton all inside 1.5 km. Three holes traced members' pads while the rest
+  are on championship tees — ProVisualizer's published tee sits 48, 48 and 71 yd
+  BEHIND the OSM start on exactly those three, against ≤7 yd on the other
+  fifteen.
+  **LACC North** is the course that added `osmHoleWays`. One polygon holds both
+  the North and the South, 36 hole ways, two full sets of `ref=1..18`, **every
+  one unnamed** — and unlike Pine Valley the routings INTERLEAVE, so from the
+  North centroid the SOUTH hole wins ref=1 by 16 m and ref=2 by 386 m.
+  Nearest-centre is not weak there, it is wrong. Pin by way id, and establish
+  the ids from fingerprints rather than proximity: par sequence and per-hole arc
+  length each match one course's card on all 18. It also carried a **par bug** —
+  the 7th shipped as a par 4 and the course as par 71, against the club card,
+  OSM's par tag and the 2023 U.S. Open card, all of which say par 3.
+  **Cabot Links** is the reminder to check the tuple against a card before
+  assuming it came from one: six pars disagreed with the club's, the yardages
+  matched no tee set, and the famous 100-yd short hole sat at 16 when the card
+  has it at 14. It is also the second `rake: 3` course (33 of 109 bunkers under
+  6 yd) and the one that exposed the deeprough-shadowing bug below. Its sea is
+  mostly a VIEW, which is a measurement and not a judgement: projecting the
+  coastline onto each centreline puts it inside the 50-yd corridor on two holes
+  only (6, at 14-31 yd for all 465 yd — kept) and 48-87 yd away on the 16th,
+  where the imported `ocean` was dropped by hand.
+  **Camargo** is the cleanest entry in the registry — tuple already matching the
+  GOLD card on par, SI and yardage bar four yards — and a second worked example
+  of the `pine-valley:1` remap on its 2nd.
+  **Doral** shows what to do when a course has THREE published cards (Black
+  7545, WGC 2016 7528, Cadillac 2026 7739) and the mapper picked pads per hole:
+  score total absolute deviation against each (316 / 299 / 420) and commit to
+  one, rather than mixing per hole and ending up with a total that is no real
+  configuration. Black wins on being the club's own and the one OSM's `par` AND
+  `handicap` tags match on all 18.
+  Worth copying from all five: **ProVisualizer's per-hole tee/pin arrays make
+  the whole card checkable numerically in one pass.** `3dlink.php?id=<id>`
+  exposes `tempHoleTeeLat/Lon` and `tempHolePinLat/Lon` as 1..18 arrays for the
+  whole course, so one harvest gives you, for every hole, a second opinion on
+  the tee (projected onto the hole's HEADING, per Quail Hollow) and a check that
+  the centreline ends on the right green (PV's pin landed 0-11 yd from every one
+  of these 90 hole ends). That is what separated "wrong pad" from "Chaikin
+  rounding" from "the card describes a different tee" across 90 holes without
+  eyeballing any of them.
+
 ### Known gaps & importer artifact modes
 
 - **Coverage** — obscure courses may lack `golf=hole` centerlines, and many
@@ -284,6 +332,18 @@ find the polygon name for a new course, query Overpass for
     them with `osmIgnore` in `COURSE_GEO`, with the evidence in the comment.
     Do not drop a merely LARGE bunker: Seminole's way/697261262 is 1.34 acres
     and is genuine.
+  - *Rough shadowing real hazards* (FIXED at source in the Cabot pass, listed
+    so the shape is recognisable if it recurs with another always-dropped
+    kind): `golf=rough` classifies to `deeprough`, which is filtered out
+    wholesale at merge time — but it still competed for sample points, and the
+    rasteriser breaks on the FIRST ring containing a point in Overpass response
+    order. So a course-wide rough multipolygon silently deleted every hazard
+    drawn inside it. `cabot-links:5` imported with no zones at all: way
+    /1044331550 covers the hole at -41..37 lateral, so both greenside bunkers on
+    a 186-yd par 3, 16 and 21 yd off the line, rasterised as rough and vanished.
+    The tell is a hole coming through BARE that imagery says is not — and the
+    profile (`--profile`) showing the bunkers reaching the corridor anyway,
+    which is what separates this from a genuine ownership cull.
   - *Broken lateral hazards*: a continuous lake/marsh shows gaps where the
     fairway widens past the 50-yd sample corridor. If imagery shows unbroken
     water, span it continuously — the gap rewards aggressive lines for the

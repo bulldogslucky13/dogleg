@@ -25,10 +25,20 @@ describe('course data', () => {
       expect(par).toBeGreaterThanOrEqual(70)
       expect(par).toBeLessThanOrEqual(73)
       // bounds cover real championship extremes (e.g. Augusta's 520yd 4th,
-      // Chambers Bay's convertible par 4s, Payne's Valley's 653yd 13th)
+      // Chambers Bay's convertible par 4s, Payne's Valley's 653yd 13th).
+      // The par-3 ceiling is 335 for LACC North's 7th, which measures 330 off
+      // the Tournament tee this course ships (284 for the 2023 U.S. Open, the
+      // third-longest par 3 in that championship's history). It was raised
+      // from 300 when that hole's par was corrected from 4 — the club card,
+      // OSM's par tag and the U.S. Open card all say 3 — so the bound was
+      // wrong about the world rather than the data being wrong. Keep it snug:
+      // it exists to catch a par transcribed onto the wrong hole.
+      // The floor is 95 for Cabot Links' 14th, the shortest hole in the
+      // library: the club card says 102 and the real centreline measures 99,
+      // a 3-yd gap that is ordinary tee-box variance rather than a bad import.
       for (const h of c.holes) {
-        if (h.par === 3) expect(h.yards).toBeGreaterThanOrEqual(100)
-        if (h.par === 3) expect(h.yards).toBeLessThanOrEqual(300)
+        if (h.par === 3) expect(h.yards).toBeGreaterThanOrEqual(95)
+        if (h.par === 3) expect(h.yards).toBeLessThanOrEqual(335)
         if (h.par === 4) expect(h.yards).toBeGreaterThanOrEqual(280)
         if (h.par === 4) expect(h.yards).toBeLessThanOrEqual(620)
         if (h.par === 5) expect(h.yards).toBeGreaterThanOrEqual(460)

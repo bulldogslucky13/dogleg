@@ -75,6 +75,11 @@ export function stageName(stage: Stage, par: number, lie?: string): string {
       // a bail-out par 3 plays its `second` stage from the tee box
       return par === 3 ? 'Tee shot' : 'Second shot'
     case 'approach':
+      // An approach can now be played FROM sand: a miss that finds a bunker the
+      // green isn't guarding by leaves a full shot rather than a splash (see
+      // resolveApproach). On a par 3 that used to read "Tee shot" from a
+      // greenside waste bunker, which is simply not where the player is.
+      if (lie === 'sand') return 'Bunker shot'
       return par === 3 ? 'Tee shot' : 'Approach'
     case 'putt':
       return 'Putt'

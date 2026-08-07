@@ -261,4 +261,50 @@
 // whistling-straits:9/18 call. Cabot imports at rake 3, the second course to
 // need it (33 of 109 bunkers under 6 yd across); the other four keep the
 // 6-yd default.
-export const ENGINE_VERSION = 17
+// v18 = approach sand, three ways at once. All three are one change because
+// each without the others is worse than none.
+//  1. DISPERSION. `hazardShares` weighted every hazard by how much of the
+//     landing WINDOW it covered. For a drive that is right — `driveWindow` is a
+//     real landing band. For an approach the window is `[ball.pos + dist*0.45,
+//     length + 12]`, spanning more than half the shot, so uniform weighting
+//     said a bunker you could only reach by coming up eighty yards short was,
+//     per yard, as likely as the one guarding the green. On lacc-north:13 from
+//     300 yd that was 62% of the sand mass. Approaches now draw their misses
+//     around the green centre with a spread that grows with the shot, and each
+//     zone is weighted by the integral of that density (see `approachFocus`).
+//     Drives pass no focus and are weighted exactly as before.
+//  2. THE BALL LANDS WHERE THE ROLL SAID. `resolveApproach` picked a zone and
+//     then ignored it, pinning the ball greenside whatever it picked and always
+//     entering the short game. Since `shortOdds` never reads `ball.pos`, a ball
+//     "in" a bunker 96 yd out was being splashed out with a 24% up-and-down.
+//     Now it finishes in that bunker and `playsAsGreensideSand` decides splash
+//     or swing — the same predicate the model uses, shared so they cannot drift.
+//  3. THE MODEL PRICES THE MIXTURE. grade.ts valued every approach-sand outcome
+//     as a greenside splash. With (2) shipped and this not, the telescoping
+//     identity found the hidden penalty immediately: mean luck +0.323 a round
+//     and the greedy calibration 1.071 against its 0.8 ceiling.
+// v18 ALSO carries the same "land where the roll said" fix for WATER, on both
+// the tee shot and the approach, because it is the identical bug one hazard
+// over and one bump is better than two. A `cross` hazard always used the zone
+// the roll picked; a LATERAL one ignored it and dropped at a fixed `length -
+// 44` on approaches, or a fraction of the drive window off the tee. Laterals
+// are ~80% of water outcomes, and the lake the roll had just named sat 47 yd
+// (approach) and 39 yd (long) from where the ball was actually placed, more
+// than 40 yd away a third of the time — and generous in the wrong direction,
+// since finding a lake 150 yd short ADVANCED you to wedge range. Both stages
+// now drop at the middle of the stretch of that lake the shot could have
+// reached, through one shared `waterDropPos`; the measured gap falls to 5.7 and
+// 3.3 yd, the residual being the near-green floor.
+// Unlike the sand bug this never lied to the grade model — resolve.ts and
+// grade.ts shared the same wrong formula, so the identity had nothing to catch.
+// That is why it needed measuring rather than waiting for a test to fail, and
+// why the new invariants in greenside.test.ts pin the rule itself.
+// One latent bug fell out: the near-green floor could drag a drop BACKWARDS
+// when the shot was played from nearer the green than the floor
+// (whistling-straits:7, ball at 188 on a 221-yд par 3, dropped at 177). It
+// can't now.
+// Together: greedy calibration 0.7646 -> 0.7427, and mean luck over 2000 rounds
+// 0.0469 -> 0.0191. No threshold was moved.
+// Play Ratings regenerated LAST, after every odds change: 22 of 53 courses
+// shift, every one by exactly one point (16 down, 6 up).
+export const ENGINE_VERSION = 18

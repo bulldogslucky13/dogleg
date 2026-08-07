@@ -36,7 +36,7 @@ import type {
   Stage,
 } from './types'
 import { courseBySlug } from './courses'
-import { buildLayout } from './layout'
+import { buildLayout, playsAsGreensideSand } from './layout'
 import {
   approachOdds,
   longOdds,
@@ -49,7 +49,7 @@ import {
   type ZoneShare,
 } from './odds'
 import { AGGRESSIVE_BUDGET, destinyPlan, fortuneOddsFor, setupFromSeed } from './replay'
-import { aceFiringChoice, secondGoMode } from './resolve'
+import { aceFiringChoice, secondGoMode, waterDropPos, WATER_DROP_APPROACH, WATER_DROP_LONG } from './resolve'
 
 const CHOICES: Choice[] = ['safe', 'normal', 'aggressive']
 
@@ -270,13 +270,78 @@ function nextVLong(
   }
   // water
   const list = zoneShares.filter((s) => s.bucket === 'water')
-  const calcPos = (z: HazardZone | null) => {
-    const raw = z && z.side === 'cross' ? Math.max(ball.pos + 30, z.from - 8) : Math.max(ball.pos + 40, mid * 0.8)
-    return Math.min(raw, L - 30)
-  }
+  // Shared with resolve.ts, same reasoning as the approach drop below.
+  const calcPos = (z: HazardZone | null) => waterDropPos(z, ball.pos, L, WATER_DROP_LONG, mid)
   if (!list.length) return go(calcPos(null), 'rough')
   const total = list.reduce((s, z) => s + z.share, 0) || 1
   return list.reduce((acc, z) => acc + (z.share / total) * go(calcPos(z.zone), 'rough'), 0)
+}
+
+/**
+ * An approach that finds sand is not always a greenside splash.
+ *
+ * `resolveApproach` lands the ball in the bunker the roll actually chose, and
+ * only enters the short game when that bunker is greenside (`isGreenside` —
+ * the same predicate the odds weight with). A fairway bunker instead leaves a
+ * full approach to play from sand, which costs about a third of a stroke more
+ * than a splash from beside the green.
+ *
+ * Valuing every sand outcome as the greenside fixed point therefore hides that
+ * cost from the model, and the telescoping identity finds it immediately:
+ * mean luck moved from -0.004 to +0.323 and the greedy calibration from 0.764
+ * to 1.071 when the resolver started landing balls in real bunkers while this
+ * line still priced them all as splashes. That is the same "hidden penalty"
+ * failure the fringe/deep-rough note in resolve.ts describes, and "the odds
+ * never lie" has exactly one sanctioned exception, which this isn't.
+ *
+ * So mirror `nextVLong`'s sand branch: an exact probability-weighted mixture
+ * over the zones, each valued where the ball would really come to rest.
+ */
+function nextVApproachSand(
+  par: number,
+  layout: HoleLayout,
+  cond: Conditions,
+  character: CharacterId | undefined,
+  fOdds: FortuneShotOdds | undefined,
+  ball: BallState,
+  missShares: ZoneShare[],
+  depth: number,
+  waterDepth: number,
+  memo: Map<string, number>,
+): number {
+  const L = layout.length
+  const list = missShares.filter((s) => s.bucket === 'sand')
+  // No mapped sand behind the outcome: the resolver falls back to its greenside
+  // placement, so the greenside fixed point is exactly right.
+  if (!list.length) return vSandFixedPoint(layout, cond)
+  const total = list.reduce((s, z) => s + z.share, 0) || 1
+  const splash = (acc: number, share: number) => acc + (share / total) * vSandFixedPoint(layout, cond)
+  return list.reduce((acc, z) => {
+    // Mirror resolve.ts exactly: a zone with no room ahead of the ball falls
+    // back to the greenside placement.
+    if (z.zone.to <= ball.pos + 6) return splash(acc, z.share)
+    // Valued at the MEAN rest, not integrated over the span the resolver
+    // samples. `nextVLong` integrates its analogous spreads with 5-point
+    // quadrature to close the Jensen gap, and that was tried here first — but
+    // each node expands a whole continuation subtree, and five of them pushed
+    // the greedy calibration past its 30s budget. The rules also disagree
+    // non-monotonically on this integrand (mean 0.756, 2-point 0.761, 3-point
+    // 0.724, 5-point 0.725 on the calibration sample), which is the greenside
+    // boundary below aliasing against the nodes rather than the higher orders
+    // being more truthful. The mean already improves on the 0.765 this replaced
+    // and costs one evaluation, so it is what ships; revisit with a smarter
+    // split (integrate each side of the boundary separately) if the headroom
+    // is ever needed.
+    const lo = Math.max(z.zone.from, ball.pos + 6)
+    const hi = z.zone.to
+    const pos = Math.min((lo + hi) / 2, L - 5)
+    // Whether that rest is a splash or a swing is decided by the SAME shared
+    // predicate the resolver uses, so the two cannot disagree.
+    const v = playsAsGreensideSand(z.zone, pos, L, layout.greenDepth)
+      ? vSandFixedPoint(layout, cond)
+      : vOf(par, layout, cond, character, fOdds, 'approach', { pos, lie: 'sand', side: 'center' }, depth + 1, waterDepth, memo)
+    return acc + (z.share / total) * v
+  }, 0)
 }
 
 function nextVApproachWater(
@@ -293,10 +358,10 @@ function nextVApproachWater(
 ): number {
   const L = layout.length
   const list = missShares.filter((s) => s.bucket === 'water')
-  const calcPos = (z: HazardZone | null) => {
-    const raw = z && z.side === 'cross' ? Math.max(ball.pos, z.from - 10) : L - 44
-    return Math.min(raw, L - 35)
-  }
+  // Shared with resolve.ts rather than re-derived — a drop formula that drifts
+  // between the model and the game reads as luck. Same reasoning as
+  // `secondGoMode` and `playsAsGreensideSand`.
+  const calcPos = (z: HazardZone | null) => waterDropPos(z, ball.pos, L, WATER_DROP_APPROACH)
   const valueAt = (pos: number): number => {
     if (waterDepth >= 3) {
       // recursion depth cap: a water hazard that keeps eating shots is
@@ -365,7 +430,8 @@ function computeQ(
   if (o.makeable > 0) q += o.makeable * (1 + nextVPuttLook(cond, character, choice, 'makeable'))
   if (o.lag > 0) q += o.lag * (1 + nextVPuttLook(cond, character, choice, 'lag'))
   if (o.fringe > 0) q += o.fringe * (1 + vShortgameClosed(layout, cond, 'fringe'))
-  if (o.sand > 0) q += o.sand * (1 + vSandFixedPoint(layout, cond))
+  if (o.sand > 0)
+    q += o.sand * (1 + nextVApproachSand(par, layout, cond, character, fOdds, ball, dr.detail.missShares, depth, waterDepth, memo))
   if (o.water > 0) q += o.water * (2 + nextVApproachWater(par, layout, cond, character, fOdds, ball, dr.detail.missShares, depth, waterDepth, memo))
   return q
 }

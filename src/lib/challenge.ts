@@ -122,12 +122,16 @@ export function challengeUrl(p: ReplayPayload): string {
 }
 
 /** Decode + fully validate a challenge code: the round must actually replay.
- * Null covers truncated links AND rounds this bundle can't reconstruct. */
+ * Null covers truncated links AND rounds this bundle can't reconstruct.
+ * Practice rounds only (Jackson's rule, 2026-08-09): challenges live in
+ * unlimited play. A daily seed re-labeled as a challenge — a hand-edited
+ * #watch code, say — is rejected here, the same door the share card already
+ * doesn't open. */
 export function parseChallenge(code: string): Challenge | null {
   const p = decodeReplay(code)
   if (!p) return null
   const outcome = replayRound(p.seed, p.character, p.decisions)
-  if (!outcome.ok) return null
+  if (!outcome.ok || outcome.info.mode !== 'practice') return null
   return {
     id: challengeIdFor(p),
     code,
@@ -237,17 +241,6 @@ export function verdictCopy(v: ChallengeVerdict, from: string): string {
   if (v === 'won') return `Challenge beaten. ${from} owes you a rematch.`
   if (v === 'tied') return `Matched to the stroke — ties don't take it. ${from}'s card stands.`
   return `${from}'s card stands. The odds sided with them today.`
-}
-
-/**
- * The challenge URL as the share-card PREVIEW displays it: scheme dropped,
- * code cut to a six-character handle with a visible ellipsis. The preview is
- * for reading, and two hundred characters of base64 buried the scorecard it
- * sits under — but what actually goes out on Copy/Share is always the full
- * working link, and the ellipsis makes the trim plain rather than sneaky.
- */
-export function previewChallengeUrl(url: string): string {
-  return url.replace(/^https:\/\//, '').replace(/(#challenge=.{6}).+/, '$1…')
 }
 
 /** Share text for throwing a challenge (fresh or revenge). Short on purpose:

@@ -274,9 +274,6 @@ export function shareText(
   toPar: number,
   character?: CharacterId,
   streak?: number,
-  /** when the finished round can be challenged, the link RIDES the main share
-   * text — a separate copy-a-link button gets 11 taps a week, this gets 300 */
-  challengeUrl?: string,
 ): string {
   const rows: string[] = []
   for (let i = 0; i < results.length; i += 9) {
@@ -296,6 +293,6 @@ export function shareText(
     ...(char ? [`${char.emoji} ${char.name}`] : []),
     '',
     `🐦 ${birdies}  ·  ⛳ ${pars}  ·  😬 ${overs}`,
-    ...(challengeUrl ? [`⚔️ Beat my round — one attempt: ${challengeUrl}`] : [SITE_URL]),
+    SITE_URL,
   ].join('\n')
 }

@@ -7,7 +7,7 @@ import { decisionsFromScores, encodeReplay } from '../engine/replay'
 import type { CharacterId, HoleResult } from '../engine/types'
 import { track } from '../lib/analytics'
 import { backendEnabled } from '../lib/backend'
-import { challengeShareText, challengeUrl, previewChallengeUrl, type Challenge, type ChallengeAttempt } from '../lib/challenge'
+import { challengeShareText, challengeUrl, type Challenge, type ChallengeAttempt } from '../lib/challenge'
 import { ChallengeFaceoff, useShareActions } from './ChallengeScreen'
 import { bundleIsStale, FRESH_TTL_MS } from '../lib/freshness'
 import { fetchCourseRecords, fetchSeasonRecords, loadPlayer, type CourseRecord } from '../lib/leaderboard'
@@ -771,10 +771,12 @@ export function ResultScreen(props: {
     }
   })()
   const replayUrl = roundPayload ? `https://${SITE_URL}/#watch=${encodeReplay(roundPayload)}` : null
-  // a finished challenge attempt doesn't re-arm as a fresh gauntlet from the
-  // share card — its head-to-head card carries the rally's next throw instead
-  const myChallengeUrl = roundPayload && !props.challenge ? challengeUrl(roundPayload) : null
-  const text = shareText(props.setup, results, toPar, props.character, streaks.dayStreak, myChallengeUrl ?? undefined)
+  // challenges are creatable from PRACTICE rounds only (they're unlimited
+  // play's game — the daily's share card stays the classic squares), and a
+  // finished attempt doesn't re-arm as a fresh gauntlet from the wrap — its
+  // head-to-head card carries the rally's next throw instead
+  const myChallengeUrl = roundPayload && props.practice && !props.challenge ? challengeUrl(roundPayload) : null
+  const text = shareText(props.setup, results, toPar, props.character, streaks.dayStreak)
   // practice wrap: the challenge share stands alone (the daily's rides its share card)
   const practiceChallenge = useShareActions(
     myChallengeUrl
@@ -799,14 +801,14 @@ export function ResultScreen(props: {
       ta.remove()
     }
     if (!ok) return
-    track('share_clicked', { method: 'clipboard', to_par: toPar, has_challenge_link: !!myChallengeUrl })
+    track('share_clicked', { method: 'clipboard', to_par: toPar })
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }
   const share = async () => {
     try {
       await navigator.share({ text })
-      track('share_clicked', { method: 'native', to_par: toPar, has_challenge_link: !!myChallengeUrl })
+      track('share_clicked', { method: 'native', to_par: toPar })
     } catch (err) {
       // AbortError means the user closed the share sheet — anything else is a real failure
       if (err instanceof Error && err.name === 'AbortError') return
@@ -962,11 +964,7 @@ export function ResultScreen(props: {
       {!props.practice && (
         <div className="share-block">
           <div className="kicker">Your share card</div>
-          {/* the preview trims the challenge link to a readable handle — the
-              full working link is what Copy/Share actually send */}
-          <pre className="share-preview">
-            {myChallengeUrl ? text.replace(myChallengeUrl, previewChallengeUrl(myChallengeUrl)) : text}
-          </pre>
+          <pre className="share-preview">{text}</pre>
           <div className="share-actions">
             <button className="cta ghost" onClick={copy}>
               {copied ? 'Copied ✓' : 'Copy'}

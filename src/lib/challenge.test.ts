@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it } from 'vitest'
-import { practiceSetup } from '../engine/daily'
+import { dailySetup, practiceSetup } from '../engine/daily'
 import { splitFortune } from '../engine/fortune'
-import { decisionsFromScores, encodeReplay, decodeReplay, replayRound } from '../engine/replay'
+import { decisionsFromScores, encodeReplay, decodeReplay, replayRound, setupFromSeed } from '../engine/replay'
 import type { Choice } from '../engine/types'
 import { advanceHole, applyChoice, newRound, roundToPar, type RoundState } from '../state/store'
 import {
@@ -15,7 +15,6 @@ import {
   challengeUrl,
   challengeVerdict,
   parseChallenge,
-  previewChallengeUrl,
   syncChallengeRound,
 } from './challenge'
 
@@ -69,6 +68,15 @@ describe('the challenge codec', () => {
     expect(ch.from.name).toBe('Rob')
     expect(ch.from.toPar).toBe(roundToPar(round))
     expect(ch.rally).toBe(0)
+  })
+
+  it('practice rounds only: a daily seed re-labeled as a challenge is rejected', () => {
+    // a hand-edited #watch code from a daily is a valid REPLAY but not a
+    // valid challenge — challenges live in unlimited play
+    const daily = playRound(newRound(dailySetup(new Date(2026, 6, 20)), 'daily', 'dart'))
+    const code = encodeReplay({ seed: daily.seed, character: 'dart', decisions: decisionsFromScores(daily.scores)!, name: 'Rob' })
+    expect(replayRound(daily.seed, 'dart', decisionsFromScores(daily.scores)!).ok).toBe(true)
+    expect(parseChallenge(code)).toBeNull()
   })
 
   it('the challenge id is stable across re-encodes and blind to the rally', () => {
@@ -174,6 +182,22 @@ describe('one attempt, run like the daily', () => {
     expect(deviceTwo.course.slug).toBe(deviceOne.course.slug)
   })
 
+  it('a finished attempt is refereed like any unlimited round — course and season records stay in reach', () => {
+    const ch = parseChallenge(codeFor(finishedRound(), 'Rob'))!
+    const mine = playRound(newRound(acceptChallenge(ch), 'practice', 'greens'))
+    syncChallengeRound(mine)
+    const done = attemptFor(ch.id)!.done!
+    // exactly the referee's two moves: reconstruct the setup from the seed,
+    // then replay the decisions. A challenge attempt is an ordinary practice
+    // round — same seed grammar, same validation, same record contention on
+    // both boards. Nothing about being a challenge is visible to the server.
+    const info = setupFromSeed(done.seed)
+    expect(info?.mode).toBe('practice')
+    const outcome = replayRound(done.seed, done.character, done.decisions)
+    expect(outcome.ok).toBe(true)
+    if (outcome.ok) expect(outcome.toPar).toBe(done.toPar)
+  })
+
   it('rounds that are not challenge attempts leave the ledger untouched', () => {
     const round = playRound(newRound(practiceSetup('pebble-beach', 'free'), 'practice'))
     syncChallengeRound(round)
@@ -194,14 +218,6 @@ describe('the verdict', () => {
     expect(fresh).toContain('one attempt')
     expect(fresh.endsWith('https://x/#challenge=abc')).toBe(true)
     expect(challengeShareText({ courseName: 'Pebble Beach', toPar: -3, url: 'u', rally: 1 })).toContain('REVENGE')
-  })
-
-  it('the preview handle trims the link but the shared text never changes', () => {
-    const url =
-      'https://dogleg.cameronbristol.xyz/#challenge=eyJ2IjoxLCJzIjoicHJhY3RpY2UyOnBlYmJsZS1iZWFjaCJ9abcdef'
-    expect(previewChallengeUrl(url)).toBe('dogleg.cameronbristol.xyz/#challenge=eyJ2Ij…')
-    // idempotent on an already-short handle, and blind to non-challenge urls
-    expect(previewChallengeUrl('https://x.com/page')).toBe('x.com/page')
   })
 
   it('challengeIdFor differs when only the character differs (same seed and decisions)', () => {

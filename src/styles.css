@@ -2775,9 +2775,6 @@ button {
   font-size: 0.86rem;
   line-height: 1.55;
   white-space: pre-wrap;
-  /* the challenge link is one long unbroken token — wrap it inside the card
-     rather than letting it push the box wide */
-  overflow-wrap: anywhere;
   text-align: center;
   background: var(--cream);
   border: 1.5px solid var(--line);

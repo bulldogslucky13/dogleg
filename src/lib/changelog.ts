@@ -66,7 +66,7 @@ export const CHANGELOG: ChangeEntry[] = [
     date: '2026-08-09',
     kind: 'feature',
     title: 'Challenge links: beat this round',
-    note: 'Your share card now carries a challenge. Whoever taps it plays the same course against your actual round — one attempt, their own luck, ties don\'t take it. Beat a challenge and you get to send the revenge link. Settle it in the group chat.',
+    note: 'Finish an unlimited round and throw it down as a challenge. Whoever taps the link plays the same course against your actual round — one attempt, their own luck, ties don\'t take it. Beat a challenge and you get to send the revenge link. Challenge rounds are real rounds: course and season records are live the whole way. Settle it in the group chat.',
   },
   {
     date: '2026-08-07',

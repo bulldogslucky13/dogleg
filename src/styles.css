@@ -3607,3 +3607,28 @@ button {
     font-size: 2.7rem;
   }
 }
+
+/* the hunt card: season records within reach, one tap from the course list
+   sorted by what's winnable. Gold keyline — records are the prize on offer. */
+.hunt-card {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  text-align: left;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--gold);
+  border-radius: 12px;
+  padding: 10px 14px;
+}
+
+.hunt-card b {
+  font-size: 0.9rem;
+}
+
+.hunt-card em {
+  font-style: normal;
+  font-size: 0.75rem;
+  color: rgba(29, 43, 32, 0.65);
+}

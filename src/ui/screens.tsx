@@ -16,6 +16,7 @@ import { hasEarnedAwards, reconcileAchievements, type Unlock } from '../state/ac
 import { Wordmark } from './Wordmark'
 import { dismissSteals, pendingSteals, syncLedger, type StolenRecord } from '../lib/records'
 import { loadFavorites, toggleFavorite } from '../lib/favorites'
+import { seasonHunt } from '../lib/hunt'
 import { loadGhost, type Ghost } from '../state/ghost'
 import { currentHandicap, formatHandicap } from '../state/stats'
 import { characterRecords, computeStreaks, loadArchive, type HistoryEntry, type RoundRecap, type RoundState } from '../state/store'
@@ -116,16 +117,18 @@ export function HomeScreen(props: {
   }, [showCourses, courseRecs, recType])
 
   // the season board is the live race: fetched per season KEY, so any render
-  // after a quarterly rollover swaps in the fresh board
+  // after a quarterly rollover swaps in the fresh board. Fetched on MOUNT
+  // (not when the panel opens) because the hunt card below the unlimited CTA
+  // reads it before any panel exists — one ~40-row query per home visit.
   useEffect(() => {
-    if (showCourses && backendEnabled && seasonRecsKey !== season.key) {
+    if (backendEnabled && seasonRecsKey !== season.key) {
       setSeasonRecsKey(season.key)
       setSeasonRecs(null)
-      // a FAILED season fetch stays null (no lines) — an empty season board is
-      // "open, be the first"; an unreachable one must not pretend to know
+      // a FAILED season fetch stays null (no lines, no hunt) — an empty season
+      // board is "open, be the first"; an unreachable one must not pretend to know
       void fetchSeasonRecords(season.key).then((r) => setSeasonRecs(r))
     }
-  }, [showCourses, seasonRecsKey, season.key])
+  }, [seasonRecsKey, season.key])
 
   // the record-stolen check: compare the records this device holds against
   // the server's holders. Purely a read — the "notification" is derived.
@@ -167,6 +170,14 @@ export function HomeScreen(props: {
   const filtersActive = activeFilterCount > 0 || courseSort !== 'tour'
   // guest courses browse (and filter, and sort) like everything else — one pool
   const browsable = [...COURSES, ...GUEST_COURSES]
+  // the hunt: season records takeable RIGHT NOW (open boards + beatable
+  // numbers, minus my own trophies) — the bait under the unlimited CTA
+  const hunt = seasonHunt(
+    seasonRecs,
+    browsable.map((c) => c.slug),
+    myName,
+    ATTAINABLE_RECORD_TO_PAR,
+  )
   const visibleCourses = browsable.filter((c) => {
     if (favsOnly && !favs.has(c.slug)) return false
     if (playedFilter === 'unplayed' && playedSlugs.has(c.slug)) return false
@@ -337,6 +348,30 @@ export function HomeScreen(props: {
         Play unlimited
         <span className="cta-sub">Browse courses</span>
       </button>
+      {/* the hunt card: why open the course list — records are sitting there.
+          Tapping lands on the list already sorted by what's winnable. Renders
+          only when the board is KNOWN and something is actually takeable. */}
+      {hunt !== null && hunt.total > 0 && (
+        <button
+          className="hunt-card"
+          onClick={() => {
+            track('hunt_opened', { total: hunt.total, open: hunt.open })
+            setRecType('season')
+            setCourseSort('beatable')
+            setShowCourses(true)
+          }}
+        >
+          <b>
+            🎯 {hunt.total} season record{hunt.total === 1 ? '' : 's'} within reach
+          </b>
+          <em>
+            {hunt.open > 0 && `${hunt.open} wide open`}
+            {hunt.open > 0 && hunt.worst !== null && ' · '}
+            {hunt.worst !== null && `softest number standing is ${toParLabel(hunt.worst)}`}
+            {' — go take one ›'}
+          </em>
+        </button>
+      )}
       {showCourses && (
         <div className="course-list">
           <div className="course-tabs" role="tablist" aria-label="Course type">

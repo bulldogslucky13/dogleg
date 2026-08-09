@@ -265,6 +265,9 @@ export interface ReplayPayload {
   decisions: Choice[][]
   /** optional display name of who played it */
   name?: string
+  /** challenge links only: how deep the revenge rally runs (0/absent = the
+   * opening challenge, 1 = the first revenge, …). Replay links never set it. */
+  rally?: number
 }
 
 const CHOICE_CHAR: Record<Choice, string> = { safe: 's', normal: 'n', aggressive: 'a' }
@@ -273,7 +276,7 @@ const CHAR_CHOICE: Record<string, Choice> = { s: 'safe', n: 'normal', a: 'aggres
 /** Compact, URL-safe replay code: share a round as pure data. */
 export function encodeReplay(p: ReplayPayload): string {
   const d = p.decisions.map((hole) => hole.map((c) => CHOICE_CHAR[c]).join('')).join('-')
-  const raw = JSON.stringify({ v: 1, s: p.seed, c: p.character ?? '', d, n: p.name ?? '' })
+  const raw = JSON.stringify({ v: 1, s: p.seed, c: p.character ?? '', d, n: p.name ?? '', ...(p.rally ? { r: p.rally } : {}) })
   // btoa is fine: the payload is ASCII except possibly the name — escape it
   const b64 = btoa(unescape(encodeURIComponent(raw)))
   return b64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
@@ -283,13 +286,14 @@ export function decodeReplay(code: string): ReplayPayload | null {
   try {
     const b64 = code.replace(/-/g, '+').replace(/_/g, '/')
     const raw = decodeURIComponent(escape(atob(b64)))
-    const j = JSON.parse(raw) as { v: number; s: string; c: string; d: string; n?: string }
+    const j = JSON.parse(raw) as { v: number; s: string; c: string; d: string; n?: string; r?: number }
     if (j.v !== 1 || typeof j.s !== 'string' || typeof j.d !== 'string') return null
     const decisions = j.d.split('-').map((hole) => hole.split('').map((ch) => CHAR_CHOICE[ch]))
     // hole count varies by course (par-3 shorts run 9/10); replayRound checks the exact length
     if (decisions.length < 1 || decisions.length > 18 || decisions.some((h) => h.some((c) => !c))) return null
     const character = j.c === 'fairway' || j.c === 'dart' || j.c === 'greens' ? j.c : undefined
-    return { seed: j.s, character, decisions, name: j.n || undefined }
+    const rally = typeof j.r === 'number' && Number.isInteger(j.r) && j.r > 0 ? Math.min(j.r, 999) : undefined
+    return { seed: j.s, character, decisions, name: j.n || undefined, rally }
   } catch {
     return null
   }

@@ -25,8 +25,9 @@ import { loadArchive, type ArchivedRound } from './store'
  */
 
 export interface Ghost {
-  /** 'record' = the standing course record; 'personal' = your own best here */
-  kind: 'record' | 'personal'
+  /** 'record' = the standing course record; 'personal' = your own best here;
+   * 'challenge' = the round a challenge link dared you to beat */
+  kind: 'record' | 'personal' | 'challenge'
   /** the record holder's clubhouse name; null when the ghost is your own round */
   holder: string | null
   seed: string
@@ -95,6 +96,21 @@ function buildGhost(
   }
 }
 
+/**
+ * The challenger's actual round as the ghost — a challenge attempt races the
+ * card that dared it, not the course record. Same pace-race contract as every
+ * ghost: their scoreline is the truth, their ball is atmosphere, and nothing
+ * touches the live round's dice.
+ */
+export function challengerGhost(ch: {
+  from: { seed: string; character?: CharacterId; decisions: Choice[][]; name: string | null }
+}): Ghost | null {
+  return buildGhost(ch.from.seed, ch.from.character, ch.from.decisions, {
+    kind: 'challenge',
+    holder: ch.from.name,
+  })
+}
+
 function bestReplayable(courseSlug: string, excludeSeed?: string): ArchivedRound | null {
   const candidates = loadArchive().filter((r) => r.courseSlug === courseSlug && r.seed !== excludeSeed)
   if (!candidates.length) return null
@@ -149,6 +165,7 @@ export function paceVs(ghost: Ghost, playerScores: Array<{ strokes: number } | n
 
 /** what the chip calls the thing being raced — short, honest */
 export function ghostNoun(ghost: Ghost): string {
+  if (ghost.kind === 'challenge') return ghost.holder ?? 'your rival'
   return ghost.kind === 'record' ? 'the record' : 'your best'
 }
 

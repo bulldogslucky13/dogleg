@@ -63,6 +63,12 @@ export const CHANGE_KIND_LABEL: Record<ChangeKind, string> = {
 
 export const CHANGELOG: ChangeEntry[] = [
   {
+    date: '2026-08-09',
+    kind: 'feature',
+    title: 'Challenge links: beat this round',
+    note: 'Your share card now carries a challenge. Whoever taps it plays the same course against your actual round — one attempt, their own luck, ties don\'t take it. Beat a challenge and you get to send the revenge link. Settle it in the group chat.',
+  },
+  {
     date: '2026-08-07',
     kind: 'odds',
     title: 'You now end up in the bunker — and the lake — you actually found',

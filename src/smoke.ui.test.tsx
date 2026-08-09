@@ -1359,6 +1359,110 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
     window.location.hash = ''
   })
 
+  it('a #challenge= link lands on the challenge screen; accepting pins ONE attempt and resumes like the daily', async () => {
+    const { advanceHole } = await import('./state/store')
+    const { decisionsFromScores, encodeReplay } = await import('./engine/replay')
+    // the challenger's real finished round, encoded exactly as the wrap does
+    let s = newRound(practiceSetup('pebble-beach', 'smokechallenge'), 'practice', 'dart')
+    let guard = 0
+    while (!s.complete && guard++ < 500) {
+      if (s.hole?.stage === 'done') {
+        s = advanceHole(s)
+        continue
+      }
+      const next = applyChoice(s, 'normal')
+      s = next === s ? applyChoice(s, 'safe') : next
+    }
+    const code = encodeReplay({ seed: s.seed, character: 'dart', decisions: decisionsFromScores(s.scores)!, name: 'Rival Rob' })
+    window.location.hash = `#challenge=${code}`
+    localStorage.clear()
+    localStorage.setItem('dogleg:tutorial:v1', 'done')
+
+    render(<App />)
+    // the gauntlet: who threw it, what it takes to beat
+    expect(screen.getByText(/been challenged/)).toBeTruthy()
+    expect(screen.getByText(/Rival Rob shot/)).toBeTruthy()
+    expect(screen.getByText(/Watch their round first/)).toBeTruthy()
+
+    fireEvent.click(screen.getByText('Take the challenge'))
+    // the pick screen wears the stakes, then the round starts on the SAME course
+    expect(screen.getByText('Pick your player')).toBeTruthy()
+    expect(screen.getByText(/Beat Rival Rob/)).toBeTruthy()
+    fireEvent.click(screen.getByText(CHARACTERS[0].name))
+    expect(screen.getAllByText(/· Challenge/).length).toBeGreaterThan(0)
+    // the pace chip races the CHALLENGER, not the course record
+    expect(screen.getByText(/chasing Rival Rob/)).toBeTruthy()
+
+    // one attempt was pinned: a fresh practice seed, never the challenger's dice
+    const ledger = JSON.parse(localStorage.getItem('dogleg:challenges:v1')!)
+    expect(ledger.attempts).toHaveLength(1)
+    expect(ledger.attempts[0].attemptSeed).toBeTruthy()
+    expect(ledger.attempts[0].attemptSeed).not.toBe(s.seed)
+
+    // backing out (tab close, whatever) and re-opening the SAME link resumes
+    // the attempt where it stood — never a second deal
+    cleanup()
+    render(<App />)
+    expect(screen.getByText('Resume your attempt')).toBeTruthy()
+    fireEvent.click(screen.getByText('Resume your attempt'))
+    expect(screen.getAllByText(/· Challenge/).length).toBeGreaterThan(0)
+    const after = JSON.parse(localStorage.getItem('dogleg:challenges:v1')!)
+    expect(after.attempts).toHaveLength(1)
+    expect(after.attempts[0].attemptSeed).toBe(ledger.attempts[0].attemptSeed)
+    window.location.hash = ''
+  })
+
+  it('a finished attempt re-opens to the head-to-head — the attempt is spent, the rally CTA is live', async () => {
+    const { advanceHole } = await import('./state/store')
+    const { decisionsFromScores, encodeReplay } = await import('./engine/replay')
+    const { acceptChallenge, parseChallenge, syncChallengeRound } = await import('./lib/challenge')
+    const finish = (r: ReturnType<typeof newRound>) => {
+      let st = r
+      let guard = 0
+      while (!st.complete && guard++ < 500) {
+        if (st.hole?.stage === 'done') {
+          st = advanceHole(st)
+          continue
+        }
+        const next = applyChoice(st, 'normal')
+        st = next === st ? applyChoice(st, 'safe') : next
+      }
+      return st
+    }
+    const theirs = finish(newRound(practiceSetup('pebble-beach', 'smokerally'), 'practice', 'dart'))
+    const code = encodeReplay({
+      seed: theirs.seed,
+      character: 'dart',
+      decisions: decisionsFromScores(theirs.scores)!,
+      name: 'Rival Rob',
+    })
+    localStorage.clear()
+    localStorage.setItem('dogleg:tutorial:v1', 'done')
+    // play the attempt through the store (the UI walk is covered above) and
+    // sign it into the ledger the way App's completion hook does
+    const ch = parseChallenge(code)!
+    const mine = finish(newRound(acceptChallenge(ch), 'practice', 'greens'))
+    syncChallengeRound(mine)
+
+    window.location.hash = `#challenge=${code}`
+    render(<App />)
+    expect(screen.getByText('The head-to-head')).toBeTruthy()
+    expect(screen.queryByText('Take the challenge')).toBeNull()
+    // jsdom has no navigator.share, so the copy CTA carries the rally:
+    // revenge on a win, the reply (with the still-live gauntlet) otherwise
+    expect(screen.getByText(/Copy (revenge link|your reply)/)).toBeTruthy()
+    window.location.hash = ''
+  })
+
+  it('a truncated challenge link shows the friendly error, not the home screen', () => {
+    window.location.hash = '#challenge=not-a-real-code'
+    render(<App />)
+    expect(screen.getByText(/That challenge link doesn't parse/)).toBeTruthy()
+    fireEvent.click(screen.getByText('Teebox'))
+    expect(screen.getByText('Tee off')).toBeTruthy()
+    window.location.hash = ''
+  })
+
   it('the locker lists archived rounds and its Watch button opens the viewer', async () => {
     const { newRound, applyChoice, advanceHole, archiveRound } = await import('./state/store')
     const { practiceSetup } = await import('./engine/daily')

@@ -592,6 +592,13 @@ describe('smoke: a finished round produces its result artifacts', () => {
     expect(shareText(setup, results, roundToPar(done), 'dart', 1)).not.toContain('streak')
     expect(shareText(setup, results, roundToPar(done), 'dart', 0)).not.toContain('streak')
     expect(card).not.toContain('streak')
+
+    // a challenge link RIDES the main share text, replacing the bare site line
+    // — never both, and never on a card that has no round to challenge with
+    const dared = shareText(setup, results, roundToPar(done), 'dart', 0, 'https://x/#challenge=abc')
+    expect(dared).toContain('⚔️ Beat my round — one attempt: https://x/#challenge=abc')
+    expect(dared.split('\n').filter((l) => l.includes('dogleg.cameronbristol.xyz'))).toHaveLength(0)
+    expect(card).toContain('dogleg.cameronbristol.xyz')
   })
 
   it('grades the round — the swing coach report identity, determinism, and copy', () => {

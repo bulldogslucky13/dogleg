@@ -916,6 +916,17 @@ export function ResultScreen(props: {
           </div>
         </div>
       )}
+      {/* throw the round down while it stings (or shines) — the challenge
+          share sits above the coach's autopsy. One line, no sub-label: the
+          one-attempt/own-luck contract is told on the receiving end. */}
+      {props.practice && !props.challenge && myChallengeUrl && (
+        <button
+          className="cta"
+          onClick={practiceChallenge.canNativeShare ? practiceChallenge.share : practiceChallenge.copy}
+        >
+          {practiceChallenge.copied ? 'Challenge link copied ✓' : '⚔️ Challenge a friend'}
+        </button>
+      )}
       {props.grade && (
         <div className="coach-panel">
           <div className="coach-head">
@@ -1031,15 +1042,6 @@ export function ResultScreen(props: {
           }}
         >
           {copiedReplay ? 'Replay link copied ✓' : '🎬 Copy replay link — let them watch it'}
-        </button>
-      )}
-      {props.practice && !props.challenge && myChallengeUrl && (
-        <button
-          className="cta"
-          onClick={practiceChallenge.canNativeShare ? practiceChallenge.share : practiceChallenge.copy}
-        >
-          {practiceChallenge.copied ? 'Challenge link copied ✓' : '⚔️ Challenge a friend to beat it'}
-          <span className="cta-sub">One attempt · their own luck</span>
         </button>
       )}
       {props.practice && (

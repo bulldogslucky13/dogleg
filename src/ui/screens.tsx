@@ -14,6 +14,7 @@ import { FortuneInfo } from './Tutorial'
 import { ChangeLog } from './ChangeLog'
 import { hasEarnedAwards, reconcileAchievements, type Unlock } from '../state/achievements'
 import { Wordmark } from './Wordmark'
+import { recordChurn } from '../lib/churn'
 import { dismissSteals, pendingSteals, syncLedger, type StolenRecord } from '../lib/records'
 import { loadGhost, type Ghost } from '../state/ghost'
 import { currentHandicap, formatHandicap } from '../state/stats'
@@ -290,6 +291,25 @@ export function HomeScreen(props: {
               ⏳ {season.name} ends in {seasonCountdown(season)} — season records are up for grabs
             </p>
           )}
+          {/* the wall keeps score of itself: how many records changed hands
+              this week, and how many fell in daily play (they wear the crown).
+              A quiet week says nothing — drama isn't invented here. */}
+          {courseTab === 'courses' &&
+            (() => {
+              const churn = recordChurn(courseRecs)
+              if (!churn || churn.total === 0) return null
+              return (
+                <p className="season-countdown record-churn">
+                  🔥 {churn.total} record{churn.total === 1 ? '' : 's'} changed hands this week
+                  {churn.daily > 0 && (
+                    <>
+                      {' '}— {churn.daily} in daily play
+                      <RecordCrown rec={{ mode: 'daily' }} />
+                    </>
+                  )}
+                </p>
+              )
+            })()}
           {courseTab === 'courses' &&
             [...COURSES, ...GUEST_COURSES].map((c) => {
               const sr = seasonRecs?.get(c.slug)

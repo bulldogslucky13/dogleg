@@ -63,6 +63,12 @@ export const CHANGE_KIND_LABEL: Record<ChangeKind, string> = {
 
 export const CHANGELOG: ChangeEntry[] = [
   {
+    date: '2026-08-09',
+    kind: 'feature',
+    title: 'The wall keeps score of itself',
+    note: 'The course list now says how many records changed hands this week \u2014 and how many fell in daily play, crown and all. A quiet week says nothing.',
+  },
+  {
     date: '2026-08-07',
     kind: 'odds',
     title: 'You now end up in the bunker — and the lake — you actually found',

@@ -9,7 +9,8 @@ import { track } from '../lib/analytics'
 import { backendEnabled } from '../lib/backend'
 import { bundleIsStale, FRESH_TTL_MS } from '../lib/freshness'
 import { fetchCourseRecords, fetchSeasonRecords, loadPlayer, type CourseRecord } from '../lib/leaderboard'
-import { seasonCountdown, seasonForDate } from '../engine/season'
+import { seasonForDate } from '../engine/season'
+import { SeasonClock } from './SeasonClock'
 import { FortuneInfo } from './Tutorial'
 import { ChangeLog } from './ChangeLog'
 import { hasEarnedAwards, reconcileAchievements, type Unlock } from '../state/achievements'
@@ -286,11 +287,7 @@ export function HomeScreen(props: {
             </button>
           </div>
           {courseTab === 'par3' && <Par3Intro />}
-          {courseTab === 'courses' && (
-            <p className="season-countdown">
-              ⏳ {season.name} ends in {seasonCountdown(season)} — season records are up for grabs
-            </p>
-          )}
+          {courseTab === 'courses' && <SeasonClock season={season} />}
           {/* the wall keeps score of itself: how many records changed hands
               this week, and how many fell in daily play (they wear the crown).
               A quiet week says nothing — drama isn't invented here. */}

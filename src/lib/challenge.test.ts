@@ -15,6 +15,7 @@ import {
   challengeUrl,
   challengeVerdict,
   parseChallenge,
+  previewChallengeUrl,
   syncChallengeRound,
 } from './challenge'
 
@@ -132,6 +133,47 @@ describe('one attempt, run like the daily', () => {
     expect(replayRound(att.done!.seed, att.done!.character, att.done!.decisions).ok).toBe(true)
   })
 
+  it('two challenges in flight at once — the group-chat case — keep separate attempts and snapshots', () => {
+    // two different rounds land in the chat; this device takes both
+    const chA = parseChallenge(codeFor(finishedRound('sender-a'), 'Rob'))!
+    const chB = parseChallenge(codeFor(finishedRound('sender-b'), 'Mike'))!
+    const setupA = acceptChallenge(chA)
+    const setupB = acceptChallenge(chB)
+    expect(setupA.seed).not.toBe(setupB.seed)
+
+    // start A, get a few shots in, then B takes the live slot mid-round
+    let roundA = newRound(setupA, 'practice', 'dart')
+    roundA = applyChoice(roundA, 'normal')
+    syncChallengeRound(roundA)
+    let roundB = newRound(setupB, 'practice', 'greens')
+    roundB = applyChoice(roundB, 'normal')
+    syncChallengeRound(roundB)
+
+    // A's progress survived B's — each attempt snapshots under its own id
+    expect(attemptFor(chA.id)?.snapshot?.seed).toBe(roundA.seed)
+    expect(attemptFor(chB.id)?.snapshot?.seed).toBe(roundB.seed)
+
+    // finishing B signs only B; A stays live and resumable where it stood
+    const doneB = playRound(roundB)
+    syncChallengeRound(doneB)
+    expect(attemptFor(chB.id)?.done?.toPar).toBe(roundToPar(doneB))
+    expect(attemptFor(chA.id)?.done).toBeUndefined()
+    expect(attemptFor(chA.id)?.snapshot?.rolls).toBe(roundA.rolls)
+    expect(challengeAttemptForRound(roundA)?.id).toBe(chA.id)
+  })
+
+  it('the same link works for everyone in the chat — attempts key on the device, not the code', () => {
+    // one link, two devices (a cleared ledger stands in for the second phone)
+    const code = codeFor(finishedRound('the-gauntlet'), 'Rob')
+    const ch = parseChallenge(code)!
+    const deviceOne = acceptChallenge(ch)
+    localStorage.clear()
+    const deviceTwo = acceptChallenge(parseChallenge(code)!)
+    // same challenge id, but each device dealt its own luck
+    expect(deviceTwo.seed).not.toBe(deviceOne.seed)
+    expect(deviceTwo.course.slug).toBe(deviceOne.course.slug)
+  })
+
   it('rounds that are not challenge attempts leave the ledger untouched', () => {
     const round = playRound(newRound(practiceSetup('pebble-beach', 'free'), 'practice'))
     syncChallengeRound(round)
@@ -152,6 +194,14 @@ describe('the verdict', () => {
     expect(fresh).toContain('one attempt')
     expect(fresh.endsWith('https://x/#challenge=abc')).toBe(true)
     expect(challengeShareText({ courseName: 'Pebble Beach', toPar: -3, url: 'u', rally: 1 })).toContain('REVENGE')
+  })
+
+  it('the preview handle trims the link but the shared text never changes', () => {
+    const url =
+      'https://dogleg.cameronbristol.xyz/#challenge=eyJ2IjoxLCJzIjoicHJhY3RpY2UyOnBlYmJsZS1iZWFjaCJ9abcdef'
+    expect(previewChallengeUrl(url)).toBe('dogleg.cameronbristol.xyz/#challenge=eyJ2Ij…')
+    // idempotent on an already-short handle, and blind to non-challenge urls
+    expect(previewChallengeUrl('https://x.com/page')).toBe('x.com/page')
   })
 
   it('challengeIdFor differs when only the character differs (same seed and decisions)', () => {

@@ -162,7 +162,12 @@ export function acceptChallenge(ch: Challenge): DailySetup {
     ledger.attempts.unshift(att)
   }
   if (!att.attemptSeed) {
-    att.attemptSeed = practiceSetup(ch.courseSlug, `c${Date.now().toString(36)}`).seed
+    // timestamp + entropy, like nothing else in the ledger: attempts are
+    // MATCHED by this seed, so two challenges accepted in the same
+    // millisecond (a group chat's worth of links, tapped back to back) must
+    // never mint the same one — they'd cross-wire snapshots and verdicts
+    const extra = `c${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`
+    att.attemptSeed = practiceSetup(ch.courseSlug, extra).seed
     saveLedger(ledger)
   }
   return attemptSetup(att.attemptSeed, ch.courseSlug)
@@ -232,6 +237,17 @@ export function verdictCopy(v: ChallengeVerdict, from: string): string {
   if (v === 'won') return `Challenge beaten. ${from} owes you a rematch.`
   if (v === 'tied') return `Matched to the stroke — ties don't take it. ${from}'s card stands.`
   return `${from}'s card stands. The odds sided with them today.`
+}
+
+/**
+ * The challenge URL as the share-card PREVIEW displays it: scheme dropped,
+ * code cut to a six-character handle with a visible ellipsis. The preview is
+ * for reading, and two hundred characters of base64 buried the scorecard it
+ * sits under — but what actually goes out on Copy/Share is always the full
+ * working link, and the ellipsis makes the trim plain rather than sneaky.
+ */
+export function previewChallengeUrl(url: string): string {
+  return url.replace(/^https:\/\//, '').replace(/(#challenge=.{6}).+/, '$1…')
 }
 
 /** Share text for throwing a challenge (fresh or revenge). Short on purpose:

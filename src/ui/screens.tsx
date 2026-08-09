@@ -7,7 +7,7 @@ import { decisionsFromScores, encodeReplay } from '../engine/replay'
 import type { CharacterId, HoleResult } from '../engine/types'
 import { track } from '../lib/analytics'
 import { backendEnabled } from '../lib/backend'
-import { challengeShareText, challengeUrl, type Challenge, type ChallengeAttempt } from '../lib/challenge'
+import { challengeShareText, challengeUrl, previewChallengeUrl, type Challenge, type ChallengeAttempt } from '../lib/challenge'
 import { ChallengeFaceoff, useShareActions } from './ChallengeScreen'
 import { bundleIsStale, FRESH_TTL_MS } from '../lib/freshness'
 import { fetchCourseRecords, fetchSeasonRecords, loadPlayer, type CourseRecord } from '../lib/leaderboard'
@@ -962,7 +962,11 @@ export function ResultScreen(props: {
       {!props.practice && (
         <div className="share-block">
           <div className="kicker">Your share card</div>
-          <pre className="share-preview">{text}</pre>
+          {/* the preview trims the challenge link to a readable handle — the
+              full working link is what Copy/Share actually send */}
+          <pre className="share-preview">
+            {myChallengeUrl ? text.replace(myChallengeUrl, previewChallengeUrl(myChallengeUrl)) : text}
+          </pre>
           <div className="share-actions">
             <button className="cta ghost" onClick={copy}>
               {copied ? 'Copied ✓' : 'Copy'}

@@ -94,21 +94,25 @@ Deno.serve(async (req) => {
   const { ok: fetchOk, full } = await fetchFullEmail(emailId)
 
   const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
-  const { error } = await supabase.from('received_emails').upsert(
-    {
-      email_id: emailId,
-      message_id: toText(full?.message_id ?? event.data?.message_id),
-      from_address: toText(full?.from ?? event.data?.from),
-      to_addresses: toTextArray(full?.to ?? event.data?.to),
-      cc_addresses: toTextArray(full?.cc ?? event.data?.cc),
-      subject: toText(full?.subject ?? event.data?.subject),
-      text_body: toText(full?.text),
-      html_body: toText(full?.html),
-      attachments: full?.attachments ?? event.data?.attachments ?? [],
-      received_at: toText(event.data?.created_at ?? event.created_at),
-    },
-    { onConflict: 'email_id' },
-  )
+  // Content columns ride along ONLY when the full message was fetched: on
+  // conflict the upsert updates just the columns present in the payload, so a
+  // redelivery whose refetch fails can't wipe a body an earlier delivery
+  // already stored — it refreshes the metadata and leaves the content alone.
+  const row: Record<string, unknown> = {
+    email_id: emailId,
+    message_id: toText(full?.message_id ?? event.data?.message_id),
+    from_address: toText(full?.from ?? event.data?.from),
+    to_addresses: toTextArray(full?.to ?? event.data?.to),
+    cc_addresses: toTextArray(full?.cc ?? event.data?.cc),
+    subject: toText(full?.subject ?? event.data?.subject),
+    received_at: toText(event.data?.created_at ?? event.created_at),
+  }
+  if (full) {
+    row.text_body = toText(full.text)
+    row.html_body = toText(full.html)
+    row.attachments = full.attachments ?? event.data?.attachments ?? []
+  }
+  const { error } = await supabase.from('received_emails').upsert(row, { onConflict: 'email_id' })
   if (error) return json(500, { error: 'could not store email' })
   if (!fetchOk) return json(500, { error: 'stored metadata; body fetch failed — retry will backfill' })
   return json(200, { stored: emailId })

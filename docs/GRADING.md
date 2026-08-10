@@ -67,6 +67,25 @@ formula (jitter fixed at its expected value: 0), except:
   drop differently than side zones), so these are exact probability-weighted
   mixtures over `zoneShares`/`missShares` — never collapsed to a single
   "average" zone.
+  Approach **sand** is the mixture that took longest to become true. It used
+  to collapse to the greenside splash fixed point for every zone, which was
+  right only because `resolveApproach` also pinned the ball greenside no
+  matter which bunker won the roll. Now the ball finishes in the bunker the
+  roll actually chose, so the mixture values each zone where the ball really
+  comes to rest — a splash when `playsAsGreensideSand` says so, and otherwise
+  a full approach played from a `sand` lie. Both sides consult that one shared
+  predicate deliberately: when the resolver and the model disagree about which
+  sand is which, the difference shows up as phantom luck (it did, at +0.32 a
+  round, before the model caught up). Each non-greenside zone is valued at its
+  **mean** rest rather than integrated over the span — see the note at
+  `nextVApproachSand` for why the higher-order rules were tried and dropped.
+  **Water** is the same story with the opposite tell. Its lateral drop used to
+  ignore the zone the roll picked on both the tee shot and the approach, but
+  because this file's model and `resolve.ts` shared the *same* wrong formula,
+  the identity had nothing to catch and the error was invisible to grading —
+  it had to be measured directly. Both now call `waterDropPos`, exported from
+  resolve.ts for exactly the `secondGoMode` reason: one function, so a drop
+  formula cannot drift between the game and its model.
 - **approach makeable/lag**: the resulting putt distance is uniform over a
   real range (`resolve.ts`'s `5 + rng()*span` / `24 + rng()*span`); integrated
   with the same 5-point quadrature. Every such range stays within a single

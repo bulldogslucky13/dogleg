@@ -183,6 +183,31 @@ export function isGreenside(zone: HazardZone, length: number, greenDepth: number
   return zone.to >= greenFront - 8 && zone.to - zone.from <= 45
 }
 
+/** How far from the green a ball still plays as a splash rather than a swing. */
+export const GREENSIDE_SAND_YD = 30
+
+/**
+ * Does a ball resting in `zone` play as GREENSIDE sand (splash it out, the
+ * `shortgame` stage and `shortOdds`' sand table) or as a full shot from a
+ * bunker (an `approach` with a `sand` lie)?
+ *
+ * `isGreenside` alone is not enough, because it describes the ZONE and this
+ * question is about the BALL. Harbour Town 5's 82-yд waste runs right up to
+ * the green but is too long to count as greenside — correct for weighting the
+ * hazard, wrong for a ball that finishes in its last few yards. Before this
+ * existed, exactly that lie showed "Bunker shot · 8 yards to go" with a full
+ * approach's three options, when from eight yards you obviously splash it.
+ *
+ * Shared by `resolveApproach` and grade.ts's `nextVApproachSand` — the resolver
+ * and the model MUST agree about which sand is which, or the model prices a
+ * splash and the player plays a swing, and the telescoping identity turns the
+ * difference into phantom luck. Same reasoning as `secondGoMode` being shared
+ * rather than re-derived.
+ */
+export function playsAsGreensideSand(zone: HazardZone, pos: number, length: number, greenDepth: number): boolean {
+  return isGreenside(zone, length, greenDepth) || length - pos <= GREENSIDE_SAND_YD
+}
+
 /** Zones that overlap [from,to] on the given side reach. Zones fully behind `ballPos` never count. */
 export function reachableZones(
   layout: HoleLayout,

@@ -19,7 +19,9 @@ import {
 import { lifetimeRounds, loadArchive, type ArchivedRound, type HistoryEntry } from '../state/store'
 import { pastSeasons, roundsInSeason, seasonAwards, type SeasonAward } from '../state/seasonStore'
 import { loadLedger, syncLedger } from '../lib/records'
+import { hasEarnedAwards, reconcileAchievements } from '../state/achievements'
 import { AccountPanel } from './AccountPanel'
+import { AchievementsView } from './Achievements'
 import { RoundScorecard } from './RoundScorecard'
 import { shortCourseName } from './courseName'
 import { track } from '../lib/analytics'
@@ -34,7 +36,7 @@ import { track } from '../lib/analytics'
  */
 
 type LockerView = 'main' | 'stats' | 'ace' | 'albatross'
-type LockerTab = 'recent' | 'records' | 'seasons'
+type LockerTab = 'recent' | 'records' | 'seasons' | 'awards'
 
 /** an archived round already carries everything the scorecard needs */
 function toLogged(r: ArchivedRound): LoggedRound {
@@ -60,9 +62,11 @@ export function RoundsScreen(props: {
   initialView?: 'main' | 'stats'
   /** open with the account panel already expanded (How to Play's sync line) */
   initialAccount?: boolean
+  /** deep-link straight onto a tab (the wrap screen's achievements card) */
+  initialTab?: LockerTab
 }) {
   const [view, setView] = useState<LockerView>(props.initialView ?? 'main')
-  const [tab, setTab] = useState<LockerTab>('recent')
+  const [tab, setTab] = useState<LockerTab>(props.initialTab ?? 'recent')
   /** permanent shelf: past seasons where this player ended holding records */
   const [awards, setAwards] = useState<SeasonAward[]>([])
   useEffect(() => {
@@ -101,6 +105,11 @@ export function RoundsScreen(props: {
     void fetchCourseRecords().then((recs) => {
       if (!live || !recs) return
       syncLedger(recs, myName)
+      // same as the home screen's pass: a record adopted or reclaimed elsewhere
+      // moves the record achievements, and this lands after the app-start
+      // reconcile. Quietly — finding out isn't earning. setLedger below
+      // re-renders, so an open Awards tab picks the grants up immediately.
+      reconcileAchievements('quiet')
       setLedger(loadLedger())
     })
     return () => {
@@ -217,7 +226,23 @@ export function RoundsScreen(props: {
   const prs = [...bestByCourse.values()]
     .filter((r) => !recordByCourse.has(r.courseSlug))
     .sort((a, b) => a.toPar - b.toPar)
-  const recent = [...rounds].sort((a, b) => b.playedAt - a.playedAt).slice(0, 10)
+  // Recent comes off the round LOG, not the replay archive. The two aren't the
+  // same set: the archive is pruned (src/state/store.ts) and only ever holds
+  // rounds this device played, while the log keeps every round forever and
+  // absorbs dailies synced from other devices. Reading the archive here meant a
+  // freshly-synced device — full stats, full awards, empty archive — showed
+  // "Last 0 rounds". `row()` already offers Replay only where the archive still
+  // has the decisions, so log-only rounds simply come without that button.
+  const recent = [...log].sort((a, b) => b.playedAt - a.playedAt).slice(0, 10)
+  // …and the tabs themselves gate on anything the clubhouse can show, for the
+  // same reason: they used to gate on the archive, which hid the Awards and
+  // Seasons tabs (neither of which reads the archive at all) behind an
+  // empty-state message on any device whose history arrived by sync. Earned
+  // awards count on their own — the record sync can grant them on a device
+  // holding no rounds at all, since only dailies sync and a player's records
+  // may all have been set in practice play elsewhere.
+  const hasRounds = log.length > 0 || rounds.length > 0
+  const hasAnything = hasRounds || hasEarnedAwards()
 
   const scorecard = card && (
     <RoundScorecard
@@ -399,7 +424,7 @@ export function RoundsScreen(props: {
         <span className="fine">Handicap, score breakdown, best &amp; worst</span>
       </button>
 
-      {rounds.length === 0 ? (
+      {!hasAnything ? (
         <p className="tagline center">No rounds in the clubhouse yet — go play one and it'll show up here.</p>
       ) : (
         <>
@@ -428,14 +453,35 @@ export function RoundsScreen(props: {
             >
               Seasons
             </button>
+            <button
+              role="tab"
+              aria-selected={tab === 'awards'}
+              className={`locker-tab${tab === 'awards' ? ' on' : ''}`}
+              onClick={() => setTab('awards')}
+            >
+              Awards
+            </button>
           </div>
+
+          {tab === 'awards' && <AchievementsView />}
 
           {tab === 'recent' && (
             <section className="rounds-section">
-              <div className="kicker">
-                Last {recent.length} round{recent.length === 1 ? '' : 's'}
-              </div>
-              {recent.map((r) => row(toLogged(r)))}
+              {recent.length === 0 ? (
+                // reachable now that awards alone open the clubhouse: records
+                // synced from another device, no rounds on this one yet
+                <p className="fine">
+                  No rounds on this device yet — your awards and records came across with your account. Play one
+                  and it'll show up here.
+                </p>
+              ) : (
+                <>
+                  <div className="kicker">
+                    Last {recent.length} round{recent.length === 1 ? '' : 's'}
+                  </div>
+                  {recent.map((r) => row(r))}
+                </>
+              )}
             </section>
           )}
 

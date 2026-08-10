@@ -88,6 +88,211 @@ find the polygon name for a new course, query Overpass for
   cleared hole 15, which imports with just two zones on the #4 handicap hole
   and is simply that bare.
 
+- **Torrey Pines — South (all 18)** — the course that proves "shift, don't
+  scale" is a rule about a *diagnosis*, not a reflex. Two holes missed the
+  BLACK card by more than tee-box variance, for opposite reasons, and the same
+  fix would have been right on one and wrong on the other. Hole 10 imported 36
+  yd SHORT off a forward pad — the textbook case, shifted +36. Hole 6 imported
+  22 yd LONG, and shifting it would have been the error: its tee and green
+  endpoints are both correct, so the excess is curvature in a wandering
+  polyline (bend 65 yd, the course's biggest). The tell is cheap and worth
+  copying — **compare each bunker's STRAIGHT-LINE distance from the tee to its
+  arc position**. On hole 6 they agree to within 2 yd in the fairway and
+  diverge only near the green, which says the excess accumulates along the
+  hole rather than sitting at the tee; a blind shift would have walked the
+  driving-zone sand ~25 yd back from measured truth. It is remapped through
+  arc → straight-line instead.
+  Also the first course whose defining hazard was **absent from OSM
+  entirely**: no `natural=scrub` or `wood` polygon exists inside or within
+  900 m of the property, so the canyons that give the course its character
+  imported as open ground on five holes. They were hand-authored as
+  `deeprough` from **USGS NED 10m elevation transects** (`api.opentopodata.org`,
+  the same 3DEP data ProVisualizer quotes). The recipe, which is what the
+  shipped zones were cut from — follow it exactly or you will not reproduce
+  them: sample **every 10 yd** along the centreline, at **±20, 30, 40, 50 and
+  60 yd**, and take the nearest offset whose ground sits **≥6 m below the
+  playing line** as the rim. Author a zone only over a contiguous run where
+  that rim is **inside the importer's own 50-yd corridor**, and span exactly
+  that run — no extrapolating past the last measured station.
+  That turns "there's a canyon there" into a measurement, and it cuts both
+  ways: it authored rims on 3/4/6/13/17 and *declined* 2/7/8/9/14/15/16, whose
+  ground falls away at 55-70 yd — outside the corridor, the same call that
+  cleared `whistling-straits:9/18`.
+  **Sample at 10 yd, not 25.** A first pass at 25-yd spacing was too coarse to
+  see that hole 17's rim is not one run: it dives inside the corridor over
+  10-120, wanders back out, and returns over 210-340. Read off those coarse
+  stations the hole shipped one 100-350 zone — 230 yd of hazard past the
+  evidence, on a hole it moves the odds and Play Rating for — and it took
+  review to catch. The re-measure also *widened* 4, 6 and 13, so the error
+  from coarse stations runs in both directions.
+  A gap in the run is a real decision, not a rounding artifact. Merge one only
+  where the rim wanders just past 50 yd through a feature imagery shows
+  unbroken (a hole in a continuous hazard rewards an aggressive line for the
+  wrong reason — the broken-lateral-hazard mode below), and say so in the
+  comment; leave the long ones open. Hole 17's 90-yd gap stayed, so that hole
+  carries two zones. Reach for all of this on any course with terrain the
+  polygons don't describe.
+  Two more worth knowing: a single bunker straddling the centreline can
+  rasterise into **two overlapping zones** (a `cross` slice nested inside a
+  flanking slice — holes 3 and 8, both front greenside bunkers), and the
+  stroke index disagreed with the card on 13 of 18 holes while OSM's own
+  `handicap` tags matched the card on all 18 — a reminder that OSM's hole tags
+  are a useful *corroborator* of a card even though its geometry is only ever
+  ground truth for shape.
+
+- **Pine Valley (all 18)** — the course that shows `osmHolePrefix` is not always
+  available when you need it. Pine Valley's 10-hole Short Course sits INSIDE the
+  same `golf_course` polygon with `ref=1..10`, colliding with the championship
+  holes, and **not one of the 28 hole ways is named** — so the prefix mechanism
+  has nothing to match and nearest-centre carries the identity check alone. What
+  made that safe was checking the MARGIN rather than trusting the rule: measured
+  from the championship centroid, the right hole wins every colliding ref by
+  465-961 m, because the two courses sit in blocks ~1 km apart. Where a margin
+  like that doesn't exist, don't import. Two independent per-hole checks then
+  confirmed it — all 18 centrelines start on a `golf=tee` and end on a DISTINCT
+  `golf=green` (the Potomac check), and ProVisualizer's own tee coordinate sits
+  within 3 yd of the centreline start on 16 of 18.
+  Worth copying: **the 3D planner exposes its tee, pin and dogleg-target
+  coordinates as page globals** (`tempHoleTeeLat/Lon`, `tempHolePinLat/Lon`,
+  `tempHoleTargetLat/Lon`), so the whole course can be compared to OSM
+  numerically instead of by eye. That is what separated this course's three
+  length problems, which look identical in a length column and need opposite
+  fixes: holes 6 and 17 sit on FORWARD pads (PV's tee 28 and 67 yd behind the
+  centreline start → `--shift`); hole 1's endpoints are both right but Chaikin
+  rounds 24 yd off a 3-point line around a genuinely sharp corner (remap
+  smoothed-arc → RAW-arc); holes 13 and 16 are the torrey-6 case, endpoints
+  right and the line wandering long (remap arc → straight-line).
+  Also the first course where `cross` bands are mostly REAL — Pine Valley is
+  wall-to-wall sand and you carry waste to reach the fairway on most holes, so
+  `--profile` ruling every band REAL CARRY is the course being honest. The
+  discriminator that still worked is the mapped-fairway test: four bands had
+  `golf=fairway` running beside them for 27-50% of their span and were folded to
+  flanks, and the rest had none at all.
+
+- **Muirfield (all 18)** — the course that added the negative `--shift` and the
+  per-course rake. Its shipped tuple already matched the club's WHITE card
+  (par 71 / 6728) on par, stroke index *and* yardage for all 18, so it was pure
+  geometry, and notable for three things.
+  First, **the tee problem ran the other way.** Every previous course that
+  missed its card imported SHORT off a forward pad; Muirfield imports LONG on
+  ten holes because OSM traced them from the CHAMPIONSHIP tees (7089 yd of
+  centreline against the card's 6728). `--shift` now takes a negative, which
+  trims that run off the front instead of prepending a missing one — and
+  trimming is the *stronger* operation, because it only discards measured line
+  where the positive path invents a straight one. Diagnose before reaching for
+  it: the tell is that ProVisualizer's published tee sat within 1-7 yd of the
+  untrimmed OSM start on 17 of 18 holes, and PV's tee-to-pin distance tracked
+  the OSM length rather than the card on exactly the ten long holes. Then check
+  the trim lands somewhere real — 9 of 10 came down within 12 yd of a mapped
+  `golf=tee`, most within 2-8. (Hole 15 is the one that didn't: only two pads
+  are mapped and the card needs 49 yd, so the card wins and the entry says so.)
+  Second, **the 6-yd lateral rake is not fine enough for every course.** This
+  is `bandon-dunes:12` generalised — there, one bunker 4 yd off the line
+  vanished under the rake and was hand-added back. Muirfield's ~150 revetted
+  pots are frequently under 6 yd across, and the default rake stepped over
+  greenside sand on 14 of 18 holes, including both walls of the 13th, which the
+  hole's own `signature` names. `COURSE_GEO.rake` lowers it per course (3 here);
+  it is per-course rather than global so every already-imported course keeps the
+  resolution it was QA'd at. Check for this with the polygons rather than by
+  eye: count the bunkers whose ring comes within ~30 yd of the hole's green and
+  compare against the greenside zones you actually shipped. 81 touch a green at
+  Muirfield and the 6-yd pass left 28 of them with no zone at all.
+  Third, **a `cross` band must be wide enough to be worth carrying.** Lateral
+  continuity across the line is necessary, not sufficient: a 3-yd pot sitting on
+  the centreline satisfies it while blocking three yards of a hundred-yard
+  corridor. Sand now needs to span >=12 yd to earn `cross`; water and trees keep
+  the old rule, because a burn crossing a fairway is narrow and IS a forced
+  carry. Muirfield ends with zero cross zones on any hole, which is the links
+  being honest rather than a bug.
+  Worth knowing: its OSM `handicap` tags disagree with the club card on 12 of 18
+  holes — the exact reverse of Torrey Pines, where they matched on all 18. OSM's
+  hole tags corroborate a card; they never arbitrate one. And `golf=rough` is
+  useless here for the reason it usually is: one course-wide multipolygon
+  spanning the whole corridor (the default surface), correctly dropped.
+
+- **Quail Hollow Club (all 18)** — the course where **the house scorecard
+  source is the wrong source**. BlueGolf carries Quail Hollow only as its MEMBER
+  configuration (par 72 / 7,546, the 1st played as a par 5), which is a
+  different golf course from the tournament setup the game ships. Pulling the
+  card first, per step 1, would therefore have produced a par mismatch on hole 1
+  and read as "a data bug, full stop" when the tuple was right all along. What
+  settled it: the shipped par sequence AND OSM's own per-hole `par` tags both
+  match the 2025 PGA Championship card (par 71 / 7,626) on all 18, so the
+  members' card is the outlier. **Check what CONFIGURATION a card describes
+  before treating a par mismatch as a bug** — for a tournament venue the club's
+  everyday card and its championship card can differ by a par and 80 yards, and
+  the championship's own scorecard PDF is the better source. Par ended up
+  untouched; four yardages moved.
+  Second, its shifts go **both directions on the same course** — 1 and 3 trim,
+  eight others prepend. 82 tee pads over 18 holes and the mapper picked a
+  different one per hole, the seminole pattern, so per-hole diagnosis is the
+  only way through. Projecting ProVisualizer's published tee onto each hole's
+  HEADING (a signed along-distance, not the raw point distance) is what sorted
+  them: it agrees within 12 yd on seven of the ten. Raw distance would not have
+  worked — hole 15's PV tee is 104 yd away but sits 79 yd off the hole's line,
+  so it corroborates nothing, and only the projection reveals that.
+  Third, it is a clean example of the **carnoustie linestring mode** biting the
+  one hole that could least afford it: `waterway=stream` never reaches the
+  polygon rasterizer, so 18 — whose signature reads "creek all down the left" —
+  imported with no water whatsoever. Projecting the stream onto the hole's own
+  shifted centreline gives the creek crossing at ~190 and then running up the
+  left at 1-23 yd off, unbroken, to the green. The crossing was deliberately not
+  laid as a `cross`: at 190 yd on a 494-yd par 4 it is far short of the landing
+  area, and a forced carry there would be invented.
+  Worth copying: **check bunker SIZE against the rake before assuming you need a
+  finer one.** Muirfield needed rake 3 immediately before this; Quail Hollow
+  keeps the 6-yd default because not one of its 74 bunkers is under 6 yd across
+  (min 6.7, median 12.8). One number decides it, and it is the reason the rake
+  is a per-course knob and not a new global.
+
+- **Shinnecock Hills / LACC North / Cabot Links / Camargo / Doral Blue Monster
+  (all 18 each)** — five courses frozen in one pass, and between them they show
+  every identity mechanism the registry has.
+  **Shinnecock** is the case where OSM's own hole NAMES are the identity check:
+  its 18 centrelines carry the club's hole names (Westward Ho, Plateau, Redan,
+  Eden, Home …) matching the published card name-for-name in order, which is
+  worth more than a polygon name with National Golf Links, Sebonack and
+  Southampton all inside 1.5 km. Three holes traced members' pads while the rest
+  are on championship tees — ProVisualizer's published tee sits 48, 48 and 71 yd
+  BEHIND the OSM start on exactly those three, against ≤7 yd on the other
+  fifteen.
+  **LACC North** is the course that added `osmHoleWays`. One polygon holds both
+  the North and the South, 36 hole ways, two full sets of `ref=1..18`, **every
+  one unnamed** — and unlike Pine Valley the routings INTERLEAVE, so from the
+  North centroid the SOUTH hole wins ref=1 by 16 m and ref=2 by 386 m.
+  Nearest-centre is not weak there, it is wrong. Pin by way id, and establish
+  the ids from fingerprints rather than proximity: par sequence and per-hole arc
+  length each match one course's card on all 18. It also carried a **par bug** —
+  the 7th shipped as a par 4 and the course as par 71, against the club card,
+  OSM's par tag and the 2023 U.S. Open card, all of which say par 3.
+  **Cabot Links** is the reminder to check the tuple against a card before
+  assuming it came from one: six pars disagreed with the club's, the yardages
+  matched no tee set, and the famous 100-yd short hole sat at 16 when the card
+  has it at 14. It is also the second `rake: 3` course (33 of 109 bunkers under
+  6 yd) and the one that exposed the deeprough-shadowing bug below. Its sea is
+  mostly a VIEW, which is a measurement and not a judgement: projecting the
+  coastline onto each centreline puts it inside the 50-yd corridor on two holes
+  only (6, at 14-31 yd for all 465 yd — kept) and 48-87 yd away on the 16th,
+  where the imported `ocean` was dropped by hand.
+  **Camargo** is the cleanest entry in the registry — tuple already matching the
+  GOLD card on par, SI and yardage bar four yards — and a second worked example
+  of the `pine-valley:1` remap on its 2nd.
+  **Doral** shows what to do when a course has THREE published cards (Black
+  7545, WGC 2016 7528, Cadillac 2026 7739) and the mapper picked pads per hole:
+  score total absolute deviation against each (316 / 299 / 420) and commit to
+  one, rather than mixing per hole and ending up with a total that is no real
+  configuration. Black wins on being the club's own and the one OSM's `par` AND
+  `handicap` tags match on all 18.
+  Worth copying from all five: **ProVisualizer's per-hole tee/pin arrays make
+  the whole card checkable numerically in one pass.** `3dlink.php?id=<id>`
+  exposes `tempHoleTeeLat/Lon` and `tempHolePinLat/Lon` as 1..18 arrays for the
+  whole course, so one harvest gives you, for every hole, a second opinion on
+  the tee (projected onto the hole's HEADING, per Quail Hollow) and a check that
+  the centreline ends on the right green (PV's pin landed 0-11 yd from every one
+  of these 90 hole ends). That is what separated "wrong pad" from "Chaikin
+  rounding" from "the card describes a different tee" across 90 holes without
+  eyeballing any of them.
+
 ### Known gaps & importer artifact modes
 
 - **Coverage** — obscure courses may lack `golf=hole` centerlines, and many
@@ -127,6 +332,18 @@ find the polygon name for a new course, query Overpass for
     them with `osmIgnore` in `COURSE_GEO`, with the evidence in the comment.
     Do not drop a merely LARGE bunker: Seminole's way/697261262 is 1.34 acres
     and is genuine.
+  - *Rough shadowing real hazards* (FIXED at source in the Cabot pass, listed
+    so the shape is recognisable if it recurs with another always-dropped
+    kind): `golf=rough` classifies to `deeprough`, which is filtered out
+    wholesale at merge time — but it still competed for sample points, and the
+    rasteriser breaks on the FIRST ring containing a point in Overpass response
+    order. So a course-wide rough multipolygon silently deleted every hazard
+    drawn inside it. `cabot-links:5` imported with no zones at all: way
+    /1044331550 covers the hole at -41..37 lateral, so both greenside bunkers on
+    a 186-yd par 3, 16 and 21 yd off the line, rasterised as rough and vanished.
+    The tell is a hole coming through BARE that imagery says is not — and the
+    profile (`--profile`) showing the bunkers reaching the corridor anyway,
+    which is what separates this from a genuine ownership cull.
   - *Broken lateral hazards*: a continuous lake/marsh shows gaps where the
     fairway widens past the 50-yd sample corridor. If imagery shows unbroken
     water, span it continuously — the gap rewards aggressive lines for the
@@ -207,8 +424,22 @@ find the polygon name for a new course, query Overpass for
      imported 67 yd short: shifting puts sand at 253 R / 333 L and the imagery
      shows ~246 / ~330, while scaling predicted 217 / 310. A shift also keeps
      greenside features greenside, which is what makes it safe to apply
-     blindly to all 18. (`bend` profiles are lateral yards and need no
-     adjustment either way.)
+     blindly to all 18.
+     **`bend` is the exception — it cannot be shifted afterwards.** Its 13
+     samples are evenly spaced *fractions of the hole*, and `HoleMap` replays
+     them at the same fractions of the final card length, so a profile measured
+     on a short raw line gets STRETCHED over the long card hole and draws the
+     corner yards early (64 yd early on `pacific-dunes:8`, off a 110-yd forward
+     pad). The lateral values need no scaling — that much of the old note was
+     right — but their POSITIONS do. Re-measure instead:
+     `pnpm import:osm <course> <hole> --shift N` prepends the missing tee run
+     as a straight segment back along the opening heading, so `length`, every
+     zone, `fairwayFrom`/`To` and the bend profile all come out in card
+     coordinates in one pass — and the deviations get re-based on the real
+     back-tee → green chord, which no resample of the old numbers could do.
+     It also rasterises the prepended stretch, so hazards beside the back-tee
+     run are found rather than assumed absent. Use it for any hole importing
+     more than ~10 yd short.
 2. `pnpm import:osm <course> <hole> --compare` — sanity-check vs the shipped
    layout and the card from step 1.
 3. Paste the `--json` zones into `src/engine/geometry.ts` under `${slug}:${hole}`.

@@ -137,11 +137,60 @@ function junkReach(dist: number): number {
   return Math.max(0, Math.min(1, (dist - 40) / 150))
 }
 
+/**
+ * WHERE A MISS ACTUALLY CLUSTERS — the approach's shot dispersion.
+ *
+ * `hazardShares` weights each hazard by how much of the landing WINDOW it
+ * covers. For a drive that is right: `driveWindow` is a genuine landing band,
+ * a few dozen yards wide, and a ball is about as likely to finish at one end
+ * of it as the other. For an approach it is not, because that window is
+ * `[ball.pos + dist * 0.45, length + 12]` — deliberately enormous, spanning
+ * more than half the shot. Weighting it uniformly says a bunker you could only
+ * reach by coming up eighty yards short is, per yard, exactly as likely as the
+ * one guarding the green.
+ *
+ * It isn't, and the effect was not small: on lacc-north:13 from 300 yd, 62% of
+ * the sand mass sat in two fairway bunkers 60 and 84 yd short of the green.
+ *
+ * So an approach passes a focus: misses are drawn around the green centre with
+ * a spread that grows with the shot, and each zone is weighted by the INTEGRAL
+ * of that density across the part of it the window reaches, rather than by raw
+ * length. Simpson's rule over three points is exact enough for a Gaussian
+ * across a zone this short and costs the same on every zone, which matters
+ * because this runs a few million times in `gen:ratings`.
+ *
+ * `sigma` is deliberately generous — wider than a tour player's real long/short
+ * dispersion — because this distribution is conditional on ALREADY having
+ * missed the green, and those misses are the fat tail rather than the middle.
+ * Erring wide keeps far hazards honestly in play instead of pruning them to
+ * zero; the point is to rank them, not to erase them.
+ *
+ * Drives pass no focus and are weighted exactly as before.
+ */
+export interface MissFocus {
+  target: number
+  sigma: number
+}
+
+function approachFocus(layout: HoleLayout, dist: number): MissFocus {
+  return {
+    target: layout.length - layout.greenDepth / 2,
+    sigma: Math.max(12, Math.min(30, dist * 0.12)),
+  }
+}
+
+/** Mean of the miss density across [lo,hi] — Simpson's rule, 3 evaluations. */
+function focusDensity(lo: number, hi: number, f: MissFocus): number {
+  const k = (x: number) => Math.exp(-(((x - f.target) / f.sigma) ** 2) / 2)
+  return (k(lo) + 4 * k((lo + hi) / 2) + k(hi)) / 6
+}
+
 function hazardShares(
   layout: HoleLayout,
   ball: BallState,
   window: [number, number],
   choice: Choice,
+  focus?: MissFocus,
 ): { shares: ZoneShare[]; exposure: number } {
   const reach = reachableZones(layout, ball.pos, window[0], window[1])
   let total = 0
@@ -154,7 +203,12 @@ function hazardShares(
       : zone.side === 'cross'
         ? 1.15
         : 0.85
-    const w = overlap * sideW * KIND_SEVERITY[zone.kind] * CHALLENGE[choice]
+    // `overlap` is the zone's share of the window by LENGTH; the focus turns
+    // that into its share by miss PROBABILITY. Same clipped span either way.
+    const density = focus
+      ? focusDensity(Math.max(window[0], zone.from), Math.min(window[1], zone.to), focus)
+      : 1
+    const w = overlap * density * sideW * KIND_SEVERITY[zone.kind] * CHALLENGE[choice]
     if (w > 0.001) {
       raw.push({ zone, bucket: KIND_BUCKET[zone.kind], w })
       total += w
@@ -478,7 +532,7 @@ export function approachOdds(
 
   // Where can this shot actually miss? Between the ball and just past the green.
   const window: [number, number] = [ball.pos + dist * 0.45, layout.length + 12]
-  const { shares, exposure } = hazardShares(layout, ball, window, choice)
+  const { shares, exposure } = hazardShares(layout, ball, window, choice, approachFocus(layout, dist))
 
   // Deep rough in range costs you greens, in proportion to how far out you
   // are (see JUNK_MAX_BITE). Applied before the odds are built so the green

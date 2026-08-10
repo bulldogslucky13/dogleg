@@ -50,7 +50,16 @@ deliberate exceptions, neither of which is ever logged**:
   what the game did nor what it told you.
 
 Both are spelled out in the note at the top of `changelog.ts`, which is the
-source of truth for this policy. Payloads without
+source of truth for this policy. **The rule is enforced by CI**: the
+change-log gate (`.github/workflows/changelog-check.yml`, policy + tests in
+`scripts/changelog-check.mjs`) fails any PR that neither updates
+`changelog.ts` nor is exempt. Exemptions, by PR label: `course` (course work —
+also auto-detected when a diff touches only course-import paths, so routine
+imports need no label at all) and `no-changelog` (the deliberate skip for
+everything the policy exempts: cosmetic work, refactors, CI, docs). **To log
+course work you DO want players to see**: add `changelog-include` alongside
+`course` and write the entry. Entry kinds: `odds` | `feature` | `fix` |
+`design`. Payloads without
 a version (pre-handshake clients) still replay as before. Preventively, the
 build also emits `version.json` beside the bundle (vite.config.ts) and the
 home screen fetches it no-store (`src/lib/freshness.ts`) — a mismatch shows a

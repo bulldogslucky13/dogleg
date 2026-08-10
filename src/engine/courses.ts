@@ -411,6 +411,11 @@ export const COURSES: CourseSpec[] = [
     greens: 'Fast',
     wind: 16,
     blurb: 'Ross by the sea in Florida, a Donald Ross favorite ringed by ocean wind.',
+    // The import drew no trees/deeprough anywhere: Seminole's off-corridor
+    // ground is the native sandy scrub the importer deliberately ignores as
+    // hazard zones (see the osmIgnore note in scripts/import-osm.ts) — so
+    // that's the word for an unmapped bad lie, not the 'junk' fallback.
+    junkLabel: 'scrub',
     holes: holes([
       [4, 405, 17, 'S', 'sand'],
       [4, 480, 5, 'L', 'water'],
@@ -473,25 +478,42 @@ export const COURSES: CourseSpec[] = [
     greens: 'Firm',
     wind: 12,
     blurb: 'Long clifftop municipal that hosts majors above the Pacific.',
+    // Real geometry found 82 bunkers and not one tree polygon — OSM has no
+    // wood inside the boundary — so the odds' junk floor had nothing to name
+    // (see CourseSpec.junkLabel), and without a word here the import would
+    // have quietly downgraded "trees" to "junk" on the course named for its
+    // pines. The pines line the corridors but almost never decide a shot;
+    // what actually swallows a ball at Torrey is the kikuyu, thick enough
+    // that every US Open broadcast talks about it.
+    junkLabel: 'kikuyu',
     holes: holes([
-      [4, 452, 11, 'S', 'sand'],
-      [4, 389, 13, 'R', 'sand'],
-      [3, 198, 15, 'S', 'ocean', 'A clifftop par 3 with the Pacific shimmering far below'],
-      [4, 488, 3, 'L', 'ocean'],
-      [4, 453, 7, 'S', 'sand'],
-      [5, 560, 9, 'R', 'ocean'],
-      [4, 462, 5, 'S', 'sand'],
-      [3, 173, 17, 'S', 'sand'],
-      [5, 614, 1, 'S', 'sand'],
-      [4, 416, 10, 'S', 'sand'],
-      [3, 221, 16, 'S', 'sand'],
-      [4, 504, 2, 'R', 'sand'],
-      [5, 612, 12, 'L', 'sand'],
+      // Card = the BLACK tees (`torreypinessouth`): par 72, 7802 yd,
+      // 78.8/148 — the championship set this course is known for, and the
+      // longest of the six men's tee sets BlueGolf publishes. strokeIndex is
+      // that card's HCP row, which disagreed with the shipped tuple on 13 of
+      // 18 holes and feeds pressure() in the odds; OSM's own `handicap` tags
+      // match the card on all 18, which is the corroboration. Par matched the
+      // shipped tuple exactly and is likewise corroborated by OSM's `par`.
+      // Yardages are the card's; they auto-reconcile to the imported geometry
+      // below, which was shifted onto the card hole by hole.
+      [4, 451, 5, 'S', 'sand'],
+      [4, 389, 15, 'R', 'sand'],
+      [3, 201, 13, 'S', 'ocean', 'A clifftop par 3 with the Pacific shimmering far below'],
+      [4, 490, 3, 'S', 'ocean'], // flag said 'L'; the real centreline bends 4 yd
+      [4, 454, 11, 'S', 'sand'],
+      [5, 564, 9, 'R', 'ocean'],
+      [4, 462, 1, 'S', 'sand'],
+      [3, 177, 17, 'S', 'sand'],
+      [5, 615, 7, 'S', 'sand'],
+      [4, 454, 16, 'S', 'sand'],
+      [3, 225, 14, 'S', 'sand'],
+      [4, 505, 2, 'R', 'sand'],
+      [5, 621, 6, 'L', 'sand'],
       [4, 437, 8, 'S', 'sand'],
-      [4, 478, 4, 'S', 'sand'],
-      [3, 227, 14, 'S', 'ocean'],
-      [4, 442, 6, 'R', 'sand'],
-      [5, 568, 18, 'S', 'water', 'The par 5 where Tiger made the putt — water fronts the green'],
+      [4, 517, 12, 'S', 'sand'],
+      [3, 227, 18, 'S', 'ocean'],
+      [4, 443, 4, 'R', 'sand'],
+      [5, 570, 10, 'S', 'water', 'The par 5 where Tiger made the putt — water fronts the green'],
     ]),
   },
   {
@@ -532,24 +554,51 @@ export const COURSES: CourseSpec[] = [
     wind: 8,
     blurb: 'Often ranked the best in the world — sandy waste and forced carries everywhere.',
     holes: holes([
-      [4, 421, 11, 'R', 'sand'],
-      [4, 367, 15, 'S', 'sand'],
-      [3, 198, 9, 'S', 'sand'],
-      [4, 461, 3, 'R', 'sand'],
-      [3, 232, 1, 'S', 'sand', 'The par 3 they call the hardest hole in the world'],
-      [4, 388, 13, 'L', 'sand'],
-      [5, 585, 5, 'S', 'sand', 'Hell’s Half Acre — a hundred yards of sand to cross on the second'],
-      [4, 327, 17, 'S', 'sand'],
-      [4, 432, 7, 'R', 'sand'],
-      [3, 145, 14, 'S', 'sand', 'A tiny par 3 over a pit you don’t climb out of'],
-      [4, 397, 12, 'L', 'sand'],
-      [4, 337, 18, 'S', 'sand'],
-      [4, 486, 2, 'R', 'sand'],
-      [3, 184, 10, 'S', 'sand'],
-      [5, 603, 6, 'L', 'sand'],
-      [4, 436, 8, 'S', 'sand'],
-      [4, 345, 16, 'S', 'sand'],
-      [4, 483, 4, 'R', 'sand'],
+      // Card = the BACK tees (`pinevalley`): par 70, 7197 yd, 76.6/155 — the
+      // longest of the three men's sets BlueGolf publishes, and the one that
+      // fits a difficulty-10 course. The shipped tuple was the club's historic
+      // ~6,765 card, which is why 13 of 18 yardages moved.
+      // strokeIndex is the card's HCP row. It disagreed with the shipped tuple
+      // on 16 of 18 holes and feeds pressure() in the odds, so this is the
+      // consequential half of the card pull: 7 was shipped SI 5 and is the
+      // card's No. 1, while 5 was shipped SI 1 and is really 11. BlueGolf
+      // publishes an IDENTICAL HCP row for the BACK and REGULAR sets, which is
+      // the corroboration — stroke index is a property of the course, not the
+      // tee. (The reputation of 5 as the hardest par 3 in golf is about the
+      // shot, not the stroke index; the signature copy still stands.)
+      // OSM carries `par` on all 18 hole ways and it matches the card exactly;
+      // it tags no `handicap` here, unlike Torrey.
+      // Yardages are the card's; they auto-reconcile to the imported geometry
+      // below, which was shifted onto the card hole by hole.
+      // The dogleg flags are re-derived from the real centrelines, against the
+      // SAME >=20 yd threshold the caddy chip uses (panels.tsx) — so the flag
+      // and the chip can never disagree about whether a hole is a dogleg.
+      // Eight change: 6, 13 and 15 turned the opposite way to the shipped flag;
+      // 12, 16 and 17 were flagged straight but bend 51, 54 and 27 yd; and 9
+      // and 11 were flagged 'R' and 'L' on centrelines that bend only 10 yd,
+      // which is straight by this threshold. 7 and 8 bend 17 and 19 — real
+      // turns the map still draws from OSM_BEND, but under the threshold, so
+      // they stay 'S' rather than claiming a dogleg the chip won't show.
+      // OSM_BEND overrides this flag on the map wherever an entry exists; the
+      // flag still drives the procedural fallback, so a backwards one is a trap.
+      [4, 421, 3, 'R', 'sand'],
+      [4, 368, 9, 'S', 'sand'],
+      [3, 198, 17, 'S', 'sand'],
+      [4, 499, 5, 'R', 'sand'],
+      [3, 238, 11, 'S', 'sand', 'The par 3 they call the hardest hole in the world'],
+      [4, 444, 13, 'R', 'sand'],
+      [5, 636, 1, 'S', 'sand', 'Hell’s Half Acre — a hundred yards of sand to cross on the second'],
+      [4, 326, 15, 'S', 'sand'],
+      [4, 458, 7, 'S', 'sand'],
+      [3, 161, 18, 'S', 'sand', 'A tiny par 3 over a pit you don’t climb out of'],
+      [4, 397, 10, 'S', 'sand'],
+      [4, 358, 14, 'L', 'sand'],
+      [4, 486, 4, 'L', 'sand'],
+      [3, 220, 16, 'S', 'sand'],
+      [5, 615, 2, 'R', 'sand'],
+      [4, 475, 8, 'R', 'sand'],
+      [4, 414, 12, 'R', 'sand'],
+      [4, 483, 6, 'R', 'sand'],
     ]),
   },
   {
@@ -560,25 +609,50 @@ export const COURSES: CourseSpec[] = [
     greens: 'Firm',
     wind: 20,
     blurb: 'The course that started a pilgrimage — raw Oregon coast, firm and fast.',
+    // Card = the TOURNAMENT tees (BlueGolf `bandondunesgresort`): par 72,
+    // 7315 yd, 75.9/145. Par, yardage and stroke index already matched on all
+    // 18, so the import moved seventeen of eighteen yardages not at all — and
+    // hole 16, where four sources were compared and BlueGolf lost. See the
+    // YARDAGE CONFLICT note in src/engine/geometry.ts before touching any
+    // number here: the club's own card differs from BlueGolf on six holes
+    // (1, 5, 9, 11, 13, 16) and only 16 is outside tee-set variance.
+    // The `dogleg` flags are another story — ELEVEN were wrong against the real
+    // centrelines, and 4 and 8 pointed the opposite way (flagged 'L' on holes
+    // that turn right 47 and 33 yd). Flags below are set at the caddy chip's
+    // >=20 yd bar; holes 5, 10, 11, 13 and 17 bend 15-19 yd, so they read 'S'
+    // here while keeping a profile in OSM_BEND that curves them on the map.
+    // The `hazard` column is left EXACTLY as shipped, both ways: it only feeds
+    // the procedural layout and is inert once a hole has real geometry, so 11
+    // and 17 keep an 'ocean' the measurements say they don't have, and 6 and 16
+    // keep 'sand' next to a signature naming the Pacific they do.
+    // See the Bandon Dunes notes in src/engine/geometry.ts.
     holes: holes([
-      [4, 386, 13, 'S', 'sand'],
+      [4, 386, 13, 'R', 'sand'],
       [3, 220, 15, 'S', 'sand'],
       [5, 563, 3, 'R', 'sand'],
-      [4, 443, 5, 'L', 'sand'],
-      [4, 473, 1, 'S', 'ocean', 'Along the cliff’s edge — the Pacific down the entire right'],
-      [3, 217, 17, 'S', 'sand'],
-      [4, 411, 7, 'R', 'sand'],
-      [4, 385, 11, 'L', 'sand'],
-      [5, 605, 9, 'S', 'sand'],
-      [4, 380, 8, 'R', 'sand'],
-      [4, 469, 2, 'L', 'ocean'],
+      [4, 443, 5, 'R', 'sand'],
+      // The sea is down the LEFT here, not the right: the hole plays due north
+      // and the Pacific is 108° left of that. Measured rim runs 0-310 yd.
+      [4, 473, 1, 'S', 'ocean', 'Along the cliff’s edge — the Pacific down the whole left side'],
+      [3, 217, 17, 'S', 'sand', 'A long one-shotter with the beach falling away all down the left'],
+      [4, 411, 7, 'S', 'sand'],
+      [4, 385, 11, 'R', 'sand'],
+      [5, 605, 9, 'R', 'sand'],
+      [4, 380, 8, 'S', 'sand'],
+      [4, 469, 2, 'S', 'ocean'],
       [3, 238, 18, 'S', 'sand'],
-      [5, 554, 6, 'R', 'sand'],
-      [4, 390, 16, 'S', 'sand'],
-      [3, 206, 14, 'S', 'ocean', 'A par 3 to a green teetering above the beach'],
-      [4, 412, 10, 'L', 'sand'],
-      [4, 405, 12, 'R', 'ocean'],
-      [5, 558, 4, 'S', 'sand'],
+      [5, 554, 6, 'S', 'sand'],
+      [4, 390, 16, 'R', 'sand'],
+      // Was "a green teetering above the beach" — it isn't. This is an inland
+      // dune par 3 whose ground CLIMBS away from the water; 3DEP found no rim
+      // within the corridor and the imagery shows no ocean on the hole at all.
+      [3, 206, 14, 'S', 'ocean', 'A long par 3 into a bowl in the dunes, one bunker guarding right'],
+      // 412 was BlueGolf's number and it is wrong: the club's own hole-by-hole
+      // says 363, ProVisualizer measures 358, the OSM tee->green line 347. The
+      // one hole where the shipped card lost to the geography.
+      [4, 363, 10, 'R', 'sand', 'The Pacific shoulders the whole tee shot down the right'],
+      [4, 405, 12, 'S', 'ocean'],
+      [5, 558, 4, 'R', 'sand'],
     ]),
   },
   {
@@ -647,25 +721,32 @@ export const COURSES: CourseSpec[] = [
     greens: 'Firm',
     wind: 18,
     blurb: 'Windblown fescue and firm greens on Long Island’s eastern end.',
+    // Stroke indices are the club's men's handicap row, which BlueGolf prints
+    // IDENTICALLY on all five of its tee sets — so it is the course's, not a
+    // tee's, and it applies to the U.S. Open setup the yardages describe. The
+    // shipped tuple disagreed with it on 15 of 18 holes. Par (70) is unchanged:
+    // the card confirms it on all 18, so OSM's lone par=5 tag on the 12th is
+    // the outlier. Yardages are the 2018 U.S. Open card's; they auto-reconcile
+    // to the imported geometry below. Geometry: OSM_GEOMETRY 'shinnecock-hills:*'.
     holes: holes([
-      [4, 394, 17, 'S', 'sand'],
-      [3, 252, 5, 'S', 'sand'],
-      [4, 501, 1, 'R', 'sand'],
-      [4, 476, 9, 'S', 'sand'],
-      [5, 592, 11, 'L', 'sand'],
-      [4, 495, 3, 'S', 'water'],
-      [3, 187, 15, 'S', 'sand', 'The Redan seventh — feed it off the slope and let it chase'],
-      [4, 440, 13, 'S', 'sand'],
-      [4, 482, 7, 'R', 'sand'],
-      [4, 415, 10, 'S', 'sand'],
-      [3, 157, 16, 'S', 'sand'],
+      [4, 399, 15, 'S', 'sand'],
+      [3, 252, 17, 'S', 'sand'],
+      [4, 500, 5, 'R', 'sand'],
+      [4, 475, 7, 'S', 'sand'],
+      [5, 589, 11, 'L', 'sand'],
+      [4, 491, 1, 'S', 'water'],
+      [3, 189, 13, 'S', 'sand', 'The Redan seventh — feed it off the slope and let it chase'],
+      [4, 439, 9, 'S', 'sand'],
+      [4, 485, 3, 'R', 'sand'],
+      [4, 415, 2, 'S', 'sand'],
+      [3, 159, 16, 'S', 'sand'],
       [4, 469, 8, 'L', 'sand'],
-      [4, 371, 18, 'S', 'none'],
-      [4, 520, 2, 'R', 'sand'],
-      [4, 409, 12, 'S', 'sand'],
-      [5, 614, 6, 'R', 'sand'],
-      [3, 176, 14, 'S', 'sand'],
-      [4, 490, 4, 'S', 'sand', 'Uphill to the clubhouse — a windswept, brutal finish'],
+      [4, 374, 12, 'S', 'none'],
+      [4, 519, 4, 'R', 'sand'],
+      [4, 409, 6, 'S', 'sand'],
+      [5, 616, 10, 'R', 'sand'],
+      [3, 175, 18, 'S', 'sand'],
+      [4, 485, 14, 'S', 'sand', 'Uphill to the clubhouse — a windswept, brutal finish'],
     ]),
   },
   {
@@ -706,6 +787,21 @@ export const COURSES: CourseSpec[] = [
     greens: 'Fast',
     wind: 6,
     blurb: 'A Gil Hanse restoration of barrancas and bold greens in the heart of L.A.',
+    // Real geometry found 149 bunkers and not one tree polygon inside the
+    // boundary, so the odds' junk floor had nothing to name (see
+    // CourseSpec.junkLabel) and would have said the literal "junk". The
+    // barranca is what a wild one finds here — it is the course's own word for
+    // it, the blurb already uses it, and every one of LACC's `natural=sand`
+    // polygons doubles as a `golf=bunker`, which is exactly why the barrancas
+    // arrive as sand and leave nothing else for the junk bucket to point at.
+    junkLabel: 'barranca',
+    // PAR FIX: the 7th shipped as a par 4, making this course par 71. It is a
+    // par 3 — the club's card, OSM's own par tag and the 2023 U.S. Open card
+    // all agree, and at 326 yd off this Tournament tee (284 for the Open) it is
+    // among the longest par 3s ever used in a major. Course par is 70. Stroke
+    // indices already matched the card on all 18 and are untouched. Yardages are
+    // the card's Tournament tee; they auto-reconcile to the imported geometry.
+    // Geometry: OSM_GEOMETRY 'lacc-north:*'.
     holes: holes([
       [5, 578, 17, 'R', 'sand'],
       [4, 503, 1, 'L', 'sand'],
@@ -713,7 +809,7 @@ export const COURSES: CourseSpec[] = [
       [3, 234, 5, 'S', 'sand'],
       [4, 483, 3, 'R', 'sand'],
       [4, 335, 15, 'L', 'sand'],
-      [4, 326, 7, 'S', 'sand'],
+      [3, 326, 7, 'S', 'sand', 'A par 3 of more than 300 yards — the tee shot is a driver'],
       [5, 555, 13, 'R', 'sand'],
       [3, 181, 11, 'S', 'sand'],
       [4, 409, 10, 'L', 'sand'],
@@ -734,26 +830,36 @@ export const COURSES: CourseSpec[] = [
     difficulty: 7,
     greens: 'Firm',
     wind: 18,
-    blurb: 'True links on the Nova Scotia shore, every hole in view of the Atlantic.',
+    blurb: 'True links on the Nova Scotia shore, every hole in view of the sea.',
+    // REBUILT FROM THE CLUB CARD. The shipped tuple was not a transcription of
+    // any real card: its par sequence disagreed with the club's on six holes,
+    // its yardages matched no tee set, and it put the famous 100-yard short
+    // hole at 16 when the card has it at 14. OSM's own par tags match the BLACK
+    // card (6854, par 70) on all 18, so par, stroke index and yardage are all
+    // the card's now. Yardages auto-reconcile to the imported geometry.
+    // `hazard` is set from what actually imported: the sea only comes inside
+    // the corridor on the 6th (measured 14-31 yd off the line the whole way),
+    // so it is the one `ocean` hole — see the Cabot note in geometry.ts for the
+    // measurement that cleared the rest. Geometry: OSM_GEOMETRY 'cabot-links:*'.
     holes: holes([
-      [5, 506, 15, 'S', 'sand'],
-      [4, 410, 7, 'S', 'sand'],
-      [4, 300, 17, 'S', 'ocean'],
-      [3, 175, 9, 'S', 'sand'],
-      [4, 455, 3, 'S', 'sand'],
-      [4, 425, 5, 'R', 'ocean'],
-      [3, 160, 13, 'S', 'sand'],
-      [4, 470, 1, 'L', 'sand'],
-      [4, 405, 11, 'S', 'sand'],
-      [4, 415, 12, 'S', 'sand'],
-      [5, 560, 10, 'S', 'sand'],
-      [4, 430, 6, 'L', 'sand'],
-      [4, 445, 4, 'S', 'sand'],
-      [3, 200, 8, 'S', 'ocean'],
-      [4, 380, 16, 'S', 'sand'],
-      [3, 100, 18, 'S', 'ocean', 'A hundred-yard flick over the beach to the sea’s edge'],
-      [4, 415, 14, 'S', 'ocean', 'Along the Atlantic shore for home'],
-      [4, 470, 2, 'S', 'sand'],
+      [5, 540, 7, 'L', 'sand'],
+      [3, 247, 9, 'S', 'sand'],
+      [4, 330, 15, 'R', 'none'],
+      [4, 450, 3, 'S', 'sand'],
+      [3, 178, 12, 'S', 'sand'],
+      [4, 465, 4, 'L', 'ocean', 'The sea down the left the whole way — every yard of it in play'],
+      [3, 192, 16, 'S', 'sand'],
+      [5, 580, 8, 'L', 'sand'],
+      [4, 360, 17, 'L', 'sand'],
+      [4, 385, 13, 'S', 'sand'],
+      [5, 620, 1, 'R', 'sand'],
+      [4, 450, 5, 'R', 'sand'],
+      [4, 440, 11, 'S', 'sand'],
+      [3, 102, 18, 'S', 'sand', 'A hundred-yard flick — the shortest shot on the course'],
+      [4, 413, 10, 'S', 'sand'],
+      [4, 457, 6, 'L', 'sand'],
+      [3, 170, 14, 'S', 'sand'],
+      [4, 475, 2, 'S', 'sand'],
     ]),
   },
   {
@@ -807,6 +913,10 @@ export const COURSES: CourseSpec[] = [
     greens: 'Firm',
     wind: 8,
     blurb: 'A Seth Raynor gem of template holes and bold, geometric greens.',
+    // Untouched: the shipped tuple already matched the club's GOLD card on par,
+    // stroke index AND yardage for all 18 bar four yards on the 17th, so this
+    // import was pure geometry. Yardages auto-reconcile to it.
+    // Geometry: OSM_GEOMETRY 'camargo:*'.
     holes: holes([
       [4, 390, 17, 'S', 'none'],
       [5, 529, 5, 'L', 'sand'],
@@ -835,26 +945,36 @@ export const COURSES: CourseSpec[] = [
     difficulty: 9,
     greens: 'Firm',
     wind: 12,
-    blurb: 'Water down the right all day and a closing hole that has ended many rounds.',
+    blurb: 'Water down the left all day and a closing hole that has ended many rounds.',
+    // Stroke indices are BlueGolf's BLACK card, which OSM's own `handicap` tags
+    // match on ALL 18 (as do its `par` tags) — the torrey-pines corroboration.
+    // The shipped indices disagreed with both on 16 of 18. Yardages are that
+    // card's too; the shipped ones matched no published setup, missing the
+    // Black card by up to 65 yd a hole. They auto-reconcile to the imported
+    // geometry. Geometry: OSM_GEOMETRY 'doral-blue-monster:*'.
+    // The blurb said "water down the RIGHT all day" and the real course is the
+    // other way round — the import lays 3292 yd of water down the left against
+    // 1236 down the right, and the 18th's own signature already said left.
+    // Caught by the copy-vs-geometry check in the freeze process.
     holes: holes([
-      [5, 562, 9, 'S', 'water'],
-      [4, 407, 11, 'R', 'sand'],
-      [4, 434, 7, 'L', 'water'],
-      [3, 234, 13, 'S', 'sand'],
-      [4, 473, 3, 'R', 'water'],
-      [4, 447, 5, 'L', 'sand'],
-      [4, 430, 15, 'S', 'water'],
-      [5, 599, 1, 'R', 'water'],
-      [3, 178, 17, 'S', 'water'],
-      [5, 564, 8, 'L', 'water'],
-      [4, 440, 6, 'R', 'sand'],
-      [5, 603, 10, 'S', 'water'],
-      [3, 245, 12, 'S', 'sand'],
-      [4, 483, 2, 'L', 'water'],
-      [3, 175, 16, 'S', 'water'],
-      [4, 280, 14, 'R', 'sand'],
-      [4, 436, 4, 'L', 'water'],
-      [4, 473, 18, 'L', 'water', 'The Blue Monster’s bite — water clings to the left for home'],
+      [5, 582, 5, 'S', 'water'],
+      [4, 446, 17, 'R', 'sand'],
+      [4, 441, 3, 'L', 'water'],
+      [3, 206, 13, 'S', 'water'],
+      [4, 421, 15, 'R', 'water'],
+      [4, 432, 7, 'L', 'sand'],
+      [4, 474, 1, 'S', 'water'],
+      [5, 553, 9, 'R', 'water'],
+      [3, 210, 11, 'S', 'water'],
+      [5, 626, 4, 'L', 'water'],
+      [4, 423, 16, 'R', 'water'],
+      [5, 599, 8, 'S', 'water'],
+      [3, 245, 10, 'S', 'sand'],
+      [4, 482, 6, 'L', 'water'],
+      [3, 155, 18, 'S', 'water'],
+      [4, 345, 14, 'R', 'water'],
+      [4, 428, 12, 'L', 'water'],
+      [4, 477, 2, 'L', 'water', 'The Blue Monster’s bite — water clings to the left for home'],
     ]),
   },
   {
@@ -1597,7 +1717,58 @@ export const PAR3_COURSES: CourseSpec[] = [
 ]
 
 /** Every playable course: the daily-rotation library plus the par-3 courses. */
-export const ALL_COURSES: CourseSpec[] = [...COURSES, ...PAR3_COURSES]
+
+/**
+ * GUEST COURSES — real courses that live in the library and unlimited play but
+ * are NOT part of the daily rotation walk. The rotation array above is fixed
+ * history (a shipped era's walk is a modulo over it, and editing it re-maps
+ * already-covered dailies — see ROTATION_ERAS in daily.ts), so one-off
+ * additions land here and reach the daily only via an explicit DAILY_OVERRIDES
+ * entry in daily.ts; permanent rotation changes go through a new future-dated
+ * era instead. First occupant: Jackson's golf-trip easter egg, played by the
+ * crew on 2026-08-01.
+ */
+export const GUEST_COURSES: CourseSpec[] = [
+  {
+    slug: 'kings-creek',
+    name: 'Kings Creek Country Club',
+    location: 'Kemp, Texas',
+    difficulty: 5,
+    greens: 'Medium',
+    wind: 12,
+    blurb: 'Water on sixteen of eighteen. Bring extra balls, your boys, and a dog or two.',
+    // Every imported hole is water-only — no trees/deeprough polygons anywhere
+    // — so the junk floor needs the course's own word or wild shots read "In
+    // the junk" (see CourseSpec.junkLabel). On a lake course where the trouble
+    // is the margins, the honest word is the reeds you're hacking out of.
+    junkLabel: 'cattails',
+    // The club's BLUE card: par 71 (35/36), 6507 yds, 72.0/124. Five par 3s,
+    // back-to-back par 5s at 7 and 9's turn, and a drivable 276yd 16th. SI is
+    // the card's men's handicap row. Geometry: OSM_GEOMETRY 'kings-creek:*'.
+    holes: holes([
+      [4, 351, 3, 'L', 'water'],
+      [4, 340, 15, 'L', 'water'],
+      [3, 200, 1, 'S', 'water'],
+      [4, 393, 5, 'R', 'water'],
+      [4, 360, 11, 'R', 'water'],
+      [3, 164, 17, 'S', 'water'],
+      [5, 515, 13, 'L', 'water'],
+      [3, 209, 7, 'S', 'water'],
+      [5, 567, 9, 'L', 'water', 'The turn: nine down, nine to go. Grab a dog.'],
+      [4, 443, 4, 'S', 'water'],
+      [3, 151, 18, 'S', 'water'],
+      [5, 576, 2, 'S', 'water'],
+      [4, 415, 6, 'L', 'water'],
+      [4, 387, 12, 'R', 'water'],
+      [4, 394, 10, 'R', 'water'],
+      [4, 276, 14, 'R', 'water'],
+      [3, 191, 16, 'S', 'water'],
+      [5, 575, 8, 'L', 'water'],
+    ]),
+  },
+]
+
+export const ALL_COURSES: CourseSpec[] = [...COURSES, ...PAR3_COURSES, ...GUEST_COURSES]
 
 // Reconcile hole yardage with imported OSM geometry: where a hole has real
 // geography, its measured length is the single source of truth, so the tuple's

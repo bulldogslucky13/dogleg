@@ -15,6 +15,13 @@
  *   pnpm import:osm sawgrass 17 --raw      # dump matched OSM features
  *   pnpm import:osm sawgrass 17 --debug    # ring counts + per-ring extents
  *   pnpm import:osm sawgrass 17 --fresh    # bypass the per-course Overpass cache
+ *   pnpm import:osm sawgrass 17 --shift 110  # centreline starts at a forward pad:
+ *                                          # prepend the missing tee run so length,
+ *                                          # zones AND the bend profile come out in
+ *                                          # card coordinates (see --shift below)
+ *   pnpm import:osm muirfield 17 --shift -60 # NEGATIVE: centreline starts BEHIND
+ *                                          # the card's tee (traced from a back pad),
+ *                                          # so trim that run off the front instead
  *
  * Registry: COURSE_GEO below maps a short slug → course center, the exact
  * golf_course polygon name (osmName), and the engine slug (for --compare).
@@ -96,9 +103,49 @@ type CourseGeo = {
    * saying what it actually is and how that was established from imagery,
    * because this is the one hook that lets an import ignore real OSM data. */
   osmIgnore?: number[]
+  /** Lateral rake spacing in yards, overriding the 6-yd default. Lower it for
+   * a course whose hazards are SMALLER than the default assumes: the rake
+   * samples the corridor at fixed offsets, so a bunker narrower than the
+   * spacing can sit between two samples and never register — then die on the
+   * 4-yd minimum span. Muirfield is the case this was added for (its ~150
+   * revetted pots are frequently under 6 yd across, and a 6-yd rake dropped
+   * greenside sand on 14 of 18 holes, including both walls of the 13th that
+   * the hole's own signature copy names). Per-course rather than global so
+   * every already-imported course keeps the resolution it was QA'd at —
+   * committed geometry is static data, but re-importing one of them later
+   * should not silently change its zones. Costs one rake pass per step, so
+   * don't lower it without evidence that real hazards are being missed. */
+  rake?: number
+  /** Explicit ref -> OSM way id for the centreline of every hole, pinning the
+   * target hole by ID instead of by name or by nearest-centre. The last resort
+   * for a site whose courses share one golf_course polygon AND leave the hole
+   * ways unnamed, so `osmHolePrefix` has nothing to match and the
+   * nearest-centre tie-break is not merely weak but WRONG. LACC is that case:
+   * the North and South routings interleave rather than sitting in separate
+   * blocks, so measured from the North centroid the SOUTH hole wins ref=1 by
+   * 16 m and ref=2 by 386 m — the exact situation Pine Valley's note says not
+   * to import through. An id list is the strongest identity pin available, but
+   * it is also the most brittle (OSM re-draws a hole, the id changes), so a
+   * miss is FATAL rather than falling back, and every entry needs the evidence
+   * that mapped id -> hole recorded in its COURSE_GEO comment.
+   *
+   * Deliberately NOT applied to the neighbour set used by `ownsHazard` — the
+   * opposite of what `osmHolePrefix` does. A prefix narrows the hole lines to
+   * one course, which is safe only where the courses occupy separate blocks
+   * (Bandon, Pacific Dunes) and each verified no sand bleeds. Where routings
+   * interleave, the other course's centrelines are exactly what you want
+   * present, so its bunkers get culled from this course's corridors by being
+   * nearer their own hole. Pinning the target while keeping every line in the
+   * ownership test gets both halves right. */
+  osmHoleWays?: Record<number, number>
 }
 
 const COURSE_GEO: Record<string, CourseGeo> = {
+  // King's Creek CC, Kemp TX (OSM way 386836594). NAME-COLLISION WARNING:
+  // a second "Kings Creek Country Club" exists in Rehoboth Beach, Delaware —
+  // never import that one's geography under this slug. The Texas club is
+  // pinned by center + the apostrophe in its OSM name.
+  kingscreek: { name: 'Kings Creek Country Club', center: [32.4039, -96.2461], radius: 1500, osmName: "King's Creek Country Club", engineSlug: 'kings-creek' },
   sawgrass: { name: 'TPC Sawgrass — Stadium', center: [30.1985, -81.396], radius: 1400, osmName: 'Stadium Course', osmHolePrefix: 'Stadium', engineSlug: 'tpc-sawgrass' },
   augusta: { name: 'Augusta National', center: [33.5021, -82.0233], radius: 1600, osmName: 'Augusta National', engineSlug: 'augusta-national' },
   pebble: { name: 'Pebble Beach Links', center: [36.5686, -121.9497], radius: 2500, osmName: 'Pebble Beach Golf', engineSlug: 'pebble-beach' },
@@ -177,6 +224,321 @@ const COURSE_GEO: Record<string, CourseGeo> = {
     engineSlug: 'seminole',
     osmIgnore: [697252551, 697255070, 697249629],
   },
+  // Torrey Pines maps its two courses as SEPARATE golf_course polygons — South
+  // is way 35679036, North is way 35679009 — and both carry a full set of
+  // plain ref=N hole ways, so the anchored name is doing real work here: North
+  // sits 1.3 km up the mesa, well inside the radius, and an unanchored
+  // /Torrey Pines/ would match both and mix two courses' holes under one ref.
+  // map_to_area on the South polygon keeps `golf=*` features (and therefore
+  // every bunker) South-only; the radius applies only to water/coastline,
+  // which is what we want — the Pacific is outside the course boundary.
+  // All 18 South centrelines are mapped with plain ref=N and no names, so no
+  // osmHolePrefix. Radius 1400 covers the 878 x 1573 m polygon (901 m
+  // half-diagonal) and reaches past the bluff to the coastline that makes
+  // 3/4/6/14. OSM's `handicap` tags on the hole ways match the club's BLACK
+  // card on ALL 18 — it was the SHIPPED tuple that disagreed, on 13 — so here
+  // the tags corroborated the card rather than competing with it, which is
+  // what gave confidence to overwrite 13 stroke indices at once. That does not
+  // promote OSM: the card stays ground truth for stroke index and OSM for
+  // shape only, and where the two conflict the card still wins (potomac's
+  // hole 15 par above). A matching `handicap`/`par` row is a useful second
+  // opinion on a card, nothing more.
+  torrey: { name: 'Torrey Pines — South', center: [32.8971, -117.2477], radius: 1400, osmName: '^Torrey Pines South Course$', engineSlug: 'torrey-pines-south' },
+  // Pacific Dunes has NO golf_course polygon of its own. It shares way
+  // 362513477 ("Bandon Dunes Golf Resort") with the Bandon Dunes course and
+  // Old Macdonald — 54 hole ways, three complete sets of ref=1..18 — so
+  // map_to_area alone would mix three courses under one ref and osmHolePrefix
+  // is carrying the whole identity check. Sheep Ranch, Bandon Trails, Bandon
+  // Preserve and Shortys are separate polygons with their own names, so the
+  // anchored name keeps them out.
+  // **The prefix deliberately stops before "Hole".** Five of the eighteen ways
+  // are named with a DOUBLE SPACE — "Pacific Dunes  Hole 5", and likewise
+  // 8/9/10/11 — so /^Pacific Dunes Hole/ would silently drop a quarter of the
+  // course, the same shape of trap as Whistling Straits' misspelled hole 1.
+  // No `packed` clause: of the 105 bunkers that reach a Pacific Dunes
+  // corridor, ZERO are nearer a neighbouring course's centreline (the three
+  // courses sit in separate dune blocks), so ownsHazard's default rule is safe
+  // here even though the polygon holds three courses' sand.
+  // Radius 1600 covers the 790 x 1383 m course block (796 m half-diagonal) and
+  // reaches the Pacific coastline west of the bluff holes.
+  pacificdunes: {
+    name: 'Pacific Dunes',
+    center: [43.2005, -124.3923],
+    radius: 1600,
+    osmName: '^Bandon Dunes Golf Resort$',
+    osmHolePrefix: '^Pacific Dunes',
+    engineSlug: 'pacific-dunes',
+  },
+  // Bandon Dunes shares way 362513477 ("Bandon Dunes Golf Resort") with Pacific
+  // Dunes and Old Macdonald — 54 hole ways, three complete sets of ref=1..18 —
+  // so osmHolePrefix is carrying the whole identity check, exactly as for
+  // pacificdunes above. Sheep Ranch, Bandon Trails, Bandon Preserve and Shortys
+  // are separate polygons with their own names, so the anchored name keeps them
+  // out.
+  // The third set — Old Macdonald's — is entirely UNNAMED (18 ways with a bare
+  // ref and no name), which is what makes the prefix safe here: /^Bandon Dunes/
+  // cannot accidentally match them, and the prefix miss is fatal rather than
+  // falling through to nearest-centre. All 18 Bandon Dunes ways use plain
+  // single-space "Bandon Dunes Hole N" — the double-space trap that would have
+  // dropped a quarter of Pacific Dunes does NOT recur on this set (verified way
+  // by way against the 54).
+  // No `packed` clause: of the 69 bunkers that reach a Bandon Dunes corridor,
+  // ZERO are nearer a Pacific Dunes or Old Macdonald centreline (the three
+  // courses sit in separate dune blocks), so ownsHazard's default rule is safe
+  // even though the polygon holds all 423 of the site's bunkers.
+  // Radius 1400 covers the 974 x 1313 m course block (818 m half-diagonal —
+  // farthest centreline node 722 m from centre) and reaches the Pacific
+  // coastline, which runs 114-795 m west of the holes and is `natural=coastline`
+  // here, so it imports as `ocean` rather than needing the whistling-straits
+  // relabel. Centre is the centroid of the 18 championship centrelines.
+  bandondunes: {
+    name: 'Bandon Dunes',
+    center: [43.1897, -124.3953],
+    radius: 1400,
+    osmName: '^Bandon Dunes Golf Resort$',
+    osmHolePrefix: '^Bandon Dunes',
+    engineSlug: 'bandon-dunes',
+  },
+  // Pine Valley is way 820204638. **OSM names it "Pine Valley Country Club"**,
+  // which is NOT the club's name (Pine Valley Golf Club) — the same shape of
+  // trap as TPC Potomac's misspelled "Avanel Farm", so the regex has to match
+  // OSM's string, not reality. Identity is nailed down by the polygon's own
+  // `wikipedia=en:Pine Valley Golf Club` tag plus the location (Pine Valley
+  // Borough, Camden County NJ). Anchored because "Pine Valley" names courses
+  // in a dozen states; the two unnamed golf_course ways 2 km west inside a
+  // wider radius are Pine Hill / Trump National Philly, which also carry ref=N
+  // holes (their ref=2 and ref=3 show up in an unscoped query).
+  //
+  // **The site holds a SECOND course and osmHolePrefix cannot separate them.**
+  // Pine Valley's 10-hole Short Course sits INSIDE the same polygon with
+  // `ref=1..10`, so map_to_area passes it through and every one of those refs
+  // collides with a championship hole. Neither set is NAMED — all 28 ways
+  // carry a bare ref — so the prefix mechanism has nothing to match on and the
+  // nearest-centre tie-break is doing the identity work here, which is exactly
+  // the situation its own comment warns about. What makes it safe is the
+  // MARGIN, not the rule: the Short Course is a compact block ~1 km NW of the
+  // championship routing, so measured from the centre below the championship
+  // tee wins every colliding ref by 465-961 m (worst case ref=8: 288 m vs
+  // 753 m). That is not a tie-break, it is a rout. It was verified ref by ref
+  // before importing, and every imported centreline was then checked to start
+  // on a `golf=tee` polygon and finish on the `golf=green` whose hole matches
+  // the card's par — the potomac endpoint check, which is what actually proves
+  // the right 18 came through rather than the ordering rule promising it.
+  // The centre is therefore the centroid of the CHAMPIONSHIP hole ways
+  // (39.7875, -74.9703), not the polygon's — the polygon centroid sits ~150 m
+  // toward the Short Course and shrinks the margins for no benefit.
+  // No `packed` clause: the Short Course's sand is ~1 km from the nearest
+  // championship corridor, so none of it is nearer a championship centreline
+  // than its own, and the championship holes are separated by mature pine
+  // forest rather than packed side by side.
+  // Radius 1200 covers the 1171 x 1079 m championship block (796 m
+  // half-diagonal) and the six tagged water hazards inside it, while stopping
+  // well short of Pine Hill's ponds 2 km west. No coastline here.
+  pinevalley: {
+    name: 'Pine Valley Golf Club',
+    center: [39.7875, -74.9703],
+    radius: 1200,
+    osmName: '^Pine Valley Country Club$',
+    engineSlug: 'pine-valley',
+  },
+  // Muirfield (Honourable Company of Edinburgh Golfers) is way 101336384,
+  // Gullane, East Lothian. NAME-COLLISION WARNING, and it bites twice: the
+  // library already contains `muirfield-village` (Dublin, Ohio) at rotation
+  // #47, and BlueGolf's bare `muirfield` id is a THIRD course — Muirfield GC
+  // in North Rocks, Australia (par 69, 6205 METERS), which is what you get if
+  // you guess the card URL. The Scottish card is `muirfieldsc`.
+  // Anchored `^Muirfield$` because the polygon's name is exactly that.
+  //
+  // Gullane's links are packed shoulder to shoulder, so the radius matters
+  // more than usual: five other courses sit inside 2.5 km — The Renaissance
+  // Club (1.3 km NE), Gullane No.1/2/3 as one 54-hole polygon (1.8 km SW),
+  // Archerfield's two 18s (2.4 km E), Luffness New (2.6 km SW). Radius 1400
+  // covers Muirfield's own ~1.2 km block and the sea to its north without
+  // reaching any of them. map_to_area then scopes the features anyway.
+  // No osmHolePrefix and none possible — all 18 hole ways are unnamed, bare
+  // `ref` — but unlike Pine Valley there is nothing to disambiguate: the
+  // polygon contains exactly 18 `golf=hole` ways carrying refs 1-18, one
+  // each, no second course inside the boundary.
+  // Rake 3, not the default 6 — see CourseGeo.rake. Muirfield's bunkers are
+  // small revetted pots, and at 6 yd the corridor rake stepped straight over
+  // greenside sand on 14 of 18 holes. Verified against the OSM polygons rather
+  // than by eye: 81 bunkers touch a green, and the 6-yd pass left 28 of them
+  // with no zone at all, including both walls of the 13th.
+  muirfield: {
+    name: 'Muirfield',
+    center: [56.0458, -2.8218],
+    radius: 1400,
+    osmName: '^Muirfield$',
+    engineSlug: 'muirfield',
+    rake: 3,
+  },
+  // Quail Hollow Club, Charlotte NC (way 877659537). NAME-COLLISION WARNING:
+  // "Quail Hollow" is a common club name and BlueGolf alone carries five more
+  // (quailhollow, quailhollowgcc1, quailhollowccweiskop, quailhollowgolfcourse,
+  // …) in other states. The Charlotte club is `quailhollowclub` there and the
+  // only golf_course polygon named "Quail Hollow" anywhere in a 0.3-degree box
+  // around the city here.
+  quailhollow: {
+    name: 'Quail Hollow Club',
+    center: [35.1141, -80.8423],
+    radius: 1500,
+    osmName: '^Quail Hollow Club$',
+    engineSlug: 'quail-hollow',
+  },
+  // Shinnecock Hills is way 689056680, Southampton NY. Its 18 hole ways carry
+  // the club's own HOLE NAMES — Westward Ho, Plateau, Peconic, Pump House,
+  // Montauk, Pond, Redan, Lowlands, Ben Nevis, Eastward Ho, Hill Head,
+  // Tuckahoe, Road Side, Thom's Elbow, Sebonac, Shinnecock, Eden, Home — which
+  // match the club's published card name-for-name in order. That is a stronger
+  // identity check than any polygon name, and it is why nearest-centre is not
+  // doing anything load-bearing here: exactly 18 golf=hole ways sit inside the
+  // boundary, one per ref, no second course. No osmHolePrefix is possible (the
+  // names are HOLE names, not a shared course prefix, so any prefix would match
+  // nothing and be fatal) and none is needed.
+  // Three neighbours within 1.5 km all carry their own ref=N holes — National
+  // Golf Links of America (way 28989103, 1.27 km N, itself a DogLeg course at
+  // rotation #30), Sebonack (28452574), Southampton GC (599416777) — so the
+  // anchored name plus map_to_area is real work, not ceremony.
+  // Radius 1200 covers the 1133 x 1189 m polygon (821 m half-diagonal;
+  // farthest centreline node 701 m from centre) and the ponds inside it.
+  // TEE PADS: OSM traced the CHAMPIONSHIP tees on fifteen holes and members'
+  // pads on 5, 14 and 16 (raw arcs 543/470/548 against the U.S. Open card's
+  // 589/519/616, while the other fifteen land within 10 yd) — the seminole /
+  // quail-hollow per-hole pattern, fixed with a positive --shift on those
+  // three. Card note: BlueGolf carries Shinnecock ONLY as the members' Red
+  // card (6940), a different setup from the 7440 the game ships, so par and
+  // stroke index come from BlueGolf (whose Men's Hcp row is identical across
+  // all five tee sets, i.e. it is the club's, not a tee's) and the yardages
+  // from the 2018 U.S. Open card. See the quail-hollow entry for why a card
+  // has to be read as describing a CONFIGURATION.
+  shinnecock: {
+    name: 'Shinnecock Hills Golf Club',
+    center: [40.8971, -72.4402],
+    radius: 1200,
+    osmName: '^Shinnecock Hills Golf Club$',
+    engineSlug: 'shinnecock-hills',
+  },
+  // The Los Angeles Country Club — NORTH course. Way 56135439 is named simply
+  // "Los Angeles Country Club" and contains BOTH the North and the South, 36
+  // golf=hole ways, two complete sets of ref=1..18, **every one of them
+  // unnamed**. So osmHolePrefix has nothing to match, and — unlike Pine
+  // Valley, where the second course sat in a block 1 km away and lost every
+  // colliding ref by 465-961 m — the two routings here INTERLEAVE. Measured
+  // from the North centreline centroid the SOUTH hole actually wins ref=1 (by
+  // 16 m) and ref=2 (by 386 m), and ref=18 comes down to 20 m. Nearest-centre
+  // is not weak here, it is WRONG, which is the case Pine Valley's note says
+  // to refuse. Hence osmHoleWays: every hole pinned by way id.
+  //
+  // The ids below were established from TWO independent fingerprints, both
+  // agreeing on all 18 and neither leaving a hole ambiguous:
+  //  - PAR. This set's par tags read 5,4,4,3,4,4,3,5,3,4,3,4,4,5,3,4,4,4,
+  //    which is BlueGolf's North card exactly; the other set reads
+  //    4,4,5,3,4,4,3,5,3,5,3,4,4,3,4,5,3,4, which is its South card exactly.
+  //    The two cards differ on six holes, so this alone separates them.
+  //  - LENGTH. Arc length per hole tracks the North card's Tournament tee on
+  //    all 18 (572/578, 499/503, 396/400, 231/234, 483/483, 309/335, 331/326,
+  //    532/555, 180/181, 381/409, 290/294, 392/388, 531/510, 621/633, 130/133,
+  //    447/542, 523/528, 497/498) while the other set tracks the South card
+  //    (342/342, 397/400, 564/617, …). Totals: 7346 vs the North's 7530, and
+  //    6179 vs the South's 6407.
+  // Note osmHoleWays deliberately does NOT narrow the hole lines ownsHazard
+  // measures against (see its doc comment): the South's 18 centrelines stay in
+  // the set so its bunkers are culled from North corridors by being nearer
+  // their own hole — which matters precisely because the routings interleave.
+  // Radius 1300 covers the shared polygon; the only other golf_course inside
+  // it is none (Hillcrest 2.4 km SE, Bel-Air 2.6 km NW, Rancho Park 3.2 km S
+  // are all outside), so the anchored name is unambiguous.
+  // CARD BUG FOUND: the shipped tuple had hole 7 as a par 4, making the course
+  // par 71. BlueGolf's card, OSM's own par tag, and the 2023 U.S. Open card
+  // all say par 3 (284 yd for the Open, 326 off the Tournament tee — the
+  // third-longest par 3 in U.S. Open history). Par 70. Fixed in courses.ts.
+  lacc: {
+    name: 'Los Angeles Country Club — North',
+    center: [34.0731, -118.4231],
+    radius: 1300,
+    osmName: '^Los Angeles Country Club$',
+    engineSlug: 'lacc-north',
+    osmHoleWays: {
+      1: 1145215817, 2: 1145294562, 3: 1145638805, 4: 1146022230, 5: 1146025900,
+      6: 1146032384, 7: 1146041063, 8: 1146053377, 9: 1146057487, 10: 1146070198,
+      11: 1146073902, 12: 1146101472, 13: 1146478635, 14: 1146667370, 15: 1146669377,
+      16: 1146671443, 17: 1145342058, 18: 1145233742,
+    },
+  },
+  // Cabot Links, Inverness, Nova Scotia — way 854966311 ("Cabot Links Golf
+  // Resort"). The resort's other three courses are SEPARATE polygons well
+  // outside the radius (Cabot Cliffs way 676091202, 2.1 km NE; The Nest way
+  // 1480922644, 2.5 km NE; both with their own holes), so map_to_area on the
+  // anchored name is enough — exactly 18 golf=hole ways with plain ref=1..18
+  // and no names sit inside the boundary, one per ref, no second course. No
+  // osmHolePrefix possible or needed.
+  // Radius 1400 covers the 1185 x 1725 m polygon (1046 m half-diagonal;
+  // farthest centreline node 928 m from centre) and reaches the Gulf of St
+  // Lawrence coastline west of the links, which is natural=coastline here so
+  // it imports as `ocean` rather than needing the whistling-straits relabel.
+  // CARD: the shipped tuple was not transcribed from any real card — its par
+  // sequence disagrees with the club's on six holes and its yardages match no
+  // tee set (it put the famous 100-yd short hole at 16 rather than 14). OSM's
+  // par tags match the club's BLACK card (6854, par 70) on all 18, so the card
+  // wins outright and par, stroke index and yardage were all rebuilt from it.
+  // Rake 3, not the default 6 — the muirfield case, and checked the same way
+  // (bunker size against the rake, one number, before assuming): 33 of Cabot's
+  // 109 bunkers are under 6 yd across and the median is 7.3, so the default
+  // lateral rake steps over a third of the course's sand. Quail Hollow kept the
+  // 6-yd default on exactly this test (min 6.7, median 12.8), and so do the
+  // other four courses imported alongside this one, which is why the knob is
+  // per-course rather than global.
+  cabot: {
+    name: 'Cabot Links',
+    center: [46.2353, -61.3075],
+    radius: 1400,
+    osmName: '^Cabot Links Golf Resort$',
+    engineSlug: 'cabot-links',
+    rake: 3,
+  },
+  // Camargo Club, Indian Hill OH — way 30678974, and the cleanest import in
+  // the registry. One polygon, exactly 18 golf=hole ways with plain ref=1..18,
+  // no second course anywhere inside the radius (it is the only golf_course
+  // within 3 km), and OSM's par tags match the club's GOLD card on all 18.
+  // The shipped tuple already matched that card on par AND yardage for all 18
+  // bar four yards on the 17th, so this was very nearly pure geometry.
+  // Radius 1200 covers the 1410 x 1294 m polygon (957 m half-diagonal;
+  // farthest centreline node 773 m from centre).
+  camargo: {
+    name: 'Camargo Club',
+    center: [39.1778, -84.3336],
+    radius: 1200,
+    osmName: '^Camargo Club$',
+    engineSlug: 'camargo',
+  },
+  // Trump National Doral — Blue Monster. Way 112673308 is named "TPC Blue
+  // Monster" and wraps ONLY the Blue: exactly 18 golf=hole ways inside it, all
+  // named "Blue Monster N", one per ref. It nests inside relation 1564163
+  // ("Trump National Doral"), which also holds the Red Tiger, Golden Palm and
+  // Silver Fox — importing against the RELATION would mix four courses' refs,
+  // so the way is what the anchored name must pin.
+  // osmHolePrefix is set even though map_to_area already isolates the course:
+  // the names are all present and uniform (verified way by way against the
+  // 18 — no Whistling-Straits misspelling, no Pacific-Dunes double space), so
+  // it costs nothing and it is a second lock on a site with four courses.
+  // Radius 1100 covers the 946 x 1287 m polygon (799 m half-diagonal;
+  // farthest centreline node 771 m from centre). Doral's water is all
+  // golf-tagged (9 water_hazard + 4 lateral_water_hazard) so it arrives
+  // through map_to_area rather than by radius.
+  // OSM's `handicap` tags match BlueGolf's BLACK card on ALL 18 and its `par`
+  // tags match on all 18 too — the torrey-pines corroboration pattern — which
+  // is what gave confidence to replace the shipped yardages wholesale: those
+  // matched neither the Black card (7545) nor the 2016 WGC setup (7528), being
+  // off by up to 65 yd a hole, so they were an approximation rather than any
+  // real configuration.
+  doral: {
+    name: 'Trump National Doral — Blue Monster',
+    center: [25.8209, -80.3423],
+    radius: 1100,
+    osmName: '^TPC Blue Monster$',
+    osmHolePrefix: '^Blue Monster',
+    engineSlug: 'doral-blue-monster',
+  },
 }
 
 // ---------- Overpass ----------
@@ -184,6 +546,10 @@ const OVERPASS_ENDPOINTS = [
   'https://overpass-api.de/api/interpreter',
   'https://overpass.kumi.systems/api/interpreter',
   'https://overpass.private.coffee/api/interpreter',
+  // Fourth mirror, added during the Muirfield import when the first three all
+  // returned the "server is probably too busy" dispatcher timeout for ~15 min
+  // and this one answered every query first try.
+  'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
 ]
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
@@ -352,6 +718,12 @@ function pointAtArc(pts: Vec[], cum: number[], a: number): { p: Vec; dir: Vec } 
 /**
  * Cosmetic dogleg profile: signed lateral deviation (yards, >0 = golfer-left)
  * of the smoothed centreline from the straight tee→green chord, sampled at
+ *
+ * NOTE THE SIGN IS THE BULGE, NOT THE TURN, and they are OPPOSITE: a hole that
+ * doglegs RIGHT bows golfer-LEFT of its own tee→green chord (the chord cuts the
+ * corner), so a POSITIVE profile is a RIGHT dogleg. src/ui/panels.tsx makes
+ * exactly that conversion for the chip (`m < 0 ? 'L' : 'R'`). Read the printed
+ * label below, not the raw sign, or you will document the hole backwards.
  * BEND_SAMPLES+1 evenly-spaced fractions. Endpoints are ~0 by construction; the
  * max-magnitude sample marks where — and how hard — the hole actually turns.
  * Map-only: the odds engine works in 1-D and never sees this, so it is not
@@ -499,7 +871,8 @@ async function main() {
   // the hole centerline: golf=hole way with matching ref. Neighboring courses
   // (Pebble/Spyglass/Del Monte in one radius) each have a hole `ref`, and a
   // shared site (Sawgrass Stadium vs Valley) even shares the whole numbering —
-  // so disambiguate first by hole NAME (osmHolePrefix), then by nearest center.
+  // so disambiguate first by way ID (osmHoleWays), then by hole NAME
+  // (osmHolePrefix), then by nearest center.
   const centerProj = projector(geo.center[0], geo.center[1])
   const c0 = centerProj({ lat: geo.center[0], lon: geo.center[1] })
   let candidates = els.filter(
@@ -510,11 +883,57 @@ async function main() {
     console.error(`no golf=hole way with ref=${holeNo}. available refs: [${refs.join(', ')}]`)
     process.exit(2)
   }
+  if (geo.osmHoleWays) {
+    // FATAL on a miss, for the same reason osmHolePrefix is (below) and more
+    // so: an id list is only ever set where NEITHER a name prefix nor
+    // nearest-centre can tell two courses apart, so there is nothing safe to
+    // fall back to. If OSM re-draws a hole the id changes and this stops,
+    // which is the intended outcome — re-pin the id against the current data
+    // and re-verify it is the right course's hole before importing.
+    const wantId = geo.osmHoleWays[holeNo]
+    if (!wantId) {
+      console.error(`hole ${holeNo}: no osmHoleWays entry for ${geo.name}. Pin the way id before importing.`)
+      process.exit(2)
+    }
+    const pinned = candidates.filter((e) => e.id === wantId)
+    if (!pinned.length) {
+      const ids = candidates.map((e) => e.id).join(', ')
+      console.error(
+        `hole ${holeNo}: osmHoleWays pins way ${wantId} on ${geo.name}, which is not among the\n` +
+          `  ${candidates.length} way(s) sharing ref=${holeNo} here: [${ids}]\n` +
+          `  That id is this course's only identity check against the other course on the site,\n` +
+          `  so this refuses to guess. Re-pin osmHoleWays in COURSE_GEO against the current OSM\n` +
+          `  data — and re-verify the replacement is this course's hole — before importing.`,
+      )
+      process.exit(2)
+    }
+    candidates = pinned
+  }
   if (geo.osmHolePrefix) {
     const re = new RegExp(geo.osmHolePrefix, 'i')
     const named = candidates.filter((e) => re.test(e.tags?.name ?? ''))
-    if (named.length) candidates = named
-    else console.error(`  no hole name matched /${geo.osmHolePrefix}/i; falling back to nearest-center`)
+    // FATAL, deliberately, rather than falling through to nearest-centre. A
+    // prefix is only ever set where several courses share ONE golf_course
+    // polygon and therefore share hole `ref`s — Bandon's 54 ways across three
+    // courses, Sawgrass Stadium against Dye's Valley, Carnoustie against its
+    // three siblings — so it is the ONLY thing telling them apart. If an OSM
+    // rename breaks the match, nearest-centre would quietly hand back a
+    // NEIGHBOURING course's hole and emit it under this slug: geometry that
+    // claims to be the real place and isn't, which step 0 of the freeze process
+    // in scripts/README.md calls worse than shipping nothing at all. Stop and
+    // make a human re-pin the prefix.
+    if (!named.length) {
+      const names = candidates.map((e) => JSON.stringify(e.tags?.name ?? null)).join(', ')
+      console.error(
+        `hole ${holeNo}: no golf=hole way matched /${geo.osmHolePrefix}/i on ${geo.name}.\n` +
+          `  ${candidates.length} way(s) share ref=${holeNo} here, named: ${names}\n` +
+          `  That prefix is this course's only identity check against the others on the site,\n` +
+          `  so this refuses to guess. Re-pin osmHolePrefix in COURSE_GEO against the current\n` +
+          `  OSM names before importing.`,
+      )
+      process.exit(2)
+    }
+    candidates = named
   }
   const holeWay = candidates.sort((a, b) => {
     const da = len(sub(centerProj(a.geometry![0]), c0))
@@ -526,7 +945,67 @@ async function main() {
   // reference frame anchored at the tee end of the hole line
   const line = holeWay.geometry
   const proj = projector(line[0].lat, line[0].lon)
-  const center: Vec[] = chaikin(line.map(proj), 2)
+  // --shift <yd>: the centreline starts at a FORWARD pad, so prepend the
+  // missing tee run as a straight segment back along the opening heading —
+  // the same assumption the zone shift already makes ("the real tee is N yards
+  // straight back"), applied to the geometry instead of to the numbers
+  // afterwards. Everything downstream then comes out in CARD coordinates for
+  // free: `length`, every zone's from/to, fairwayFrom/To — and, crucially, the
+  // BEND PROFILE, which cannot be shifted after the fact. Its 13 samples are
+  // evenly spaced fractions of the hole, and HoleMap replays them at the same
+  // fractions of the final card length, so a profile measured on the short raw
+  // line gets STRETCHED over the long one and draws the corner yards early
+  // (64 yd early on pacific-dunes:8, whose pad is 110 yd forward). Re-measuring
+  // on the extended line also re-bases the deviations on the real back-tee ->
+  // green chord, which a resample of the old numbers could not do.
+  const rawPts = line.map(proj)
+  const shiftIdx = flags.indexOf('--shift')
+  const shiftYd = shiftIdx >= 0 ? Number(flags[shiftIdx + 1]) : 0
+  if (shiftIdx >= 0 && !Number.isFinite(shiftYd)) {
+    console.error('--shift needs a yardage, e.g. --shift 110')
+    process.exit(2)
+  }
+  if (shiftYd > 0 && rawPts.length >= 2) {
+    const [p0, p1] = rawPts
+    const back = sub(p0, p1)
+    const bl = len(back) || 1
+    rawPts.unshift([p0[0] + (back[0] / bl) * toMeters(shiftYd), p0[1] + (back[1] / bl) * toMeters(shiftYd)])
+  }
+  // A NEGATIVE --shift is the mirror image: the centreline starts BEHIND the
+  // card's tee (the mapper traced from a championship pad on a course we ship
+  // off a shorter card), so walk N yards down the existing line and start
+  // there. Muirfield is the case this was written for — OSM drew 10 of 18 from
+  // the back pads, and the club's WHITE card, which the shipped tuple already
+  // matched exactly, is 361 yd shorter in total.
+  //
+  // Trimming is the STRONGER half of the operation, not a grudging inverse:
+  // the positive path invents a straight run back from the tee, while this one
+  // only discards measured line, so the geometry that survives is all real.
+  // Do it here, on the raw points and before smoothing, for the same reason
+  // --shift prepends here — length, zones, fairwayFrom/To and the bend profile
+  // then all come out in card coordinates in one pass. Hazards beside the
+  // discarded run drop out with it, which is correct: they sit behind the tee
+  // we actually play from.
+  if (shiftYd < 0 && rawPts.length >= 2) {
+    let drop = toMeters(-shiftYd)
+    while (rawPts.length >= 2 && drop > 0) {
+      const seg = len(sub(rawPts[1], rawPts[0]))
+      if (seg > drop) {
+        // land mid-segment: move the first point forward along it
+        const d = sub(rawPts[1], rawPts[0])
+        const f = drop / (seg || 1)
+        rawPts[0] = [rawPts[0][0] + d[0] * f, rawPts[0][1] + d[1] * f]
+        break
+      }
+      drop -= seg
+      rawPts.shift()
+    }
+    if (rawPts.length < 2) {
+      console.error(`--shift ${shiftYd} trims the whole centreline away`)
+      process.exit(2)
+    }
+  }
+  const center: Vec[] = chaikin(rawPts, 2)
   const cum = arcLengths(center)
   const holeLenM = cum[cum.length - 1]
   const length = Math.round(toYards(holeLenM))
@@ -547,7 +1026,7 @@ async function main() {
   const CORRIDOR_YD = 50 // how far left/right we care about
   const OCEAN_REACH_YD = 160 // how far out to look for a set-back cliff line
   const STEP_YD = 2
-  const RAKE_YD = 6 // lateral sample spacing
+  const RAKE_YD = geo.rake ?? 6 // lateral sample spacing (see CourseGeo.rake)
   const CENTER_YD = 10 // |offset| within this counts as "on the line" → crossing
 
   // pre-project every hazard ring once, keep only rings near the corridor
@@ -652,17 +1131,134 @@ async function main() {
   }
   const coastReach = toMeters(CORRIDOR_YD + 120)
 
-  // green depth: the along span where the centre line runs through a green
-  let greenLo = Infinity
-  let greenHi = -Infinity
+  // green depth: the along span where the centre line runs through a green —
+  // specifically the LAST contiguous run of it. Taking min/max across every hit
+  // is what made cypress-point:1 read 402 yd deep: that centreline passes a
+  // NEIGHBOURING green at 28-54 yd before reaching its own at 400, so the span
+  // stretched between two different greens and pinned the 45 clamp. That is the
+  // artifact scripts/README.md says to suspect whenever greenDepth reads exactly
+  // 45, and it is silent whenever the stray green inflates the number without
+  // reaching the clamp. The green a hole is played TO is the one its line ends
+  // on, so only the run that reaches the end counts.
+  // Carry the polygon id per sample so a line touching MORE THAN ONE green is
+  // reported rather than silently resolved. There is no automatic way to pick
+  // the right one: the tell-tale is which green the hole is played TO, and for
+  // a way drawn tee->pin that is the one its end sits in — but if a way
+  // OVERSHOOTS its own green into a neighbour's, "the green at the end" is the
+  // neighbour, so polygon identity picks the same wrong green the last run
+  // does. What the old min/max at least did was fail LOUDLY (a conspicuous
+  // clamped 45). So the heuristic stays — it is right for every tee->pin way,
+  // which is all 246 shipped holes — and the ambiguity is made loud instead,
+  // naming every green and its span so a human decides. Never let this pass
+  // quietly: a plausible-looking depth off the wrong green is worse than an
+  // obviously wrong one.
+  // Identity is TYPE + ID, never the id alone: OSM way and relation ids are
+  // separate namespaces, so way/123 and relation/123 are different objects and
+  // keying on the number could fuse two greens into one — suppressing the
+  // warning below and letting the run bridge them, which is exactly the
+  // inflated depth this whole block exists to prevent. Same reason the Ring
+  // type carries `type` for hazard reporting.
+  const greenKey = (g: { id: number; type: OsmElement['type'] }) => `${g.type}/${g.id}`
+  // EVERY green containing each station, sorted — not the first `find` hit.
+  // Where two green polygons OVERLAP, taking the first match makes both the
+  // warning and the measured run depend on the order `rings` happens to be in,
+  // which is the ordering-dependent wrong-green result this guard exists to
+  // expose. Sorting also makes the target choice below deterministic.
+  const onGreen: { a: number; keys: string[] }[] = []
   for (let a = 0; a <= length; a += STEP_YD) {
     const p = pointAtArc(center, cum, toMeters(a)).p
-    for (const { kind, ring } of rings) {
-      if (kind === 'green' && pointInRing(ring, p)) {
-        greenLo = Math.min(greenLo, a)
-        greenHi = Math.max(greenHi, a)
-        break
+    const keys = rings
+      .filter((r) => r.kind === 'green' && pointInRing(r.ring, p))
+      .map(greenKey)
+      .sort()
+    if (keys.length) onGreen.push({ a, keys: [...new Set(keys)] })
+  }
+  const greensTouched = [...new Set(onGreen.flatMap((g) => g.keys))].sort()
+  if (greensTouched.length > 1) {
+    const spans = greensTouched.map((key) => {
+      const hits = onGreen.filter((g) => g.keys.includes(key))
+      return `    ${key}  ${hits[0].a}-${hits[hits.length - 1].a} yd`
+    })
+    console.error(
+      `  ! hole ${holeNo}: the centreline runs through ${greensTouched.length} DIFFERENT greens:\n` +
+        spans.join('\n') +
+        `\n    greenDepth is measured from the LAST run (the green a tee->pin line ends on).\n` +
+        `    Check that is this hole's green — a line that overshoots into a neighbour's\n` +
+        `    would measure the neighbour here, and it would look perfectly plausible.\n` +
+        `    (Normal cause: the tee sits beside the PREVIOUS hole's green — cypress-point:1.)`,
+    )
+  }
+  // The green this hole is played TO is the one its line ends on. `keys` is
+  // sorted, so keys[0] is the same choice whatever order `rings` came in; if
+  // the last station sits on more than one green they genuinely overlap at the
+  // pin, which no rule can disambiguate, so say so.
+  const targetKey = onGreen.length ? onGreen[onGreen.length - 1].keys[0] : ''
+  if (onGreen.length && onGreen[onGreen.length - 1].keys.length > 1) {
+    console.error(
+      `  ! hole ${holeNo}: the pin sits on ${onGreen[onGreen.length - 1].keys.length} OVERLAPPING greens ` +
+        `(${onGreen[onGreen.length - 1].keys.join(', ')}); measuring ${targetKey}. Check the mapping.`,
+    )
+  }
+  let greenLo = Infinity
+  let greenHi = -Infinity
+  if (onGreen.length) {
+    // walk back over the last contiguous run of stations still ON THE TARGET —
+    // a station that has left it is a different green touching, not more depth
+    let lo = onGreen.length - 1
+    while (lo > 0 && onGreen[lo].a - onGreen[lo - 1].a <= STEP_YD * 2 && onGreen[lo - 1].keys.includes(targetKey))
+      lo--
+    greenLo = onGreen[lo].a
+    greenHi = onGreen[onGreen.length - 1].a
+  }
+
+  // A centreline that STOPS AT THE PIN runs through only the FRONT HALF of its
+  // green, so the walk above measures half a green and the clamp floors it at
+  // 20 — SHALLOWER than the procedural default (28-36) the import is supposed
+  // to improve on. That is not cosmetic: greenDepth sets `fairwayTo` and feeds
+  // isGreenside() in the odds. Bandon maps every hole this way (all 18 Pacific
+  // Dunes lines end within 9 yd of their green's centroid, and 11 of 18
+  // floored), and it is the mirror of the greenDepth-45 mode in the README:
+  // there the line runs on to the WRONG green, here it stops at the right one.
+  // So where the walk is STILL INSIDE a green when the way runs out, keep
+  // walking along the approach direction until it actually leaves. Same test,
+  // same yardstick — the only thing that changes is that the way ending is no
+  // longer mistaken for the green ending. Do NOT substitute the ring's own
+  // extent along that axis: on a green set across the shot (hole 3 is 42 yd
+  // wide against 32 deep) the bounding extent reads corner-to-corner and
+  // invents depth. Lines that exit their green before the end are untouched.
+  if (isFinite(greenHi) && greenHi >= length - STEP_YD) {
+    // Pinned to the run's OWN polygon, not "any green". Two greens that touch or
+    // overlap would otherwise let the ray walk straight out of the target and on
+    // through its neighbour without ever landing a sample on open ground —
+    // rebuilding the very inflated depth this block exists to stop, and doing it
+    // where the multi-green warning above cannot see it, since that is computed
+    // only from samples on the original centreline.
+    const endP = pointAtArc(center, cum, toMeters(length)).p
+    const backP = pointAtArc(center, cum, toMeters(Math.max(0, length - 25))).p
+    const app = sub(endP, backP)
+    const appLen = len(app) || 1
+    const appDir: Vec = [app[0] / appLen, app[1] / appLen]
+    for (let a = length + STEP_YD; a <= length + 60; a += STEP_YD) {
+      const d = toMeters(a - length)
+      const q: Vec = [endP[0] + appDir[0] * d, endP[1] + appDir[1] * d]
+      // Ask "am I still on the TARGET", never "which green did find() hit
+      // first" — where a neighbour overlaps the target past the pin, the first
+      // hit can be the neighbour while q is still inside the target, and
+      // truncating there would make the depth depend on ring order rather than
+      // on the target green's own edge.
+      if (rings.some((r) => r.kind === 'green' && greenKey(r) === targetKey && pointInRing(r.ring, q))) {
+        greenHi = a
+        continue
       }
+      const other = rings.find((r) => r.kind === 'green' && pointInRing(r.ring, q))
+      if (other) {
+        console.error(
+          `  ! hole ${holeNo}: past the pin the approach leaves ${targetKey} and enters ` +
+            `${greenKey(other)} at ${a} yd — greenDepth stops at the target green's own edge. ` +
+            `Two greens touching here is worth a look.`,
+        )
+      }
+      break
     }
   }
 
@@ -730,7 +1326,14 @@ async function main() {
         (!geo.osmHolePrefix || new RegExp(geo.osmHolePrefix, 'i').test(e.tags?.name ?? '')),
     )
     .map((e) => {
-      const l = e.geometry!.map(proj)
+      // The TARGET's line must be the SHIFTED one (rawPts carries the prepended
+      // tee run), or --shift half-works: the corridor rake reaches hazards
+      // beside the new back-tee segment, but ownership still measures them
+      // against the forward pad, so a neighbouring hole's line is nearer and
+      // they get culled — silently dropping exactly the hazards --shift exists
+      // to find. Neighbours keep their own raw geometry; only the hole being
+      // imported grows a tee.
+      const l = e === holeWay ? rawPts : e.geometry!.map(proj)
       return { isTarget: e === holeWay, line: l, cum: arcLengths(l) }
     })
   const distToLine = (hl: { line: Vec[]; cum: number[] }, q: Vec) => Math.abs(projectToPolyline(hl.line, hl.cum, q).lateral)
@@ -778,6 +1381,17 @@ async function main() {
       const q: Vec = [base[0] + nrm[0] * toMeters(off), base[1] + nrm[1] * toMeters(off)]
       for (const { kind, ring } of ownedRings) {
         if (kind === 'green') continue
+        // `deeprough` (golf=rough) is dropped wholesale at merge time — it is
+        // the course's DEFAULT surface, usually one big multipolygon, and never
+        // becomes a zone. So letting it win a sample point here can only ever
+        // HIDE a real hazard drawn inside it: the loop breaks on the first ring
+        // that contains the point, and ring order is just Overpass's response
+        // order. That is what emptied cabot-links:3 and :5 — way/1044331550
+        // covers the whole 5th at -41..37 lateral, so both greenside bunkers
+        // (16 and 21 yd off the line on a 186-yd par 3) rasterised as rough and
+        // then vanished, leaving a bare hole where the imagery shows sand.
+        // Skipping it outright is equivalent to testing it last.
+        if (kind === 'deeprough') continue
         if (pointInRing(ring, q)) {
           record(kind, a, off)
           break // one kind per sample point
@@ -803,8 +1417,26 @@ async function main() {
       let run: number[] = []
       const flush = () => {
         if (!run.length) return
-        const spansLine = run.some((o) => o > 0) && run.some((o) => o < 0) && run.some((o) => Math.abs(o) <= CENTER_YD)
-        const side = spansLine ? 'cross' : run[0] > 0 ? 'left' : run[run.length - 1] < 0 ? 'right' : 'cross'
+        // A crossing must also be WIDE enough to be worth carrying. Continuity
+        // across the line is necessary but not sufficient: a small revetted pot
+        // sitting on the centreline satisfies it while blocking three yards of
+        // a hundred-yard corridor, and `cross` means "you must carry this".
+        // Muirfield produced three (6:224, 8:274, 18:364, spanning 9, 6 and 3
+        // yd laterally) once the rake was fine enough to see them at all.
+        // Width alone can't be the test, though — a burn crossing the fairway
+        // is narrow and IS a forced carry (Carnoustie, Rae's Creek). So the
+        // minimum applies to SAND only: a narrow bunker on the line is a pot
+        // you aim around, a narrow watercourse is a hazard you clear.
+        const MIN_CROSS_SAND_YD = 12
+        const spansLine =
+          run.some((o) => o > 0) &&
+          run.some((o) => o < 0) &&
+          run.some((o) => Math.abs(o) <= CENTER_YD) &&
+          (kind !== 'bunker' || run[run.length - 1] - run[0] >= MIN_CROSS_SAND_YD)
+        // Falls through to the flank holding most of the hazard's mass; a
+        // straddling run that isn't a crossing used to default to 'cross'.
+        const mass = run.reduce((s, o) => s + o, 0)
+        const side = spansLine ? 'cross' : run[0] > 0 ? 'left' : run[run.length - 1] < 0 ? 'right' : mass >= 0 ? 'left' : 'right'
         raws.push({ kind, from: a, to: a + STEP_YD, side })
         run = []
       }
@@ -994,7 +1626,7 @@ async function main() {
   if (Math.abs(bendMax) >= 8) {
     const cornerFrac = bend.indexOf(bendMax) / BEND_SAMPLES
     console.log(
-      `bend: max ${bendMax > 0 ? '+' : ''}${bendMax} yd ${bendMax > 0 ? '(left)' : '(right)'} near ${Math.round(cornerFrac * length)} yd — [${bend.join(', ')}]`,
+      `bend: dogleg ${bendMax > 0 ? 'RIGHT' : 'LEFT'} — bows ${bendMax > 0 ? '+' : ''}${bendMax} yd golfer-${bendMax > 0 ? 'left' : 'right'} of the chord (the bulge is OPPOSITE the turn) near ${Math.round(cornerFrac * length)} yd — [${bend.join(', ')}]`,
     )
   } else {
     console.log(`bend: straight (max ${bendMax} yd, not persisted)`)
@@ -1003,8 +1635,10 @@ async function main() {
   // side-by-side with the current procedural layout the game ships today
   if (flags.includes('--compare')) {
     const { buildLayout } = await import('../src/engine/layout.ts')
-    const { COURSES } = await import('../src/engine/courses.ts')
-    const course = COURSES.find((c: { slug: string }) => c.slug === geo.engineSlug)
+    // courseBySlug spans the whole library — rotation, par-3 shorts, and guest
+    // courses alike — so a course outside the daily walk still compares.
+    const { courseBySlug } = await import('../src/engine/courses.ts')
+    const course = courseBySlug(geo.engineSlug)
     const spec = course?.holes[holeNo - 1]
     if (!spec) {
       console.error(`\n(no engine hole for ${geo.engineSlug} #${holeNo} to compare)`)

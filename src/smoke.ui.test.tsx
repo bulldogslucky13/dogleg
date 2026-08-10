@@ -383,6 +383,149 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
     expect(screen.queryByText(/Season record open/)).toBeNull()
   })
 
+  it('the Awards tab shows the ladders, the backfill summary once, and hides hidden badges', async () => {
+    localStorage.setItem('dogleg:tutorial:v1', 'done')
+    // a stored history earns real tiers before the app ever opens
+    const { logRound } = await import('./state/stats')
+    const { newRound, applyChoice, advanceHole, archiveRound } = await import('./state/store')
+    const { practiceSetup } = await import('./engine/daily')
+    let st = newRound(practiceSetup('pebble-beach', 'smokeawards'), 'practice', 'dart')
+    let guard = 0
+    while (!st.complete && guard++ < 500) {
+      if (st.hole?.stage === 'done') {
+        st = advanceHole(st)
+        continue
+      }
+      const next = applyChoice(st, 'normal')
+      st = next === st ? applyChoice(st, 'safe') : next
+    }
+    archiveRound(st) // the Clubhouse entry on home gates on the archive
+    logRound(st)
+    render(<App />)
+    // the app-start quiet pass granted without a single toast
+    expect(document.querySelector('.ach-toast')).toBeNull()
+    const ledger = JSON.parse(localStorage.getItem('dogleg:achievements:v1')!)
+    expect(ledger.earned['rounds:1']).toMatchObject({ backfilled: true })
+    expect(ledger.backfill.granted).toBeGreaterThan(0)
+
+    fireEvent.click(screen.getByText(/Clubhouse/))
+    fireEvent.click(screen.getByRole('tab', { name: 'Awards' }))
+    // the one-time summary line, then never again
+    expect(screen.getByText(/already earned/)).toBeTruthy()
+    // ladders show the carrot: the next tier by name
+    expect(screen.getByText('The Flock')).toBeTruthy()
+    expect(screen.getByText('The Grind')).toBeTruthy()
+    expect(screen.getAllByText(/next:/).length).toBeGreaterThan(0)
+    // hidden one-offs stay masked until earned; visible ones show requirements
+    expect(screen.getAllByText('???').length).toBeGreaterThan(0)
+    expect(screen.getByText('Name on the Wall')).toBeTruthy()
+    // leaving and returning: summary marked seen, gone for good
+    fireEvent.click(screen.getByRole('tab', { name: 'Recent' }))
+    fireEvent.click(screen.getByRole('tab', { name: 'Awards' }))
+    expect(screen.queryByText(/already earned/)).toBeNull()
+  })
+
+  it('a device whose history arrived by sync can still reach its Awards', () => {
+    // The shape account sync leaves behind: daily history and a round log, and
+    // an EMPTY replay archive — the decisions never leave the device that
+    // played them. Both clubhouse doors used to be gated on the archive, so
+    // this player had full ladder progress and no way to look at it.
+    const history: HistoryEntry[] = [
+      { dateKey: '2026-07-18', puzzleNumber: 1, courseSlug: 'pebble-beach', toPar: -2, results: Array(18).fill('par'), character: 'dart' },
+      { dateKey: '2026-07-19', puzzleNumber: 2, courseSlug: 'pebble-beach', toPar: 1, results: Array(18).fill('par'), character: 'dart' },
+    ]
+    localStorage.setItem('dogleg:history:v1', JSON.stringify(history))
+    expect(localStorage.getItem('dogleg:archive:v1')).toBeNull()
+
+    render(<App />)
+    fireEvent.click(screen.getByText(/Clubhouse/))
+    // the tab strip is present at all — it used to be replaced wholesale by
+    // the "no rounds in the clubhouse" line
+    expect(screen.queryByText(/No rounds in the clubhouse/)).toBeNull()
+    fireEvent.click(screen.getByRole('tab', { name: 'Awards' }))
+    expect(screen.getByText('The Grind')).toBeTruthy()
+    // …and the ladders count the synced rounds, rather than reading zero
+    expect(screen.getByText(/^2 \/ 10 rounds$/)).toBeTruthy()
+
+    // Recent lists them too — no Replay button, since no decisions came with
+    fireEvent.click(screen.getByRole('tab', { name: 'Recent' }))
+    expect(screen.getByText(/Last 2 rounds/)).toBeTruthy()
+    expect(screen.queryByText(/▶ Replay/)).toBeNull()
+  })
+
+  it('a record-only synced player reaches Awards with no rounds anywhere', () => {
+    // Narrower than the case above and it defeats it: account history carries
+    // DAILIES only, so a player whose course records were all set in practice
+    // play on another device syncs in with an adopted records ledger and no
+    // rounds at all — no archive, no history, no round log. The awards are
+    // real (Name on the Wall, the record ladders); the doors used to be shut.
+    localStorage.setItem(
+      'dogleg:records:v1',
+      JSON.stringify({
+        v: 1,
+        held: {
+          'pebble-beach': { toPar: -6, since: 1 },
+          'st-andrews-old': { toPar: -4, since: 2 },
+          'royal-portrush': { toPar: -3, since: 3 },
+        },
+        stolen: {},
+        reclaimed: {},
+      }),
+    )
+    expect(localStorage.getItem('dogleg:archive:v1')).toBeNull()
+    expect(localStorage.getItem('dogleg:history:v1')).toBeNull()
+
+    render(<App />)
+    // the app-start quiet pass grants off the records alone
+    fireEvent.click(screen.getByText(/Clubhouse/))
+    expect(screen.queryByText(/No rounds in the clubhouse/)).toBeNull()
+    fireEvent.click(screen.getByRole('tab', { name: 'Awards' }))
+    expect(screen.getByText('Name on the Wall')).toBeTruthy()
+    // three held records is Landlord, the first rung of The Wall
+    expect(screen.getByText('Landlord')).toBeTruthy()
+
+    // Recent says so plainly rather than claiming "Last 0 rounds"
+    fireEvent.click(screen.getByRole('tab', { name: 'Recent' }))
+    expect(screen.getByText(/No rounds on this device yet/)).toBeTruthy()
+    expect(screen.queryByText(/Last 0 rounds/)).toBeNull()
+  })
+
+  it('a rank survives the number behind it falling', () => {
+    // The Wall counts records held RIGHT NOW, the one ladder whose value can
+    // go down. Earn Landlord at three, lose two to thieves, and the rank has
+    // to stay — the earned ledger is append-only, so reconcile will never
+    // grant it again and showing "Unranked · next: Landlord" would dangle a
+    // carrot the player already owns and can never re-earn.
+    localStorage.setItem(
+      'dogleg:achievements:v1',
+      JSON.stringify({ v: 1, earned: { 'recordsNow:1': { at: 1 } }, counts: {}, backfill: { at: 1, granted: 1, seen: true } }),
+    )
+    localStorage.setItem(
+      'dogleg:records:v1',
+      JSON.stringify({ v: 1, held: { 'pebble-beach': { toPar: -6, since: 1 } }, stolen: {}, reclaimed: {} }),
+    )
+
+    render(<App />)
+    fireEvent.click(screen.getByText(/Clubhouse/))
+    fireEvent.click(screen.getByRole('tab', { name: 'Awards' }))
+
+    const wall = [...document.querySelectorAll('.ach-ladder')].find((el) =>
+      el.textContent?.includes('The Wall'),
+    )!
+    expect(wall).toBeTruthy()
+    // the rank stands…
+    expect(wall.querySelector('.ach-rank')!.textContent).toBe('Landlord')
+    expect(wall.querySelector('.ach-rank')!.className).not.toMatch(/none/)
+    // …the carrot moves on to the tier actually still unearned…
+    expect(wall.textContent).toMatch(/The Baron/)
+    expect(wall.textContent).not.toMatch(/next:\s*Landlord/)
+    // …and the live number is still reported honestly underneath
+    expect(wall.textContent).toMatch(/1 \/ 10 records held right now/)
+    // the bar can't run backwards past its floor
+    const width = (wall.querySelector('.ach-bar i') as HTMLElement).style.width
+    expect(Number.parseFloat(width)).toBeGreaterThanOrEqual(0)
+  })
+
   it('the Clubhouse scorecard opens on paper, outside the dark screen', async () => {
     const { newRound, applyChoice, advanceHole, archiveRound } = await import('./state/store')
     const { logRound } = await import('./state/stats')
@@ -415,6 +558,17 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
   })
 
   it('the Clubhouse has a Seasons tab with the in-progress season and archive framing', async () => {
+    // The launch-season framing ("nothing archived yet") only renders while
+    // Summer 2026 is current, so on a real clock this test expired the moment
+    // Fall began (00:00 ET, Aug 1 2026). Pin "now" inside the launch season:
+    // the round below is stamped with Date.now(), so it lands in that season
+    // too, and the assertions hold on any future run date.
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-07-21T12:00:00Z'))
+    // beforeEach acked the splash for the REAL season; re-ack for the pinned
+    // one, or the splash takes over the app before the Clubhouse is reachable
+    localStorage.setItem('dogleg:season-ack:v1', seasonForDate().key)
+
     const { newRound, applyChoice, advanceHole, archiveRound } = await import('./state/store')
     const { logRound } = await import('./state/stats')
     const { practiceSetup } = await import('./engine/daily')
@@ -434,10 +588,12 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
     render(<App />)
     fireEvent.click(screen.getByText(/🏆 Clubhouse/))
     fireEvent.click(screen.getByText('Seasons'))
-    expect(screen.getByText(/in progress — ends in/)).toBeTruthy()
+    // the pinned clock puts us in Summer 2026 — name it, so a bad pin fails
+    // here rather than quietly changing which branch is under test
+    expect(screen.getByText(/Summer Season · in progress — ends in/)).toBeTruthy()
     expect(screen.getByText(/1 round this season/)).toBeTruthy()
     // launch season: nothing archived yet, framed as coming — not missing
-    expect(screen.getByText(/first season in the books-to-be/)).toBeTruthy()
+    expect(screen.getByText(/Summer 2026 is the first season in the books-to-be/)).toBeTruthy()
   })
 
   it('the streak display carries the fortune disclosure note', () => {
@@ -999,6 +1155,54 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
     const save = JSON.parse(localStorage.getItem('dogleg:round:v1') ?? 'null')
     expect(save.character).toBe(CHARACTERS[2].id)
     expect(save.currentHole).toBe(0)
+  })
+
+  it("following the wrap's earned card into Awards retires that round's unlocks", () => {
+    vi.useFakeTimers()
+    render(<App />)
+
+    // play today's daily to the wrap screen — a first round always earns
+    // ladder tier 1s, so the earned card is guaranteed to be there
+    fireEvent.click(screen.getByText('Tee off'))
+    fireEvent.click(screen.getByText(CHARACTERS[0].name))
+    for (let guard = 0; guard < 400; guard++) {
+      if (screen.queryByText('Back to the Teebox')) break
+      const splash = screen.queryByText('HOLE IN ONE') ?? screen.queryByText('ALBATROSS')
+      if (splash) {
+        act(() => {
+          vi.advanceTimersByTime(5100)
+        })
+        fireEvent.click(splash)
+        continue
+      }
+      const advance = screen.queryByText('Next hole') ?? screen.queryByText('Sign the card')
+      if (advance) {
+        fireEvent.click(advance)
+        continue
+      }
+      const card = document.querySelector<HTMLButtonElement>('button.choice')!
+      fireEvent.click(card)
+      fireEvent.click(card)
+      act(() => {
+        vi.advanceTimersByTime(1500)
+      })
+    }
+
+    // the durable earned card is on the wrap, and it deep-links to Awards
+    const earned = document.querySelector<HTMLButtonElement>('button.ach-earned')
+    expect(earned).toBeTruthy()
+    fireEvent.click(earned!)
+    expect(screen.getByRole('tab', { name: 'Awards' }).getAttribute('aria-selected')).toBe('true')
+
+    // …and following it LEAVES the wrap, so those unlocks retire with it.
+    // They used to survive the trip, so re-opening today's card served the same
+    // earned list (and its toast rail) all over again on a round that had
+    // already been celebrated.
+    fireEvent.click(screen.getByText('‹ Teebox'))
+    fireEvent.click(screen.getByText(/See today's card/))
+    expect(screen.getByText(/Daily No\./)).toBeTruthy()
+    expect(document.querySelector('button.ach-earned')).toBeNull()
+    expect(document.querySelector('.ach-toast')).toBeNull()
   })
 
   it('a destiny ace fires the HOLE IN ONE splash, which dismisses on tap', () => {

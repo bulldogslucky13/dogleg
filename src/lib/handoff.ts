@@ -46,6 +46,7 @@ const RECORDS_KEY = 'dogleg:records:v1'
 const POSTED_KEY = 'dogleg:posted:v1'
 const LIFETIME_KEY = 'dogleg:lifetime:v1'
 const FORTUNE_KEY = 'dogleg:fortune:v1'
+const ACHIEVEMENTS_KEY = 'dogleg:achievements:v1'
 /** An in-progress round is device/session state, not identity state — it
  *  never follows a handoff in EITHER direction. Carrying one across could
  *  hand a brand-new device someone else's mid-round shot decisions, or
@@ -300,7 +301,15 @@ function mergeRoundLogJson(local: string, incoming: string): string {
  *  device's own state deciding, since it is the one that has been playing.
  */
 function mergeRecordsJson(local: string, incoming: string): string {
-  type Ledger = { held?: Record<string, unknown>; stolen?: Record<string, unknown> }
+  type Ledger = {
+    held?: Record<string, unknown>
+    stolen?: Record<string, unknown>
+    /** reclaim COUNTS, kept forever and derivable from nothing else (records.ts
+     *  says so explicitly: a reclaim leaves no trace in held or stolen). Take
+     *  the higher per course — summing would double-count the reclaims both
+     *  devices already know about. */
+    reclaimed?: Record<string, number>
+  }
   let mine: Ledger | null
   let theirs: Ledger | null
   try {
@@ -317,6 +326,12 @@ function mergeRecordsJson(local: string, incoming: string): string {
   if (!mine) return incoming
   const held = { ...(theirs.held ?? {}), ...(mine.held ?? {}) }
   const stolen = { ...(theirs.stolen ?? {}), ...(mine.stolen ?? {}) }
+  const reclaimed: Record<string, number> = { ...(theirs.reclaimed ?? {}) }
+  for (const [slug, n] of Object.entries(mine.reclaimed ?? {})) {
+    const a = typeof n === 'number' && Number.isFinite(n) ? n : 0
+    const b = reclaimed[slug]
+    reclaimed[slug] = Math.max(a, typeof b === 'number' && Number.isFinite(b) ? b : 0)
+  }
   for (const slug of Object.keys(held)) {
     if (!(slug in stolen)) continue
     // local decides; if it knew the course under neither state, keep the hold
@@ -324,7 +339,75 @@ function mergeRecordsJson(local: string, incoming: string): string {
     if (mine.stolen && slug in mine.stolen && !(mine.held && slug in mine.held)) delete held[slug]
     else delete stolen[slug]
   }
-  return JSON.stringify({ v: 1, held, stolen })
+  return JSON.stringify({ v: 1, held, stolen, reclaimed })
+}
+
+/**
+ * The achievements ledger (`dogleg:achievements:v1`) — "versioned, append-only,
+ * idempotent to reconcile" in its own words (achievements.ts), which is exactly
+ * why the default local-wins rule would be wrong here: a device that has earned
+ * anything of its own would discard the arriving shelf wholesale, and an
+ * append-only record is the one shape where nothing should ever be dropped.
+ *
+ *  - `earned`: union by grant id, keeping the EARLIER `at`. The field means
+ *    "when first granted", so the earlier stamp is the true one — and a live
+ *    grant beats a backfill of the same badge on the same reasoning.
+ *  - `counts`: repeatable one-off tallies. Higher wins rather than sum: both
+ *    devices backfill from the same history, so adding them would inflate a
+ *    count the player earned once.
+ *  - `backfill`: the once-ever "here's what you already had" notice. Seen on
+ *    either device means seen — re-surfacing a dismissed notice on arrival
+ *    would be the migration announcing itself as a discovery.
+ */
+function mergeAchievementsJson(local: string, incoming: string): string {
+  type Entry = { at?: number; backfilled?: boolean }
+  type Ledger = {
+    earned?: Record<string, Entry>
+    counts?: Record<string, number>
+    backfill?: { at?: number; granted?: number; seen?: boolean }
+  }
+  const parse = (raw: string): Ledger | null => {
+    try {
+      const j = JSON.parse(raw) as { v?: number; earned?: unknown }
+      return j?.v === 1 && j.earned && typeof j.earned === 'object' ? (j as Ledger) : null
+    } catch {
+      return null
+    }
+  }
+  const mine = parse(local)
+  const theirs = parse(incoming)
+  if (!theirs) return local
+  if (!mine) return incoming
+
+  const earned: Record<string, Entry> = { ...(theirs.earned ?? {}) }
+  for (const [id, entry] of Object.entries(mine.earned ?? {})) {
+    const other = earned[id]
+    if (!other) {
+      earned[id] = entry
+      continue
+    }
+    const a = typeof entry?.at === 'number' ? entry.at : Infinity
+    const b = typeof other?.at === 'number' ? other.at : Infinity
+    const first = a <= b ? entry : other
+    // a live grant is the truer record of the same badge than a backfill
+    earned[id] = entry.backfilled === other.backfilled ? first : entry.backfilled ? other : entry
+  }
+
+  const num = (v: unknown): number => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? v : 0)
+  const counts: Record<string, number> = { ...(theirs.counts ?? {}) }
+  for (const [id, n] of Object.entries(mine.counts ?? {})) {
+    counts[id] = Math.max(num(n), num(counts[id]))
+  }
+
+  const backfill =
+    mine.backfill || theirs.backfill
+      ? {
+          ...(mine.backfill ?? theirs.backfill),
+          seen: Boolean(mine.backfill?.seen || theirs.backfill?.seen),
+        }
+      : undefined
+
+  return JSON.stringify({ v: 1, earned, counts, ...(backfill ? { backfill } : {}) })
 }
 
 /** Date keys this device has successfully posted — the OTHER half of the
@@ -439,6 +522,9 @@ function mergeInto(store: Storage, key: string, incoming: string): void {
       return
     case RECORDS_KEY:
       store.setItem(key, mergeRecordsJson(local, incoming))
+      return
+    case ACHIEVEMENTS_KEY:
+      store.setItem(key, mergeAchievementsJson(local, incoming))
       return
     case POSTED_KEY:
       store.setItem(key, mergePostedJson(local, incoming))

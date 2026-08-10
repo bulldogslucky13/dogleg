@@ -416,6 +416,16 @@ describe('gradeRound: calibration (Monte Carlo)', () => {
     // the rounds is the entire +0.030 move (0.7347 → 0.7646). Expect this to
     // happen again as more of the calibration's first ten courses are
     // imported. See docs/GRADING.md §6 before moving this again.
+    //
+    // The threshold has NOT moved since, and the headroom has grown rather than
+    // shrunk: approach-sand dispersion + landing in the bunker the roll chose
+    // took this to 0.7560. That change is a useful worked example of what this
+    // number is for — it caught the intermediate state, where the resolver had
+    // started landing balls in real fairway bunkers while the model still
+    // priced every sand outcome as a greenside splash, as 1.071 here and mean
+    // luck at +0.323. Pricing the mixture honestly (nextVApproachSand) brought
+    // both back. A jump in THIS metric with luck moving in step is the
+    // signature of an unpriced penalty, not of a harder library.
     expect(Math.abs(meanDiff)).toBeLessThan(0.8)
     expect(meanLoss).toBeLessThan(0.1)
   }, 30000)

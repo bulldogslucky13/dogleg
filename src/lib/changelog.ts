@@ -7,7 +7,10 @@
  * the ones a player has a right to know about. Everything else is a new
  * feature or a fix, and the list makes that ratio visible at a glance.
  *
- * MAINTENANCE — this is not optional, and it rides an existing rule:
+ * MAINTENANCE — this is not optional, and it is now MECHANICAL: the
+ * change-log gate (.github/workflows/changelog-check.yml, policy in
+ * scripts/changelog-check.mjs) fails any PR that neither updates this file
+ * nor carries a valid exemption label. It also rides the existing rule:
  * a change that bumps `ENGINE_VERSION` (src/engine/version.ts) MUST add an
  * entry here with kind 'odds', in the same PR. Player-visible features and
  * fixes get an entry too, subject to the two exceptions below; refactors,
@@ -45,7 +48,7 @@
  * plain, specific, no jargon and no PR numbers.
  */
 
-export type ChangeKind = 'odds' | 'feature' | 'fix'
+export type ChangeKind = 'odds' | 'feature' | 'fix' | 'design'
 
 export interface ChangeEntry {
   /** YYYY-MM-DD, the day it reached players */
@@ -59,20 +62,45 @@ export const CHANGE_KIND_LABEL: Record<ChangeKind, string> = {
   odds: 'Odds changed',
   feature: 'New',
   fix: 'Fix',
+  design: 'Design',
 }
 
 export const CHANGELOG: ChangeEntry[] = [
   {
-    date: '2026-07-29',
+    date: '2026-08-10',
     kind: 'feature',
     title: 'A new address: playdogleg.com',
     note: 'The game moved to playdogleg.com — shorter, and easier to pass on. Share text and replay links point there from now on. An old bookmark still works and brings your clubhouse with it: your name, streak, records and saved rounds all come across on the first visit.',
+  },
+  {
+    date: '2026-08-07',
+    kind: 'odds',
+    title: 'You now end up in the bunker — and the lake — you actually found',
+    note: 'When an approach found trouble, the game picked which bunker or lake off a list that treated every one in range as equally likely, so one eighty yards short of the green came up about as often as the one beside it. Then it ignored that pick: sand always dropped you greenside, which is why a bunker shot sometimes drew your ball on open grass beside the green, and a lateral water penalty always dropped you a fixed distance out, which could hand you a free forty yards. Now the odds weight hazards by how likely that miss really is, and you finish where you actually went in. Greenside sand is still a splash; sand out in the fairway leaves you a full shot, and a water drop goes back to the water rather than up the hole. Twenty-two courses moved a point of difficulty, most of them down.',
+  },
+  {
+    date: '2026-08-01',
+    kind: 'odds',
+    title: 'Real greens were being measured at half their size',
+    note: 'Every course drawn from real-world maps had its greens come out about half as deep as they really are. That put the front edge too close to the pin, so sand guarding the front of a green was not always counted as guarding it, and those bunkers read as slightly less dangerous than they are. All 199 holes are re-measured against the real green. No course changed its difficulty rating.',
+  },
+  {
+    date: '2026-07-27',
+    kind: 'feature',
+    title: 'Achievements',
+    note: 'The Clubhouse grows an Awards tab: named ranks for every pursuit \u2014 birdies, streaks, records, rounds \u2014 plus one-off badges, a few of them hidden until you stumble into them. Your whole history counts from day one: anything you\u2019d already earned is waiting on the shelf.',
   },
   {
     date: '2026-07-27',
     kind: 'fix',
     title: 'No more trees on treeless courses',
     note: 'Drive it somewhere nobody mapped and the game used to put you "in the trees" — even on a links with not a tree on it, and it drew your ball sitting on the fairway while it said so. Now each course names its own junk, and the ball is drawn where you actually are.',
+  },
+  {
+    date: '2026-07-26',
+    kind: 'design',
+    title: 'Welcome to DogLeg 2.0',
+    note: 'One week after launch, we\u2019ve stepped up our design game: a full rebadge of the menus and branding, a post-round wrap screen that leads with your score, your share card, and a proper leaderboard \u2014 plus small tweaks under the hood to make your card a little sexier when it hits the group chat. The golf is untouched \u2014 keep on swingin\u2019.',
   },
   {
     date: '2026-07-25',

@@ -335,6 +335,28 @@ describe('importing onto a device that has already been played on', () => {
     expect('pebble-beach' in ledger.held).toBe(false)
   })
 
+  it('carries reclaim counts, which nothing else in the ledger can reconstruct', async () => {
+    // records.ts is explicit that a reclaim leaves no trace in held or stolen,
+    // so it is counted at the moment it happens and kept forever — dropping it
+    // on a rebuild would lose it permanently. Higher wins: both devices know
+    // about the same reclaims, so summing would double-count them.
+    const target = seeded({
+      'dogleg:player:v1': ANON,
+      'dogleg:records:v1': { v: 1, held: {}, stolen: {}, reclaimed: { 'pebble-beach': 1, augusta: 3 } },
+    })
+    await importHandoff(
+      await packHandoff(
+        seeded({
+          ...OLD_DEVICE,
+          'dogleg:records:v1': { v: 1, held: {}, stolen: {}, reclaimed: { 'pebble-beach': 2, oakmont: 1 } },
+        }),
+      ),
+      target,
+    )
+    const ledger = JSON.parse(target.getItem('dogleg:records:v1')!) as { reclaimed: Record<string, number> }
+    expect(ledger.reclaimed).toEqual({ 'pebble-beach': 2, augusta: 3, oakmont: 1 })
+  })
+
   it('keeps the hold when this device knew the course under neither state', async () => {
     // an inconsistent incoming ledger must not invent a theft notice
     const target = seeded({ 'dogleg:player:v1': ANON, 'dogleg:records:v1': { v: 1, held: {}, stolen: {} } })
@@ -380,6 +402,75 @@ describe('importing onto a device that has already been played on', () => {
     const ledger = JSON.parse(target.getItem('dogleg:records:v1')!) as { held: Record<string, { toPar: number }> }
     expect(ledger.held['pebble-beach'].toPar).toBe(-2) // local's conflicting entry wins
     expect(ledger.held.augusta.toPar).toBe(0) // incoming's non-conflicting entry still arrives
+  })
+
+  it('unions the achievements shelf — an append-only record must never lose a grant', async () => {
+    const target = seeded({
+      'dogleg:player:v1': ANON,
+      'dogleg:achievements:v1': {
+        v: 1,
+        earned: { 'birdies:3': { at: 500 }, 'streak:1': { at: 900 } },
+        counts: { hooky: 1 },
+      },
+    })
+    await importHandoff(
+      await packHandoff(
+        seeded({
+          ...OLD_DEVICE,
+          'dogleg:achievements:v1': {
+            v: 1,
+            earned: { 'birdies:3': { at: 100 }, 'records:1': { at: 200 } },
+            counts: { hooky: 4, anniversary: 2 },
+          },
+        }),
+      ),
+      target,
+    )
+    const ledger = JSON.parse(target.getItem('dogleg:achievements:v1')!) as {
+      earned: Record<string, { at: number }>
+      counts: Record<string, number>
+    }
+    // every grant from both devices survives...
+    expect(Object.keys(ledger.earned).sort()).toEqual(['birdies:3', 'records:1', 'streak:1'])
+    // ...and a badge both knew about keeps the EARLIER grant time
+    expect(ledger.earned['birdies:3'].at).toBe(100)
+    // repeatable counts take the higher, never the sum (both backfill the same history)
+    expect(ledger.counts).toEqual({ hooky: 4, anniversary: 2 })
+  })
+
+  it('prefers a live grant over a backfill of the same badge', async () => {
+    const target = seeded({
+      'dogleg:player:v1': ANON,
+      'dogleg:achievements:v1': { v: 1, earned: { 'birdies:3': { at: 100, backfilled: true } }, counts: {} },
+    })
+    await importHandoff(
+      await packHandoff(
+        seeded({ ...OLD_DEVICE, 'dogleg:achievements:v1': { v: 1, earned: { 'birdies:3': { at: 900 } }, counts: {} } }),
+      ),
+      target,
+    )
+    const ledger = JSON.parse(target.getItem('dogleg:achievements:v1')!) as {
+      earned: Record<string, { at: number; backfilled?: boolean }>
+    }
+    expect(ledger.earned['birdies:3'].backfilled).toBeUndefined()
+    expect(ledger.earned['birdies:3'].at).toBe(900)
+  })
+
+  it('does not re-surface a backfill notice the player already dismissed', async () => {
+    const target = seeded({
+      'dogleg:player:v1': ANON,
+      'dogleg:achievements:v1': { v: 1, earned: {}, counts: {}, backfill: { at: 5, granted: 7, seen: true } },
+    })
+    await importHandoff(
+      await packHandoff(
+        seeded({
+          ...OLD_DEVICE,
+          'dogleg:achievements:v1': { v: 1, earned: {}, counts: {}, backfill: { at: 5, granted: 7, seen: false } },
+        }),
+      ),
+      target,
+    )
+    expect(JSON.parse(target.getItem('dogleg:achievements:v1')!).backfill.seen).toBe(true)
   })
 
   it('heals a corrupted local fortune counter from a valid incoming payload instead of perpetuating it', async () => {

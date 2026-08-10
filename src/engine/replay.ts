@@ -21,6 +21,11 @@ export { seasonForDate, type Season } from './season'
 // the engine-generation handshake: the client sends its copy with every
 // submission, the referee compares against this one before replaying
 export { ENGINE_VERSION } from './version'
+// the Cup calendar, for the referee's policy checks: setupFromSeed already
+// proves a major seed names a real event/course/day — the function still has
+// to ask whether that event is actually RUNNING (eventPlayable) before it
+// accepts the round into event_scores
+export { eventForKey, eventPlayable } from './events'
 
 /**
  * Deterministic round replay — the backbone of leaderboard score validation.

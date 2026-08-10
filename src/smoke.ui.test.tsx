@@ -246,6 +246,55 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
     expect(screen.getAllByText(/records loading…/).length).toBeGreaterThan(0)
   })
 
+  it('the browse view is remembered: sort + filters + toggle survive a full reload, visibly', () => {
+    localStorage.setItem('dogleg:tutorial:v1', 'done')
+    const first = render(<App />)
+    fireEvent.click(screen.getByText(/Play unlimited/))
+
+    // configure a view: hardest-first sort, hard-difficulty filter, all-time records
+    fireEvent.click(screen.getByText(/⇅ Sort/)) // tour → easiest
+    fireEvent.click(screen.getByText(/⇅ Sort/)) // easiest → hardest
+    fireEvent.click(screen.getByText(/☰ Filters/))
+    fireEvent.click(screen.getByText('Hard 8–10'))
+    fireEvent.click(screen.getByText(/^Show \d+ courses?$/))
+    fireEvent.click(screen.getByText('View All-Time Records'))
+
+    // stored for real — this is what survives the reload
+    const stored = JSON.parse(localStorage.getItem('dogleg:course-browse:v1')!)
+    expect(stored).toMatchObject({ sort: 'hardest', rating: 'hard', recType: 'alltime' })
+
+    // the "full reload": tear the app down completely and mount fresh
+    first.unmount()
+    render(<App />)
+    fireEvent.click(screen.getByText(/Play unlimited/))
+
+    // restored AND visibly active — nothing silently applied
+    expect(screen.getByText(/Sort: Hardest/).className).toContain(' on')
+    expect(screen.getByText(/☰ Filters · 1/).className).toContain(' on')
+    expect(screen.getByText('View All-Time Records').className).toContain(' on')
+    expect(screen.getByText(/\d+ of \d+ courses/)).toBeTruthy()
+  })
+
+  it('a stale saved view that matches nothing shows the empty state and reset, never a blank list', () => {
+    localStorage.setItem('dogleg:tutorial:v1', 'done')
+    // a saved favorites-only view… on a device with no favorites (the same
+    // shape as an "open records" view going stale across a season rollover)
+    localStorage.setItem(
+      'dogleg:course-browse:v1',
+      JSON.stringify({ recType: 'season', played: 'all', rating: 'any', record: 'any', favsOnly: true, sort: 'tour' }),
+    )
+    render(<App />)
+    fireEvent.click(screen.getByText(/Play unlimited/))
+
+    // the filters are named as the cause, with the one-tap way out
+    expect(screen.getByText(/No courses match your saved filters/)).toBeTruthy()
+    fireEvent.click(screen.getByText('Reset filters'))
+    expect(screen.queryByText(/No courses match/)).toBeNull()
+    expect(screen.getAllByText(/Par 7\d/).length).toBeGreaterThan(0)
+    // …and the reset is itself remembered
+    expect(JSON.parse(localStorage.getItem('dogleg:course-browse:v1')!).favsOnly).toBe(false)
+  })
+
   it('the season splash shows once after a rollover, explains the goal, then never again', () => {
     localStorage.removeItem('dogleg:season-ack:v1')
     const first = render(<App />)

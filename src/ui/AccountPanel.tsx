@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { backendEnabled } from '../lib/backend'
 import { currentEmail, sendMagicLink, signOut, syncAccount } from '../lib/auth'
 import { fetchMyHistory, loadPlayer } from '../lib/leaderboard'
+import { clearRelink, needsRelink } from '../lib/handoff'
 import { mergeHistory, type HistoryEntry } from '../state/store'
 import { identifyPlayer, track } from '../lib/analytics'
 import { Spinner } from './Spinner'
@@ -15,7 +16,13 @@ import { Spinner } from './Spinner'
  * "played today" follow the player across devices.
  */
 export function AccountPanel(props: { onHistorySynced?: (h: HistoryEntry[]) => void; defaultOpen?: boolean }) {
-  const [open, setOpen] = useState(props.defaultOpen ?? false)
+  // Arrived from the old domain with an email session that couldn't come with
+  // them (see handoff.ts). Their clubhouse is intact; only the sign-in is
+  // gone, and unexplained that reads as the move having eaten something. Open
+  // the panel unasked — this is the one case where the player is looking for
+  // an answer we already have.
+  const [relink, setRelink] = useState(() => needsRelink())
+  const [open, setOpen] = useState(props.defaultOpen ?? relink)
   const [email, setEmail] = useState('')
   const [sent, setSent] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -38,6 +45,11 @@ export function AccountPanel(props: { onHistorySynced?: (h: HistoryEntry[]) => v
     void (async () => {
       const addr = await currentEmail()
       setSignedInAs(addr)
+      if (addr) {
+        // signed in again — the prompt has done its job
+        clearRelink()
+        setRelink(false)
+      }
       if (!addr) return
       const out = await syncAccount()
       // cross-device sign-in reconciled — status distinguishes a fresh adopt on
@@ -93,7 +105,7 @@ export function AccountPanel(props: { onHistorySynced?: (h: HistoryEntry[]) => v
   return (
     <div className="account-panel">
       <button className="home-link" onClick={() => setOpen((v) => !v)}>
-        {signedInAs ? `⛅ Synced · ${playerName ?? signedInAs}` : '⛅ Sync across devices'}
+        {relink && !signedInAs ? '⛅ Sign in again to re-sync' : signedInAs ? `⛅ Synced · ${playerName ?? signedInAs}` : '⛅ Sync across devices'}
       </button>
       {open && (
         <div className="account-body">
@@ -159,10 +171,19 @@ export function AccountPanel(props: { onHistorySynced?: (h: HistoryEntry[]) => v
             <p className="fine">✉️ Check your email and tap the link — it lands you back here, synced.</p>
           ) : (
             <>
-              <p className="fine">
-                Optional: add an email to carry your clubhouse name to your phone, laptop, anywhere — and to
-                recover it if a browser gets wiped.
-              </p>
+              {relink ? (
+                <p className="fine">
+                  <b>Your clubhouse made the move</b> — {playerName ? <b>{playerName}</b> : 'your name'}, your streak
+                  and every round came across from the old address. Only the email sign-in couldn&rsquo;t travel with
+                  them, for the same reason a password can&rsquo;t: sign in again below and this device is synced as
+                  before. Nothing was lost.
+                </p>
+              ) : (
+                <p className="fine">
+                  Optional: add an email to carry your clubhouse name to your phone, laptop, anywhere — and to
+                  recover it if a browser gets wiped.
+                </p>
+              )}
               <form className="name-form" onSubmit={sendLink}>
                 <input
                   type="email"
@@ -183,6 +204,19 @@ export function AccountPanel(props: { onHistorySynced?: (h: HistoryEntry[]) => v
                   )}
                 </button>
               </form>
+              {relink && (
+                // never linked an email and don't want to? the prompt should
+                // take no for an answer and never ask again
+                <button
+                  className="home-link"
+                  onClick={() => {
+                    clearRelink()
+                    setRelink(false)
+                  }}
+                >
+                  I didn&rsquo;t use email sync
+                </button>
+              )}
             </>
           )}
           {error && <p className="fine board-error">{error}</p>}

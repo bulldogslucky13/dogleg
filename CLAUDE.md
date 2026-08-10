@@ -114,6 +114,19 @@ real HTML file against the real unpacker — **if you touch the wire format,
 change both sides**. New persistence keys need no change: the sweep is by
 `dogleg:` prefix, not a hand-listed set.
 
+**The email session is the one thing deliberately left behind.** supabase-js
+keeps it at `sb-<ref>-auth-token`, outside the `dogleg:` namespace, so the
+sweep never sees it — and that is the intended outcome, not a gap: it is a
+REFRESH token, and a URL fragment is an acceptable place for the player secret
+(post scores as that clubhouse) and not for one that buys ongoing account
+access. So a linked player arrives with everything except the sign-in, which
+unexplained reads as the move having eaten their account. The old page
+therefore ships a flag — `dogleg:handoff-relink:v1`, a boolean, never the
+credential — and `AccountPanel` turns it into one sentence and clears it.
+Signing back in reconciles rather than duplicates: the account's linked player
+row is the same id the handoff carried, so `link-account` returns `linked` and
+the daily dice keep their salt.
+
 Cross-device sync is optional email magic links (Supabase Auth): the
 `link-account` function ties `auth.users` to a player row (`players.user_id`);
 `src/lib/auth.ts` + `src/ui/AccountPanel.tsx` handle send/reconcile/adopt.

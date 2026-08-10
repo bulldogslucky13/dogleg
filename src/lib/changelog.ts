@@ -70,7 +70,7 @@ export const CHANGELOG: ChangeEntry[] = [
     date: '2026-08-10',
     kind: 'feature',
     title: 'A new address: playdogleg.com',
-    note: 'The game moved to playdogleg.com — shorter, and easier to pass on. Share text and replay links point there from now on. An old bookmark still works and brings your clubhouse with it: your name, streak, records and saved rounds all come across on the first visit.',
+    note: 'The game moved to playdogleg.com — shorter, and easier to pass on. Share text and replay links point there from now on. An old bookmark still works and brings your clubhouse with it: your name, streak, records and saved rounds all come across on the first visit. If you had added an email for cross-device sync, that one thing cannot follow you between two addresses — sign in once more and this device is synced exactly as it was.',
   },
   {
     date: '2026-08-10',

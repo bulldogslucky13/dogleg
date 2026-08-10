@@ -83,6 +83,9 @@
         // whole history under bp:history:v1 and would otherwise hand over
         // nothing. Collected as-is; src/lib/handoff.ts renames them on arrival.
         var LEGACY_PREFIX = 'bp:'
+        // Tells the new origin a sign-in existed here, so it can explain the
+        // one thing this page cannot carry. See src/lib/handoff.ts.
+        var RELINK_KEY = 'dogleg:handoff-relink:v1'
         var status = document.getElementById('status')
         var go = document.getElementById('go')
 
@@ -133,13 +136,25 @@
 
         function collect() {
           var keys = {}
+          var hadSession = false
           try {
             for (var i = 0; i < localStorage.length; i++) {
               var k = localStorage.key(i)
-              if (!k || (k.indexOf(PREFIX) !== 0 && k.indexOf(LEGACY_PREFIX) !== 0)) continue
+              if (!k) continue
+              // The Supabase email session. NEVER carried — it is a refresh
+              // token, and a URL fragment is the wrong place for one. But a
+              // player who had it lands signed out on the new domain with no
+              // explanation, which reads as the migration having lost
+              // something. So note only THAT it existed, never its value.
+              if (/^sb-.+-auth-token$/.test(k)) {
+                hadSession = true
+                continue
+              }
+              if (k.indexOf(PREFIX) !== 0 && k.indexOf(LEGACY_PREFIX) !== 0) continue
               var v = localStorage.getItem(k)
               if (v !== null) keys[k] = v
             }
+            if (hadSession) keys[RELINK_KEY] = '1'
           } catch (e) {
             // private mode is the expected case and is silent; anything else
             // (a patched localStorage, a future browser quirk) at least

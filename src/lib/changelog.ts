@@ -73,6 +73,12 @@ export const CHANGELOG: ChangeEntry[] = [
     note: 'The game moved to playdogleg.com — shorter, and easier to pass on. Share text and replay links point there from now on. An old bookmark still works and brings your clubhouse with it: your name, streak, records and saved rounds all come across on the first visit.',
   },
   {
+    date: '2026-08-10',
+    kind: 'feature',
+    title: 'Find your next record',
+    note: 'Unlimited play’s course list learned to hunt: filter by difficulty, by what you’ve played, by open or beatable records — season or all-time, your pick — star your target courses, and sort the whole board by what’s winnable. Fifty courses, one shortlist.',
+  },
+  {
     date: '2026-08-07',
     kind: 'odds',
     title: 'You now end up in the bunker — and the lake — you actually found',
@@ -83,12 +89,6 @@ export const CHANGELOG: ChangeEntry[] = [
     kind: 'odds',
     title: 'Real greens were being measured at half their size',
     note: 'Every course drawn from real-world maps had its greens come out about half as deep as they really are. That put the front edge too close to the pin, so sand guarding the front of a green was not always counted as guarding it, and those bunkers read as slightly less dangerous than they are. All 199 holes are re-measured against the real green. No course changed its difficulty rating.',
-  },
-  {
-    date: '2026-07-27',
-    kind: 'feature',
-    title: 'Find your next record',
-    note: 'Unlimited play\u2019s course list learned to hunt: filter by difficulty, by what you\u2019ve played, by open or beatable records \u2014 season or all-time, your pick \u2014 star your target courses, and sort the whole board by what\u2019s winnable. Forty-nine courses, one shortlist.',
   },
   {
     date: '2026-07-27',

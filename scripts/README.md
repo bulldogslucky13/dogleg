@@ -293,6 +293,109 @@ find the polygon name for a new course, query Overpass for
   rounding" from "the card describes a different tee" across 90 holes without
   eyeballing any of them.
 
+- **Erin Hills (all 18)** — the course that says **check the CLUB'S card, and
+  check its date**. Its cards disagree with each other, and both of the
+  widely-quoted third-party ones are stale in opposite directions: one puts the
+  1st at 608 and the total at 7800, which is the 2017 U.S. Open-era card, while
+  the club has since shortened 1/3/11/17 and LENGTHENED the 16th from 183 to
+  247. Settled by reading the club's own scorecard PDF (04/26) — the text is in
+  subset CFF fonts, so it comes out through the `/ToUnicode` maps rather than a
+  naive string scrape — which BlueGolf turns out to reproduce exactly. The
+  shipped tuple matched par on all 18 and nothing else (SI wrong on 15, and the
+  yardages no tee set at all).
+  That card history IS the shift diagnosis, and it is worth copying: **when a
+  club moves its tees, OSM keeps tracing the old pads**, so the holes needing a
+  trim are exactly the ones the club shortened (3 -39, 5 -36, 11 -44, 17 -33)
+  and the one needing a prepend is the one it lengthened (16, +57). The trims
+  were verified, not assumed — after the trim all four of the 3rd's bunkers and
+  all three of the 11th's land on measured sand.
+  Two hand-fixes, both `cross` bands that are not carries: the 7th's is a PAIR
+  of touching pots (`--profile` rules it TOUCHING POLYGONS, not one span) worth
+  12 yd of a hundred-yard corridor, and the 13th's is a pond 20 yd off the
+  RIGHT that the coarse line clips by 4 — left in, it would have made the
+  card's EASIEST hole a forced water carry. 12 and 17 import BARE and imagery
+  confirms that is honest, not the cabot-links shadowing bug.
+  Also the course that needed a `junkLabel`: real geometry gave it sand and
+  glacial grass and not one tree polygon, so the odds' junk floor had nothing
+  to name (fescue).
+
+- **Winged Foot — West (all 18)** — the quail-hollow "which CONFIGURATION is
+  this card" check at its sharpest, and the lesson is to run it before treating
+  a par mismatch as a bug. BlueGolf carries Winged Foot only as the members'
+  course (Blue, par 72 / 7426, four par 5s); the game ships par 70 with the 9th
+  and 16th converted, which is the 2006 U.S. Open setup and no tee set on the
+  club card. Score the shipped tuple against every candidate rather than
+  eyeballing: 2006 (par identical, 14 of 18 yardages dead-on, deviation 102)
+  beats the members' card (216, plus two par mismatches) and 2020 (which
+  converted the 5th, not the 9th). Par stays; four yardages move. Stroke index
+  has to come from the CLUB card — a USGA championship card publishes none —
+  and it moves on 17 of 18.
+  That split is also the shift diagnosis, and it is the cleanest instance of a
+  useful general rule: **when the card and the mapper disagree about which tee
+  a hole plays from, the per-hole trims are exactly the holes the championship
+  moved.** OSM's lengths track the members' Blue card to ~3 yd a hole (total
+  deviation 60 over 18), so the 9th comes off the front by 56 — the yardage
+  that turns a 572-yd par 5 into a 514-yd par 4 — and 3 and 17 by 32 and 18.
+  Identity is the shinnecock check at full strength: way/122734591 holds
+  exactly 18 hole ways carrying the club's West hole NAMES in card order, and
+  the East's 18 sit outside the polygon, so `map_to_area` separates them alone.
+  One hand-fix, the 12th's 4-yd `trees` cross at the tee (a chute, not a
+  carry). The crosses that survive are Tillinghast's actual cross bunkers.
+
+- **National Golf Links of America / The Country Club, Brookline (all 18
+  each)** — both pure geometry, both tuples already matching their cards on
+  par, stroke index and yardage for all 18. Between them they show the two ends
+  of the shift spectrum. NGLA is the cleanest import in the registry (fourteen
+  holes within 7 yd of the card raw); TCC has the largest shifts, going both
+  ways, off 72 mapped tee pads.
+  Two things worth copying. First, **TCC is the case for reading the card's own
+  per-tee overrides**: its 2nd imports 288 against a card of 220 and is trimmed
+  65, because from BLACK the hole plays 220 as a PAR 3 while every shorter set
+  plays ~288 as a par 4 — the geometry was right and the card was unusual.
+  Its 15th is trimmed 77 for the opposite reason: OSM and ProVisualizer both
+  traced the championship pad the 2022 U.S. Open used, and the club's BLACK
+  card is the configuration we ship.
+  Second, **NGLA's 16th is the doral "commit to one card" rule applied against
+  good evidence.** OSM (476) and ProVisualizer (474) agree the hole plays from
+  a new back tee that postdates the card's 415, and a published source confirms
+  the teeing ground was added. It is still trimmed to the card, because taking
+  it would mix a tee the other seventeen holes are not played from into an
+  otherwise coherent 6935 configuration.
+  Between them, five hand-fixes and four of the five are the same mode:
+  greenside rings rasterised as carries INTO the green they guard (ngla 6,
+  tcc 12, tcc 18) or a real carry whose `fairwayFrom` sat inside the water
+  (ngla 13, 14).
+
+- **Whispering Pines (Trinity, TX) — all 18, and the course that found the
+  ring-stitching bug.** Pure geometry (its tuple already matched the club's
+  Spirit card on par, SI and yardage for all 18), but the hardest IDENTITY in
+  the registry and the most instructive failure.
+  Identity first: nineteen clubs share this name, the bare `whisperingpines`
+  slug on BlueGolf belongs to one in **Alabama**, and OSM's polygon for the
+  Texas club carries no `name` tag at all — which is what `osmAreaId` was added
+  for. It is pinned instead by three hole ways whose par + handicap match the
+  Spirit card on a distinctive SI sequence, and by all 18 centrelines ending on
+  18 distinct greens. The 8th has no `ref` in OSM and is pinned by way id.
+  Then the lake, and **the wrong diagnosis is the part worth keeping.** Lake
+  Livingston appeared to enclose the whole property — every hole imported as
+  one full-width water `cross` tee to green — which reads exactly like a
+  badly-drawn outer ring, and was briefly "fixed" by dropping the relation with
+  `osmIgnore`. That also deleted the real water on six holes. The actual cause
+  was the rasteriser reading the relation's 26 outer member ways as 26 separate
+  rings (see the artifact catalog). **If a huge water polygon seems to cover a
+  course, count its member ways before blaming the mapper.**
+  Also worth copying: the RAKE check went the other way here. 12 of 81 bunkers
+  are under the 6-yd default, which is the muirfield/cabot condition and says
+  lower it — but the outcome check overruled the size check. 48 bunkers come
+  within 30 yd of a green, and rake 6 yields 33 greenside zones against rake
+  3's 32, while rake 3 merges the 10th's two-sided greenside complex into one
+  side. **Bunker width screens; greenside zones shipped decides.**
+  Six hand-fixes, and note the shape differs from the other four courses in
+  this batch: four crossings overrun the green they carry TO by 4-8 yd and are
+  CLIPPED to the green front rather than dropped, because unlike a greenside
+  ring rasterised as a carry these are the real thing — on 15 and 16 they are
+  the hole.
+
 ### Known gaps & importer artifact modes
 
 - **Coverage** — obscure courses may lack `golf=hole` centerlines, and many
@@ -344,6 +447,31 @@ find the polygon name for a new course, query Overpass for
     The tell is a hole coming through BARE that imagery says is not — and the
     profile (`--profile`) showing the bunkers reaching the corridor anyway,
     which is what separates this from a genuine ownership cull.
+  - *A multipolygon inflated to its own shoreline* (FIXED at source, in two
+    halves). First, only OUTER members were read, so the land an INNER ring
+    punches out of a feature counted as part of it. Second — and this is the
+    one that actually bites — each member way was treated as a complete ring,
+    when a multipolygon ring is routinely **split across several members** (six
+    of NGLA's arrive that way, 27 of Whispering Pines'). Point-in-polygon
+    closes whatever it is handed with an artificial last-to-first edge, so half
+    a lake becomes a lake bounded by a straight line through open water.
+    Whispering Pines sits on a peninsula inside "Lake Livingston"
+    (relation/976304), whose outer arrives as 26 fragments: read separately
+    they swallowed the whole property and all 18 holes imported as one
+    full-width water `cross` from tee to green. **The tell is a course that is
+    100% forced carry.** Stitched into the single ring it actually is, every
+    mid-hole point tests dry and the lake needs no special-casing.
+    Worth knowing because the wrong diagnosis is so plausible: this first
+    looked like a badly-drawn outer that genuinely enclosed the course, and was
+    briefly "fixed" by dropping the relation with `osmIgnore` — which also
+    deleted the real water on six holes. If a huge water polygon seems to cover
+    a course, count its member ways before blaming the mapper.
+  - *A polygon dropped before its holes are read*: the proximity filter that
+    decides whether a ring is near enough to matter scans boundary vertices.
+    For a hole played along an island or a peninsula, the water's edge beside
+    it IS an inner ring while the outer boundary can be miles out across the
+    lake, so scanning only the outer discarded the polygon and the hole came
+    through with no water. Inner boundaries count too.
   - *Broken lateral hazards*: a continuous lake/marsh shows gaps where the
     fairway widens past the 50-yd sample corridor. If imagery shows unbroken
     water, span it continuously — the gap rewards aggressive lines for the

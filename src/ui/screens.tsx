@@ -15,6 +15,7 @@ import { ChangeLog } from './ChangeLog'
 import { hasEarnedAwards, reconcileAchievements, type Unlock } from '../state/achievements'
 import { Wordmark } from './Wordmark'
 import { dismissSteals, pendingSteals, syncLedger, type StolenRecord } from '../lib/records'
+import { loadFavorites, toggleFavorite } from '../lib/favorites'
 import { loadGhost, type Ghost } from '../state/ghost'
 import { currentHandicap, formatHandicap } from '../state/stats'
 import { characterRecords, computeStreaks, loadArchive, type HistoryEntry, type RoundRecap, type RoundState } from '../state/store'
@@ -22,6 +23,11 @@ import { AccountPanel } from './AccountPanel'
 import { CharacterAvatar } from './Avatars'
 import { DailyBoardView, ScoreBoard } from './Leaderboard'
 import { PlayRatingChip } from './PlayRating'
+
+/** "Attainable record" = active-type record at this to-par OR WORSE (closer
+ * to par reads as beatable). Tunable — what counts as attainable is a design
+ * dial, not a law. */
+export const ATTAINABLE_RECORD_TO_PAR = -4
 
 export function HomeScreen(props: {
   history: HistoryEntry[]
@@ -48,6 +54,17 @@ export function HomeScreen(props: {
   const records = characterRecords(props.history)
   const [showCourses, setShowCourses] = useState(false)
   const [courseTab, setCourseTab] = useState<'courses' | 'par3'>('courses')
+  /** unlimited-list filters — combinable, all reading existing data: the
+   * archive for played/recent, Play Ratings for difficulty, the two record
+   * maps for the hunt. Record filters obey the season/all-time toggle. */
+  const [recType, setRecType] = useState<'season' | 'alltime'>('season')
+  const [playedFilter, setPlayedFilter] = useState<'all' | 'unplayed' | 'played'>('all')
+  const [ratingFilter, setRatingFilter] = useState<'any' | 'easy' | 'mid' | 'hard'>('any')
+  const [recordFilter, setRecordFilter] = useState<'any' | 'open' | 'attainable' | 'mine' | 'notmine'>('any')
+  const [favsOnly, setFavsOnly] = useState(false)
+  const [courseSort, setCourseSort] = useState<'tour' | 'easiest' | 'hardest' | 'beatable' | 'recent' | 'favorites'>('tour')
+  const [favs, setFavs] = useState<Set<string>>(() => loadFavorites())
+  const [filterSheet, setFilterSheet] = useState(false)
   const [courseRecs, setCourseRecs] = useState<Map<string, CourseRecord> | null>(null)
   const [seasonRecs, setSeasonRecs] = useState<Map<string, CourseRecord> | null>(null)
   /** which season the loaded seasonRecs belong to — a rollover while the
@@ -89,9 +106,14 @@ export function HomeScreen(props: {
   // the all-time board loads once when the browser opens — the wall of legends
   useEffect(() => {
     if (showCourses && backendEnabled && courseRecs === null) {
-      void fetchCourseRecords().then((r) => setCourseRecs(r ?? new Map()))
+      // a FAILED fetch stays null, same rule the season board follows: an
+      // empty map reads as "every record open — be the first", and 49 rows of
+      // that lie is exactly what a flaky connection must not produce. While
+      // null the rows say the records are still loading and the record
+      // filters stay disabled. Flipping the toggle retries (recType dep).
+      void fetchCourseRecords().then((r) => setCourseRecs(r))
     }
-  }, [showCourses, courseRecs])
+  }, [showCourses, courseRecs, recType])
 
   // the season board is the live race: fetched per season KEY, so any render
   // after a quarterly rollover swaps in the fresh board
@@ -130,6 +152,60 @@ export function HomeScreen(props: {
   const startPractice = stale ? () => window.location.reload() : props.onPractice
   // courses you've completed get their scorecard corner punched (the notch)
   const playedSlugs = new Set(loadArchive().map((r) => r.courseSlug))
+  // Jackson's bands: Easy 1-3 / Medium 4-7 / Hard 8-10
+  const RATING_BAND = { easy: [1, 3], mid: [4, 7], hard: [8, 10] } as const
+  const activeRecs = recType === 'season' ? seasonRecs : courseRecs
+  const recsReady = activeRecs !== null
+  const myName = loadPlayer()?.name ?? null
+  // recent sort reads the archive once per open, not per row: last playedAt
+  // per slug. The archive prunes, so "recent" means what it remembers — the
+  // same source and the same honesty as the played notch itself.
+  const lastPlayed = new Map<string, number>()
+  for (const r of loadArchive()) lastPlayed.set(r.courseSlug, Math.max(lastPlayed.get(r.courseSlug) ?? 0, r.playedAt))
+  const activeFilterCount =
+    (playedFilter !== 'all' ? 1 : 0) + (ratingFilter !== 'any' ? 1 : 0) + (recordFilter !== 'any' ? 1 : 0) + (favsOnly ? 1 : 0)
+  const filtersActive = activeFilterCount > 0 || courseSort !== 'tour'
+  // guest courses browse (and filter, and sort) like everything else — one pool
+  const browsable = [...COURSES, ...GUEST_COURSES]
+  const visibleCourses = browsable.filter((c) => {
+    if (favsOnly && !favs.has(c.slug)) return false
+    if (playedFilter === 'unplayed' && playedSlugs.has(c.slug)) return false
+    if (playedFilter === 'played' && !playedSlugs.has(c.slug)) return false
+    if (ratingFilter !== 'any') {
+      const [lo, hi] = RATING_BAND[ratingFilter]
+      const r = playRatingFor(c.slug)
+      if (r < lo || r > hi) return false
+    }
+    if (recordFilter !== 'any' && recsReady) {
+      const rec = activeRecs.get(c.slug)
+      if (recordFilter === 'open' && rec) return false
+      if (recordFilter === 'attainable' && (!rec || rec.to_par < ATTAINABLE_RECORD_TO_PAR)) return false
+      if (recordFilter === 'mine' && !(rec && myName && rec.player_name === myName)) return false
+      if (recordFilter === 'notmine' && rec && myName && rec.player_name === myName) return false
+    }
+    return true
+  }).sort((a, b) => {
+    if (courseSort === 'easiest') return playRatingFor(a.slug) - playRatingFor(b.slug)
+    if (courseSort === 'hardest') return playRatingFor(b.slug) - playRatingFor(a.slug)
+    if (courseSort === 'recent') return (lastPlayed.get(b.slug) ?? 0) - (lastPlayed.get(a.slug) ?? 0)
+    // starred courses first, tour order within each group — the shortlist
+    // floats to the top without needing the filter sheet at all
+    if (courseSort === 'favorites') return Number(favs.has(b.slug)) - Number(favs.has(a.slug))
+    if (courseSort === 'beatable') {
+      // weakest active record first — open records are the weakest of all
+      const va = activeRecs?.get(a.slug)?.to_par ?? 99
+      const vb = activeRecs?.get(b.slug)?.to_par ?? 99
+      return vb - va
+    }
+    return 0
+  })
+  const resetFilters = () => {
+    setPlayedFilter('all')
+    setRatingFilter('any')
+    setRecordFilter('any')
+    setFavsOnly(false)
+    setCourseSort('tour')
+  }
   return (
     <div className="screen home">
       {/* The masthead is one lockup: the kicker and the tagline sit IN the
@@ -290,36 +366,181 @@ export function HomeScreen(props: {
               ⏳ {season.name} ends in {seasonCountdown(season)} — season records are up for grabs
             </p>
           )}
-          {courseTab === 'courses' &&
-            [...COURSES, ...GUEST_COURSES].map((c) => {
-              const sr = seasonRecs?.get(c.slug)
-              const at = courseRecs?.get(c.slug)
-              return (
-                <button
-                  key={c.slug}
-                  className={`course-row${playedSlugs.has(c.slug) ? ' notched' : ''}`}
-                  onClick={() => startPractice(c.slug)}
-                >
-                  <b>{c.name}</b>
-                  <span>
-                    {c.location} · Play Rating {playRatingFor(c.slug)}/10
-                  </span>
-                  {seasonRecs &&
-                    (sr ? (
-                      <em className="course-cr">
-                        Season {toParLabel(sr.to_par)} · {characterById(sr.character ?? undefined)?.emoji ?? ''}{' '}
-                        {sr.player_name}
-                      </em>
-                    ) : (
-                      <em className="course-cr open">Season record open — be the first</em>
-                    ))}
-                  {at && (
-                    <em className="course-cr alltime">
-                      All-time {toParLabel(at.to_par)} · {characterById(at.character ?? undefined)?.emoji ?? ''}{' '}
-                      {at.player_name}
-                    </em>
-                  )}
+          {courseTab === 'courses' && (
+            <div className="course-filters">
+              {/* one slim row; the full controls live in the sheet below */}
+              <div className="filter-bar">
+                <div className="rec-toggle" role="group" aria-label="Record type">
+                  <button className={`rec-toggle-btn${recType === 'season' ? ' on' : ''}`} onClick={() => setRecType('season')}>
+                    View Season Records
+                  </button>
+                  <button className={`rec-toggle-btn${recType === 'alltime' ? ' on' : ''}`} onClick={() => setRecType('alltime')}>
+                    View All-Time Records
+                  </button>
+                </div>
+                <div className="filter-bar-actions">
+                  <button className={`filter-chip${activeFilterCount > 0 ? ' on' : ''}`} onClick={() => setFilterSheet(true)}>
+                    ☰ Filters{activeFilterCount > 0 ? ` · ${activeFilterCount}` : ''}
+                  </button>
+                  <button
+                    className="filter-chip sort"
+                    onClick={() =>
+                      setCourseSort(
+                        courseSort === 'tour'
+                          ? 'easiest'
+                          : courseSort === 'easiest'
+                            ? 'hardest'
+                            : courseSort === 'hardest'
+                              ? 'beatable'
+                              : courseSort === 'beatable'
+                                ? 'recent'
+                                : courseSort === 'recent'
+                                  ? 'favorites'
+                                  : 'tour',
+                      )
+                    }
+                    aria-label="Change sort order"
+                  >
+                    ⇅ Sort:{' '}
+                    {courseSort === 'tour'
+                      ? 'Tour'
+                      : courseSort === 'easiest'
+                        ? 'Easiest'
+                        : courseSort === 'hardest'
+                          ? 'Hardest'
+                          : courseSort === 'beatable'
+                            ? 'Beatable'
+                            : courseSort === 'recent'
+                              ? 'Recent'
+                              : '★ Favorites'}
+                  </button>
+                </div>
+              </div>
+              {visibleCourses.length !== browsable.length && (
+                <p className="fine filter-count">
+                  {visibleCourses.length} of {browsable.length} courses
+                </p>
+              )}
+            </div>
+          )}
+          {filterSheet && (
+            <div className="tut-backdrop filter-sheet-backdrop" role="dialog" aria-modal="true" aria-label="Course filters" onClick={() => setFilterSheet(false)}>
+              <div className="tut-card filter-sheet" onClick={(e) => e.stopPropagation()}>
+                <button className="tut-skip" onClick={() => setFilterSheet(false)} aria-label="Close">
+                  Done
                 </button>
+                <div className="kicker">Filter courses</div>
+                <div className="filter-group">
+                  <span className="filter-label">Played</span>
+                  <div className="filter-row" role="group" aria-label="Filter by played">
+                    {(['all', 'unplayed', 'played'] as const).map((f) => (
+                      <button key={f} className={`filter-chip${playedFilter === f ? ' on' : ''}`} onClick={() => setPlayedFilter(f)}>
+                        {f === 'all' ? 'All' : f === 'unplayed' ? 'Never played' : 'Played ▸'}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="filter-group">
+                  <span className="filter-label">Difficulty</span>
+                  <div className="filter-row" role="group" aria-label="Filter by difficulty">
+                    {(['any', 'easy', 'mid', 'hard'] as const).map((f) => (
+                      <button key={f} className={`filter-chip${ratingFilter === f ? ' on' : ''}`} onClick={() => setRatingFilter(f)}>
+                        {f === 'any' ? 'Any' : f === 'easy' ? 'Easy 1–3' : f === 'mid' ? 'Medium 4–7' : 'Hard 8–10'}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="filter-group">
+                  <span className="filter-label">{recType === 'season' ? 'Season record' : 'All-time record'}</span>
+                  <div className="filter-row" role="group" aria-label="Filter by record">
+                    {(['any', 'open', 'attainable', 'mine', 'notmine'] as const).map((f) => (
+                      <button
+                        key={f}
+                        className={`filter-chip${recordFilter === f ? ' on' : ''}`}
+                        disabled={f !== 'any' && !recsReady}
+                        title={f !== 'any' && !recsReady ? 'Records still loading' : undefined}
+                        onClick={() => setRecordFilter(f)}
+                      >
+                        {f === 'any'
+                          ? 'Any'
+                          : f === 'open'
+                            ? 'Open'
+                            : f === 'attainable'
+                              ? `Attainable (${ATTAINABLE_RECORD_TO_PAR} or worse)`
+                              : f === 'mine'
+                                ? 'I hold it'
+                                : "I don't hold it"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="filter-group">
+                  <span className="filter-label">Favorites</span>
+                  <div className="filter-row">
+                    <button className={`filter-chip fav${favsOnly ? ' on' : ''}`} onClick={() => setFavsOnly(!favsOnly)}>
+                      ★ Favorites only{favs.size > 0 ? ` · ${favs.size}` : ''}
+                    </button>
+                  </div>
+                </div>
+                <div className="filter-foot">
+                  {filtersActive && (
+                    <button className="filter-reset" onClick={resetFilters}>
+                      Reset filters
+                    </button>
+                  )}
+                  <button className="cta filter-apply" onClick={() => setFilterSheet(false)}>
+                    Show {visibleCourses.length} course{visibleCourses.length === 1 ? '' : 's'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+          {courseTab === 'courses' && visibleCourses.length === 0 && (
+            <div className="filter-empty">
+              <p className="fine">No courses match.</p>
+              <button className="filter-reset" onClick={resetFilters}>
+                Reset filters
+              </button>
+            </div>
+          )}
+          {courseTab === 'courses' &&
+            visibleCourses.map((c) => {
+              // the row shows the ACTIVE record type only, labeled, so nobody
+              // misreads which record they're hunting — the toggle above flips it
+              const rec = activeRecs?.get(c.slug)
+              const mine = Boolean(rec && myName && rec.player_name === myName)
+              const recLabel = recType === 'season' ? 'Season' : 'All-time'
+              return (
+                <div key={c.slug} className="course-row-wrap">
+                  <button
+                    className={`course-row${playedSlugs.has(c.slug) ? ' notched' : ''}`}
+                    onClick={() => startPractice(c.slug)}
+                  >
+                    <b>{c.name}</b>
+                    <span>
+                      {c.location} · Play Rating {playRatingFor(c.slug)}/10
+                    </span>
+                    {!recsReady && <em className="course-cr loading">{recLabel} records loading…</em>}
+                    {recsReady &&
+                      (rec ? (
+                        <em className={`course-cr${recType === 'alltime' ? ' alltime' : ''}`}>
+                          {recLabel} {toParLabel(rec.to_par)} · {characterById(rec.character ?? undefined)?.emoji ?? ''}{' '}
+                          {rec.player_name}
+                          {mine && <i className="course-cr-you">YOU</i>}
+                        </em>
+                      ) : (
+                        <em className="course-cr open">{recLabel} record open — be the first</em>
+                      ))}
+                  </button>
+                  <button
+                    className={`course-fav${favs.has(c.slug) ? ' on' : ''}`}
+                    aria-label={favs.has(c.slug) ? `Unfavorite ${c.name}` : `Favorite ${c.name}`}
+                    aria-pressed={favs.has(c.slug)}
+                    onClick={() => setFavs(new Set(toggleFavorite(c.slug)))}
+                  >
+                    {favs.has(c.slug) ? '★' : '☆'}
+                  </button>
+                </div>
               )
             })}
           {courseTab === 'par3' &&

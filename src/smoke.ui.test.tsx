@@ -205,6 +205,47 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
     expect(localStorage.getItem('dogleg:tutorial:v1')).toBeNull()
   })
 
+  it('unlimited course filters live in a sheet: combine, reset, favorite, toggle', () => {
+    localStorage.setItem('dogleg:tutorial:v1', 'done')
+    render(<App />)
+    fireEvent.click(screen.getByText(/Play unlimited/))
+
+    // the slim bar: toggle + Filters + sort — the chips live in the sheet
+    fireEvent.click(screen.getByText(/☰ Filters/))
+    const apply = () => screen.getByText(/^Show \d+ courses?$/) as HTMLButtonElement
+    const total = Number(apply().textContent!.match(/\d+/)![0])
+
+    fireEvent.click(screen.getByText('Hard 8–10'))
+    const hard = Number(apply().textContent!.match(/\d+/)![0])
+    expect(hard).toBeLessThan(total)
+
+    // record filters are DISABLED until records load (backend off in tests —
+    // they must not pretend to filter on data they don't have)
+    expect((screen.getByText('Open') as HTMLButtonElement).disabled).toBe(true)
+    expect((screen.getByText('I hold it') as HTMLButtonElement).disabled).toBe(true)
+
+    // reset lives in the sheet and restores the world
+    fireEvent.click(screen.getByText('Reset filters'))
+    expect(Number(apply().textContent!.match(/\d+/)![0])).toBe(total)
+
+    // apply closes the sheet; the bar badge reflects active filters
+    fireEvent.click(screen.getByText('Never played'))
+    fireEvent.click(apply())
+    expect(screen.queryByText('Filter courses')).toBeNull()
+    expect(screen.getByText(/☰ Filters · 1/)).toBeTruthy()
+
+    // favorite from the row (outside the sheet), and it persists
+    fireEvent.click(screen.getAllByRole('button', { name: /^Favorite / })[0])
+    expect(JSON.parse(localStorage.getItem('dogleg:favorites:v1')!).slugs.length).toBe(1)
+
+    // the season/all-time toggle sits on the bar and defaults to season
+    expect(screen.getByText('View Season Records').className).toContain(' on')
+    fireEvent.click(screen.getByText('View All-Time Records'))
+    expect(screen.getByText('View All-Time Records').className).toContain(' on')
+    // with records unfetched (backend off), rows say so instead of lying
+    expect(screen.getAllByText(/records loading…/).length).toBeGreaterThan(0)
+  })
+
   it('the season splash shows once after a rollover, explains the goal, then never again', () => {
     localStorage.removeItem('dogleg:season-ack:v1')
     const first = render(<App />)

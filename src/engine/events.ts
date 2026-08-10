@@ -81,8 +81,8 @@ export function paysPoints(e: CupEvent): boolean {
 export const DOGLEG_CUP: CupEvent[] = [
   // ---- the two exhibition launch weeks: prove the format, grow the field ----
   // Bellerive runs alongside the real playoffs' St. Louis week. Its course
-  // needs importing before Aug 20 — the entry flips to 'confirmed' with it.
-  { key: 'bellerive-2026', name: 'DogLeg Cup at Bellerive', courseSlug: 'bellerive', start: '2026-08-20', exhibition: true, status: 'placeholder' },
+  // landed 2026-08-10 (a guest, like every Cup-only venue).
+  { key: 'bellerive-2026', name: 'DogLeg Cup at Bellerive', courseSlug: 'bellerive', start: '2026-08-20', exhibition: true, status: 'confirmed' },
   // THE DOGLEG CUP CHAMPIONSHIP — the game's own course, the flagship,
   // yearly on this week. The course ships with this entry (a guest course:
   // playable ONLY when the Championship is on).

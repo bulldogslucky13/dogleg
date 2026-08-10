@@ -79,6 +79,7 @@ export const PLAY_RATINGS: Record<string, number> = {
   'the-swing': 1,
   'palm-beach-par-3': 8,
   'kings-creek': 4,
+  'bellerive': 5,
   'the-dogleg': 8,
 }
 
@@ -137,5 +138,6 @@ export const PLAY_INDEX: Record<string, number> = {
   'the-swing': -1.090,
   'palm-beach-par-3': 2.187,
   'kings-creek': 0.526,
+  'bellerive': 0.749,
   'the-dogleg': 1.874,
 }

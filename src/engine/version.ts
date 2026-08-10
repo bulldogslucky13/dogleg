@@ -307,4 +307,8 @@
 // 0.0469 -> 0.0191. No threshold was moved.
 // Play Ratings regenerated LAST, after every odds change: 22 of 53 courses
 // shift, every one by exactly one point (16 down, 6 up).
-export const ENGINE_VERSION = 18
+// v19 — Bellerive Country Club imported (OSM_GEOMETRY 'bellerive:*', all 18
+// holes, BlueGolf BLACK card): real geometry for the DogLeg Cup's opening
+// exhibition venue changes what its seeds replay into. Per-course work, so no
+// changelog entry (see changelog.ts's note).
+export const ENGINE_VERSION = 19

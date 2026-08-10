@@ -141,6 +141,15 @@ type CourseGeo = {
 }
 
 const COURSE_GEO: Record<string, CourseGeo> = {
+  // Bellerive CC, Creve Coeur MO (OSM way 617944761) — DogLeg Cup opening
+  // exhibition venue. Single course on the property, one clean polygon, 18
+  // unnamed golf=hole ways with plain ref=1..18, so no osmHolePrefix. Name is
+  // anchored against the club's ORIGINAL Normandy MO site and Bellerive GC in
+  // Tasmania — neither shares the polygon name, but the anchor costs nothing.
+  // OSM's par tags match BlueGolf's BLACK card (par 72 / 7506, 76.5/146) on
+  // all 18; its handicap tags match on 16 of 18 (OSM swaps 12 and 17's 4/6 —
+  // the card wins, OSM corroborates, never arbitrates).
+  bellerive: { name: 'Bellerive Country Club', center: [38.6629, -90.4843], radius: 1600, osmName: '^Bellerive Country Club$', engineSlug: 'bellerive' },
   // King's Creek CC, Kemp TX (OSM way 386836594). NAME-COLLISION WARNING:
   // a second "Kings Creek Country Club" exists in Rehoboth Beach, Delaware —
   // never import that one's geography under this slug. The Texas club is

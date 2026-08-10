@@ -1767,6 +1767,46 @@ export const GUEST_COURSES: CourseSpec[] = [
     ]),
   },
   {
+    // Bellerive CC — the DogLeg Cup's opening exhibition venue (Aug 20 2026,
+    // events.ts 'bellerive-2026'). A guest like Kings Creek: never in the
+    // daily rotation or the practice browser. BlueGolf BLACK card: par 72
+    // (36/36), 7506 yds, 76.5/146; SI is the card's HCP row (OSM's own
+    // handicap tags corroborate 16 of 18). Geometry: OSM_GEOMETRY
+    // 'bellerive:*' — see its block note for the tee-pad shifts and the
+    // hand-laid Smith Creek water.
+    slug: 'bellerive',
+    name: 'Bellerive Country Club',
+    location: 'St. Louis, Missouri',
+    difficulty: 8,
+    greens: 'Fast',
+    wind: 10,
+    blurb: 'The Green Monster of Ladue. Robert Trent Jones built everything big — the greens, the sand, and the creek that owns the closing stretch.',
+    // No wood polygons reached any corridor, so the junk floor needs the
+    // course's own word (rough.test.ts). The misses here die under the old
+    // oaks that line every fairway — unmapped, but very much there.
+    junkLabel: 'oaks',
+    holes: holes([
+      [4, 436, 7, 'L', 'sand'],
+      [4, 427, 13, 'L', 'water'],
+      [3, 168, 17, 'S', 'water', 'All carry — the pond swallows everything short and right'],
+      [5, 562, 9, 'L', 'water'],
+      [4, 489, 3, 'S', 'water'],
+      [3, 215, 11, 'S', 'water'],
+      [4, 395, 15, 'L', 'sand'],
+      [5, 612, 1, 'L', 'water', 'The creek stalks the right of the layup on the hardest hole on the card'],
+      [4, 438, 5, 'L', 'sand'],
+      [5, 515, 10, 'L', 'water', 'The creek crosses sixty short of the green — lay back or fly it'],
+      [4, 361, 14, 'S', 'water'],
+      [4, 468, 4, 'L', 'sand'],
+      [3, 187, 18, 'S', 'sand'],
+      [4, 417, 12, 'L', 'sand'],
+      [4, 495, 2, 'R', 'sand'],
+      [3, 237, 16, 'S', 'sand'],
+      [5, 624, 6, 'R', 'water', 'The creek crosses the layup twice — thread it, carry it, or lay well back'],
+      [4, 460, 8, 'L', 'sand'],
+    ]),
+  },
+  {
     // THE DOGLEG — the game's own course, host of the DogLeg Cup Championship
     // every year. A guest on purpose: it never enters the daily rotation, and
     // it isn't in the practice browser — the only week you can play the

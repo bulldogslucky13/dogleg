@@ -79,7 +79,7 @@ export const PLAY_RATINGS: Record<string, number> = {
   'the-swing': 1,
   'palm-beach-par-3': 8,
   'kings-creek': 4,
-  'the-dogleg': 5,
+  'the-dogleg': 8,
 }
 
 /** avg score-to-par measured per course, kept for the methodology disclaimer. */
@@ -137,5 +137,5 @@ export const PLAY_INDEX: Record<string, number> = {
   'the-swing': -1.090,
   'palm-beach-par-3': 2.187,
   'kings-creek': 0.526,
-  'the-dogleg': 0.653,
+  'the-dogleg': 1.874,
 }

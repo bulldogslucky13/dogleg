@@ -65,8 +65,11 @@ class SandboxDateClass extends RealDate {
 
 // everything below imports AFTER the clock is shimmed
 const { localDateKey } = await import('./engine/daily')
-const { activeEvent, dayOfEvent, eventForKey } = await import('./engine/events')
-const { replayRound } = await import('./engine/replay')
+const { activeEvent, dayOfEvent, eventDateKeys, eventForKey, majorSeedBase } = await import('./engine/events')
+const { replayRound, setupFromSeed } = await import('./engine/replay')
+const { buildLayout } = await import('./engine/layout')
+const { rngFromString } = await import('./engine/rng')
+const { playShot, startHole } = await import('./engine/resolve')
 const { SUPABASE_URL } = await import('./lib/backend')
 const { recordWon } = await import('./lib/records')
 const { recordPostedCupRound } = await import('./lib/cup')
@@ -77,61 +80,126 @@ const store = await import('./state/store')
 // ---------------------------------------------------------------------------
 
 const FIELD = ['Rob', 'Jack Bow', 'Mike', 'Andres', 'Him Nantz', 'Tigers driver', 'KMAN', 'Mshea55', 'T dawg', 'WGT']
-const CHARS = ['fairway', 'dart', 'greens', null] as const
+const CHARS = ['fairway', 'dart', 'greens', undefined] as const
 
-/** deterministic pseudo-random per (name, n) so boards are stable across reloads */
-function jitter(name: string, n: number, span: number): number {
-  let h = 2166136261
-  for (const c of `${name}:${n}`) h = ((h ^ c.charCodeAt(0)) * 16777619) >>> 0
-  return (h % (span * 2 + 1)) - span
+/**
+ * Every demo row is a REAL round: dealt from a real major seed (the player's
+ * name as salt) and played by the engine with a normal policy — so scores,
+ * per-hole results, and seed+decisions all agree, and "watch this round" on
+ * the podium replays actual golf. Cached per event; ~40 engine rounds cost
+ * a couple hundred milliseconds, once.
+ */
+interface DemoRow {
+  event_key: string
+  day: number
+  player_id: string
+  player_name: string
+  character?: (typeof CHARS)[number]
+  to_par: number
+  strokes: number
+  results: unknown[]
+  seed: string
+  decisions: string[][]
 }
 
-function demoEventRows(eventKey: string): unknown[] {
+const eventRowsCache = new Map<string, DemoRow[]>()
+
+function playDemoRound(seed: string, character?: (typeof CHARS)[number]): Omit<DemoRow, 'event_key' | 'day' | 'player_id' | 'player_name' | 'character'> | null {
+  const info = setupFromSeed(seed)
+  if (!info) return null
+  const rng = rngFromString(seed)
+  const decisions: string[][] = []
+  let strokes = 0
+  let par = 0
+  for (const spec of info.course.holes) {
+    const layout = buildLayout(info.course.slug, spec, info.cond)
+    const h = startHole(layout, info.cond, character ?? undefined)
+    const hole: string[] = []
+    let guard = 0
+    while (h.stage !== 'done' && guard++ < 25) {
+      playShot(h, 'normal', rng)
+      hole.push('normal')
+    }
+    decisions.push(hole)
+    strokes += h.score!.strokes
+    par += spec.par
+  }
+  const outcome = replayRound(seed, character ?? undefined, decisions as never)
+  if (!outcome.ok) return null
+  return { to_par: outcome.toPar, strokes: outcome.strokes, results: outcome.results, seed, decisions }
+}
+
+/** this device's own posted rounds — merged into every board fetch, so the
+ * sandbox behaves like prod: post a round, see your row */
+const MY_ROWS_KEY = 'sandbox:my-event-rows'
+
+function myEventRows(): DemoRow[] {
+  try {
+    const raw = localStorage.getItem(MY_ROWS_KEY)
+    return raw ? (JSON.parse(raw) as DemoRow[]) : []
+  } catch {
+    return []
+  }
+}
+
+function pushMyEventRow(row: DemoRow): void {
+  try {
+    const rows = myEventRows()
+    if (!rows.some((r) => r.event_key === row.event_key && r.day === row.day)) {
+      rows.push(row)
+      localStorage.setItem(MY_ROWS_KEY, JSON.stringify(rows))
+    }
+  } catch {
+    /* private mode */
+  }
+}
+
+function demoEventRows(eventKey: string): DemoRow[] {
   const event = eventForKey(eventKey)
   if (!event) return []
+  const cached = eventRowsCache.get(eventKey)
+  if (cached) return [...cached, ...myEventRows().filter((r) => r.event_key === eventKey)]
   const today = localDateKey()
   const liveDay = dayOfEvent(event, today)
   // days fully in the books, plus a partial field for the live day
   const doneDays = liveDay ? liveDay - 1 : today > event.start ? 4 : 0
-  const rows: unknown[] = []
+  const rows: DemoRow[] = []
+  const dateKeys = eventDateKeys(event)
   FIELD.forEach((name, i) => {
     // a couple of players skip days — the "N of 3" grey rows need showing
     const skips = new Set(i % 4 === 1 ? [2] : i % 4 === 3 ? [1, 3] : [])
-    for (let day = 1; day <= doneDays; day++) {
+    const salt = name.toLowerCase().replace(/[^a-z0-9]/g, '')
+    const days = [...Array(doneDays).keys()].map((d) => d + 1)
+    if (liveDay && i % 2 === 0) days.push(liveDay) // half the field is in early
+    for (const day of days) {
       if (skips.has(day)) continue
-      const toPar = Math.max(-6, Math.min(9, jitter(name, day, 4) + (day >= 3 ? 1 : 0)))
+      const played = playDemoRound(`${majorSeedBase(event, dateKeys[day - 1])}:${salt}${day}`, CHARS[i % CHARS.length])
+      if (!played) continue
       rows.push({
         event_key: eventKey,
         day,
         player_id: `demo-${name}`,
         player_name: name,
         character: CHARS[i % CHARS.length],
-        to_par: toPar,
-        strokes: 72 + toPar,
-        results: [],
-      })
-    }
-    // the live day: roughly half the field has already posted
-    if (liveDay && i % 2 === 0 && !skips.has(liveDay)) {
-      const toPar = Math.max(-5, Math.min(9, jitter(name, liveDay * 7, 4) + (liveDay >= 3 ? 1 : 0)))
-      rows.push({
-        event_key: eventKey,
-        day: liveDay,
-        player_id: `demo-${name}`,
-        player_name: name,
-        character: CHARS[i % CHARS.length],
-        to_par: toPar,
-        strokes: 72 + toPar,
-        results: [],
+        ...played,
       })
     }
   })
-  return rows
+  eventRowsCache.set(eventKey, rows)
+  return [...rows, ...myEventRows().filter((r) => r.event_key === eventKey)]
+}
+
+/** deterministic pseudo-random per (name, n) — the daily board needs numbers,
+ * not replayable rounds */
+function jitter(name: string, n: number, span: number): number {
+  let h = 2166136261
+  for (const c of `${name}:${n}`) h = ((h ^ c.charCodeAt(0)) * 16777619) >>> 0
+  return (h % (span * 2 + 1)) - span
 }
 
 function demoDailyBoard(): unknown[] {
   return FIELD.slice(0, 8)
-    .map((name, i) => ({ player_name: name, character: CHARS[i % CHARS.length], to_par: jitter(name, 99, 4) }))
+    .map((name, i) => ({ player_name: name, character: CHARS[i % CHARS.length] ?? null, to_par: jitter(name, 99, 4) }))
     .sort((a, b) => (a.to_par as number) - (b.to_par as number))
 }
 
@@ -163,8 +231,23 @@ function localReferee(body: {
   submitted.add(body.seed)
   const player = { id: 'sandbox-jackson-id', name: 'Jackson' }
   if (info.mode === 'major') {
-    const field = demoEventRows(info.eventKey!) as { day: number; to_par: number }[]
-    const todays = field.filter((r) => r.day === info.eventDay)
+    // the row lands on the board exactly like prod — my line shows up
+    if (!duplicate) {
+      pushMyEventRow({
+        event_key: info.eventKey!,
+        day: info.eventDay!,
+        player_id: player.id,
+        player_name: player.name,
+        character: body.character,
+        to_par: replay.toPar,
+        strokes: replay.strokes,
+        results: replay.results,
+        seed: body.seed,
+        decisions: body.decisions,
+      })
+    }
+    const field = demoEventRows(info.eventKey!)
+    const todays = field.filter((r) => r.day === info.eventDay && r.player_name !== player.name)
     const better = todays.filter((r) => r.to_par < replay.toPar).length
     return json({
       mode: 'major',
@@ -261,7 +344,7 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Res
 // 3. THE PROFILE — seeded once, through the real store
 // ---------------------------------------------------------------------------
 
-const SEEDED_KEY = 'sandbox:seeded:v2'
+const SEEDED_KEY = 'sandbox:seeded:v3'
 
 function dateKeyDaysAgo(n: number): string {
   const d = new Date()
@@ -332,6 +415,27 @@ async function seedProfile(): Promise<void> {
   // has it at -6 now. The Teebox steal card lights up on first sync.
   recordWon('pebble-beach', -4, Date.now() - 5 * 86_400_000)
   recordWon('harbour-town', -3, Date.now() - 3 * 86_400_000) // still held — Name on the Wall
+
+  // one trophy already in the room: the Bellerive exhibition, won — so the
+  // Clubhouse Trophy Room has hardware to show before this week ends.
+  // Additive: never clobber trophies the podium ceremony has engraved.
+  if (!localStorage.getItem('dogleg:cup-trophies:v1'))
+  localStorage.setItem(
+    'dogleg:cup-trophies:v1',
+    JSON.stringify([
+      {
+        eventKey: 'bellerive-2026',
+        eventName: 'DogLeg Cup at Bellerive',
+        courseSlug: 'bellerive',
+        major: false,
+        exhibition: true,
+        rank: 1,
+        total: -5,
+        rounds: [-3, 1, -2, 0],
+        at: Date.now() - 5 * 86_400_000,
+      },
+    ]),
+  )
 
   localStorage.setItem(SEEDED_KEY, 'done')
 }

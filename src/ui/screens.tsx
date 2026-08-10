@@ -3,6 +3,7 @@ import { characterById, playableCharacters } from '../engine/characters'
 import { courseBySlug, COURSES, GUEST_COURSES, PAR3_COURSES, playRatingFor } from '../engine/courses'
 import { dailySetup, forecastSetup, RESULT_LABEL, RESULT_SQUARE, shareText, SITE_URL, toParLabel, type DailySetup } from '../engine/daily'
 import { cupShareText, type CupEvent } from '../engine/events'
+import { eventStandings, fetchEventScores } from '../lib/cup'
 import { gradeCopy, type RoundGrade } from '../engine/grade'
 import { decisionsFromScores, encodeReplay } from '../engine/replay'
 import { CupHomeCard } from './CupBoard'
@@ -761,8 +762,35 @@ export function ResultScreen(props: {
   const streaks = computeStreaks(props.history)
   const broke = toPar < 0
   const char = characterById(props.character)
+  // the Cup share card carries the tournament line too: my counted total so
+  // far, with TODAY's round folded in locally so the line is right even
+  // while the board fetch races the post
+  const [cupStanding, setCupStanding] = useState<{ total: number; played: number; rank?: number } | null>(null)
+  useEffect(() => {
+    if (!props.cup) return
+    let live = true
+    void fetchEventScores(props.cup.event.key).then((rows) => {
+      if (!live) return
+      const mine = loadPlayer()?.name?.toLowerCase()
+      const myRows = (rows ?? []).filter((r) => !!mine && r.player_name.toLowerCase() === mine)
+      const days = new Map(myRows.map((r) => [r.day, r.to_par]))
+      if (!days.has(props.cup!.day)) days.set(props.cup!.day, toPar)
+      const posted = [...days.values()].sort((a, b) => a - b)
+      const me = rows ? eventStandings(rows).find((s) => !!mine && s.name.toLowerCase() === mine) : undefined
+      setCupStanding({
+        total: posted.slice(0, 3).reduce((s, v) => s + v, 0),
+        played: posted.length,
+        rank: me?.eligible ? me.rank : undefined,
+      })
+    })
+    return () => {
+      live = false
+    }
+    // one fetch per event/day — toPar is fixed for a finished round
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [props.cup?.event.key, props.cup?.day])
   const text = props.cup
-    ? cupShareText(props.cup.event, props.cup.day, results, toPar, props.character)
+    ? cupShareText(props.cup.event, props.cup.day, results, toPar, props.character, cupStanding ?? undefined)
     : shareText(props.setup, results, toPar, props.character, streaks.dayStreak)
   // a replay link IS the round: seed + decisions, re-run by the viewer's engine
   const replayUrl = (() => {

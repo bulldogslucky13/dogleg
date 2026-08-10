@@ -286,28 +286,25 @@ export function ScoreBoard(props: {
     )
   }
 
-  // a Cup round: post it, say where it landed in today's field, and show the
-  // event's best-3-of-4 board. No record banners here — Cup rounds don't
-  // contend for course records (deliberate; see submit-round).
+  // a Cup round: post it, note where the ROUND landed as a footnote, and give
+  // the stage to the TOURNAMENT standings — the number that actually matters
+  // is your best-3-of-4, not today's mini-board. One block, one kicker. No
+  // record banners: Cup rounds don't contend for course records (deliberate).
   if (round.mode === 'major') {
     const parsed = /^major:([a-z0-9-]+):(\d{4}-\d{2}-\d{2}):/.exec(round.seed)
     const event = parsed ? eventForKey(parsed[1]) : null
     const day = event && parsed ? dayOfEvent(event, parsed[2]) : null
-    return (
-      <div className="board-block">
-        <div className="kicker">
-          {event?.name ?? 'DogLeg Cup'}
-          {day ? ` · Round ${day}` : ''}
-        </div>
+    const status = (
+      <>
         {player && busy && (
           <p className="fine">
             <Spinner />
             Posting your round…
           </p>
         )}
-        {result?.rank && (
+        {result?.rank && day && (
           <p className="board-rank">
-            You're <b>{ordinal(result.rank)}</b> of {result.total} in today's round so far
+            Round {day}: <b>{toParLabel(roundToPar(round))}</b> · {ordinal(result.rank)} of {result.total} today
           </p>
         )}
         {result?.duplicate && <p className="fine">Today's round was already on the card — the first one stands.</p>}
@@ -318,8 +315,16 @@ export function ScoreBoard(props: {
           </>
         )}
         {error && <p className="fine board-error">{error}</p>}
-        {event && <CupEventBoard event={event} />}
-      </div>
+      </>
+    )
+    if (!event) return <div className="board-block cup-board">{status}</div>
+    return (
+      <CupEventBoard
+        event={event}
+        title={`${event.name} · Tournament standings`}
+        head={status}
+        refreshKey={result ? 1 : 0}
+      />
     )
   }
 

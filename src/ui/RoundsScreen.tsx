@@ -17,6 +17,8 @@ import {
   type LoggedRound,
 } from '../state/stats'
 import { lifetimeRounds, loadArchive, type ArchivedRound, type HistoryEntry } from '../state/store'
+import { eventDateKeys, eventForKey } from '../engine/events'
+import { loadCupTrophies } from '../lib/cup'
 import { pastSeasons, roundsInSeason, seasonAwards, type SeasonAward } from '../state/seasonStore'
 import { loadLedger, syncLedger } from '../lib/records'
 import { hasEarnedAwards, reconcileAchievements } from '../state/achievements'
@@ -182,7 +184,8 @@ export function RoundsScreen(props: {
         </b>
         <span>
           {context ? `${context} · ` : ''}
-          {shortDate(r.dateKey)} · {r.mode === 'daily' ? 'Daily' : 'Practice'} · {r.strokes} strokes
+          {shortDate(r.dateKey)} · {r.mode === 'daily' ? 'Daily' : r.mode === 'major' ? 'Cup' : 'Practice'} ·{' '}
+          {r.strokes} strokes
         </span>
       </div>
       {badge && <em className={`round-badge ${badge === 'CR' ? 'cr' : 'pr'}`}>{badge}</em>}
@@ -393,6 +396,8 @@ export function RoundsScreen(props: {
         </button>
       </div>
 
+      <TrophyRoom log={log} onCard={setCard} onWatch={watch} />
+
       {awards.length > 0 && (
         <div className="season-awards">
           {awards
@@ -528,6 +533,98 @@ export function RoundsScreen(props: {
  * the clubhouse-name field, and a button reading "Sync" there promises an email
  * magic link it never sends. Claiming a record needs a name, not an account.
  */
+/**
+ * THE TROPHY ROOM — tournament hardware, right under the fortune shelf.
+ * Engraved by the podium ceremony (recordCupTrophy) once per event this
+ * device's player finished or played. A trophy expands into the four rounds:
+ * every round still in the log opens its scorecard, and rounds the archive
+ * still holds replay in full. The empty room stays visible — a visible zero
+ * creates the goal, same rule as the ace and albatross shelves.
+ */
+function TrophyRoom(props: {
+  log: LoggedRound[]
+  onCard: (r: LoggedRound) => void
+  onWatch: (seed: string) => void
+}) {
+  const [open, setOpen] = useState<string | null>(null)
+  const trophies = loadCupTrophies()
+  const archive = loadArchive()
+  const ordinal = (n: number) =>
+    `${n}${n % 100 >= 11 && n % 100 <= 13 ? 'th' : n % 10 === 1 ? 'st' : n % 10 === 2 ? 'nd' : n % 10 === 3 ? 'rd' : 'th'}`
+  if (trophies.length === 0) {
+    return (
+      <div className="cup-trophy-room empty">
+        <div className="kicker">🏆 Trophy Room</div>
+        <p className="fine">Tournament hardware lives here. Post three rounds at a DogLeg Cup event and come collect.</p>
+      </div>
+    )
+  }
+  const medal = (rank?: number) => (rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : rank ? '🏵️' : '🎗️')
+  return (
+    <div className="cup-trophy-room">
+      <div className="kicker">🏆 Trophy Room</div>
+      {trophies.map((t) => {
+        const event = eventForKey(t.eventKey)
+        const days = event ? eventDateKeys(event) : []
+        const opened = open === t.eventKey
+        const played = t.rounds.filter((r) => r !== null).length
+        return (
+          <div key={t.eventKey} className={`cup-trophy${t.rank === 1 ? ' champion' : ''}`}>
+            <button className="cup-trophy-head" onClick={() => setOpen(opened ? null : t.eventKey)}>
+              <span className="cup-medal">{medal(t.rank)}</span>
+              <span className="cup-trophy-name">
+                <b>{t.eventName}</b>
+                <span>
+                  {t.rank
+                    ? `${ordinal(t.rank)} · ${toParLabel(t.total ?? 0)}`
+                    : `${played} round${played === 1 ? '' : 's'} posted`}
+                  {t.major ? ' · Major' : ''}
+                  {t.exhibition ? ' · Exhibition' : ''}
+                </span>
+              </span>
+              <span className="cup-trophy-toggle" aria-hidden>
+                {opened ? '–' : '+'}
+              </span>
+            </button>
+            {opened && (
+              <div className="cup-trophy-rounds">
+                {t.rounds.map((toPar, i) => {
+                  const dk = days[i]
+                  const logged =
+                    toPar !== null && dk
+                      ? props.log.find((r) => r.mode === 'major' && r.seed.startsWith(`major:${t.eventKey}:${dk}:`))
+                      : undefined
+                  const replayable = !!logged && archive.some((a) => a.seed === logged.seed)
+                  return (
+                    <div key={i} className="cup-trophy-round">
+                      <span className="cup-trophy-round-day">R{i + 1}</span>
+                      {toPar === null ? (
+                        <span className="fine">not played</span>
+                      ) : (
+                        <b>{toParLabel(toPar)}</b>
+                      )}
+                      {logged && (
+                        <button className="cta ghost slim" onClick={() => props.onCard(logged)}>
+                          Scorecard
+                        </button>
+                      )}
+                      {replayable && (
+                        <button className="cta ghost slim" onClick={() => props.onWatch(logged!.seed)}>
+                          ▶ Replay
+                        </button>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 export function SyncCta(props: { copy: string; onTap: () => void; trigger: string; action?: string }) {
   return (
     <button className="sync-cta" data-trigger={props.trigger} onClick={props.onTap}>

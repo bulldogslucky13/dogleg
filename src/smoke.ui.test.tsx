@@ -41,6 +41,9 @@ beforeEach(() => {
   // ...and the what's-new drop, which any test that seeds history would
   // otherwise land behind (its own tests clear this)
   localStorage.setItem('dogleg:whatsnew-ack:v1', WHATS_NEW_VERSION)
+  // ...and the Cup's one-time introduction, which outranks both above
+  // (its own tests clear this)
+  localStorage.setItem('dogleg:cup-intro-ack:v1', 'seen')
 })
 
 afterEach(() => {
@@ -1367,6 +1370,12 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
     // re-ack the season splash for the season the FAKE date lands in
     localStorage.setItem('dogleg:season-ack:v1', seasonForDate().key)
     render(<App />)
+
+    // the first landing of an event week is the event's welcome splash:
+    // the course, the format, and a first tee straight from the card
+    expect(screen.getByText(/is on$|This week|Major week/)).toBeTruthy()
+    expect(screen.getByText(/one attempt a day, best three count/)).toBeTruthy()
+    fireEvent.click(screen.getByText(/Later — to the Teebox/))
 
     expect(screen.getByText('DogLeg Cup at Pinehurst No. 2')).toBeTruthy()
     expect(screen.getByText(/Round 2 of 4 · Friday/)).toBeTruthy()

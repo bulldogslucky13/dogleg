@@ -82,6 +82,13 @@ create table if not exists event_scores (
 );
 create index if not exists event_scores_board on event_scores (event_key, to_par);
 
+-- The round ITSELF (seed + decision list), exactly as course_records keeps
+-- record rounds: the podium's "watch the winning rounds" replays real golf,
+-- not a summary. Public read is deliberate — this is the same payload a
+-- replay share link carries, and a champion's rounds are bragging material.
+alter table event_scores add column if not exists seed text;
+alter table event_scores add column if not exists decisions jsonb;
+
 alter table event_scores enable row level security;
 drop policy if exists "anyone can read event scores" on event_scores;
 create policy "anyone can read event scores" on event_scores for select using (true);

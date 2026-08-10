@@ -1,5 +1,5 @@
-import { cupPoints, eventForKey, paysPoints } from '../engine/events'
-import type { CharacterId, HoleResult } from '../engine/types'
+import { cupPoints, eventForKey, paysPoints, type CupEvent } from '../engine/events'
+import type { CharacterId, Choice, HoleResult } from '../engine/types'
 import { SUPABASE_ANON_KEY, SUPABASE_URL, backendEnabled } from './backend'
 
 /**
@@ -29,6 +29,10 @@ export interface EventScoreRow {
   to_par: number
   strokes: number
   results: HoleResult[]
+  /** the round itself, kept by the referee like course_records keeps record
+   * rounds — what makes a podium round watchable. Absent on old rows. */
+  seed?: string | null
+  decisions?: Choice[][] | null
 }
 
 const REST_HEADERS = { apikey: SUPABASE_ANON_KEY }
@@ -69,7 +73,7 @@ export async function fetchEventScores(eventKey: string): Promise<EventScoreRow[
     const url =
       `${SUPABASE_URL}/rest/v1/event_scores` +
       `?event_key=eq.${encodeURIComponent(eventKey)}` +
-      `&select=event_key,day,player_id,player_name,character,to_par,strokes,results`
+      `&select=event_key,day,player_id,player_name,character,to_par,strokes,results,seed,decisions`
     const res = await fetch(url, { headers: REST_HEADERS })
     if (!res.ok) return null
     return (await res.json()) as EventScoreRow[]
@@ -86,7 +90,7 @@ export async function fetchCupSeasonScores(eventKeys: string[]): Promise<EventSc
     const url =
       `${SUPABASE_URL}/rest/v1/event_scores` +
       `?event_key=in.(${list})` +
-      `&select=event_key,day,player_id,player_name,character,to_par,strokes,results`
+      `&select=event_key,day,player_id,player_name,character,to_par,strokes,results,seed,decisions`
     const res = await fetch(url, { headers: REST_HEADERS })
     if (!res.ok) return null
     return (await res.json()) as EventScoreRow[]
@@ -161,6 +165,58 @@ export function eventStandings(rows: EventScoreRow[]): EventStanding[] {
     .filter((s) => !s.eligible)
     .sort((a, b) => b.played - a.played || (a.counted.reduce((x, y) => x + y, 0)) - (b.counted.reduce((x, y) => x + y, 0)))
   return [...eligible, ...partial]
+}
+
+// ---------------------------------------------------------------------------
+// The Trophy Room ledger — what this device's player took home
+// ---------------------------------------------------------------------------
+
+export interface CupTrophy {
+  eventKey: string
+  eventName: string
+  courseSlug: string
+  major: boolean
+  exhibition: boolean
+  /** final competition rank; undefined = played but never posted three rounds */
+  rank?: number
+  total: number | null
+  /** to-par by round day (index 0 = Thursday); null = not posted */
+  rounds: (number | null)[]
+  at: number
+}
+
+const TROPHIES_KEY = 'dogleg:cup-trophies:v1'
+
+export function loadCupTrophies(): CupTrophy[] {
+  try {
+    const raw = localStorage.getItem(TROPHIES_KEY)
+    return raw ? (JSON.parse(raw) as CupTrophy[]) : []
+  } catch {
+    return []
+  }
+}
+
+/** Engraved at podium time — the ceremony writes what the player finished,
+ * once per event, and the Clubhouse Trophy Room reads it forever. */
+export function recordCupTrophy(event: CupEvent, standing: EventStanding): void {
+  try {
+    const trophies = loadCupTrophies()
+    if (trophies.some((t) => t.eventKey === event.key)) return
+    trophies.unshift({
+      eventKey: event.key,
+      eventName: event.name,
+      courseSlug: event.courseSlug,
+      major: !!event.major,
+      exhibition: !!event.exhibition,
+      rank: standing.eligible ? standing.rank : undefined,
+      total: standing.total,
+      rounds: standing.rounds,
+      at: Date.now(),
+    })
+    localStorage.setItem(TROPHIES_KEY, JSON.stringify(trophies.slice(0, 100)))
+  } catch {
+    /* private mode */
+  }
 }
 
 export interface CupStanding {

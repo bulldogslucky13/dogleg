@@ -46,6 +46,7 @@ import { MomentSplash } from './ui/MomentSplash'
 import { decodeReplay, type ReplayPayload } from './engine/replay'
 import { activeEvent, dayOfEvent, eventForKey, majorSetup, type CupEvent } from './engine/events'
 import { CupPodiumSplash, podiumDue } from './ui/CupBoard'
+import { CupEventSplash, CupIntroSplash, cupEventSplashDue, needsCupIntro } from './ui/CupSplash'
 import { ReplayScreen } from './ui/ReplayScreen'
 import { RoundsScreen } from './ui/RoundsScreen'
 import { CharacterPickScreen, HomeScreen, ResultScreen } from './ui/screens'
@@ -70,13 +71,18 @@ type View = 'home' | 'pick' | 'play' | 'result' | 'watch' | 'rounds'
  * board reset. Decided once, at mount — never re-derived mid-session, so a
  * dialog can't appear over a screen the player navigated to themselves.
  */
-type LandingModal = 'tutorial' | 'whatsnew' | 'season' | 'cupPodium'
+type LandingModal = 'tutorial' | 'whatsnew' | 'season' | 'cupPodium' | 'cupIntro' | 'cupEvent'
 
 function pickLandingModal(): LandingModal | null {
   if (!hasSeenTutorial()) return 'tutorial'
   // the podium is expiring news (a four-day window after an event you
-  // played) — it outranks the evergreen announcements below
+  // played) — it outranks everything evergreen below
   if (podiumDue()) return 'cupPodium'
+  // the Cup announcements: the concept once, then each event's welcome on
+  // the first landing inside its week (a player who hasn't met the Cup yet
+  // gets the intro this landing and the event's welcome on the next)
+  if (needsCupIntro()) return 'cupIntro'
+  if (cupEventSplashDue()) return 'cupEvent'
   if (needsWhatsNew()) return 'whatsnew'
   if (needsSeasonSplash()) return 'season'
   return null
@@ -413,6 +419,18 @@ export default function App() {
     if (more.length) setUnlocks((u) => [...u, ...more])
   }
 
+  // the one doorway into a Cup round — the Teebox card and the event splash
+  // both walk through here
+  const startCupRound = () => {
+    const live = activeEvent(localDateKey())
+    if (!live) return
+    const setup = majorSetup(live.event, localDateKey())
+    if (!setup) return
+    setPending({ mode: 'major', setup, event: live.event })
+    setLanding(null)
+    setView('pick')
+  }
+
   if (view === 'home') {
     return (
       <>
@@ -426,7 +444,28 @@ export default function App() {
             if (!due) {
               return null
             }
-            return <CupPodiumSplash event={due} onClose={() => setLanding(null)} />
+            return (
+              <CupPodiumSplash
+                event={due}
+                onClose={() => setLanding(null)}
+                onWatch={(p) => {
+                  // the ceremony hands off to the replay viewer; the podium
+                  // stays owed (un-acked) so it greets the return landing
+                  setWatching(p)
+                  setView('watch')
+                }}
+              />
+            )
+          })()}
+        {landing === 'cupIntro' && !showTutorial && <CupIntroSplash onClose={() => setLanding(null)} />}
+        {landing === 'cupEvent' &&
+          !showTutorial &&
+          (() => {
+            const due = cupEventSplashDue()
+            if (!due) return null
+            return (
+              <CupEventSplash event={due.event} day={due.day} onPlay={startCupRound} onClose={() => setLanding(null)} />
+            )
           })()}
         {landing === 'season' && !showTutorial && (
           <SeasonSplash
@@ -491,14 +530,7 @@ export default function App() {
             setPending({ mode: 'practice', setup: practiceSetup(slug, `${Date.now()}`) })
             setView('pick')
           }}
-          onCup={() => {
-            const live = activeEvent(localDateKey())
-            if (!live) return
-            const setup = majorSetup(live.event, localDateKey())
-            if (!setup) return
-            setPending({ mode: 'major', setup, event: live.event })
-            setView('pick')
-          }}
+          onCup={startCupRound}
           onShowResult={() => {
             setResultFor('daily')
             setView('result')

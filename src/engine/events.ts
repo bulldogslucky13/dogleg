@@ -233,14 +233,16 @@ export function cupPoints(rank: number, major = false): number {
 }
 
 /** The Cup round's share card — the daily's format wearing the event's name.
- * `rank` is "Nth of M today", straight from the referee's reply. */
+ * Carries BOTH numbers that matter: today's round and the tournament line. */
 export function cupShareText(
   e: CupEvent,
   day: number,
   results: HoleResult[],
   toPar: number,
   character?: CharacterId,
-  rank?: { rank: number; total: number },
+  /** the player's tournament position so far: counted total, rounds posted,
+   * and (once eligible) the competition rank */
+  standing?: { total: number; played: number; rank?: number },
 ): string {
   const rows: string[] = []
   for (let i = 0; i < results.length; i += 9) {
@@ -249,10 +251,19 @@ export function cupShareText(
   const course = courseBySlug(e.courseSlug)
   const par = course?.holes.reduce((s, h) => s + h.par, 0) ?? 72
   const char = characterById(character)
+  const ord = (n: number) =>
+    `${n}${n % 100 >= 11 && n % 100 <= 13 ? 'th' : n % 10 === 1 ? 'st' : n % 10 === 2 ? 'nd' : n % 10 === 3 ? 'rd' : 'th'}`
   return [
     `🏆 ${e.name.toUpperCase()}`,
     `Round ${day} of 4 · Par ${par}`,
-    `${par + toPar} (${toParLabel(toPar)})${rank ? ` · ${rank.rank} of ${rank.total} today` : ''}`,
+    `Today: ${par + toPar} (${toParLabel(toPar)})`,
+    ...(standing
+      ? [
+          `Tournament: ${toParLabel(standing.total)} thru ${standing.played} round${standing.played === 1 ? '' : 's'}${
+            standing.rank ? ` · ${ord(standing.rank)}` : ''
+          }`,
+        ]
+      : []),
     '',
     ...rows,
     ...(char ? [`${char.emoji} ${char.name}`] : []),

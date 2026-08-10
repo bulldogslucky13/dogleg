@@ -351,6 +351,10 @@ Deno.serve(async (req) => {
       to_par: replay.toPar,
       strokes: replay.strokes,
       results: replay.results,
+      // the validated round itself, kept like course_records keeps record
+      // rounds — the podium replays a champion's actual golf
+      seed,
+      decisions,
     }
     const { error } = await supabase.from('event_scores').insert(row)
     if (error && error.code !== '23505') return json(500, { error: 'could not save score' })

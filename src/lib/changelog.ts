@@ -63,6 +63,12 @@ export const CHANGE_KIND_LABEL: Record<ChangeKind, string> = {
 
 export const CHANGELOG: ChangeEntry[] = [
   {
+    date: '2026-08-09',
+    kind: 'feature',
+    title: 'The DogLeg Cup',
+    note: 'Tournament golf. Four rounds, Thursday through Sunday, one course, one attempt a day — your best three count, and nobody gets cut. The course firms up as the weekend goes: Sunday plays the hardest, and it says so up front. Every event pays points toward the season-long DogLeg Cup. First tee times land this month.',
+  },
+  {
     date: '2026-08-07',
     kind: 'odds',
     title: 'You now end up in the bunker — and the lake — you actually found',

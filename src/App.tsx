@@ -44,6 +44,8 @@ import { prefersReducedMotion } from './ui/motion'
 import type { MomentKind } from './engine/fortune'
 import { MomentSplash } from './ui/MomentSplash'
 import { decodeReplay, type ReplayPayload } from './engine/replay'
+import { activeEvent, dayOfEvent, eventForKey, majorSetup, type CupEvent } from './engine/events'
+import { CupPodiumSplash, podiumDue } from './ui/CupBoard'
 import { ReplayScreen } from './ui/ReplayScreen'
 import { RoundsScreen } from './ui/RoundsScreen'
 import { CharacterPickScreen, HomeScreen, ResultScreen } from './ui/screens'
@@ -68,10 +70,13 @@ type View = 'home' | 'pick' | 'play' | 'result' | 'watch' | 'rounds'
  * board reset. Decided once, at mount — never re-derived mid-session, so a
  * dialog can't appear over a screen the player navigated to themselves.
  */
-type LandingModal = 'tutorial' | 'whatsnew' | 'season'
+type LandingModal = 'tutorial' | 'whatsnew' | 'season' | 'cupPodium'
 
 function pickLandingModal(): LandingModal | null {
   if (!hasSeenTutorial()) return 'tutorial'
+  // the podium is expiring news (a four-day window after an event you
+  // played) — it outranks the evergreen announcements below
+  if (podiumDue()) return 'cupPodium'
   if (needsWhatsNew()) return 'whatsnew'
   if (needsSeasonSplash()) return 'season'
   return null
@@ -87,8 +92,9 @@ function watchFromHash(): WatchState {
   if (!m) return null
   return decodeReplay(m[1]) ?? 'bad'
 }
-/** setup is generated when the pick screen opens, so the conditions it shows are the ones you play */
-type PendingStart = { mode: 'daily' | 'practice'; setup: DailySetup }
+/** setup is generated when the pick screen opens, so the conditions it shows
+ * are the ones you play. Cup starts carry their event for the stakes card. */
+type PendingStart = { mode: 'daily' | 'practice' | 'major'; setup: DailySetup; event?: CupEvent }
 
 export default function App() {
   const [round, setRound] = useState<RoundState | null>(() => loadRound())
@@ -116,8 +122,9 @@ export default function App() {
   /** How to Play reopened from the masthead — orthogonal to the landing pick */
   const [manualTutorial, setManualTutorial] = useState(false)
   const showTutorial = manualTutorial || landing === 'tutorial'
-  /** which result the result view shows — the daily card or a finished practice round */
-  const [resultFor, setResultFor] = useState<'daily' | 'practice'>('daily')
+  /** which result the result view shows — the daily card, a finished practice
+   * round, or a finished Cup round */
+  const [resultFor, setResultFor] = useState<'daily' | 'practice' | 'major'>('daily')
   const [animating, setAnimating] = useState(false)
   const [splash, setSplash] = useState<CharacterAdvantage | null>(null)
   const [splashKey, setSplashKey] = useState(0)
@@ -341,6 +348,17 @@ export default function App() {
   // state changes on the result screen don't recompute it
   const roundGrade = useMemo(() => (round && round.complete ? tryGradeRound(round) : null), [round])
 
+  // which Cup event/day the live round belongs to — read off the seed, which
+  // is the one place that can't drift from what the referee will see
+  const cupRound = useMemo(() => {
+    if (round?.mode !== 'major') return null
+    const m = /^major:([a-z0-9-]+):(\d{4}-\d{2}-\d{2}):/.exec(round.seed)
+    const event = m ? eventForKey(m[1]) : null
+    const day = event && m ? dayOfEvent(event, m[2]) : null
+    return event && day ? { event, day } : null
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [round?.seed, round?.mode])
+
   const previewWindow = useMemo<[number, number] | null>(() => {
     if (!hole || !selected || animating) return null
     if (hole.stage === 'tee') return longOdds(hole.layout, hole.cond, hole.ball, selected, 'tee', hole.character).window
@@ -400,6 +418,16 @@ export default function App() {
       <>
         {/* exactly one of these three can be live at a time — `landing` holds a
             single value and the manual tutorial replaces rather than stacks */}
+        {landing === 'cupPodium' &&
+          !showTutorial &&
+          (() => {
+            const due = podiumDue()
+            // acked between pick and render (another tab) — retire the slot
+            if (!due) {
+              return null
+            }
+            return <CupPodiumSplash event={due} onClose={() => setLanding(null)} />
+          })()}
         {landing === 'season' && !showTutorial && (
           <SeasonSplash
             onClose={() => {
@@ -463,6 +491,14 @@ export default function App() {
             setPending({ mode: 'practice', setup: practiceSetup(slug, `${Date.now()}`) })
             setView('pick')
           }}
+          onCup={() => {
+            const live = activeEvent(localDateKey())
+            if (!live) return
+            const setup = majorSetup(live.event, localDateKey())
+            if (!setup) return
+            setPending({ mode: 'major', setup, event: live.event })
+            setView('pick')
+          }}
           onShowResult={() => {
             setResultFor('daily')
             setView('result')
@@ -517,6 +553,11 @@ export default function App() {
       <CharacterPickScreen
         setup={start.setup}
         practice={start.mode === 'practice'}
+        cup={
+          start.mode === 'major' && start.event
+            ? { name: start.event.name, day: dayOfEvent(start.event, start.setup.dateKey) ?? 1 }
+            : undefined
+        }
         onPick={(character: CharacterId) => {
           // the one doorway every round starts through — daily, practice,
           // and result-screen rematches all land here. A stale bundle would
@@ -544,10 +585,13 @@ export default function App() {
   if (view === 'result') {
     const entry = playedToday
     const isPractice = resultFor === 'practice' && !!round && round.mode === 'practice' && round.complete
+    // a finished Cup round wraps like a practice round (its own card, no
+    // daily furniture) but wears the event's name and board
+    const isMajor = resultFor === 'major' && !!round && round.mode === 'major' && round.complete
     let setup: DailySetup
     let results = entry?.results ?? []
     let toPar = entry?.toPar ?? 0
-    if (isPractice && round) {
+    if ((isPractice || isMajor) && round) {
       setup = { ...practiceSetup(round.courseSlug, ''), cond: round.cond, puzzleNumber: 0, dateKey: round.dateKey, seed: round.seed }
       results = round.scores.map((s) => s?.result ?? 'triple')
       toPar = roundToPar(round)
@@ -555,11 +599,12 @@ export default function App() {
       setup = dailySetup()
     }
     // the full shot-by-shot round only survives in localStorage for the round it belongs to
-    const recapSource = isPractice
-      ? round
-      : round && round.mode === 'daily' && round.complete && round.dateKey === entry?.dateKey
+    const recapSource =
+      isPractice || isMajor
         ? round
-        : null
+        : round && round.mode === 'daily' && round.complete && round.dateKey === entry?.dateKey
+          ? round
+          : null
     // the swing coach's report needs the same shot-by-shot record the recap does
     const grade = recapSource ? roundGrade : null
     return (
@@ -570,6 +615,7 @@ export default function App() {
           results={results}
           toPar={toPar}
           practice={isPractice}
+          cup={isMajor && cupRound ? cupRound : undefined}
           recap={recapSource ? buildRecap(recapSource) : null}
           grade={grade}
           boardRound={recapSource}
@@ -626,7 +672,12 @@ export default function App() {
   const spec = course.holes[round.currentHole]
   const toPar = roundToPar(round)
   const holeDone = hole.stage === 'done' && hole.score
-  const modeTag = round.mode === 'daily' ? `Daily · No. ${round.puzzleNumber}` : 'Practice'
+  const modeTag =
+    round.mode === 'daily'
+      ? `Daily · No. ${round.puzzleNumber}`
+      : round.mode === 'major'
+        ? `Cup · Rd ${cupRound?.day ?? '?'}`
+        : 'Practice'
 
   const commit = (choice: Choice) => {
     if (animating || !hole) return

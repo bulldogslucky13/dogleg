@@ -2,8 +2,10 @@ import { useEffect, useState } from 'react'
 import { characterById, playableCharacters } from '../engine/characters'
 import { courseBySlug, COURSES, GUEST_COURSES, PAR3_COURSES, playRatingFor } from '../engine/courses'
 import { dailySetup, forecastSetup, RESULT_LABEL, RESULT_SQUARE, shareText, SITE_URL, toParLabel, type DailySetup } from '../engine/daily'
+import { cupShareText, type CupEvent } from '../engine/events'
 import { gradeCopy, type RoundGrade } from '../engine/grade'
 import { decisionsFromScores, encodeReplay } from '../engine/replay'
+import { CupHomeCard } from './CupBoard'
 import type { CharacterId, HoleResult } from '../engine/types'
 import { track } from '../lib/analytics'
 import { backendEnabled } from '../lib/backend'
@@ -25,11 +27,13 @@ import { PlayRatingChip } from './PlayRating'
 
 export function HomeScreen(props: {
   history: HistoryEntry[]
-  activeRound: { mode: 'daily' | 'practice'; courseName: string } | null
+  activeRound: { mode: 'daily' | 'practice' | 'major'; courseName: string } | null
   playedToday: HistoryEntry | null
   onTeeOff: () => void
   onResume: () => void
   onPractice: (slug: string) => void
+  /** start today's Cup round (App resolves the live event) */
+  onCup: () => void
   onShowResult: () => void
   onHowToPlay: () => void
   onMyRounds: () => void
@@ -239,9 +243,10 @@ export function HomeScreen(props: {
           Tee off
         </button>
       )}
-      {props.activeRound?.mode === 'practice' && (
+      {(props.activeRound?.mode === 'practice' || props.activeRound?.mode === 'major') && (
         <button className="cta ghost" onClick={props.onResume}>
-          Resume practice round · {props.activeRound.courseName}
+          {props.activeRound.mode === 'major' ? '🏆 Resume Cup round' : 'Resume practice round'} ·{' '}
+          {props.activeRound.courseName}
         </button>
       )}
       {stale && props.activeRound && !props.playedToday && (
@@ -256,6 +261,10 @@ export function HomeScreen(props: {
       )}
 
       {props.playedToday && <ForecastCard today={props.playedToday} />}
+
+      {/* the Cup: the live event card during an event week, the next-event
+          teaser between weeks. A stale bundle can't start a Cup round either. */}
+      <CupHomeCard onTee={stale ? () => window.location.reload() : props.onCup} />
 
       <button className="cta ghost" onClick={() => setShowCourses((v) => !v)}>
         Play unlimited
@@ -663,6 +672,8 @@ function HandicapChip(props: { onTap: () => void }) {
 export function CharacterPickScreen(props: {
   setup: DailySetup
   practice: boolean
+  /** a Cup round's stakes: which event, which of its four days */
+  cup?: { name: string; day: number }
   onPick: (c: CharacterId) => void
   onBack: () => void
 }) {
@@ -674,12 +685,24 @@ export function CharacterPickScreen(props: {
       </button>
       <header>
         <div className="kicker">
-          {props.practice ? 'Practice round' : "Today's round"} · {course.name}
+          {props.cup ? `🏆 ${props.cup.name} · Round ${props.cup.day} of 4` : `${props.practice ? 'Practice round' : "Today's round"} · ${course.name}`}
         </div>
         <h2 className="pick-title">Pick your player</h2>
         <p className="tagline">One edge, all {course.holes.length} holes. Choose for the course in front of you:</p>
       </header>
-      {props.practice && <GhostStakes courseSlug={course.slug} />}
+      {props.cup && (
+        <div className="ghost-stakes cr">
+          <div className="ghost-stakes-head">
+            <b>🏆 One attempt today</b>
+            <span className="ghost-stakes-score">Rd {props.cup.day}/4</span>
+          </div>
+          <span className="fine">
+            Best three of your four rounds count.{' '}
+            {props.cup.day >= 3 ? 'Weekend setup — the course is biting now.' : 'The course firms up through the weekend.'}
+          </span>
+        </div>
+      )}
+      {props.practice && !props.cup && <GhostStakes courseSlug={course.slug} />}
       <div className="chips center">
         <span className="chip">{course.holes.reduce((s, h) => s + h.yards, 0).toLocaleString()} yards</span>
         <span className="chip">Wind {cond.wind} mph</span>
@@ -710,6 +733,9 @@ export function ResultScreen(props: {
   results: HoleResult[]
   toPar: number
   practice: boolean
+  /** the round that just wrapped was a Cup round — event share card, event
+   * board via ScoreBoard, none of the daily's streak furniture */
+  cup?: { event: CupEvent; day: number }
   character?: CharacterId
   recap: RoundRecap | null
   /** the swing coach's report — decision quality vs. luck, null when ungradeable */
@@ -735,7 +761,9 @@ export function ResultScreen(props: {
   const streaks = computeStreaks(props.history)
   const broke = toPar < 0
   const char = characterById(props.character)
-  const text = shareText(props.setup, results, toPar, props.character, streaks.dayStreak)
+  const text = props.cup
+    ? cupShareText(props.cup.event, props.cup.day, results, toPar, props.character)
+    : shareText(props.setup, results, toPar, props.character, streaks.dayStreak)
   // a replay link IS the round: seed + decisions, re-run by the viewer's engine
   const replayUrl = (() => {
     if (!props.boardRound) return null
@@ -790,7 +818,9 @@ export function ResultScreen(props: {
           take, and the screenshot should carry the brand */}
       <Wordmark className="result-wordmark" />
       <div className="kicker">
-        {props.practice ? 'Practice round' : `Daily No. ${props.setup.puzzleNumber}`} · {props.setup.course.name}
+        {props.cup
+          ? `🏆 ${props.cup.event.name} · Round ${props.cup.day} of 4`
+          : `${props.practice ? 'Practice round' : `Daily No. ${props.setup.puzzleNumber}`} · ${props.setup.course.name}`}
       </div>
       <h1 className={`final ${broke ? 'good' : ''}`}>{toParLabel(toPar)}</h1>
       {char && (
@@ -946,9 +976,9 @@ export function ResultScreen(props: {
         // round took the slot, or a refreshed device only kept the day's
         // history entry): the card was already posted, so show the standings
         // read-only rather than dropping the board entirely
-        !props.practice && <DailyBoardView dateKey={props.setup.dateKey} />
+        !props.practice && !props.cup && <DailyBoardView dateKey={props.setup.dateKey} />
       )}
-      {!props.practice && (
+      {!props.practice && !props.cup && (
         <>
           <div className="stats-row">
             <div className="stat">

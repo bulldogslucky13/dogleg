@@ -1,5 +1,7 @@
+import { characterById } from './characters'
 import { courseBySlug } from './courses'
-import type { CourseSpec } from './types'
+import { majorConditions, RESULT_SQUARE, SITE_URL, toParLabel, type DailySetup } from './daily'
+import type { CharacterId, CourseSpec, HoleResult } from './types'
 
 /**
  * THE DOGLEG CUP — the season-long tournament calendar.
@@ -195,6 +197,21 @@ export function majorSeedBase(e: CupEvent, dateKey: string): string {
   return `major:${e.key}:${dateKey}:${e.courseSlug}`
 }
 
+/** Everything a Cup round needs to tee off — the dailySetup of the majors.
+ * Null off the event's window or if the course isn't in this bundle. */
+export function majorSetup(e: CupEvent, dateKey: string): DailySetup | null {
+  const day = dayOfEvent(e, dateKey)
+  const course = courseBySlug(e.courseSlug)
+  if (!day || !course) return null
+  return {
+    course,
+    cond: majorConditions(e.key, dateKey, day, course),
+    seed: majorSeedBase(e, dateKey),
+    puzzleNumber: 0,
+    dateKey,
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Cup points — the season-long race
 // ---------------------------------------------------------------------------
@@ -212,4 +229,33 @@ export function cupPoints(rank: number, major = false): number {
   if (rank < 1 || !Number.isInteger(rank)) return 0
   const base = rank <= CUP_POINTS.length ? CUP_POINTS[rank - 1] : Math.max(5, 45 - (rank - 11) * 3)
   return major ? Math.round(base * MAJOR_MULTIPLIER) : base
+}
+
+/** The Cup round's share card — the daily's format wearing the event's name.
+ * `rank` is "Nth of M today", straight from the referee's reply. */
+export function cupShareText(
+  e: CupEvent,
+  day: number,
+  results: HoleResult[],
+  toPar: number,
+  character?: CharacterId,
+  rank?: { rank: number; total: number },
+): string {
+  const rows: string[] = []
+  for (let i = 0; i < results.length; i += 9) {
+    rows.push(results.slice(i, i + 9).map((r) => RESULT_SQUARE[r]).join(''))
+  }
+  const course = courseBySlug(e.courseSlug)
+  const par = course?.holes.reduce((s, h) => s + h.par, 0) ?? 72
+  const char = characterById(character)
+  return [
+    `🏆 ${e.name.toUpperCase()}`,
+    `Round ${day} of 4 · Par ${par}`,
+    `${par + toPar} (${toParLabel(toPar)})${rank ? ` · ${rank.rank} of ${rank.total} today` : ''}`,
+    '',
+    ...rows,
+    ...(char ? [`${char.emoji} ${char.name}`] : []),
+    '',
+    `Best 3 of 4 count · ${SITE_URL}`,
+  ].join('\n')
 }

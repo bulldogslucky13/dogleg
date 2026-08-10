@@ -33,6 +33,34 @@ export interface EventScoreRow {
 
 const REST_HEADERS = { apikey: SUPABASE_ANON_KEY }
 
+// ---------------------------------------------------------------------------
+// Which Cup rounds THIS DEVICE has posted — drives the event card's state
+// ("Round 2 posted ✓") without a fetch. Written on successful submission.
+// ---------------------------------------------------------------------------
+
+const POSTED_CUP_KEY = 'dogleg:cup-posted:v1'
+
+export function recordPostedCupRound(eventKey: string, day: number): void {
+  try {
+    const raw = localStorage.getItem(POSTED_CUP_KEY)
+    const keys = raw ? (JSON.parse(raw) as string[]) : []
+    const key = `${eventKey}:${day}`
+    if (!keys.includes(key)) keys.push(key)
+    localStorage.setItem(POSTED_CUP_KEY, JSON.stringify(keys.slice(-200)))
+  } catch {
+    /* private mode */
+  }
+}
+
+export function hasPostedCupRound(eventKey: string, day: number): boolean {
+  try {
+    const raw = localStorage.getItem(POSTED_CUP_KEY)
+    return raw ? (JSON.parse(raw) as string[]).includes(`${eventKey}:${day}`) : false
+  } catch {
+    return false
+  }
+}
+
 /** Every posted round of one event. Null on any failure — a board that can't
  * load says so, it never pretends to be empty. */
 export async function fetchEventScores(eventKey: string): Promise<EventScoreRow[] | null> {

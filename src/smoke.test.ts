@@ -17,6 +17,7 @@ import { CHARACTERS } from './engine/characters'
 import { COURSES, GUEST_COURSES, PAR3_COURSES, courseBySlug, playRatingFor } from './engine/courses'
 import { PLAY_RATINGS } from './engine/playRatings'
 import { DAILY_OVERRIDES, ROTATION_ERAS, courseForPuzzle, dailyConditions, dailySetup, forecastSetup, practiceSetup, puzzleNumberForDateKey, shareText, type DailySetup } from './engine/daily'
+import { DOGLEG_CUP, eventDateKeys, eventPlayable, majorSetup } from './engine/events'
 import { splitFortune } from './engine/fortune'
 import { gradeCopy, gradeRound } from './engine/grade'
 import { decisionsFromScores, destinyPlan, fortuneOddsFor, replayRound, setupFromSeed } from './engine/replay'
@@ -31,6 +32,7 @@ import {
   applyChoice,
   buildRecap,
   holeInPlay,
+  loadRound,
   newRound,
   roundToPar,
   usesBudget,
@@ -159,6 +161,71 @@ describe('smoke: every course is playable start to finish', () => {
   it('completes a characterless round (pre-character saves must keep working)', () => {
     const setup = practiceSetup(COURSES[1].slug, 'smoke-nochar')
     expectCompleteAndSane(playRound(newRound(setup, 'practice'), normalPolicy))
+  })
+})
+
+describe('smoke: DogLeg Cup rounds play start to finish through the store', () => {
+  const live = DOGLEG_CUP.find(eventPlayable)!
+
+  /** a fresh practice round with one shot on it — save/load material */
+  function playRoundToFirstShotSafe(): RoundState {
+    return applyChoice(newRound(practiceSetup(COURSES[0].slug, 'cup-smoke-practice'), 'practice', 'dart'), 'normal')
+  }
+
+  it('a Cup round completes, replays for the referee, and carries no fortune tail', () => {
+    const setup = majorSetup(live, live.start)!
+    const done = playRound(newRound(setup, 'major', 'dart', 'someplayer-id'), normalPolicy)
+    expectCompleteAndSane(done)
+    // the seed is salted per player (daily rule) and free of any fortune tail
+    expect(done.seed.startsWith(`major:${live.key}:${live.start}:${live.courseSlug}:`)).toBe(true)
+    expect(splitFortune(done.seed).fortune).toBeNull()
+    // the referee's exact moves agree with the store's score
+    const outcome = replayRound(done.seed, 'dart', decisionsFromScores(done.scores)!)
+    expect(outcome.ok && outcome.toPar).toBe(roundToPar(done))
+  })
+
+  it('every round day of the event deals valid, distinct conditions', () => {
+    const conds = eventDateKeys(live).map((key, i) => {
+      const setup = majorSetup(live, key)!
+      expect(setup.cond.wind).toBeGreaterThanOrEqual(3)
+      expect(setup.cond.difficulty).toBeGreaterThanOrEqual(1)
+      expect(setup.cond.difficulty).toBeLessThanOrEqual(10)
+      expect(setupFromSeed(setup.seed)?.eventDay).toBe(i + 1)
+      return setup.cond
+    })
+    // four days, four deals — at least one pair must differ (the arc alone
+    // guarantees it: Sunday's wind is +3 over its own base draw)
+    expect(new Set(conds.map((c) => JSON.stringify(c))).size).toBeGreaterThan(1)
+  })
+
+  it('a Cup round from a previous day does not survive a reload (one attempt per day)', () => {
+    // node test env has no localStorage — stub the three calls loadRound makes
+    const store = new Map<string, string>()
+    vi.stubGlobal('localStorage', {
+      getItem: (k: string) => store.get(k) ?? null,
+      setItem: (k: string, v: string) => void store.set(k, v),
+      removeItem: (k: string) => void store.delete(k),
+    })
+    try {
+      const setup = majorSetup(live, live.start)!
+      const round = newRound(setup, 'major', 'dart')
+      // a Cup round saved on ITS day but reopened on a different day is dead —
+      // force the mismatch by stamping a dateKey that is never "today"
+      store.set('dogleg:round:v1', JSON.stringify({ ...round, dateKey: '2020-01-02' }))
+      expect(loadRound()).toBeNull()
+      // whereas a practice round has no expiry
+      const practice = playRoundToFirstShotSafe()
+      store.set('dogleg:round:v1', JSON.stringify(practice))
+      expect(loadRound()?.seed).toBe(practice.seed)
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it('majorSetup refuses dates outside the window and placeholder courses', () => {
+    expect(majorSetup(live, '2020-01-02')).toBeNull()
+    const placeholder = DOGLEG_CUP.find((e) => !courseBySlug(e.courseSlug))!
+    expect(majorSetup(placeholder, placeholder.start)).toBeNull()
   })
 })
 

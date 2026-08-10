@@ -13,7 +13,7 @@ import { track } from '../lib/analytics'
 export { AGGRESSIVE_BUDGET }
 
 export interface RoundState {
-  mode: 'daily' | 'practice'
+  mode: 'daily' | 'practice' | 'major'
   seed: string
   courseSlug: string
   cond: Conditions
@@ -112,7 +112,7 @@ export type UiMode = 'modern' | 'classic'
 
 export function newRound(
   setup: DailySetup,
-  mode: 'daily' | 'practice',
+  mode: 'daily' | 'practice' | 'major',
   character?: CharacterId,
   playerId?: string,
 ): RoundState {
@@ -133,16 +133,19 @@ export function newRound(
   //
   // Both modes then carry the player's fortune counters as a seed tail, so
   // ace/albatross odds and destiny replay identically on the server.
-  const salt = mode === 'daily' && playerId ? dailySalt(playerId, setup.dateKey) : null
+  // Cup rounds are salted per player like the daily — same derivation, same
+  // one-salt-you-can-play-under rule, verified by the same referee check.
+  const salt = (mode === 'daily' || mode === 'major') && playerId ? dailySalt(playerId, setup.dateKey) : null
   // A setup seed is a base seed, but be idempotent if handed one that already
   // carries a fortune tail (e.g. a round seed fed back in) — strip it before
   // re-appending, or the seed grows a second `:f…` tail that won't parse.
   // Fortune-ineligible courses (the par-3 shorts) carry NO tail at all: the
   // engine ignores it there, and a due-destiny tail would trip the referee's
   // "destined rounds don't contend for course records" gate on rounds where
-  // destiny never actually fired.
+  // destiny never actually fired. Cup rounds carry no tail either — the Cup
+  // sits outside fortune entirely (see the note in engine/events.ts).
   const baseSeed = splitFortune(setup.seed).base
-  const fortuneTail = fortuneEligible(course) ? `:${encodeFortune(fortuneFor(mode))}` : ''
+  const fortuneTail = mode !== 'major' && fortuneEligible(course) ? `:${encodeFortune(fortuneFor(mode))}` : ''
   return {
     mode,
     seed: (salt ? `${baseSeed}:${salt}` : baseSeed) + fortuneTail,
@@ -291,8 +294,9 @@ export function loadRound(): RoundState | null {
     if (!raw) return null
     const state = JSON.parse(raw) as RoundState
     if (!courseBySlug(state.courseSlug)) return null
-    // a stale daily from a previous day is dead
-    if (state.mode === 'daily' && state.dateKey !== localDateKey()) return null
+    // a stale daily from a previous day is dead — and so is a Cup round:
+    // each event day is its own one-attempt round, gone at midnight
+    if ((state.mode === 'daily' || state.mode === 'major') && state.dateKey !== localDateKey()) return null
     return state
   } catch {
     return null
@@ -540,7 +544,7 @@ export function computeStreaks(history: HistoryEntry[]): Streaks {
 
 export interface ArchivedRound {
   seed: string
-  mode: 'daily' | 'practice'
+  mode: 'daily' | 'practice' | 'major'
   courseSlug: string
   character?: CharacterId
   dateKey: string

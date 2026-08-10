@@ -21,7 +21,7 @@ export interface LoggedRound {
   /** the round's seed — unique id, and the key back into the replay archive.
    * Rounds recovered from pre-log daily history get a synthetic `hist:` id. */
   seed: string
-  mode: 'daily' | 'practice'
+  mode: 'daily' | 'practice' | 'major'
   courseSlug: string
   character?: CharacterId
   dateKey: string

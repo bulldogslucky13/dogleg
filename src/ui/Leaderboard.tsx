@@ -12,8 +12,10 @@ import {
   type CourseRecord,
   type SubmitResult,
 } from '../lib/leaderboard'
+import { dayOfEvent, eventForKey } from '../engine/events'
 import { seasonForDate } from '../engine/season'
 import { recordWon } from '../lib/records'
+import { CupEventBoard } from './CupBoard'
 import { markArchiveRecord, roundToPar, type RoundState } from '../state/store'
 import { courseBySlug } from '../engine/courses'
 import { identifyPlayer, track } from '../lib/analytics'
@@ -142,7 +144,9 @@ export function ScoreBoard(props: {
     //    record or the season record (a season-only break still lands on
     //    season_records); ordinary practice completions submit for validation
     //    but write nothing
-    const wroteToBoard = round.mode === 'daily' ? !r.duplicate : !!r.record?.broken || !!r.seasonRecord?.broken
+    //  - major: every non-duplicate post lands on the event board, like daily
+    const wroteToBoard =
+      round.mode === 'daily' || round.mode === 'major' ? !r.duplicate : !!r.record?.broken || !!r.seasonRecord?.broken
     if (wroteToBoard) {
       track('board_submitted', {
         mode: round.mode,
@@ -201,6 +205,8 @@ export function ScoreBoard(props: {
           </>
         ) : round.mode === 'daily' ? (
           'Post my card'
+        ) : round.mode === 'major' ? (
+          'Post my round'
         ) : (
           'Claim records'
         )}
@@ -276,6 +282,43 @@ export function ScoreBoard(props: {
           </>
         )}
         {error && <p className="fine board-error">{error}</p>}
+      </div>
+    )
+  }
+
+  // a Cup round: post it, say where it landed in today's field, and show the
+  // event's best-3-of-4 board. No record banners here — Cup rounds don't
+  // contend for course records (deliberate; see submit-round).
+  if (round.mode === 'major') {
+    const parsed = /^major:([a-z0-9-]+):(\d{4}-\d{2}-\d{2}):/.exec(round.seed)
+    const event = parsed ? eventForKey(parsed[1]) : null
+    const day = event && parsed ? dayOfEvent(event, parsed[2]) : null
+    return (
+      <div className="board-block">
+        <div className="kicker">
+          {event?.name ?? 'DogLeg Cup'}
+          {day ? ` · Round ${day}` : ''}
+        </div>
+        {player && busy && (
+          <p className="fine">
+            <Spinner />
+            Posting your round…
+          </p>
+        )}
+        {result?.rank && (
+          <p className="board-rank">
+            You're <b>{ordinal(result.rank)}</b> of {result.total} in today's round so far
+          </p>
+        )}
+        {result?.duplicate && <p className="fine">Today's round was already on the card — the first one stands.</p>}
+        {nameForm && (
+          <>
+            <p className="fine">Put a name on your card and post your Cup round — no account needed.</p>
+            {nameForm}
+          </>
+        )}
+        {error && <p className="fine board-error">{error}</p>}
+        {event && <CupEventBoard event={event} />}
       </div>
     )
   }

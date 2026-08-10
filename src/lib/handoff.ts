@@ -54,6 +54,48 @@ const ACHIEVEMENTS_KEY = 'dogleg:achievements:v1'
 const ROUND_KEY = 'dogleg:round:v1'
 
 /**
+ * THE ONE THING THE HANDOFF DELIBERATELY LEAVES BEHIND: the email session.
+ *
+ * supabase-js keeps it at `sb-<project-ref>-auth-token`, outside the `dogleg:`
+ * namespace, so the prefix sweep never sees it — and that is the right
+ * outcome, not an oversight to fix. That value is a REFRESH token: it buys
+ * ongoing access to the account and can be exchanged over and over. The player
+ * secret, which the handoff does carry, only lets someone post scores as that
+ * clubhouse. A URL fragment is an acceptable place for the second and not for
+ * the first.
+ *
+ * The cost is that a player who had linked an email arrives signed out, with
+ * their clubhouse intact and no explanation — which reads as "the migration
+ * lost something" when nothing was lost at all. So the old domain leaves this
+ * flag instead: a boolean saying a session WAS there, never the credential
+ * itself. AccountPanel turns it into one sentence and clears it.
+ *
+ * Signing back in reconciles rather than duplicates: the account's linked
+ * player row is the same id the handoff carried, so link-account returns
+ * 'linked', and the daily dice keep their salt.
+ */
+const RELINK_KEY = 'dogleg:handoff-relink:v1'
+
+/** True when this device arrived from the old domain carrying an email
+ *  session that could not come with it. */
+export function needsRelink(): boolean {
+  try {
+    return localStorage.getItem(RELINK_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
+/** Once they've signed in — or said they don't care — the prompt is done. */
+export function clearRelink(): void {
+  try {
+    localStorage.removeItem(RELINK_KEY)
+  } catch {
+    /* private mode: the flag was never written either */
+  }
+}
+
+/**
  * The Break Par-era prefix, and the two keys the app still migrates off it
  * (`migrateLegacyStorage`, store.ts).
  *

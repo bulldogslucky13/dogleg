@@ -12,7 +12,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 // node builtins (tsconfig.app.json carries no node types)
 import handoffHtml from '../../handoff/index.html?raw'
 import { SITE_URL } from '../engine/daily'
-import { importHandoff, packHandoff, runHandoff, unpackHandoff } from './handoff'
+import { clearRelink, importHandoff, needsRelink, packHandoff, runHandoff, unpackHandoff } from './handoff'
 
 class MemoryStorage implements Storage {
   private map = new Map<string, string>()
@@ -576,6 +576,42 @@ describe("the old domain's packing half (handoff/index.html)", () => {
     expect(target.getItem('dogleg:lifetime:v1')).toBe('42')
   })
 
+  it('flags that an email session existed WITHOUT ever carrying the token', async () => {
+    // The session is a refresh token; a URL fragment is the wrong place for
+    // one. But its absence on the far side reads as the move having lost
+    // something, so the flag — and only the flag — travels.
+    const old = seeded({
+      ...OLD_DEVICE,
+      'sb-cphmpypnvopoylwxsrlk-auth-token': JSON.stringify({ access_token: 'SECRET', refresh_token: 'ALSO-SECRET' }),
+    })
+    const url = await runPage(old)
+    const payload = url.split('#handoff=')[1]
+    const unpacked = await unpackHandoff(payload)
+
+    expect(unpacked!.keys['dogleg:handoff-relink:v1']).toBe('1')
+    // the credential itself is nowhere in the payload, at any level
+    expect(Object.keys(unpacked!.keys)).not.toContain('sb-cphmpypnvopoylwxsrlk-auth-token')
+    expect(JSON.stringify(unpacked!.keys)).not.toContain('SECRET')
+  })
+
+  it('leaves no relink flag for a player who never signed in', async () => {
+    const url = await runPage(seeded(OLD_DEVICE))
+    const unpacked = await unpackHandoff(url.split('#handoff=')[1])
+    expect(unpacked!.keys['dogleg:handoff-relink:v1']).toBeUndefined()
+  })
+
+  it('still hands over a session-only player, who has nothing else to carry', async () => {
+    // signed in, but never played on this origin: the flag alone is worth the
+    // trip, because they are exactly the player who would otherwise arrive
+    // signed out and confused
+    const old = new MemoryStorage()
+    old.setItem('sb-cphmpypnvopoylwxsrlk-auth-token', '{"access_token":"x"}')
+    const url = await runPage(old)
+    expect(url.startsWith('https://playdogleg.com/#handoff=')).toBe(true)
+    const unpacked = await unpackHandoff(url.split('#handoff=')[1])
+    expect(unpacked!.keys).toEqual({ 'dogleg:handoff-relink:v1': '1' })
+  })
+
   it('sends a never-played visitor straight on, with no empty payload', async () => {
     expect(await runPage(new MemoryStorage())).toBe('https://playdogleg.com/')
   })
@@ -630,6 +666,22 @@ describe('the boot path', () => {
     window.location.hash = `#watch=abc123&handoff=${payload}`
     expect(await runHandoff()).toBe('imported')
     expect(window.location.hash).toBe('#watch=abc123')
+  })
+
+  it('surfaces the relink prompt after an import that carried the flag', async () => {
+    const payload = await packHandoff(seeded({ ...OLD_DEVICE, 'dogleg:handoff-relink:v1': '1' }))
+    window.location.hash = `#handoff=${payload}`
+    expect(await runHandoff()).toBe('imported')
+    expect(needsRelink()).toBe(true)
+    clearRelink()
+    expect(needsRelink()).toBe(false)
+  })
+
+  it('leaves the relink prompt alone for an ordinary arrival', async () => {
+    const payload = await packHandoff(seeded(OLD_DEVICE))
+    window.location.hash = `#handoff=${payload}`
+    await runHandoff()
+    expect(needsRelink()).toBe(false)
   })
 
   it('does nothing at all on an ordinary load', async () => {

@@ -1128,6 +1128,13 @@
   color: var(--trophy-400);
 }
 
+/* the mark sits small atop the ceremony — not a watermark flood */
+.cup-podium-card .result-wordmark {
+  width: 92px;
+  height: auto;
+  margin: 0 auto;
+}
+
 .cup-podium-list {
   list-style: none;
   margin: 0;

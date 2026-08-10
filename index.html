@@ -5,6 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no" />
     <meta name="theme-color" content="#12251a" />
     <meta name="description" content="DogLeg — a daily golf challenge. One course, 18 holes, every decision shifts the odds." />
+    <!-- Pinterest site claim (playdogleg.com). Not a secret — the tag IS the
+         claim. Also emitted on every generated marketing page (scripts/lib/
+         pages.tsx); keep the two values in step. -->
+    <meta name="p:domain_verify" content="1a5c4413c8c5dfc3cbee237c0da375ee" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-title" content="DogLeg" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
@@ -39,6 +43,32 @@
     <meta name="twitter:description" content="One course. 18 holes. Play the odds and beat the course. A new daily golf challenge." />
     <meta name="twitter:image" content="https://playdogleg.com/og.png?v=3" />
     <meta name="twitter:image:alt" content="DogLeg — the wordmark in cream on deep turf green, a red pennant flying from the d's stem and the l doglegging down into the cup." />
+
+    <!-- Structured data for search: the site and the game itself. The course
+         guides carry their own BreadcrumbList (generated per page). -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebSite",
+        "name": "DogLeg",
+        "url": "https://playdogleg.com/"
+      }
+    </script>
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "VideoGame",
+        "name": "DogLeg",
+        "url": "https://playdogleg.com/",
+        "description": "A free daily golf strategy game: one course, 18 holes, every decision shifts the odds. Beat the course and break par.",
+        "genre": ["Sports game", "Strategy game", "Daily puzzle"],
+        "playMode": "SinglePlayer",
+        "gamePlatform": "Web browser",
+        "applicationCategory": "Game",
+        "operatingSystem": "Any",
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
+      }
+    </script>
 
     <title>DogLeg — daily golf challenge</title>
   </head>

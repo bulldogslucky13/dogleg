@@ -222,6 +222,30 @@ so they are exported from the design tool's own files (which live outside this
 repo, with the designer) rather than generated here. Ask for fresh exports when
 the mark changes; there is no `pnpm` command for them.
 
+## Marketing pages, SEO and Pinterest are generated too
+
+The app is a single-URL SPA, so every crawlable surface is prerendered by
+`scripts/lib/pages.tsx` (builders) + `scripts/pages-entry.tsx` (writer),
+bundled by `vite.pages.config.ts` because the builders render real app
+components (HoleMap, Wordmark) — same pattern as `build:validator`. `pnpm
+gen:pages` rides `pnpm build`, so `/courses/<slug>/` (one guide per course in
+ALL_COURSES, signature-hole map included), `/courses/`, `/how-to-play/`,
+`/changelog/`, `sitemap.xml`, `robots.txt` and `404.html` can never go stale —
+a new course gets its page and sitemap line with no wiring. `scripts/
+pages.test.ts` guards the metadata, the Pinterest domain-claim tag
+(`p:domain_verify`, also in index.html — keep the two in step), and that no
+odds internals leak (pages show CourseSpec + Play Rating only, never
+`difficulty`).
+
+The per-course Pinterest cards (2:3, 1000x1500) are rasterised by `pnpm
+gen:pin-images` into `dist/pins/` **in the deploy workflow only** (they need
+the runner's Chrome; PR CI builds pages without a browser). Course pages use
+them as `og:image` with a `?v=` cache-bust (`PIN_IMG_VERSION` in pages.tsx) —
+bump it when the card design changes, same contract as og.png. The Pinterest
+conversion tag (src/lib/analytics.ts) is dormant until the
+`VITE_PINTEREST_TAG_ID` repo variable is set; like PostHog, it never loads in
+tests.
+
 ## Commands
 
 ```sh

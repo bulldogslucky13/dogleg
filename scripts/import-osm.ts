@@ -90,6 +90,21 @@ type CourseGeo = {
   center: [number, number]
   radius?: number
   osmName: string
+  /** OSM way/relation id of the golf_course polygon, used INSTEAD of matching
+   * `osmName`. For a course OSM has mapped but never named: the anchored-name
+   * match has nothing to bite on, and falling back to "the golf_course polygon
+   * nearest the centre" would be a guess of exactly the kind step 0 of the
+   * freeze process forbids. An id is not a guess — but it is brittle in the
+   * same way `osmHoleWays` is (re-drawn polygon → new id), so a miss is FATAL
+   * rather than falling back to the name, and the entry must record how the id
+   * was established as this course. Whispering Pines is the case this was added
+   * for: `leisure=golf_course` with no `name` tag at all.
+   * `osmName` is still required alongside it — it documents, in the registry,
+   * what the polygon SHOULD be called.
+   * Written `way/<id>` or `relation/<id>`: ways and relations have SEPARATE id
+   * spaces, so a bare number would silently pull in whatever unrelated relation
+   * happens to share the number. */
+  osmAreaId?: `way/${number}` | `relation/${number}`
   osmHolePrefix?: string
   engineSlug: string
   /** holes packed tighter than ~40yd apart (par-3 shorts): assign BUNKERS
@@ -539,6 +554,189 @@ const COURSE_GEO: Record<string, CourseGeo> = {
     osmHolePrefix: '^Blue Monster',
     engineSlug: 'doral-blue-monster',
   },
+  // Erin Hills. Way 172725497, the only golf_course polygon within 3.5 km, and
+  // it holds exactly 18 golf=hole ways — one per ref, no second course to tell
+  // it apart from, so neither a prefix nor an id list is needed. The ways are
+  // unnamed, but OSM's own `par` tags match the club's BLACK card on all 18.
+  // Radius 1400 covers the 2126 x 1652 m polygon (1346 m half-diagonal;
+  // farthest centreline node 1007 m from centre).
+  // CARD: the shipped tuple matched par on all 18 and NOTHING else — its
+  // stroke index disagreed on 15 of 18 and its yardages (7513) sit between the
+  // Blue (7357) and Black (7772) sets, matching neither. Frozen on the club's
+  // own BLACK card, the whistling-straits call: the tips are the configuration
+  // a 7,700-yard US Open venue is, and the men's stroke index is identical
+  // across every men's tee set on the card, so the SI fix is unambiguous.
+  erinhills: {
+    name: 'Erin Hills',
+    center: [43.2449, -88.4019],
+    radius: 1400,
+    osmName: '^Erin Hills$',
+    engineSlug: 'erin-hills',
+  },
+  // Winged Foot — West. Way 122734591 is named "Winged Foot Golf Club" and, on
+  // the current data, wraps ONLY the West: exactly 18 golf=hole ways inside it,
+  // one per ref. The East's 18 (ways 687333625…687462459, unnamed, ref 1..18)
+  // sit OUTSIDE this polygon, so map_to_area separates the two courses on its
+  // own — no prefix or id list required.
+  // Identity is the shinnecock check at its strongest: the 18 ways carry the
+  // club's West hole names (Genesis, Elm, Pinnacle, Sound View, Long Lane, El,
+  // Babe-in-the-Woods, Arena, Meadow, Pulpit, Billows, Cape, White Mule,
+  // Shamrock, Pyramids, Hells-Bells, Well-Well, Revelations) matching the
+  // published West card name-for-name IN ORDER.
+  // Radius 1100 covers the 962 x 1798 m polygon (1019 m half-diagonal;
+  // farthest centreline node 858 m from centre).
+  // CARD: the quail-hollow case — the house source describes a DIFFERENT golf
+  // course. BlueGolf carries only the members' configuration (Blue, par 72 /
+  // 7426, the 5th, 9th, 12th and 16th all par 5s); the game ships par 70 with
+  // the 9th and 16th converted, which is the 2006 U.S. Open setup and not any
+  // tee set on the club card. Scored against all three configurations the
+  // shipped tuple is the 2006 card (par identical, 14 of 18 yardages
+  // dead-on, total deviation 102) rather than the members' (deviation 216 AND
+  // two par mismatches) or 2020's (which converted the 5th, not the 9th). So
+  // par stays; four yardages move to the 2006 card. Stroke index is taken from
+  // the club card, the only place a published SI for these holes exists —
+  // USGA championship cards carry none.
+  // OSM's own `par` tags arbitrate nothing here (9 par 5 like the members'
+  // card, 16 par 4 like the championship's) — the muirfield reminder that hole
+  // tags corroborate a card and never settle one.
+  wingedfoot: {
+    name: 'Winged Foot — West',
+    center: [40.9625, -73.7539],
+    radius: 1100,
+    osmName: '^Winged Foot Golf Club$',
+    engineSlug: 'winged-foot-west',
+  },
+  // National Golf Links of America. Way 28989103 holds exactly 18 golf=hole
+  // ways, all named "NGLA <n>", one per ref. The prefix is set even though
+  // map_to_area already isolates the course — Shinnecock Hills (already in this
+  // registry), Sebonack and Southampton GC all sit within 1.5 km and each
+  // carries its own ref=1..18, so a second lock is cheap insurance on the one
+  // site in the library where four courses' hole numbering overlaps.
+  // Radius 1500 covers the 1262 x 2432 m polygon (1370 m half-diagonal;
+  // farthest centreline node 1140 m from centre).
+  // CARD: the shipped tuple already matched BlueGolf's tips (Red, par 72 /
+  // 6935) on par, stroke index AND yardage for all 18, so this is pure
+  // geometry. OSM's `par` tags match it too.
+  ngla: {
+    name: 'National Golf Links of America',
+    center: [40.9063, -72.4492],
+    radius: 1500,
+    osmName: '^National Golf Links of America$',
+    osmHolePrefix: '^NGLA',
+    engineSlug: 'national-golf-links',
+  },
+  // The Country Club (Brookline). 27 holes on one site: way 29870415 holds the
+  // Main eighteen (Clyde + Squirrel, "Main 1".."Main 18") AND the nine-hole
+  // Primrose ("Primrose 1".."Primrose 9"), which shares refs 1-9 — the classic
+  // shared-site collision, and exactly what osmHolePrefix is for.
+  // Radius 1100 covers the 1373 x 1222 m polygon (919 m half-diagonal;
+  // farthest centreline node 727 m from centre). Robert T. Lynch Municipal sits
+  // ~530 m away, outside the polygon; only its water could arrive by radius,
+  // and none of it reaches a TCC corridor.
+  // CARD: the shipped tuple already matched BlueGolf's `cc11` BLACK card (the
+  // Main course, par 70 / 6840) on par, stroke index AND yardage for all 18 —
+  // pure geometry. Worth recording WHICH card that is, because the club has
+  // three on BlueGolf and the other two are different golf courses: the
+  // "Championship Course" entry is the composite (par 71 / 5328 as listed) and
+  // Primrose is the nine. OSM's `par` tags on the Main ways match the BLACK
+  // card on all 18; its `handicap` tags do not and cannot — they repeat values
+  // (two 13s, two 3s) and include a 19.
+  tcc: {
+    name: 'The Country Club — Main (Clyde/Squirrel)',
+    center: [42.3135, -71.1507],
+    radius: 1100,
+    osmName: '^The Country Club$',
+    osmHolePrefix: '^Main',
+    engineSlug: 'the-country-club',
+  },
+  // Whispering Pines (Trinity, TX) — the course that added `osmAreaId`, and the
+  // registry's first UNNAMED polygon. Way 1472122122 is tagged `leisure=
+  // golf_course` and nothing else, so the anchored-name match has nothing to
+  // bite on and the polygon must be pinned by id.
+  // NAME-COLLISION WARNING, and it is the worst in the registry: BlueGolf lists
+  // NINETEEN courses called some form of "Whispering Pines", including one in
+  // Oneonta, AL that owns the bare `whisperingpines` slug. The Texas club is
+  // `whisperingpinesgctexas`. Identity here rests on the three hole ways that
+  // carry tags at all — ref 1 (par 4, hcp 17), ref 5 (par 5, hcp 7) and ref 18
+  // (par 4, hcp 2) — each matching the club's Spirit card exactly, on a card
+  // whose stroke index is a distinctive sequence; plus all 18 centrelines
+  // ending on 18 DISTINCT golf=green polygons (0-12 m), the potomac check.
+  // The club's second course, The Needler, is not mapped at all.
+  // osmHoleWays pins all 18 because the 8th carries NO `ref` (way 1107623675):
+  // it is drawn between the 7th and 9th, measures 179 yd against the card's
+  // 194-yd par 3, and ends on its own green — so it is the 8th, and the id is
+  // the only way to say so. The other seventeen ids are their own refs.
+  // Radius 1400 covers the 2462 x 1844 m polygon (1538 m half-diagonal;
+  // farthest centreline node 915 m from centre); the polygon itself arrives by
+  // id, so the radius only scopes the water pull, and this course is full of it.
+  // CARD: the shipped tuple already matched BlueGolf's Spirit card (par 72 /
+  // 7468) on par, stroke index AND yardage for all 18 — pure geometry.
+  //
+  // NOT YET FROZEN, DELIBERATELY. This entry imports cleanly and every hole
+  // lands on the card, but the result is not shippable and geometry.ts has no
+  // `whispering-pines:*` keys, so the course stays procedural. The reason is
+  // the lake. Whispering Pines is built around water — its blurb says "water in
+  // play at every turn", six holes carry `hazard: 'water'`, and the 16th's
+  // signature promises "a 250-yard iron over the water — nowhere to bail" — and
+  // FIVE of those six import with no water whatsoever, because the only OSM
+  // feature covering it is the unusable Lake Livingston relation above. The
+  // club's own ponds ARE mapped and do come through (3, 7, 10, 11, 18), but the
+  // reservoir arms the back nine plays along are not.
+  // The obvious rescue — drop the polygon but keep its rings as a SHORELINE,
+  // the whistling-straits:17 measurement — does not work here either, and it is
+  // worth recording so nobody re-derives it: projected onto each centreline the
+  // ring flips sides every few stations (hole 13 reads L26, R7, L20 over 40 yd;
+  // hole 17 crosses the line eleven times), which no real shoreline does along
+  // a fairway. The ring is a coarse boundary drawn across the property, not the
+  // water's edge, so authoring zones from it would be invention.
+  // What a future pass needs is an independent source for the shore — the
+  // satellite imagery itself, measured against the centreline the way the
+  // Torrey Pines canyons were measured against NED transects — plus a decision
+  // about the pines, since OSM has no `natural=wood` polygon anywhere on a
+  // course named for its forest (the Sea Pines gap). Until then, procedural
+  // geometry is the honest answer: it is generic, but it does not promise a
+  // carry the map cannot show. See step 0 of the freeze process.
+  whisperingpines: {
+    name: 'Whispering Pines (Trinity, TX)',
+    center: [30.9487, -95.2455],
+    radius: 1400,
+    osmName: '^Whispering Pines$', // documentary only — the polygon is unnamed
+    osmAreaId: 'way/1472122122',
+    // relation/976304 "Lake Livingston" (natural=water, reservoir): 25 outer
+    // rings and 266 inners, and the outer that reaches this course ENCLOSES the
+    // whole property — the peninsula the course is built on is not punched out
+    // as an inner. Checked point by point: the mid-point of every one of the 18
+    // centrelines tests inside that outer and inside NO inner. Left in, it made
+    // all 18 holes a single full-width water `cross` from tee to green, i.e. a
+    // course that is 100% forced carry, which is the tell. This is the
+    // osmIgnore case exactly: the polygon claims open water over eighteen holes
+    // of dry land, so it is not the thing its tag says HERE. The club's real
+    // water is mapped separately and untouched by this — six polygons, four of
+    // them tagged golf=lateral_water_hazard, and they are what the imported
+    // water zones come from.
+    osmIgnore: [976304],
+    osmHoleWays: {
+      1: 715172696,
+      2: 1107623669,
+      3: 1107623670,
+      4: 1107623672,
+      5: 715178924,
+      6: 1107623673,
+      7: 1107623674,
+      8: 1107623675, // no `ref` in OSM — see the note above
+      9: 1107623682,
+      10: 1107623683,
+      11: 1107623684,
+      12: 1107623685,
+      13: 1107623686,
+      14: 1107623687,
+      15: 1107623688,
+      16: 1107623690,
+      17: 1107623691,
+      18: 715176576,
+    },
+    engineSlug: 'whispering-pines',
+  },
 }
 
 // ---------- Overpass ----------
@@ -601,10 +799,15 @@ function golfQuery(geo: CourseGeo): string {
   // Scope golf features to the named golf_course polygon (keeps neighbouring
   // courses out); pull water bodies by radius since ponds/lakes often carry no
   // golf tag and can straddle the course boundary.
+  // An unnamed polygon is pinned by id instead (see osmAreaId); the id form
+  // deliberately drops the `around` filter, because an id IS the scope.
+  const scope = geo.osmAreaId
+    ? `  ${geo.osmAreaId.split('/')[0]}(${geo.osmAreaId.split('/')[1]});`
+    : `  way["leisure"="golf_course"]["name"~"${geo.osmName}",i](around:${r},${lat},${lon});
+  relation["leisure"="golf_course"]["name"~"${geo.osmName}",i](around:${r},${lat},${lon});`
   return `[out:json][timeout:180];
 (
-  way["leisure"="golf_course"]["name"~"${geo.osmName}",i](around:${r},${lat},${lon});
-  relation["leisure"="golf_course"]["name"~"${geo.osmName}",i](around:${r},${lat},${lon});
+${scope}
 )->.gc;
 .gc map_to_area->.a;
 (
@@ -786,13 +989,39 @@ function pointInRing(ring: Vec[], q: Vec): boolean {
   return inside
 }
 
-/** All outer rings of an element as lat/lon loops (ways: one; relations: each outer member). */
-function elementRings(e: OsmElement): LatLon[][] {
-  if (e.geometry && e.geometry.length >= 3) return [e.geometry]
+/** Point-in-polygon honouring a multipolygon's inner rings (see elementRings). */
+function pointInPoly(p: { ring: Vec[]; holes: Vec[][] }, q: Vec): boolean {
+  return pointInRing(p.ring, q) && !p.holes.some((h) => pointInRing(h, q))
+}
+
+/**
+ * An element's polygons as lat/lon loops: ways are one ring with no holes;
+ * relations give one entry per OUTER member, each carrying the relation's INNER
+ * rings as holes.
+ *
+ * The holes are not decoration. A multipolygon's outer ring is the extent of
+ * the feature and its inners are the land punched out of it, so dropping the
+ * inners inflates the feature to its own bounding shoreline. Whispering Pines
+ * is the course that found this: it sits on a peninsula INSIDE relation/976304
+ * ("Lake Livingston", 26 outers and 266 inners), whose outer ring sweeps around
+ * the whole reservoir. With inners dropped, every sample point on every hole
+ * tested inside the lake and all 18 imported as one full-width water `cross`
+ * from tee to green — a course that is 100% carry, which is the tell.
+ *
+ * Attaching EVERY inner to EVERY outer is safe rather than sloppy: in a
+ * well-formed multipolygon an inner lies inside exactly one outer, and the
+ * outers are disjoint, so a point inside outer B can never be inside an inner
+ * belonging to outer A.
+ */
+type Poly = { ring: LatLon[]; holes: LatLon[][] }
+function elementRings(e: OsmElement): Poly[] {
+  if (e.geometry && e.geometry.length >= 3) return [{ ring: e.geometry, holes: [] }]
   if (e.members) {
+    const ok = (m: { geometry?: LatLon[] }) => m.geometry && m.geometry.length >= 3
+    const holes = e.members.filter((m) => m.role === 'inner' && ok(m)).map((m) => m.geometry!)
     return e.members
-      .filter((m) => m.role !== 'inner' && m.geometry && m.geometry.length >= 3)
-      .map((m) => m.geometry!)
+      .filter((m) => m.role !== 'inner' && ok(m))
+      .map((m) => ({ ring: m.geometry!, holes }))
   }
   return []
 }
@@ -875,11 +1104,19 @@ async function main() {
   // (osmHolePrefix), then by nearest center.
   const centerProj = projector(geo.center[0], geo.center[1])
   const c0 = centerProj({ lat: geo.center[0], lon: geo.center[1] })
-  let candidates = els.filter(
-    (e) => e.tags?.golf === 'hole' && String(e.tags.ref ?? '') === String(holeNo) && e.geometry,
-  )
+  const holeWays = els.filter((e) => e.tags?.golf === 'hole' && e.geometry)
+  // An osmHoleWays pin is checked against EVERY golf=hole way, not just the ones
+  // carrying ref=N: an id names one specific way, which is strictly stronger
+  // evidence than a ref tag and does not need the ref to agree with it. That
+  // also makes the pin the way to import a hole OSM simply forgot to number —
+  // whispering-pines:8 is mapped, drawn between the 7th and the 9th, and has no
+  // `ref` at all, so the ref filter alone would drop it and report the hole
+  // missing on a course that is fully mapped.
+  let candidates = geo.osmHoleWays
+    ? holeWays
+    : holeWays.filter((e) => String(e.tags!.ref ?? '') === String(holeNo))
   if (candidates.length === 0) {
-    const refs = [...new Set(els.filter((e) => e.tags?.golf === 'hole').map((e) => e.tags?.ref))].sort()
+    const refs = [...new Set(holeWays.map((e) => e.tags?.ref))].sort()
     console.error(`no golf=hole way with ref=${holeNo}. available refs: [${refs.join(', ')}]`)
     process.exit(2)
   }
@@ -900,7 +1137,7 @@ async function main() {
       const ids = candidates.map((e) => e.id).join(', ')
       console.error(
         `hole ${holeNo}: osmHoleWays pins way ${wantId} on ${geo.name}, which is not among the\n` +
-          `  ${candidates.length} way(s) sharing ref=${holeNo} here: [${ids}]\n` +
+          `  ${candidates.length} golf=hole way(s) here: [${ids}]\n` +
           `  That id is this course's only identity check against the other course on the site,\n` +
           `  so this refuses to guess. Re-pin osmHoleWays in COURSE_GEO against the current OSM\n` +
           `  data — and re-verify the replacement is this course's hole — before importing.`,
@@ -1034,7 +1271,7 @@ async function main() {
   // separate namespaces, so reporting a multipolygon hazard as way/<id> sends
   // a reviewer to an unrelated object or a 404 — and `--profile` output is
   // read as evidence during the freeze.
-  type Ring = { kind: ZoneKind | 'green'; ring: Vec[]; id: number; type: OsmElement['type'] }
+  type Ring = { kind: ZoneKind | 'green'; ring: Vec[]; holes: Vec[][]; id: number; type: OsmElement['type'] }
   const rings: Ring[] = []
   for (const e of els) {
     if (e === holeWay) continue
@@ -1042,7 +1279,8 @@ async function main() {
     const k = classify(e.tags ?? {})
     if (!k || k === 'tee' || k === 'fairway' || k === 'hole') continue
     for (const loop of elementRings(e)) {
-      const ring = loop.map(proj)
+      const ring = loop.ring.map(proj)
+      const holes = loop.holes.map((h) => h.map(proj))
       // Keep a ring only if an EDGE of it comes near the line. A real hazard
       // borders the playing corridor; a course-spanning lake that the coarse
       // straight centreline merely clips through at a dogleg has all its edges
@@ -1053,7 +1291,7 @@ async function main() {
         const al = toYards(along)
         if (al > -25 && al < length + 25) nearestEdge = Math.min(nearestEdge, toYards(Math.abs(lateral)))
       }
-      if (nearestEdge < 48) rings.push({ kind: k, ring, id: e.id, type: e.type })
+      if (nearestEdge < 48) rings.push({ kind: k, ring, holes, id: e.id, type: e.type })
     }
   }
 
@@ -1168,7 +1406,7 @@ async function main() {
   for (let a = 0; a <= length; a += STEP_YD) {
     const p = pointAtArc(center, cum, toMeters(a)).p
     const keys = rings
-      .filter((r) => r.kind === 'green' && pointInRing(r.ring, p))
+      .filter((r) => r.kind === 'green' && pointInPoly(r, p))
       .map(greenKey)
       .sort()
     if (keys.length) onGreen.push({ a, keys: [...new Set(keys)] })
@@ -1246,11 +1484,11 @@ async function main() {
       // hit can be the neighbour while q is still inside the target, and
       // truncating there would make the depth depend on ring order rather than
       // on the target green's own edge.
-      if (rings.some((r) => r.kind === 'green' && greenKey(r) === targetKey && pointInRing(r.ring, q))) {
+      if (rings.some((r) => r.kind === 'green' && greenKey(r) === targetKey && pointInPoly(r, q))) {
         greenHi = a
         continue
       }
-      const other = rings.find((r) => r.kind === 'green' && pointInRing(r.ring, q))
+      const other = rings.find((r) => r.kind === 'green' && pointInPoly(r, q))
       if (other) {
         console.error(
           `  ! hole ${holeNo}: past the pin the approach leaves ${targetKey} and enters ` +
@@ -1379,7 +1617,8 @@ async function main() {
     const nrm: Vec = [-dir[1], dir[0]] // left-hand normal (+offset = left)
     for (let off = -CORRIDOR_YD; off <= CORRIDOR_YD; off += RAKE_YD) {
       const q: Vec = [base[0] + nrm[0] * toMeters(off), base[1] + nrm[1] * toMeters(off)]
-      for (const { kind, ring } of ownedRings) {
+      for (const r of ownedRings) {
+        const kind = r.kind
         if (kind === 'green') continue
         // `deeprough` (golf=rough) is dropped wholesale at merge time — it is
         // the course's DEFAULT surface, usually one big multipolygon, and never
@@ -1392,7 +1631,7 @@ async function main() {
         // then vanished, leaving a bare hole where the imagery shows sand.
         // Skipping it outright is equivalent to testing it last.
         if (kind === 'deeprough') continue
-        if (pointInRing(ring, q)) {
+        if (pointInPoly(r, q)) {
           record(kind, a, off)
           break // one kind per sample point
         }
@@ -1479,7 +1718,7 @@ async function main() {
         const offs: number[] = []
         for (let off = -CORRIDOR_YD; off <= CORRIDOR_YD; off += RAKE_YD) {
           const q: Vec = [base[0] + nrm[0] * toMeters(off), base[1] + nrm[1] * toMeters(off)]
-          if (pointInRing(r.ring, q)) offs.push(off)
+          if (pointInPoly(r, q)) offs.push(off)
         }
         if (offs.length) m.set(a, offs)
       }

@@ -168,30 +168,21 @@ function CupNextCard(props: { event: CupEvent }) {
     const timer = setInterval(() => setT(countdownTo(firstTee)), 1000)
     return () => clearInterval(timer)
   }, [firstTee])
-  const course = courseBySlug(event.courseSlug)
-  const par = course?.holes.reduce((s, h) => s + h.par, 0)
-  const sunday = eventDateKeys(event)[3]
-  const dates = `Thu ${event.start.slice(5).replace('-', '/')} – Sun ${sunday.slice(5).replace('-', '/')}`
   return (
-    <div className={`cup-card${event.major ? ' major' : ''}`}>
-      <div className="kicker">
+    <div className="cup-tease cup-next">
+      <span className="cup-tease-kicker">
         🏆 Next on the DogLeg Cup{event.major ? ' · Major' : ''}
-        {event.exhibition ? ' · Exhibition' : ''}
-      </div>
-      <h2>{event.name}</h2>
-      <p className="cup-round-line">
-        {course ? `${course.name} · ${course.location}${par ? ` · Par ${par}` : ''}` : event.courseSlug}
-      </p>
-      <p className="fine cup-arc">{dates} · four rounds, best three count</p>
-      <p className="cup-clock-line cup-next-clock" role="timer" aria-label={`First tee in ${t.d} days`}>
+      </span>
+      <b className="cup-next-name">{event.name}</b>
+      <span className="cup-clock-line" role="timer" aria-label={`First tee in ${t.d} days`}>
         First tee in{' '}
         <b className="cup-clock">
           {t.d > 0 ? `${t.d}d ` : ''}
           {t.h}:{t.m}:{t.s}
         </b>
-      </p>
-      <button className="cta ghost slim-cup" onClick={() => setShowStandings((v) => !v)}>
-        {showStandings ? 'Hide Cup standings' : 'DogLeg Cup standings'}
+      </span>
+      <button className="cup-expand" onClick={() => setShowStandings((v) => !v)}>
+        {showStandings ? 'Hide Cup standings ‹' : 'DogLeg Cup standings ›'}
       </button>
       {showStandings && <CupStandingsList />}
     </div>

@@ -1201,14 +1201,28 @@
   overflow-y: auto;
 }
 
-/* the anticipation clock on the next-event card runs bigger — it's the show */
-.cup-next-clock {
-  text-align: left;
-  font-size: 0.95rem;
+/* the between-events card stays SMALL: name, clock, standings — that's it */
+.cup-tease.cup-next {
+  gap: 4px;
 }
 
-.cup-next-clock .cup-clock {
-  font-size: 1.15rem;
+.cup-next-name {
+  font-family: var(--font-display);
+  font-variation-settings: 'wdth' var(--wdth-tower);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: var(--track-tower);
+  font-size: 0.92rem;
+  color: var(--text-hi);
+}
+
+.cup-tease .cup-clock {
+  font-size: 1rem;
+}
+
+.cup-tease .cup-expand {
+  border-top: none;
+  padding: 2px 0 0;
 }
 
 /* the points line on the trophy shelf */

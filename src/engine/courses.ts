@@ -1775,8 +1775,8 @@ export const GUEST_COURSES: CourseSpec[] = [
     // the corners sharpen as the round goes, and the closer is the mark
     // itself — a double dogleg, left off the tee and right at the last turn.
     slug: 'the-dogleg',
-    name: 'The DogLeg',
-    location: 'Clubhouse, USA',
+    name: 'TPC DogLeg at Barksdale',
+    location: 'Barksdale, Virginia',
     difficulty: 8,
     greens: 'Firm',
     wind: 12,

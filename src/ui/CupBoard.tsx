@@ -40,12 +40,22 @@ function isMe(name: string): boolean {
 // The clock to the next round — ticks live, like a broadcast bug
 // ---------------------------------------------------------------------------
 
+function countdownTo(target: number): { d: number; h: string; m: string; s: string } {
+  const left = Math.max(0, target - Date.now())
+  const pad = (n: number) => `${Math.floor(n)}`.padStart(2, '0')
+  return {
+    d: Math.floor(left / 86_400_000),
+    h: pad((left / 3_600_000) % 24),
+    m: pad((left / 60_000) % 60),
+    s: pad((left / 1000) % 60),
+  }
+}
+
 function nextRoundParts(): { h: string; m: string; s: string } {
   const now = new Date()
   const midnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1)
-  const left = Math.max(0, midnight.getTime() - now.getTime())
-  const pad = (n: number) => `${Math.floor(n)}`.padStart(2, '0')
-  return { h: pad(left / 3_600_000), m: pad((left / 60_000) % 60), s: pad((left / 1000) % 60) }
+  const t = countdownTo(midnight.getTime())
+  return { h: `${t.d * 24 + Number(t.h)}`.padStart(2, '0'), m: t.m, s: t.s }
 }
 
 /** "Round 3 tees off in 07:41:22" — the next round opens at local midnight,
@@ -84,14 +94,7 @@ export function CupHomeCard(props: {
   if (!live) {
     const next = nextEvent(today)
     if (!next) return null
-    return (
-      <div className="cup-tease">
-        <span className="cup-tease-kicker">🏆 DogLeg Cup</span>
-        <span>
-          {next.name} · tees off {next.start.slice(5).replace('-', '/')}
-        </span>
-      </div>
-    )
+    return <CupNextCard event={next} />
   }
   const { event, day } = live
   const course = courseBySlug(event.courseSlug)
@@ -145,6 +148,103 @@ export function CupHomeCard(props: {
           {showStandings && !event.exhibition && <CupStandingsList />}
         </>
       )}
+    </div>
+  )
+}
+
+/**
+ * Between tournaments the Cup slot builds anticipation instead of going
+ * quiet: the NEXT event's full billing — name, course, dates, the major
+ * tag — over a live countdown to its first tee, with the season standings
+ * one tap away.
+ */
+function CupNextCard(props: { event: CupEvent }) {
+  const { event } = props
+  const [showStandings, setShowStandings] = useState(false)
+  const [y, m, d] = event.start.split('-').map(Number)
+  const firstTee = new Date(y, m - 1, d).getTime()
+  const [t, setT] = useState(() => countdownTo(firstTee))
+  useEffect(() => {
+    const timer = setInterval(() => setT(countdownTo(firstTee)), 1000)
+    return () => clearInterval(timer)
+  }, [firstTee])
+  const course = courseBySlug(event.courseSlug)
+  const par = course?.holes.reduce((s, h) => s + h.par, 0)
+  const sunday = eventDateKeys(event)[3]
+  const dates = `Thu ${event.start.slice(5).replace('-', '/')} – Sun ${sunday.slice(5).replace('-', '/')}`
+  return (
+    <div className={`cup-card${event.major ? ' major' : ''}`}>
+      <div className="kicker">
+        🏆 Next on the DogLeg Cup{event.major ? ' · Major' : ''}
+        {event.exhibition ? ' · Exhibition' : ''}
+      </div>
+      <h2>{event.name}</h2>
+      <p className="cup-round-line">
+        {course ? `${course.name} · ${course.location}${par ? ` · Par ${par}` : ''}` : event.courseSlug}
+      </p>
+      <p className="fine cup-arc">{dates} · four rounds, best three count</p>
+      <p className="cup-clock-line cup-next-clock" role="timer" aria-label={`First tee in ${t.d} days`}>
+        First tee in{' '}
+        <b className="cup-clock">
+          {t.d > 0 ? `${t.d}d ` : ''}
+          {t.h}:{t.m}:{t.s}
+        </b>
+      </p>
+      <button className="cta ghost slim-cup" onClick={() => setShowStandings((v) => !v)}>
+        {showStandings ? 'Hide Cup standings' : 'DogLeg Cup standings'}
+      </button>
+      {showStandings && <CupStandingsList />}
+    </div>
+  )
+}
+
+/**
+ * The points line on the Clubhouse trophy shelf: where the player stands in
+ * the season-long race, with the full standings one tap below. The Cup's
+ * money number lives with the rest of the hardware.
+ */
+export function CupPointsShelf() {
+  const [mine, setMine] = useState<{ points: number; rank: number; total: number } | 'none' | 'loading'>('loading')
+  const [open, setOpen] = useState(false)
+  useEffect(() => {
+    const today = localDateKey()
+    const keys = DOGLEG_CUP.filter((e) => eventPlayable(e) && paysPoints(e) && e.start <= today).map((e) => e.key)
+    if (keys.length === 0) {
+      setMine('none')
+      return
+    }
+    let liveFetch = true
+    void fetchCupSeasonScores(keys).then((rows) => {
+      if (!liveFetch) return
+      if (!rows) {
+        setMine('none')
+        return
+      }
+      const standings = cupStandings(rows)
+      const idx = standings.findIndex((s) => isMe(s.name))
+      setMine(idx === -1 ? 'none' : { points: standings[idx].points, rank: idx + 1, total: standings.length })
+    })
+    return () => {
+      liveFetch = false
+    }
+  }, [])
+  if (!backendEnabled) return null
+  return (
+    <div className="cup-points-shelf">
+      <button className="cup-points-line" onClick={() => setOpen((v) => !v)}>
+        <span className="kicker">🏆 DogLeg Cup points</span>
+        <b>
+          {mine === 'loading'
+            ? '…'
+            : mine === 'none'
+              ? '0 pts'
+              : `${mine.points.toLocaleString()} pts · ${mine.rank} of ${mine.total}`}
+        </b>
+        <span className="cup-trophy-toggle" aria-hidden>
+          {open ? '–' : '+'}
+        </span>
+      </button>
+      {open && <CupStandingsList />}
     </div>
   )
 }

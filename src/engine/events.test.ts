@@ -69,7 +69,7 @@ describe('the DogLeg Cup calendar is well-formed', () => {
     expect(flagship.exhibition).toBe(true)
     expect(flagship.start).toBe('2026-08-27')
     // the course shipped with the calendar entry — the week is ON
-    expect(courseBySlug('the-dogleg')?.name).toBe('The DogLeg')
+    expect(courseBySlug('the-dogleg')?.name).toBe('TPC DogLeg at Barksdale')
     expect(eventPlayable(flagship)).toBe(true)
     expect(activeEvent(flagship.start)?.event.key).toBe('the-dogleg-2026')
     // …and it stays a guest: never in the daily rotation

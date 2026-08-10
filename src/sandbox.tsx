@@ -449,7 +449,10 @@ const DAYS: Array<{ key: string; label: string }> = [
   { key: '2026-08-28', label: 'Fri · Rd 2' },
   { key: '2026-08-29', label: 'Sat · Rd 3' },
   { key: '2026-08-30', label: 'Sun · Rd 4' },
-  { key: '2026-08-31', label: 'Mon · podium' },
+  { key: '2026-08-31', label: 'Mon · podium + next-event clock' },
+  // the Monday after Pinehurst (the first POINTS event): the season race
+  // has real numbers, and the trophy shelf's points line lights up
+  { key: '2026-09-07', label: 'Sep 7 · points season live' },
 ]
 
 function setDay(key: string): void {

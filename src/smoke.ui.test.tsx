@@ -1399,12 +1399,17 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
     expect(save.seed.includes(':f')).toBe(false)
   })
 
-  it('between events the Teebox teases the next Cup tee time', () => {
+  it('between events the Teebox bills the next tournament over a live countdown', () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date(2026, 7, 31, 12)) // the Monday before the opener
     render(<App />)
-    expect(screen.getByText('🏆 DogLeg Cup')).toBeTruthy()
-    expect(screen.getByText(/DogLeg Cup at Pinehurst No\. 2 · tees off/)).toBeTruthy()
+    expect(screen.getByText(/Next on the DogLeg Cup/)).toBeTruthy()
+    expect(screen.getByText('DogLeg Cup at Pinehurst No. 2')).toBeTruthy()
+    // the clock is live and counting days until Thursday's first tee
+    expect(screen.getByText(/First tee in/)).toBeTruthy()
+    expect(screen.getByText(/2d /)).toBeTruthy()
+    // the season race is one tap away
+    expect(screen.getByText('DogLeg Cup standings')).toBeTruthy()
   })
 
   it('the podium is owed only for an event this device posted to, and only while fresh', async () => {

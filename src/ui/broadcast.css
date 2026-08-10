@@ -1201,6 +1201,55 @@
   overflow-y: auto;
 }
 
+/* the anticipation clock on the next-event card runs bigger — it's the show */
+.cup-next-clock {
+  text-align: left;
+  font-size: 0.95rem;
+}
+
+.cup-next-clock .cup-clock {
+  font-size: 1.15rem;
+}
+
+/* the points line on the trophy shelf */
+.cup-points-shelf {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.cup-points-line {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 12px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--edge-hairline);
+  border-radius: var(--r-bug);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.cup-points-line .kicker {
+  color: var(--trophy-400);
+  margin: 0;
+}
+
+.cup-points-line b {
+  font-family: var(--font-display);
+  font-variation-settings: 'wdth' var(--wdth-score);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /* the next-round clock — a broadcast bug under the posted CTA */
 .cup-clock-line {
   margin: 0;

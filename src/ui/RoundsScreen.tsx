@@ -19,6 +19,7 @@ import {
 import { lifetimeRounds, loadArchive, type ArchivedRound, type HistoryEntry } from '../state/store'
 import { eventDateKeys, eventForKey } from '../engine/events'
 import { loadCupTrophies } from '../lib/cup'
+import { CupPointsShelf } from './CupBoard'
 import { pastSeasons, roundsInSeason, seasonAwards, type SeasonAward } from '../state/seasonStore'
 import { loadLedger, syncLedger } from '../lib/records'
 import { hasEarnedAwards, reconcileAchievements } from '../state/achievements'
@@ -555,6 +556,7 @@ function TrophyRoom(props: {
     return (
       <div className="cup-trophy-room empty">
         <div className="kicker">🏆 Trophy Room</div>
+        <CupPointsShelf />
         <p className="fine">Tournament hardware lives here. Post three rounds at a DogLeg Cup event and come collect.</p>
       </div>
     )
@@ -563,6 +565,7 @@ function TrophyRoom(props: {
   return (
     <div className="cup-trophy-room">
       <div className="kicker">🏆 Trophy Room</div>
+      <CupPointsShelf />
       {trophies.map((t) => {
         const event = eventForKey(t.eventKey)
         const days = event ? eventDateKeys(event) : []

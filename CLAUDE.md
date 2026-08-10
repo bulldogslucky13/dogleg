@@ -135,6 +135,17 @@ Mail goes out through Resend — the edge function POSTs its API directly, and
 Supabase Auth is pointed at `smtp.resend.com` (sender `DogLeg Team
 <team@playdogleg.com>`, configured in the dashboard).
 
+**Mail also comes IN through Resend**: the domain has receiving enabled, and a
+Resend webhook (event `email.received`) POSTs to the `receive-email` edge
+function. The webhook carries metadata only, so the function fetches the full
+message from Resend's Received Emails API (same `RESEND_API_KEY`) and upserts
+it into `received_emails` (RLS on, no policies — service-role only; inbound
+mail is private correspondence, not board data). Auth is the svix signature
+(`RESEND_WEBHOOK_SECRET` function secret, verifier in `_shared/svix.ts`,
+tested by `svix.test.ts`), not a JWT — `verify_jwt` is off in config.toml and
+the function fails closed without the secret. Delivery is at-least-once; the
+upsert on `email_id` is what makes retries safe.
+
 **Every email we send renders through one chassis**, `supabase/functions/
 _shared/email-chassis.ts` — the broadcast card, with theme.css's tokens
 resolved to literals (mail has no custom properties, and Outlook's Word engine

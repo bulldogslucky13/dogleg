@@ -673,48 +673,34 @@ const COURSE_GEO: Record<string, CourseGeo> = {
   // 7468) on par, stroke index AND yardage for all 18 — pure geometry.
   //
   // NOT YET FROZEN, DELIBERATELY. This entry imports cleanly and every hole
-  // lands on the card, but the result is not shippable and geometry.ts has no
-  // `whispering-pines:*` keys, so the course stays procedural. The reason is
-  // the lake. Whispering Pines is built around water — its blurb says "water in
-  // play at every turn", six holes carry `hazard: 'water'`, and the 16th's
-  // signature promises "a 250-yard iron over the water — nowhere to bail" — and
-  // FIVE of those six import with no water whatsoever, because the only OSM
-  // feature covering it is the unusable Lake Livingston relation above. The
-  // club's own ponds ARE mapped and do come through (3, 7, 10, 11, 18), but the
-  // reservoir arms the back nine plays along are not.
-  // The obvious rescue — drop the polygon but keep its rings as a SHORELINE,
-  // the whistling-straits:17 measurement — does not work here either, and it is
-  // worth recording so nobody re-derives it: projected onto each centreline the
-  // ring flips sides every few stations (hole 13 reads L26, R7, L20 over 40 yd;
-  // hole 17 crosses the line eleven times), which no real shoreline does along
-  // a fairway. The ring is a coarse boundary drawn across the property, not the
-  // water's edge, so authoring zones from it would be invention.
-  // What a future pass needs is an independent source for the shore — the
-  // satellite imagery itself, measured against the centreline the way the
-  // Torrey Pines canyons were measured against NED transects — plus a decision
-  // about the pines, since OSM has no `natural=wood` polygon anywhere on a
-  // course named for its forest (the Sea Pines gap). Until then, procedural
-  // geometry is the honest answer: it is generic, but it does not promise a
-  // carry the map cannot show. See step 0 of the freeze process.
+  // lands on the card, and with ring stitching the lake it is built around
+  // comes through — but geometry.ts has no `whispering-pines:*` keys yet, so
+  // the course still plays procedural. What is missing is the hole-by-hole
+  // imagery QA the other four courses in this batch had, and the raw import
+  // has known work outstanding: four `cross` bands overrun their green by 4-8
+  // yd (5, 15, 16, 18), three `fairwayFrom`s sit inside water (11, 14, 18),
+  // the 4th imports bare, and the 5th's water is still absent though its tuple
+  // flags it. A course whose blurb promises "water in play at every turn" and
+  // whose 16th promises "a 250-yard iron over the water — nowhere to bail" is
+  // the wrong one to half-freeze, so it waits for the pass rather than
+  // shipping approximately. See step 0 of the freeze process.
+  // Also still open: OSM has no `natural=wood` polygon anywhere on a course
+  // named for its forest (the Sea Pines gap), so every hole imports treeless.
   whisperingpines: {
     name: 'Whispering Pines (Trinity, TX)',
     center: [30.9487, -95.2455],
     radius: 1400,
     osmName: '^Whispering Pines$', // documentary only — the polygon is unnamed
     osmAreaId: 'way/1472122122',
-    // relation/976304 "Lake Livingston" (natural=water, reservoir): 25 outer
-    // rings and 266 inners, and the outer that reaches this course ENCLOSES the
-    // whole property — the peninsula the course is built on is not punched out
-    // as an inner. Checked point by point: the mid-point of every one of the 18
-    // centrelines tests inside that outer and inside NO inner. Left in, it made
-    // all 18 holes a single full-width water `cross` from tee to green, i.e. a
-    // course that is 100% forced carry, which is the tell. This is the
-    // osmIgnore case exactly: the polygon claims open water over eighteen holes
-    // of dry land, so it is not the thing its tag says HERE. The club's real
-    // water is mapped separately and untouched by this — six polygons, four of
-    // them tagged golf=lateral_water_hazard, and they are what the imported
-    // water zones come from.
-    osmIgnore: [976304],
+    // NOTE for anyone reading git history: this entry briefly carried
+    // `osmIgnore: [976304]` ("Lake Livingston") on the diagnosis that its outer
+    // ring enclosed the whole property. That was wrong, and wrong in an
+    // instructive way — the relation's outer arrives as 26 SEPARATE member
+    // ways, and reading each as its own ring closes every fragment with an
+    // artificial straight edge, which is what swallowed the course. Stitched
+    // into the one ring it actually is (see stitchRings), the peninsula falls
+    // OUTSIDE the lake and all 18 mid-hole points test dry. The lake needs no
+    // special-casing; the rasteriser needed fixing.
     osmHoleWays: {
       1: 715172696,
       2: 1107623669,
@@ -1014,14 +1000,52 @@ function pointInPoly(p: { ring: Vec[]; holes: Vec[][] }, q: Vec): boolean {
  * belonging to outer A.
  */
 type Poly = { ring: LatLon[]; holes: LatLon[][] }
+
+/**
+ * Joins a role's member ways into closed rings by matching endpoints.
+ *
+ * A multipolygon ring is frequently SPLIT across several member ways — OSM
+ * shares a way between two features, or a mapper drew a long shoreline in
+ * sections — and Overpass hands each member back separately. Treating a
+ * fragment as a ring is not a small error: `pointInRing` closes whatever it is
+ * given with an artificial last-to-first edge, so half a lake becomes a lake
+ * bounded by a straight line through open water, and an inner fragment
+ * subtracts land that was never a hole. Six of NGLA's ring members arrive
+ * split, and 27 of Whispering Pines', so this is the common case rather than a
+ * corner one.
+ *
+ * Ways in a relation share node coordinates exactly, so endpoints match on
+ * value. A fragment that will not close is kept anyway rather than dropped: it
+ * is broken data either way, and the implicit closure is what shipped before
+ * this function existed, whereas dropping it would silently delete a hazard.
+ */
+function stitchRings(parts: LatLon[][]): LatLon[][] {
+  const key = (p: LatLon) => `${p.lat.toFixed(7)},${p.lon.toFixed(7)}`
+  const pool = parts.filter((p) => p.length >= 2).map((p) => p.slice())
+  const rings: LatLon[][] = []
+  while (pool.length) {
+    let cur = pool.pop()!
+    while (key(cur[0]) !== key(cur[cur.length - 1])) {
+      const tail = key(cur[cur.length - 1])
+      const i = pool.findIndex((w) => key(w[0]) === tail || key(w[w.length - 1]) === tail)
+      if (i < 0) break // no continuation — keep the fragment, see the note above
+      const w = pool.splice(i, 1)[0]
+      cur = cur.concat((key(w[0]) === tail ? w : w.slice().reverse()).slice(1))
+    }
+    if (cur.length >= 3) rings.push(cur)
+  }
+  return rings
+}
+
 function elementRings(e: OsmElement): Poly[] {
   if (e.geometry && e.geometry.length >= 3) return [{ ring: e.geometry, holes: [] }]
   if (e.members) {
-    const ok = (m: { geometry?: LatLon[] }) => m.geometry && m.geometry.length >= 3
-    const holes = e.members.filter((m) => m.role === 'inner' && ok(m)).map((m) => m.geometry!)
-    return e.members
-      .filter((m) => m.role !== 'inner' && ok(m))
-      .map((m) => ({ ring: m.geometry!, holes }))
+    const geomOf = (inner: boolean) =>
+      e
+        .members!.filter((m) => (m.role === 'inner') === inner && m.geometry && m.geometry.length >= 2)
+        .map((m) => m.geometry!)
+    const holes = stitchRings(geomOf(true))
+    return stitchRings(geomOf(false)).map((ring) => ({ ring, holes }))
   }
   return []
 }
@@ -1285,11 +1309,18 @@ async function main() {
       // borders the playing corridor; a course-spanning lake that the coarse
       // straight centreline merely clips through at a dogleg has all its edges
       // far away — that was the phantom "water crosses at 0 yds" on Sawgrass 2.
+      // INNER rings count as edges too. For a hole played along an island or a
+      // peninsula, the water's edge beside it IS the inner ring, while the
+      // outer boundary can be miles out across the lake — scanning only the
+      // outer would drop the polygon before pointInPoly ever got to use its
+      // holes, and the hole would come through with no water at all.
       let nearestEdge = Infinity
-      for (const p of ring) {
-        const { along, lateral } = projectToPolyline(center, cum, p)
-        const al = toYards(along)
-        if (al > -25 && al < length + 25) nearestEdge = Math.min(nearestEdge, toYards(Math.abs(lateral)))
+      for (const boundary of [ring, ...holes]) {
+        for (const p of boundary) {
+          const { along, lateral } = projectToPolyline(center, cum, p)
+          const al = toYards(along)
+          if (al > -25 && al < length + 25) nearestEdge = Math.min(nearestEdge, toYards(Math.abs(lateral)))
+        }
       }
       if (nearestEdge < 48) rings.push({ kind: k, ring, holes, id: e.id, type: e.type })
     }

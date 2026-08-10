@@ -366,23 +366,21 @@ find the polygon name for a new course, query Overpass for
   tcc 12, tcc 18) or a real carry whose `fairwayFrom` sat inside the water
   (ngla 13, 14).
 
-- **Whispering Pines (Trinity, TX) — NOT FROZEN, and the entry is in
-  `COURSE_GEO` to record why.** Everything about the import works: the polygon
-  is pinned (it is unnamed, which is what `osmAreaId` was added for), the 8th
-  is pinned by id (OSM never gave it a `ref`), and all 18 holes land on the
-  club's Spirit card. It is still not shippable, because the course is built
-  around water and the water is not mappable from OSM: the only feature
-  covering the lake is a reservoir multipolygon whose outer ring encloses the
-  whole property, and FIVE of the six holes the card flags as water import with
-  none — including the 16th, whose signature promises a 250-yard carry over it.
-  **The rescue that does not work is worth knowing.** Dropping the polygon but
-  keeping its rings as a SHORELINE — the whistling-straits:17 measurement — is
-  the obvious next move and it fails: projected onto each centreline the ring
-  flips sides every few stations (the 17th crosses the line eleven times),
-  which no real shoreline does along a fairway. It is a coarse boundary drawn
-  across the property, not a water's edge, so zones cut from it would be
-  invention. Procedural geometry is the honest answer until an independent
-  source for the shore exists — step 0 of the freeze process.
+- **Whispering Pines (Trinity, TX) — REGISTERED, NOT YET FROZEN.** The import
+  is sound: the polygon is pinned by id (it is unnamed, which is what
+  `osmAreaId` was added for), the 8th is pinned by id too (OSM never gave it a
+  `ref`), all 18 holes land on the club's Spirit card, and with the ring
+  stitching above the lake it is built around comes through — five of the six
+  holes the card flags as water now carry it, including the 16th, whose
+  signature promises a 250-yard carry. What it has NOT had is the hole-by-hole
+  imagery QA the other four courses got, and there is known work outstanding:
+  four `cross` bands overrun their greens by 4-8 yd, three `fairwayFrom`s sit
+  inside water, the 4th imports bare, and the 5th's water is still missing.
+  It stays procedural until that pass is done — a course whose blurb promises
+  "water in play at every turn" is the wrong one to half-freeze.
+  Worth reading its `COURSE_GEO` note before starting: it records the wrong
+  diagnosis this course produced first, and why counting a relation's member
+  ways is the check that would have caught it.
 
 ### Known gaps & importer artifact modes
 
@@ -435,16 +433,31 @@ find the polygon name for a new course, query Overpass for
     The tell is a hole coming through BARE that imagery says is not — and the
     profile (`--profile`) showing the bunkers reaching the corridor anyway,
     which is what separates this from a genuine ownership cull.
-  - *A multipolygon inflated to its own shoreline* (FIXED at source): only
-    OUTER members were read, so the land punched out of a feature by its INNER
-    rings counted as part of it. Whispering Pines sits on a peninsula inside
-    "Lake Livingston" (relation/976304, 26 outers and 266 inners) and every one
-    of its 18 holes imported as a single full-width water `cross` from tee to
-    green. The tell is a course that is 100% forced carry. Note the fix is not
-    always enough: that particular outer ring encloses the property with the
-    peninsula NOT punched out, so the relation still had to be dropped with
-    `osmIgnore` — a polygon claiming open water over eighteen holes of dry land
-    is not the thing its tag says.
+  - *A multipolygon inflated to its own shoreline* (FIXED at source, in two
+    halves). First, only OUTER members were read, so the land an INNER ring
+    punches out of a feature counted as part of it. Second — and this is the
+    one that actually bites — each member way was treated as a complete ring,
+    when a multipolygon ring is routinely **split across several members** (six
+    of NGLA's arrive that way, 27 of Whispering Pines'). Point-in-polygon
+    closes whatever it is handed with an artificial last-to-first edge, so half
+    a lake becomes a lake bounded by a straight line through open water.
+    Whispering Pines sits on a peninsula inside "Lake Livingston"
+    (relation/976304), whose outer arrives as 26 fragments: read separately
+    they swallowed the whole property and all 18 holes imported as one
+    full-width water `cross` from tee to green. **The tell is a course that is
+    100% forced carry.** Stitched into the single ring it actually is, every
+    mid-hole point tests dry and the lake needs no special-casing.
+    Worth knowing because the wrong diagnosis is so plausible: this first
+    looked like a badly-drawn outer that genuinely enclosed the course, and was
+    briefly "fixed" by dropping the relation with `osmIgnore` — which also
+    deleted the real water on six holes. If a huge water polygon seems to cover
+    a course, count its member ways before blaming the mapper.
+  - *A polygon dropped before its holes are read*: the proximity filter that
+    decides whether a ring is near enough to matter scans boundary vertices.
+    For a hole played along an island or a peninsula, the water's edge beside
+    it IS an inner ring while the outer boundary can be miles out across the
+    lake, so scanning only the outer discarded the polygon and the hole came
+    through with no water. Inner boundaries count too.
   - *Broken lateral hazards*: a continuous lake/marsh shows gaps where the
     fairway widens past the 50-yd sample corridor. If imagery shows unbroken
     water, span it continuously — the gap rewards aggressive lines for the

@@ -359,11 +359,22 @@
 //
 // v19 ALSO carries three importer changes that alter what FUTURE imports
 // produce (committed geometry is static data and untouched):
-//  - MULTIPOLYGON INNER RINGS are honoured. Only outer members were read, so a
-//    feature was inflated to its own bounding shoreline. Whispering Pines sits
-//    on a peninsula inside "Lake Livingston" (relation/976304, 26 outers and
-//    266 inners) and every one of its holes imported as a full-width water
-//    carry from tee to green.
+//  - MULTIPOLYGON RINGS ARE STITCHED AND THEIR INNERS HONOURED. Two halves of
+//    one bug. Only outer members were read, so the land an inner ring punches
+//    out of a feature counted as part of it; and each member way was treated as
+//    a complete ring, when a ring is routinely SPLIT across several members
+//    (six of NGLA's arrive that way, 27 of Whispering Pines'). The second half
+//    is the worse one, because point-in-polygon closes whatever it is given
+//    with an artificial last-to-first edge: half a lake becomes a lake bounded
+//    by a straight line through open water. Whispering Pines sits on a
+//    peninsula inside "Lake Livingston" (relation/976304), whose outer arrives
+//    as 26 fragments — read separately they swallowed the property and every
+//    hole imported as a full-width water carry tee to green. Stitched into the
+//    one ring it actually is, all 18 mid-hole points test dry.
+//    The proximity filter that decides whether a polygon is near enough to
+//    matter now scans inner boundaries too: for a hole played along an island
+//    or a peninsula the water's edge IS the inner ring, and scanning only the
+//    outer dropped the polygon before its holes could be used.
 //  - `osmAreaId` pins the golf_course polygon by id, for a course OSM has
 //    mapped but never NAMED — where the anchored-name match has nothing to
 //    bite on and nearest-polygon would be the guess step 0 forbids.
@@ -371,12 +382,10 @@
 //    than only those already carrying the right `ref`. An id names one specific
 //    way, which is stronger evidence than a ref tag, and it is the only way to
 //    import a hole OSM simply forgot to number.
-// The fifth course in this batch, Whispering Pines, is NOT here. It imports
-// cleanly and lands on its card, but five of the six holes its own tuple flags
-// as water come through with none — the only OSM feature covering the lake it
-// is built around is unusable, as the polygon AND as a shoreline. Shipping that
-// would promise carries the map cannot show, so it stays procedural; the
-// evidence is in its COURSE_GEO entry.
+// The fifth course in this batch, Whispering Pines, is NOT here — it is
+// registered and imports correctly, but its geometry has not been through the
+// imagery QA the other four had, so it stays procedural until it has. See its
+// COURSE_GEO entry.
 // Play Ratings regenerated LAST: only the four imported courses move. Three
 // change their integer rating — Erin Hills 5 -> 6, National Golf Links 5 -> 4,
 // The Country Club 7 -> 6 — and Winged Foot holds at 8.

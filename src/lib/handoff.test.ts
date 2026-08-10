@@ -631,6 +631,15 @@ describe("the old domain's packing half (handoff/index.html)", () => {
     expect(JSON.parse(target.getItem('dogleg:history:v1')!)).toHaveLength(1)
   })
 
+  it('forwards its search standing to the new domain rather than deleting it', () => {
+    // The page cannot be a 301 — it has to run JS to pack localStorage — so
+    // the canonical is how the old address hands its signals on. `noindex`
+    // would drop them instead, and the two are contradictory signals that
+    // must never appear together.
+    expect(html).toContain('<link rel="canonical" href="https://playdogleg.com/" />')
+    expect(html).not.toMatch(/<meta\s+name="robots"[^>]*noindex/)
+  })
+
   it('points at the domain this app is actually served from', () => {
     // a typo here strands everyone holding an old bookmark
     expect(html).toContain('https://playdogleg.com/')

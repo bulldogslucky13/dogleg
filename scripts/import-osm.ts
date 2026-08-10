@@ -671,27 +671,24 @@ const COURSE_GEO: Record<string, CourseGeo> = {
   // id, so the radius only scopes the water pull, and this course is full of it.
   // CARD: the shipped tuple already matched BlueGolf's Spirit card (par 72 /
   // 7468) on par, stroke index AND yardage for all 18 — pure geometry.
-  //
-  // NOT YET FROZEN, DELIBERATELY. This entry imports cleanly and every hole
-  // lands on the card, and with ring stitching the lake it is built around
-  // comes through — but geometry.ts has no `whispering-pines:*` keys yet, so
-  // the course still plays procedural. What is missing is the hole-by-hole
-  // imagery QA the other four courses in this batch had, and the raw import
-  // has known work outstanding: four `cross` bands overrun their green by 4-8
-  // yd (5, 15, 16, 18), three `fairwayFrom`s sit inside water (11, 14, 18),
-  // the 4th imports bare, and the 5th's water is still absent though its tuple
-  // flags it. A course whose blurb promises "water in play at every turn" and
-  // whose 16th promises "a 250-yard iron over the water — nowhere to bail" is
-  // the wrong one to half-freeze, so it waits for the pass rather than
-  // shipping approximately. See step 0 of the freeze process.
-  // Also still open: OSM has no `natural=wood` polygon anywhere on a course
-  // named for its forest (the Sea Pines gap), so every hole imports treeless.
+  // Frozen; the hand-fixes and the lake story are at the whispering-pines
+  // block in geometry.ts.
   whisperingpines: {
     name: 'Whispering Pines (Trinity, TX)',
     center: [30.9487, -95.2455],
     radius: 1400,
     osmName: '^Whispering Pines$', // documentary only — the polygon is unnamed
     osmAreaId: 'way/1472122122',
+    // Rake stays at the 6-yd default, and this one is worth recording because
+    // the SIZE check said to lower it and the OUTCOME check said not to. 12 of
+    // 81 bunkers are under 6 yd (min 3.2), which is the muirfield/cabot
+    // condition — but run the muirfield test properly, on what actually ships:
+    // 48 bunkers come within 30 yd of a green, and the 6-yd pass yields 33
+    // greenside zones against rake 3's 32. It recovers nothing, and it makes
+    // one hole worse — the 10th's greenside complex (sand both sides of the
+    // green) merges into a single right-hand zone at the finer spacing.
+    // Bunker width is the SCREENING test; greenside zones shipped is the one
+    // that decides.
     // NOTE for anyone reading git history: this entry briefly carried
     // `osmIgnore: [976304]` ("Lake Livingston") on the diagnosis that its outer
     // ring enclosed the whole property. That was wrong, and wrong in an

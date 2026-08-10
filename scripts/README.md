@@ -366,21 +366,35 @@ find the polygon name for a new course, query Overpass for
   tcc 12, tcc 18) or a real carry whose `fairwayFrom` sat inside the water
   (ngla 13, 14).
 
-- **Whispering Pines (Trinity, TX) — REGISTERED, NOT YET FROZEN.** The import
-  is sound: the polygon is pinned by id (it is unnamed, which is what
-  `osmAreaId` was added for), the 8th is pinned by id too (OSM never gave it a
-  `ref`), all 18 holes land on the club's Spirit card, and with the ring
-  stitching above the lake it is built around comes through — five of the six
-  holes the card flags as water now carry it, including the 16th, whose
-  signature promises a 250-yard carry. What it has NOT had is the hole-by-hole
-  imagery QA the other four courses got, and there is known work outstanding:
-  four `cross` bands overrun their greens by 4-8 yd, three `fairwayFrom`s sit
-  inside water, the 4th imports bare, and the 5th's water is still missing.
-  It stays procedural until that pass is done — a course whose blurb promises
-  "water in play at every turn" is the wrong one to half-freeze.
-  Worth reading its `COURSE_GEO` note before starting: it records the wrong
-  diagnosis this course produced first, and why counting a relation's member
-  ways is the check that would have caught it.
+- **Whispering Pines (Trinity, TX) — all 18, and the course that found the
+  ring-stitching bug.** Pure geometry (its tuple already matched the club's
+  Spirit card on par, SI and yardage for all 18), but the hardest IDENTITY in
+  the registry and the most instructive failure.
+  Identity first: nineteen clubs share this name, the bare `whisperingpines`
+  slug on BlueGolf belongs to one in **Alabama**, and OSM's polygon for the
+  Texas club carries no `name` tag at all — which is what `osmAreaId` was added
+  for. It is pinned instead by three hole ways whose par + handicap match the
+  Spirit card on a distinctive SI sequence, and by all 18 centrelines ending on
+  18 distinct greens. The 8th has no `ref` in OSM and is pinned by way id.
+  Then the lake, and **the wrong diagnosis is the part worth keeping.** Lake
+  Livingston appeared to enclose the whole property — every hole imported as
+  one full-width water `cross` tee to green — which reads exactly like a
+  badly-drawn outer ring, and was briefly "fixed" by dropping the relation with
+  `osmIgnore`. That also deleted the real water on six holes. The actual cause
+  was the rasteriser reading the relation's 26 outer member ways as 26 separate
+  rings (see the artifact catalog). **If a huge water polygon seems to cover a
+  course, count its member ways before blaming the mapper.**
+  Also worth copying: the RAKE check went the other way here. 12 of 81 bunkers
+  are under the 6-yd default, which is the muirfield/cabot condition and says
+  lower it — but the outcome check overruled the size check. 48 bunkers come
+  within 30 yd of a green, and rake 6 yields 33 greenside zones against rake
+  3's 32, while rake 3 merges the 10th's two-sided greenside complex into one
+  side. **Bunker width screens; greenside zones shipped decides.**
+  Six hand-fixes, and note the shape differs from the other four courses in
+  this batch: four crossings overrun the green they carry TO by 4-8 yd and are
+  CLIPPED to the green front rather than dropped, because unlike a greenside
+  ring rasterised as a carry these are the real thing — on 15 and 16 they are
+  the hole.
 
 ### Known gaps & importer artifact modes
 

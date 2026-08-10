@@ -1115,7 +1115,17 @@ export const COURSES: CourseSpec[] = [
     greens: 'Fast',
     wind: 6,
     blurb: 'A pristine, secluded Texas pine forest with water in play at every turn.',
+    // OSM has no `natural=wood` polygon anywhere on the property — on a course
+    // named for its pines — so the real geometry imports treeless and the odds'
+    // junk floor had nothing to name (see CourseSpec.junkLabel). The trees are
+    // what you are actually in when you miss here.
+    junkLabel: 'pines',
     holes: holes([
+      // Card = BlueGolf's Spirit tees (`whisperingpinesgctexas`), par 72 /
+      // 7468. The shipped tuple already matched it on par, stroke index AND
+      // yardage for all 18, so nothing here moved — this course was pure
+      // geometry. NAME-COLLISION WARNING: nineteen clubs share this name and
+      // the bare `whisperingpines` slug is one in Oneonta, Alabama.
       [4, 388, 17, 'L', 'none'],
       [5, 560, 5, 'R', 'sand'],
       [3, 208, 15, 'S', 'sand'],

@@ -307,9 +307,9 @@
 // 0.0469 -> 0.0191. No threshold was moved.
 // Play Ratings regenerated LAST, after every odds change: 22 of 53 courses
 // shift, every one by exactly one point (16 down, 6 up).
-// v19 = the next real dailies, imported in one PR and sharing one bump — none
-// has shipped, so a generation per course would buy nothing, the call made for
-// v5, v8, v10, v16 and v17.
+// v19 = FIVE courses, the next real dailies, imported in one PR and sharing
+// one bump — none has shipped, so a generation per course would buy nothing,
+// the call made for v5, v8, v10, v16 and v17.
 //
 // ERIN HILLS real geometry (OSM way 172725497) plus that card's stroke
 // index, which disagreed with the shipped tuple on 15 of 18 holes — and SI
@@ -382,11 +382,28 @@
 //    than only those already carrying the right `ref`. An id names one specific
 //    way, which is stronger evidence than a ref tag, and it is the only way to
 //    import a hole OSM simply forgot to number.
-// The fifth course in this batch, Whispering Pines, is NOT here — it is
-// registered and imports correctly, but its geometry has not been through the
-// imagery QA the other four had, so it stays procedural until it has. See its
-// COURSE_GEO entry.
-// Play Ratings regenerated LAST: only the four imported courses move. Three
+// WHISPERING PINES real geometry (OSM way 1472122122) — pure geometry, its
+// tuple already matching the club's Spirit card on par, SI and yardage for all
+// 18, so courses.ts gains only a junkLabel ('pines': OSM has no wood polygon
+// anywhere on a course named for its forest, so it imports treeless and the
+// junk floor had nothing to name).
+// This is the course the ring-stitching fix below was found on, and it does
+// not ship without it: read as 26 separate rings, Lake Livingston swallowed
+// the property and all 18 holes imported as a full-width water carry tee to
+// green. Stitched, the peninsula falls outside and the lake behaves — which
+// matters because five of the six holes the card flags as water get it from
+// that relation, including the 16th, whose signature promises "a 250-yard iron
+// over the water — nowhere to bail" and which now imports `water 118-222
+// cross` against a green starting at 222.
+// Every hole imports SHORT off forward pads and is prepended to the card. Six
+// hand-fixes: four crossings clipped to the green front (they carry TO those
+// greens rather than over them, so clipped rather than dropped), three
+// fairwayFroms moved past the water they sat inside, and a 10-yd tee chute on
+// the 18th.
+// Play Ratings regenerated LAST: only the five imported courses move. Four
 // change their integer rating — Erin Hills 5 -> 6, National Golf Links 5 -> 4,
-// The Country Club 7 -> 6 — and Winged Foot holds at 8.
+// The Country Club 7 -> 6, Whispering Pines 6 -> 8 — and Winged Foot holds at
+// 8. Whispering Pines moving two points is the water arriving: procedural
+// geometry had it as a pleasant tree-lined course, and the real thing carries
+// water on ten of eighteen holes.
 export const ENGINE_VERSION = 19

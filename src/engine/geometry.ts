@@ -485,6 +485,22 @@ export const OSM_BEND: Record<string, number[]> = {
   'the-country-club:17': [0, -6, -11, -17, -22, -28, -32, -35, -36, -34, -27, -14, 0],
   'the-country-club:18': [0, -6, -12, -19, -25, -31, -34, -36, -36, -31, -22, -11, 0],
 
+  // whispering-pines — measured on the SHIFTED centreline (see the
+  // whispering-pines note in OSM_GEOMETRY).
+  'whispering-pines:1': [0, -8, -16, -23, -31, -39, -45, -49, -49, -44, -33, -16, 0],
+  'whispering-pines:2': [0, 2, 4, 6, 9, 11, 12, 13, 13, 12, 9, 4, 0],
+  'whispering-pines:4': [0, 4, 8, 12, 15, 19, 22, 23, 22, 19, 13, 7, 0],
+  'whispering-pines:5': [0, -5, -9, -14, -19, -22, -25, -25, -23, -19, -13, -6, 0],
+  'whispering-pines:6': [0, 8, 16, 24, 33, 41, 46, 49, 49, 44, 32, 16, 0],
+  'whispering-pines:7': [0, -4, -8, -12, -17, -21, -23, -25, -25, -21, -15, -8, 0],
+  'whispering-pines:9': [0, 9, 18, 26, 35, 43, 48, 49, 47, 40, 26, 13, 0],
+  'whispering-pines:10': [0, 3, 7, 10, 14, 17, 19, 20, 20, 17, 12, 6, 0],
+  'whispering-pines:11': [0, 3, 7, 10, 14, 17, 19, 20, 20, 18, 13, 7, 0],
+  'whispering-pines:12': [0, -7, -13, -20, -26, -33, -38, -42, -42, -39, -30, -15, 0],
+  'whispering-pines:14': [0, -2, -5, -7, -10, -12, -15, -17, -18, -19, -17, -11, 0],
+  'whispering-pines:17': [0, -8, -15, -23, -30, -38, -46, -50, -52, -51, -43, -21, 0],
+  'whispering-pines:18': [0, -6, -11, -17, -23, -28, -32, -33, -32, -28, -19, -9, 0],
+
 }
 
 export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
@@ -8814,6 +8830,309 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
       { id: 'z4', kind: 'bunker', from: 290, to: 318, side: 'left' },
       { id: 'z5', kind: 'bunker', from: 428, to: 440, side: 'right' },
       { id: 'z6', kind: 'bunker', from: 438, to: 450, side: 'left' },
+    ],
+  },
+  // Whispering Pines (Trinity, TX). Pure geometry: the shipped tuple already
+  // matched BlueGolf's Spirit card (par 72 / 7468) on par, stroke index AND
+  // yardage for all 18, so courses.ts carries only a junkLabel.
+  // IDENTITY was the hard part here, and it is the registry's worst
+  // name-collision risk: BlueGolf lists NINETEEN courses called some form of
+  // "Whispering Pines", and the bare `whisperingpines` slug belongs to one in
+  // Oneonta, ALABAMA. The Texas club is `whisperingpinesgctexas`. OSM gives no
+  // help by name — its golf_course polygon (way/1472122122) has no `name` tag
+  // at all, which is what `osmAreaId` was added for. What pins it: the three
+  // hole ways that carry tags (ref 1 par 4 hcp 17, ref 5 par 5 hcp 7, ref 18
+  // par 4 hcp 2) match the Spirit card exactly on a distinctive SI sequence,
+  // and all 18 centrelines end on 18 DISTINCT golf=green polygons (0-12 yd).
+  // The 8th is pinned by way id because OSM never gave it a `ref` — it is drawn
+  // between the 7th and 9th, measures 179 yd against the card's 194-yd par 3,
+  // and ends on its own green. `osmHoleWays` names all 18 so nothing here rests
+  // on nearest-centre.
+  // THE LAKE IS THE STORY, and the first diagnosis of it was wrong in a way
+  // worth keeping. Lake Livingston (relation/976304) appeared to enclose the
+  // whole property: every sample point on every hole tested inside it and all
+  // 18 imported as one full-width water `cross` tee to green, a course that is
+  // 100% forced carry. That looked like a badly-drawn outer ring and was
+  // briefly "fixed" by dropping the relation — which also deleted the real
+  // water on six holes. The actual cause was the rasteriser: the relation's
+  // outer arrives as 26 SEPARATE member ways, and reading each as its own ring
+  // closes it with an artificial straight edge, so half a lake became a lake
+  // bounded by a line through open water. Stitched into the one ring it is,
+  // the peninsula falls outside and every mid-hole point tests dry. No
+  // special-casing needed. If a huge water polygon seems to cover a course,
+  // COUNT ITS MEMBER WAYS before blaming the mapper.
+  // Every hole imports SHORT and is prepended to the card (+66 on the 4th,
+  // +59 on the 17th, +52 on the 14th): OSM traced forward pads throughout, and
+  // only six tee pads are mapped across 18 holes, so the usual "does the shift
+  // land on a golf=tee" check has nothing to land on. ProVisualizer corroborates
+  // where it can — its published tee sits 48 yd behind the OSM start on the 4th,
+  // against a needed +66.
+  // SIX HAND-FIXES. Four crossings overran the green they carry TO by 4-8 yd
+  // (5, 15, 16, 18) and are CLIPPED to the green front rather than dropped —
+  // unlike the greenside-ring artifacts on the other courses in this batch,
+  // these are the real thing, and on 15 and 16 they ARE the hole. Three
+  // fairwayFroms sat inside the water they follow (11, 14, 18) and move past
+  // the crossing, the carnoustie burn rule. And 18's 10-yd `cross` at the tee
+  // is a chute, not a carry.
+  // COPY CHECK, the one that decided whether this course could ship at all:
+  // 16's signature promises "a 250-yard iron over the water — nowhere to bail",
+  // and it now imports `water 118-222 cross` against a green starting at 222 on
+  // a 252-yd par 3. That is the hole. 12's "water in play at every turn" holds
+  // too: water on 3, 7, 10, 11, 13, 14, 15, 16, 17 and 18.
+  // The 4th imports BARE and the 5th's water is genuinely outside the corridor
+  // — both measured, not assumed: nothing reaches the 4th's corridor at all,
+  // and the 5th's nearest water projects past the 50-yd rake at every station,
+  // the whistling-straits:9/18 call.
+  // Rake stays at 6; see the COURSE_GEO entry for why the size check said
+  // otherwise and the outcome check overruled it.
+  // TREES: OSM has no `natural=wood` polygon anywhere on a course named for
+  // its pines (the Sea Pines gap), so all 18 import treeless and the junk floor
+  // is named in courses.ts instead. Hand-authoring a forest across 18 holes
+  // would be invention, not import.
+  'whispering-pines:1': {
+    length: 388,
+    fairwayFrom: 136,
+    fairwayTo: 376,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 236, to: 388, side: 'left' },
+    ],
+  },
+  'whispering-pines:2': {
+    length: 560,
+    fairwayFrom: 196,
+    fairwayTo: 544,
+    greenDepth: 28,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 50, to: 278, side: 'right' },
+      { id: 'z2', kind: 'bunker', from: 128, to: 134, side: 'cross' },
+      { id: 'z3', kind: 'bunker', from: 134, to: 150, side: 'left' },
+      { id: 'z4', kind: 'bunker', from: 170, to: 176, side: 'cross' },
+      { id: 'z5', kind: 'bunker', from: 176, to: 198, side: 'left' },
+      { id: 'z6', kind: 'bunker', from: 192, to: 196, side: 'cross' },
+      { id: 'z7', kind: 'bunker', from: 304, to: 312, side: 'right' },
+      { id: 'z8', kind: 'bunker', from: 314, to: 322, side: 'left' },
+      { id: 'z9', kind: 'bunker', from: 372, to: 560, side: 'right' },
+      { id: 'z10', kind: 'bunker', from: 412, to: 426, side: 'cross' },
+      { id: 'z11', kind: 'bunker', from: 426, to: 434, side: 'left' },
+      { id: 'z12', kind: 'bunker', from: 520, to: 532, side: 'left' },
+    ],
+  },
+  'whispering-pines:3': {
+    length: 208,
+    fairwayFrom: 73,
+    fairwayTo: 196,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'water', from: 120, to: 176, side: 'cross' },
+      { id: 'z2', kind: 'water', from: 136, to: 142, side: 'right' },
+      { id: 'z3', kind: 'bunker', from: 176, to: 200, side: 'left' },
+      { id: 'z4', kind: 'bunker', from: 178, to: 200, side: 'right' },
+    ],
+  },
+  'whispering-pines:4': {
+    length: 488,
+    fairwayFrom: 171,
+    fairwayTo: 471,
+    greenDepth: 30,
+    zones: [
+    ],
+  },
+  'whispering-pines:5': {
+    length: 574,
+    fairwayFrom: 201,
+    fairwayTo: 560,
+    greenDepth: 24,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 250, to: 298, side: 'left' },
+      { id: 'z2', kind: 'bunker', from: 538, to: 544, side: 'right' },
+      { id: 'z3', kind: 'bunker', from: 544, to: 550, side: 'cross' },
+      { id: 'z4', kind: 'bunker', from: 558, to: 564, side: 'left' },
+      { id: 'z5', kind: 'bunker', from: 560, to: 574, side: 'right' },
+    ],
+  },
+  'whispering-pines:6': {
+    length: 391,
+    fairwayFrom: 137,
+    fairwayTo: 377,
+    greenDepth: 23,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 350, to: 391, side: 'right' },
+      { id: 'z2', kind: 'bunker', from: 356, to: 391, side: 'left' },
+    ],
+  },
+  'whispering-pines:7': {
+    length: 472,
+    fairwayFrom: 165,
+    fairwayTo: 456,
+    greenDepth: 28,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 14, to: 40, side: 'left' },
+      { id: 'z2', kind: 'bunker', from: 276, to: 314, side: 'left' },
+      { id: 'z3', kind: 'bunker', from: 336, to: 354, side: 'right' },
+      { id: 'z4', kind: 'water', from: 384, to: 392, side: 'right' },
+      { id: 'z5', kind: 'water', from: 392, to: 444, side: 'cross' },
+      { id: 'z6', kind: 'water', from: 444, to: 456, side: 'right' },
+      { id: 'z7', kind: 'bunker', from: 458, to: 472, side: 'right' },
+      { id: 'z8', kind: 'bunker', from: 462, to: 466, side: 'left' },
+    ],
+  },
+  'whispering-pines:8': {
+    length: 194,
+    fairwayFrom: 68,
+    fairwayTo: 178,
+    greenDepth: 28,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 142, to: 194, side: 'right' },
+      { id: 'z2', kind: 'bunker', from: 148, to: 164, side: 'cross' },
+      { id: 'z3', kind: 'bunker', from: 156, to: 166, side: 'left' },
+      { id: 'z4', kind: 'bunker', from: 178, to: 182, side: 'left' },
+    ],
+  },
+  'whispering-pines:9': {
+    length: 429,
+    fairwayFrom: 150,
+    fairwayTo: 416,
+    greenDepth: 21,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 2, to: 12, side: 'left' },
+      { id: 'z2', kind: 'bunker', from: 272, to: 288, side: 'right' },
+      { id: 'z3', kind: 'bunker', from: 278, to: 302, side: 'left' },
+      { id: 'z4', kind: 'bunker', from: 328, to: 352, side: 'left' },
+      { id: 'z5', kind: 'bunker', from: 412, to: 428, side: 'right' },
+    ],
+  },
+  'whispering-pines:10': {
+    length: 426,
+    fairwayFrom: 149,
+    fairwayTo: 414,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'water', from: 152, to: 240, side: 'right' },
+      { id: 'z2', kind: 'bunker', from: 200, to: 250, side: 'right' },
+      { id: 'z3', kind: 'bunker', from: 254, to: 284, side: 'left' },
+      { id: 'z4', kind: 'bunker', from: 392, to: 402, side: 'left' },
+      { id: 'z5', kind: 'bunker', from: 402, to: 406, side: 'cross' },
+      { id: 'z6', kind: 'bunker', from: 406, to: 416, side: 'right' },
+    ],
+  },
+  'whispering-pines:11': {
+    length: 411,
+    fairwayFrom: 152,
+    fairwayTo: 398,
+    greenDepth: 21,
+    zones: [
+      { id: 'z1', kind: 'water', from: 12, to: 50, side: 'left' },
+      { id: 'z2', kind: 'water', from: 50, to: 150, side: 'cross' },
+      { id: 'z3', kind: 'water', from: 150, to: 178, side: 'right' },
+      { id: 'z4', kind: 'bunker', from: 192, to: 252, side: 'right' },
+      { id: 'z5', kind: 'bunker', from: 264, to: 284, side: 'right' },
+      { id: 'z6', kind: 'bunker', from: 282, to: 308, side: 'left' },
+      { id: 'z7', kind: 'bunker', from: 384, to: 392, side: 'left' },
+      { id: 'z8', kind: 'bunker', from: 386, to: 396, side: 'right' },
+    ],
+  },
+  'whispering-pines:12': {
+    length: 535,
+    fairwayFrom: 187,
+    fairwayTo: 516,
+    greenDepth: 33,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 212, to: 266, side: 'right' },
+      { id: 'z2', kind: 'bunker', from: 424, to: 436, side: 'right' },
+      { id: 'z3', kind: 'bunker', from: 494, to: 528, side: 'right' },
+      { id: 'z4', kind: 'bunker', from: 514, to: 524, side: 'left' },
+    ],
+  },
+  'whispering-pines:13': {
+    length: 468,
+    fairwayFrom: 164,
+    fairwayTo: 448,
+    greenDepth: 36,
+    zones: [
+      { id: 'z1', kind: 'water', from: 0, to: 68, side: 'left' },
+      { id: 'z2', kind: 'water', from: 68, to: 130, side: 'cross' },
+      { id: 'z3', kind: 'water', from: 130, to: 140, side: 'right' },
+      { id: 'z4', kind: 'water', from: 130, to: 298, side: 'left' },
+      { id: 'z5', kind: 'bunker', from: 328, to: 452, side: 'left' },
+      { id: 'z6', kind: 'water', from: 418, to: 468, side: 'left' },
+    ],
+  },
+  'whispering-pines:14': {
+    length: 370,
+    fairwayFrom: 246,
+    fairwayTo: 357,
+    greenDepth: 22,
+    zones: [
+      { id: 'z1', kind: 'water', from: 84, to: 122, side: 'left' },
+      { id: 'z2', kind: 'water', from: 122, to: 244, side: 'cross' },
+      { id: 'z3', kind: 'water', from: 226, to: 370, side: 'left' },
+    ],
+  },
+  'whispering-pines:15': {
+    length: 178,
+    fairwayFrom: 62,
+    fairwayTo: 165,
+    greenDepth: 22,
+    zones: [
+      { id: 'z1', kind: 'water', from: 76, to: 156, side: 'cross' },
+      { id: 'z2', kind: 'bunker', from: 156, to: 178, side: 'left' },
+      { id: 'z3', kind: 'water', from: 160, to: 178, side: 'right' },
+      { id: 'z4', kind: 'bunker', from: 162, to: 178, side: 'right' },
+      { id: 'z5', kind: 'water', from: 168, to: 178, side: 'left' },
+    ],
+  },
+  'whispering-pines:16': {
+    length: 252,
+    fairwayFrom: 88,
+    fairwayTo: 235,
+    greenDepth: 30,
+    zones: [
+      { id: 'z1', kind: 'water', from: 6, to: 118, side: 'right' },
+      { id: 'z2', kind: 'water', from: 118, to: 222, side: 'cross' },
+      { id: 'z3', kind: 'water', from: 226, to: 234, side: 'right' },
+      { id: 'z4', kind: 'water', from: 226, to: 242, side: 'left' },
+      { id: 'z5', kind: 'bunker', from: 230, to: 246, side: 'left' },
+    ],
+  },
+  'whispering-pines:17': {
+    length: 629,
+    fairwayFrom: 220,
+    fairwayTo: 613,
+    greenDepth: 27,
+    zones: [
+      { id: 'z1', kind: 'water', from: 0, to: 110, side: 'right' },
+      { id: 'z2', kind: 'bunker', from: 98, to: 114, side: 'right' },
+      { id: 'z3', kind: 'water', from: 110, to: 148, side: 'cross' },
+      { id: 'z4', kind: 'water', from: 148, to: 292, side: 'left' },
+      { id: 'z5', kind: 'bunker', from: 172, to: 294, side: 'right' },
+      { id: 'z6', kind: 'bunker', from: 280, to: 286, side: 'left' },
+      { id: 'z7', kind: 'bunker', from: 300, to: 324, side: 'left' },
+      { id: 'z8', kind: 'water', from: 340, to: 629, side: 'left' },
+      { id: 'z9', kind: 'bunker', from: 380, to: 408, side: 'left' },
+      { id: 'z10', kind: 'bunker', from: 408, to: 426, side: 'cross' },
+      { id: 'z11', kind: 'bunker', from: 426, to: 440, side: 'left' },
+      { id: 'z12', kind: 'bunker', from: 572, to: 596, side: 'right' },
+      { id: 'z13', kind: 'bunker', from: 596, to: 629, side: 'left' },
+      { id: 'z14', kind: 'bunker', from: 608, to: 614, side: 'right' },
+    ],
+  },
+  'whispering-pines:18': {
+    length: 495,
+    fairwayFrom: 252,
+    fairwayTo: 478,
+    greenDepth: 29,
+    zones: [
+      { id: 'z1', kind: 'water', from: 10, to: 38, side: 'right' },
+      { id: 'z2', kind: 'water', from: 10, to: 166, side: 'left' },
+      { id: 'z3', kind: 'water', from: 166, to: 250, side: 'cross' },
+      { id: 'z4', kind: 'water', from: 250, to: 286, side: 'left' },
+      { id: 'z5', kind: 'bunker', from: 278, to: 338, side: 'left' },
+      { id: 'z6', kind: 'water', from: 412, to: 424, side: 'right' },
+      { id: 'z7', kind: 'water', from: 418, to: 466, side: 'cross' },
+      { id: 'z8', kind: 'water', from: 440, to: 464, side: 'left' },
+      { id: 'z9', kind: 'water', from: 474, to: 495, side: 'right' },
+      { id: 'z10', kind: 'bunker', from: 490, to: 494, side: 'left' },
     ],
   },
 }

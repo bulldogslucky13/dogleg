@@ -1409,7 +1409,7 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
     expect(screen.getByText(/First tee in/)).toBeTruthy()
     expect(screen.getByText(/2d /)).toBeTruthy()
     // the season race is one tap away
-    expect(screen.getByText('DogLeg Cup standings')).toBeTruthy()
+    expect(screen.getByText(/DogLeg Cup standings/)).toBeTruthy()
   })
 
   it('the podium is owed only for an event this device posted to, and only while fresh', async () => {

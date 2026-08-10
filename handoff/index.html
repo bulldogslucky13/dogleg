@@ -4,7 +4,17 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#12251a" />
-    <meta name="robots" content="noindex" />
+    <!-- CANONICAL, NOT NOINDEX. A domain move normally passes its search
+         standing on with a 301, which this page cannot be: it has to run JS to
+         pack localStorage, and a 301 would carry the player nowhere with their
+         clubhouse. Player data beat SEO, correctly — but the fallback for
+         "cannot 301" is a canonical, which consolidates this URL's signals
+         into the new domain. `noindex` did the opposite: it removed the old
+         address from the index and threw those signals away rather than
+         forwarding them. The two are contradictory signals and must not be
+         combined, so the canonical replaces it outright. Anyone who does land
+         here from a stale result is forwarded on arrival anyway. -->
+    <link rel="canonical" href="https://playdogleg.com/" />
     <title>DogLeg has moved — playdogleg.com</title>
 
     <!--

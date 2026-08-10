@@ -102,13 +102,25 @@ you could grind). Destiny (forced holeout at the guarantee threshold) is deliber
 resolved OUTSIDE the displayed odds — the game's one sanctioned exception to
 "the odds never lie", chosen for surprise. Don't add more exceptions.
 
+**The old domain hands players over.** `localStorage` is per-origin, so the
+move to playdogleg.com would otherwise strand every clubhouse — including the
+player id the daily dice are salted from. `handoff/index.html` is the one page
+the OLD domain still serves: it packs every `dogleg:` key into a URL fragment
+and bounces to the new site, where `src/lib/handoff.ts` merges it and strips
+the fragment (in `main.tsx`, before React mounts, so `ensureIdentity` can't
+mint a competing id first). The two halves live on different domains and can
+never share a bundle, so `handoff.test.ts` runs the real script out of the
+real HTML file against the real unpacker — **if you touch the wire format,
+change both sides**. New persistence keys need no change: the sweep is by
+`dogleg:` prefix, not a hand-listed set.
+
 Cross-device sync is optional email magic links (Supabase Auth): the
 `link-account` function ties `auth.users` to a player row (`players.user_id`);
 `src/lib/auth.ts` + `src/ui/AccountPanel.tsx` handle send/reconcile/adopt.
 Auth redirect URLs are configured for the prod domain and localhost:5173.
 Mail goes out through Resend — the edge function POSTs its API directly, and
 Supabase Auth is pointed at `smtp.resend.com` (sender `DogLeg Team
-<team@dogleg.cameronbristol.xyz>`, configured in the dashboard).
+<team@playdogleg.com>`, configured in the dashboard).
 
 **Every email we send renders through one chassis**, `supabase/functions/
 _shared/email-chassis.ts` — the broadcast card, with theme.css's tokens

@@ -68,7 +68,7 @@ const COPY = {
   kicker: 'Daily Golf Challenge',
   tagStart: '18 Holes. Play the Odds.',
   tagEnd: 'Beat the course.',
-  domain: 'dogleg.cameronbristol.xyz',
+  domain: 'playdogleg.com',
 }
 
 /** Webfonts as data URIs. The card is rasterised from a file:// page, where a
@@ -254,21 +254,33 @@ ${theme}
      (its box IS its ink), and the domain line is left alone — it sits on the
      card's axis on its own, and riding along with the lockup's correction
      would push it off. Vertical needs no pass: flexbox already centres the
-     stack, whose height is genuinely its content's height. */
+     stack, whose height is genuinely its content's height.
+
+     AWAIT THE FONTS FIRST. Measuring glyphs is only meaningful once the
+     glyphs are the real ones. This script is inline at the end of <body>, so
+     it runs while the @font-face rules above are still being applied — even
+     though they are base64 data URIs with nothing to fetch. Measured against
+     the fallback face, the ink comes out ~30px narrower on the right, the
+     correction lands short by exactly that, and the card ships visibly left
+     of centre with nothing in the diff to explain it. document.fonts.ready
+     resolves before the load event that the screenshot waits on, so this
+     costs nothing and cannot race the capture. */
   const inkRect = (el) => {
     const r = document.createRange()
     r.selectNodeContents(el)
     return r.getBoundingClientRect()
   }
 
-  const lockup = document.querySelector('.lockup')
-  const rects = [
-    lockup.querySelector('.wordmark svg').getBoundingClientRect(),
-    ...[...lockup.querySelectorAll('.lockup-kicker, .lockup-tag, .lockup-tag-end')].map(inkRect),
-  ]
-  const left = Math.min(...rects.map((r) => r.left))
-  const right = Math.max(...rects.map((r) => r.right))
-  lockup.style.transform = 'translateX(' + (${W} / 2 - (left + right) / 2).toFixed(2) + 'px)'
+  document.fonts.ready.then(() => {
+    const lockup = document.querySelector('.lockup')
+    const rects = [
+      lockup.querySelector('.wordmark svg').getBoundingClientRect(),
+      ...[...lockup.querySelectorAll('.lockup-kicker, .lockup-tag, .lockup-tag-end')].map(inkRect),
+    ]
+    const left = Math.min(...rects.map((r) => r.left))
+    const right = Math.max(...rects.map((r) => r.right))
+    lockup.style.transform = 'translateX(' + (${W} / 2 - (left + right) / 2).toFixed(2) + 'px)'
+  })
 </script>
 `
 }

@@ -16,7 +16,7 @@
  */
 import { useState } from 'react'
 import { createRoot } from 'react-dom/client'
-import { WORDMARK_URL } from '../supabase/functions/_shared/email-chassis.ts'
+import { SITE_URL, WORDMARK_URL } from '../supabase/functions/_shared/email-chassis.ts'
 import { AUTH_EMAILS } from '../supabase/functions/_shared/auth-emails.ts'
 import { buildStealEmail } from '../supabase/functions/submit-round/email.ts'
 
@@ -24,7 +24,7 @@ const steal = buildStealEmail({
   courseName: 'Whistling Straits',
   // an apostrophe and an injection attempt, so the escaping is visible here too
   thiefName: "O'Brien <script>",
-  siteUrl: 'https://dogleg.cameronbristol.xyz',
+  siteUrl: SITE_URL,
 })
 
 const EMAILS = [

@@ -19,6 +19,7 @@ import { HoleMap } from './ui/HoleMap'
 import { forecastSetup, localDateKey, practiceSetup } from './engine/daily'
 import { seasonForDate } from './engine/season'
 import { setupFromSeed } from './engine/replay'
+import { packHandoff, runHandoff } from './lib/handoff'
 import { loadIdentity, loadPlayer } from './lib/leaderboard'
 import { applyChoice, holeInPlay, newRound, saveRound } from './state/store'
 import type { HistoryEntry } from './state/store'
@@ -1718,5 +1719,44 @@ describe('smoke: anonymous identity and per-player daily dice', () => {
     fireEvent.click(screen.getByText(CHARACTERS[0].name))
     const plain = JSON.parse(localStorage.getItem('dogleg:round:v1') ?? 'null')
     expect(setupFromSeed(plain.seed)!.salt).toBeUndefined()
+  })
+})
+
+describe('smoke: a player arriving from the old domain', () => {
+  it('boots as the migrated clubhouse, with its carried history already live in the UI', async () => {
+    // ---- on the old domain: a named clubhouse that has played today ----
+    const identity = { id: 'a3f1c2d4-0000-4000-8000-abcdefabcdef', secret: 's3cret', name: 'Bogey Merchant' }
+    const entry: HistoryEntry = {
+      dateKey: localDateKey(),
+      puzzleNumber: 1,
+      courseSlug: 'pebble-beach',
+      toPar: 0,
+      results: [],
+      character: CHARACTERS[0].id,
+    }
+    localStorage.setItem('dogleg:player:v1', JSON.stringify(identity))
+    localStorage.setItem('dogleg:history:v1', JSON.stringify([entry]))
+    const payload = await packHandoff(localStorage)
+
+    // ---- now the new origin: a different localStorage, i.e. empty ----
+    localStorage.clear()
+    expect(loadIdentity()).toBeNull()
+
+    window.location.hash = `#handoff=${payload}`
+    await act(async () => {
+      await runHandoff()
+    })
+    // the payload must not linger where it can be copied or replayed
+    expect(window.location.hash).toBe('')
+
+    render(<App />)
+    // the clubhouse arrived whole: the name the boards know them by...
+    expect(loadPlayer()?.name).toBe('Bogey Merchant')
+    // ...and the id the daily dice are salted from, which is the part that
+    // would otherwise re-deal a day they have already posted
+    expect(loadIdentity()?.id).toBe(identity.id)
+    // and the history is not just stored but live on screen: today counts as
+    // played, so home reveals tomorrow's forecast
+    expect(screen.getByText(/Tomorrow's forecast/)).toBeTruthy()
   })
 })

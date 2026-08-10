@@ -68,6 +68,12 @@ export const CHANGE_KIND_LABEL: Record<ChangeKind, string> = {
 export const CHANGELOG: ChangeEntry[] = [
   {
     date: '2026-08-10',
+    kind: 'fix',
+    title: 'The course list remembers your sort and filters',
+    note: 'Unlimited play reset its sort and filters every time you left, so a curated view had to be rebuilt on every visit. Your last configuration now sticks — the season/all-time toggle, every filter, favorites, and the sort — and it comes back clearly marked, with a one-tap reset. If a remembered view ever matches nothing (say a season rollover reopened the records an old filter was hunting), the list says the filters are why, not that your courses are gone.',
+  },
+  {
+    date: '2026-08-10',
     kind: 'feature',
     title: 'A new address: playdogleg.com',
     note: 'The game moved to playdogleg.com — shorter, and easier to pass on. Share text and replay links point there from now on. An old bookmark still works and brings your clubhouse with it: your name, streak, records and saved rounds all come across on the first visit. If you had added an email for cross-device sync, that one thing cannot follow you between two addresses — sign in once more and this device is synced exactly as it was.',

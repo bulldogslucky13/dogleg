@@ -15,6 +15,7 @@ import { ChangeLog } from './ChangeLog'
 import { hasEarnedAwards, reconcileAchievements, type Unlock } from '../state/achievements'
 import { Wordmark } from './Wordmark'
 import { dismissSteals, pendingSteals, syncLedger, type StolenRecord } from '../lib/records'
+import { loadBrowsePrefs, saveBrowsePrefs } from '../lib/browsePrefs'
 import { loadFavorites, toggleFavorite } from '../lib/favorites'
 import { loadGhost, type Ghost } from '../state/ghost'
 import { currentHandicap, formatHandicap } from '../state/stats'
@@ -54,15 +55,21 @@ export function HomeScreen(props: {
   const records = characterRecords(props.history)
   const [showCourses, setShowCourses] = useState(false)
   const [courseTab, setCourseTab] = useState<'courses' | 'par3'>('courses')
+  /** the last-applied browse configuration, restored on every open — set a
+   * view once, come back to it (persists across full reloads; see
+   * lib/browsePrefs.ts for the local-now-portable-later contract) */
+  const savedPrefs = loadBrowsePrefs()
   /** unlimited-list filters — combinable, all reading existing data: the
    * archive for played/recent, Play Ratings for difficulty, the two record
    * maps for the hunt. Record filters obey the season/all-time toggle. */
-  const [recType, setRecType] = useState<'season' | 'alltime'>('season')
-  const [playedFilter, setPlayedFilter] = useState<'all' | 'unplayed' | 'played'>('all')
-  const [ratingFilter, setRatingFilter] = useState<'any' | 'easy' | 'mid' | 'hard'>('any')
-  const [recordFilter, setRecordFilter] = useState<'any' | 'open' | 'attainable' | 'mine' | 'notmine'>('any')
-  const [favsOnly, setFavsOnly] = useState(false)
-  const [courseSort, setCourseSort] = useState<'tour' | 'easiest' | 'hardest' | 'beatable' | 'recent' | 'favorites'>('tour')
+  const [recType, setRecType] = useState<'season' | 'alltime'>(savedPrefs.recType)
+  const [playedFilter, setPlayedFilter] = useState<'all' | 'unplayed' | 'played'>(savedPrefs.played)
+  const [ratingFilter, setRatingFilter] = useState<'any' | 'easy' | 'mid' | 'hard'>(savedPrefs.rating)
+  const [recordFilter, setRecordFilter] = useState<'any' | 'open' | 'attainable' | 'mine' | 'notmine'>(savedPrefs.record)
+  const [favsOnly, setFavsOnly] = useState(savedPrefs.favsOnly)
+  const [courseSort, setCourseSort] = useState<'tour' | 'easiest' | 'hardest' | 'beatable' | 'recent' | 'favorites'>(
+    savedPrefs.sort,
+  )
   const [favs, setFavs] = useState<Set<string>>(() => loadFavorites())
   const [filterSheet, setFilterSheet] = useState(false)
   const [courseRecs, setCourseRecs] = useState<Map<string, CourseRecord> | null>(null)
@@ -145,6 +152,19 @@ export function HomeScreen(props: {
       setSteals(pendingSteals())
     })
   }, [])
+  // remember the browse view as it changes, not on leave — a mid-session
+  // reload (or the tab dying) must not lose the configuration either
+  useEffect(() => {
+    saveBrowsePrefs({
+      recType,
+      played: playedFilter,
+      rating: ratingFilter,
+      record: recordFilter,
+      favsOnly,
+      sort: courseSort,
+    })
+  }, [recType, playedFilter, ratingFilter, recordFilter, favsOnly, courseSort])
+
   const avgLabel = (avg: number) => (avg > 0 ? `+${avg.toFixed(1)}` : avg.toFixed(1))
   // a stale bundle must not START any round — the referee refuses its score,
   // daily or practice alike. Every start path funnels into the remedy: the
@@ -383,7 +403,7 @@ export function HomeScreen(props: {
                     ☰ Filters{activeFilterCount > 0 ? ` · ${activeFilterCount}` : ''}
                   </button>
                   <button
-                    className="filter-chip sort"
+                    className={`filter-chip sort${courseSort !== 'tour' ? ' on' : ''}`}
                     onClick={() =>
                       setCourseSort(
                         courseSort === 'tour'
@@ -497,7 +517,11 @@ export function HomeScreen(props: {
           )}
           {courseTab === 'courses' && visibleCourses.length === 0 && (
             <div className="filter-empty">
-              <p className="fine">No courses match.</p>
+              {/* the filters are the cause, and the copy says so — a saved
+                  view can go stale (a rollover reopens every record, so an
+                  "open" filter that matched yesterday matches nothing today)
+                  and a bare "no courses" would read as missing data */}
+              <p className="fine">No courses match your saved filters — every course is still here.</p>
               <button className="filter-reset" onClick={resetFilters}>
                 Reset filters
               </button>

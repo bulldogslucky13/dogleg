@@ -1607,14 +1607,26 @@ async function main() {
   // long shared hazard (Rae's Creek fronting Augusta 12) has a far-off centroid
   // but runs right under our line, so it's ours; a neighbour's bunker never
   // comes close to our line at all.
-  const ownsHazard = (ring: Vec[], kind: ZoneKind) => {
+  // Measured over the outer AND inner boundaries, for the same reason the
+  // proximity filter above is: on a multipolygon the edge that borders our hole
+  // can be an INNER ring, with the outer miles away across the lake. Judging
+  // ownership on the outer alone then compares two distances that are both
+  // enormous and neither of which is the shoreline in question, so a
+  // neighbouring hole can win a reservoir by a metre of noise and cull the
+  // water from the hole whose bank it actually is.
+  // No committed course changes as a result (all 90 holes in the v19 batch
+  // re-import byte-identical, Whispering Pines included) — this makes a check
+  // that happened to come out right measure the thing it is asking about.
+  const ownsHazard = (poly: { ring: Vec[]; holes: Vec[][] }, kind: ZoneKind) => {
     let dT = Infinity
     let dOther = Infinity
-    for (const v of ring) {
-      for (const hl of holeLines) {
-        const d = distToLine(hl, v)
-        if (hl.isTarget) dT = Math.min(dT, d)
-        else dOther = Math.min(dOther, d)
+    for (const boundary of [poly.ring, ...poly.holes]) {
+      for (const v of boundary) {
+        for (const hl of holeLines) {
+          const d = distToLine(hl, v)
+          if (hl.isTarget) dT = Math.min(dT, d)
+          else dOther = Math.min(dOther, d)
+        }
       }
     }
     // Packed short courses: a bunker belongs to whichever hole line it's
@@ -1625,7 +1637,7 @@ async function main() {
     // hugging our line ⇒ ours; only cull ones clearly closer to a neighbour
     return dT <= toMeters(42) || dT <= dOther + toMeters(20)
   }
-  const ownedRings = rings.filter((r) => r.kind === 'green' || ownsHazard(r.ring, r.kind))
+  const ownedRings = rings.filter((r) => r.kind === 'green' || ownsHazard(r, r.kind))
 
   // travel direction at along a, averaged over ±25 yd → a normal that a single
   // coarse-centreline kink can't flip (a real dogleg bend still turns it)

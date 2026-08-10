@@ -63,14 +63,17 @@ describe('the DogLeg Cup calendar is well-formed', () => {
     expect(live).toBeTruthy()
   })
 
-  it('the DogLeg Cup Championship is on the books as a major exhibition', () => {
+  it('the DogLeg Cup Championship is live: a major exhibition on the game\'s own course', () => {
     const flagship = eventForKey('the-dogleg-2026')!
     expect(flagship.major).toBe(true)
     expect(flagship.exhibition).toBe(true)
     expect(flagship.start).toBe('2026-08-27')
-    // placeholder until its course ships — it must NOT schedule before then
-    expect(eventPlayable(flagship)).toBe(false)
-    expect(activeEvent(flagship.start)).toBeNull()
+    // the course shipped with the calendar entry — the week is ON
+    expect(courseBySlug('the-dogleg')?.name).toBe('The DogLeg')
+    expect(eventPlayable(flagship)).toBe(true)
+    expect(activeEvent(flagship.start)?.event.key).toBe('the-dogleg-2026')
+    // …and it stays a guest: never in the daily rotation
+    expect(courseBySlug('the-dogleg')?.par3Course).toBeUndefined()
   })
 
   it('the launch weeks are exhibitions; the points season starts Sept 3 and pays', () => {

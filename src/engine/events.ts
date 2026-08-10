@@ -84,8 +84,9 @@ export const DOGLEG_CUP: CupEvent[] = [
   // needs importing before Aug 20 — the entry flips to 'confirmed' with it.
   { key: 'bellerive-2026', name: 'DogLeg Cup at Bellerive', courseSlug: 'bellerive', start: '2026-08-20', exhibition: true, status: 'placeholder' },
   // THE DOGLEG CUP CHAMPIONSHIP — the game's own course, the flagship,
-  // yearly on this week. Flips on when the course ships.
-  { key: 'the-dogleg-2026', name: 'The DogLeg Cup Championship', courseSlug: 'the-dogleg', start: '2026-08-27', major: true, exhibition: true, status: 'placeholder' },
+  // yearly on this week. The course ships with this entry (a guest course:
+  // playable ONLY when the Championship is on).
+  { key: 'the-dogleg-2026', name: 'The DogLeg Cup Championship', courseSlug: 'the-dogleg', start: '2026-08-27', major: true, exhibition: true, status: 'confirmed' },
   // ---- the points season: weekly on our own marquees all fall and winter,
   //      counter-programming golf's off-season (CUP_SEASON_START) ----
   { key: 'pinehurst-no2-2026', name: 'DogLeg Cup at Pinehurst No. 2', courseSlug: 'pinehurst-no2', start: '2026-09-03', status: 'confirmed' },

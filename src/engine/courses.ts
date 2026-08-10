@@ -1766,6 +1766,42 @@ export const GUEST_COURSES: CourseSpec[] = [
       [5, 575, 8, 'L', 'water'],
     ]),
   },
+  {
+    // THE DOGLEG — the game's own course, host of the DogLeg Cup Championship
+    // every year. A guest on purpose: it never enters the daily rotation, and
+    // it isn't in the practice browser — the only week you can play the
+    // course is the week the Cup comes home. The course is the name: every
+    // two-shotter on the card turns (seven left, seven right, trading blows),
+    // the corners sharpen as the round goes, and the closer is the mark
+    // itself — a double dogleg, left off the tee and right at the last turn.
+    slug: 'the-dogleg',
+    name: 'The DogLeg',
+    location: 'Clubhouse, USA',
+    difficulty: 8,
+    greens: 'Firm',
+    wind: 12,
+    blurb: 'Eighteen holes and every one of them turns. Our house. The Cup comes home every August.',
+    holes: holes([
+      [4, 388, 11, 'R', 'sand', 'First Turn — the course shows you its name off the opening tee'],
+      [4, 412, 7, 'L', 'sand'],
+      [3, 176, 15, 'S', 'water'],
+      [5, 528, 9, 'R', 'water', 'The creek crosses twice — pick which one to challenge'],
+      [4, 431, 3, 'L', 'sand'],
+      [4, 366, 13, 'R', 'none'],
+      [3, 149, 17, 'S', 'sand'],
+      [4, 445, 1, 'L', 'water', 'The Elbow — the sharpest corner on the card, trouble all down the inside'],
+      [5, 556, 5, 'R', 'sand'],
+      [4, 397, 10, 'L', 'sand'],
+      [4, 430, 6, 'R', 'water'],
+      [3, 188, 14, 'S', 'water'],
+      [5, 572, 8, 'L', 'sand'],
+      [4, 449, 2, 'R', 'sand'],
+      [4, 318, 18, 'L', 'water', 'Snap Hook — drivable if you dare the corner; the safe line leaves a flip wedge'],
+      [3, 203, 12, 'S', 'sand'],
+      [4, 428, 4, 'R', 'sand'],
+      [5, 566, 16, 'L', 'water', 'The Long Way Home — a double dogleg drawn in the shape of the mark: left off the tee, right at the last turn', false, 'bridge'],
+    ]),
+  },
 ]
 
 export const ALL_COURSES: CourseSpec[] = [...COURSES, ...PAR3_COURSES, ...GUEST_COURSES]

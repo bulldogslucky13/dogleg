@@ -1,5 +1,6 @@
 import { courseBySlug } from './courses'
-import { dailyConditions, courseForPuzzle, practiceConditions, puzzleNumberForDateKey } from './daily'
+import { dailyConditions, courseForPuzzle, majorConditions, practiceConditions, puzzleNumberForDateKey } from './daily'
+import { dayOfEvent, eventForKey } from './events'
 import { destinyDue, fortuneEligible, fortuneShotOdds, splitFortune, type FortuneState, type MomentKind } from './fortune'
 import { buildLayout } from './layout'
 import { aceEligible, playShot, startHole, type HoleInPlay } from './resolve'
@@ -35,18 +36,23 @@ export { ENGINE_VERSION } from './version'
 export const AGGRESSIVE_BUDGET = 8
 
 export interface SeedInfo {
-  mode: 'daily' | 'practice'
+  mode: 'daily' | 'practice' | 'major'
   course: CourseSpec
   cond: Conditions
-  /** ace/albatross counters carried by the seed; null for pre-fortune seeds */
+  /** ace/albatross counters carried by the seed; null for pre-fortune seeds
+   * — and always ignored for 'major' (Cup rounds sit outside fortune) */
   fortune: FortuneState | null
-  /** daily only */
+  /** daily and major */
   dateKey?: string
   puzzleNumber?: number
-  /** daily only: the per-player dice salt, if the seed carried one. Callers
-   * that trust the score MUST check this against `dailySalt(playerId, dateKey)`
-   * — a free-floating salt is a licence to grind for luck. */
+  /** daily and major: the per-player dice salt, if the seed carried one.
+   * Callers that trust the score MUST check this against
+   * `dailySalt(playerId, dateKey)` — a free-floating salt is a licence to
+   * grind for luck. */
   salt?: string
+  /** major only: which DogLeg Cup event, and which of its four rounds */
+  eventKey?: string
+  eventDay?: number
 }
 
 /** Reconstruct the full round setup from a seed string, or null if invalid.
@@ -65,6 +71,33 @@ export function setupFromSeed(seed: string): SeedInfo | null {
     const course = courseForPuzzle(n)
     if (course.slug !== slug) return null // seed names a course that isn't that day's rotation
     return { mode: 'daily', course, cond: dailyConditions(dateKey, course), fortune, dateKey, puzzleNumber: n, salt }
+  }
+  // DogLeg Cup rounds: major:<eventKey>:<dateKey>:<slug>[:<salt>]. The event
+  // must exist in the calendar, name this course, and contain this date —
+  // the same closed-world validation the daily gets from its rotation. The
+  // salt rule is the daily's exactly (dailySalt(playerId, dateKey)).
+  const major = /^major:([a-z0-9-]+):(\d{4}-\d{2}-\d{2}):([a-z0-9-]+?)(?::([a-z0-9]+))?$/.exec(base)
+  if (major) {
+    const [, eventKey, dateKey, slug, salt] = major
+    const event = eventForKey(eventKey)
+    if (!event || event.courseSlug !== slug) return null
+    const day = dayOfEvent(event, dateKey)
+    if (!day) return null // a date outside the event's Thursday–Sunday window
+    const course = courseBySlug(slug)
+    if (!course) return null
+    return {
+      mode: 'major',
+      course,
+      cond: majorConditions(eventKey, dateKey, day, course),
+      // carried through splitFortune like every seed, but inert: Cup rounds
+      // sit outside fortune by design (see the note in events.ts) and
+      // destinyPlan/fortuneOddsFor below refuse 'major' outright
+      fortune,
+      dateKey,
+      salt,
+      eventKey,
+      eventDay: day,
+    }
   }
   // every historical practice prefix parses forever; the prefix itself is the
   // conditions version (practiceConditions gates pin/gust draws on it) — see
@@ -92,14 +125,16 @@ export function destinyPlan(info: SeedInfo): DestinyPlan {
   // Par-3 short courses sit outside fortune entirely: eighteen ace chances a
   // round would let a due destiny be cashed on the cheapest tee in the game.
   // Aces there are pure odds — see the par-3 paragraph in fortune.ts.
-  if (!info.fortune || !fortuneEligible(info.course)) return { ace: false, albatross: false }
+  // Cup rounds ('major') sit outside it too, even if a seed somehow carries
+  // a tail: a destiny cashing mid-tournament would tilt a four-day board.
+  if (info.mode === 'major' || !info.fortune || !fortuneEligible(info.course)) return { ace: false, albatross: false }
   const due = destinyDue(info.mode, info.fortune)
   return { ace: due.ace, albatross: due.albatross }
 }
 
 /** The per-shot probability boosts that DO flow through the honest odds. */
 export function fortuneOddsFor(info: SeedInfo): { acePerShot: number; albPerShot: number } | undefined {
-  if (!info.fortune || !fortuneEligible(info.course)) return undefined
+  if (info.mode === 'major' || !info.fortune || !fortuneEligible(info.course)) return undefined
   return fortuneShotOdds(info.mode, info.fortune)
 }
 

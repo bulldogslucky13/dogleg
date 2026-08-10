@@ -172,6 +172,40 @@ export function dailyConditions(dateKey: string, course: CourseSpec): Conditions
   return jitteredConditions(`daily:${dateKey}:${course.slug}`, course, 10, 2, dateKey >= PINS_FROM_DATEKEY)
 }
 
+/** the one-step-firmer map for the Cup's weekend arc: Fast is the ceiling */
+const FIRMER: Record<Greens, Greens> = { Slow: 'Medium', Medium: 'Firm', Firm: 'Fast', Fast: 'Fast' }
+
+/** Sunday — kept in lockstep with events.ts's EVENT_DAYS without importing it
+ * (daily.ts stays leaf-like; events.ts is calendar, this is conditions). */
+const EVENT_LAST_DAY = 4
+
+/**
+ * DOGLEG CUP conditions — the published firming-up arc.
+ *
+ * Each event day draws its own conditions from the date exactly like the
+ * daily (fresh wind, greens, pins every round), and then the weekend bias is
+ * applied ON TOP, deterministically: wind stiffens a notch a day (+0 Thursday
+ * through +3 Sunday), Saturday and Sunday play a point harder, and Sunday's
+ * greens firm up one step. The arc is DISCLOSED on the event card — that's
+ * what keeps a deliberately harder Sunday inside "the odds never lie": the
+ * course isn't sneaking up on anyone, it's the setup crew doing what real
+ * majors do to a course all weekend.
+ *
+ * Versioning: the `major:` grammar is new with this function, so there are no
+ * historical major seeds to protect — but from its first shipped event this
+ * derivation is as frozen as the daily's. Evolving it later means gating on
+ * the event's start date, like PINS_FROM_DATEKEY gates the daily.
+ */
+export function majorConditions(eventKey: string, dateKey: string, day: number, course: CourseSpec): Conditions {
+  const cond = jitteredConditions(`major:${eventKey}:${dateKey}:${course.slug}`, course, 10, 2, true)
+  return {
+    ...cond,
+    wind: cond.wind + (day - 1),
+    greens: day >= EVENT_LAST_DAY ? FIRMER[cond.greens] : cond.greens,
+    difficulty: Math.min(10, cond.difficulty + (day >= 3 ? 1 : 0)),
+  }
+}
+
 /** For practice the round seed itself is the conditions key. Par-3 shorts
  * draw from a gustier band — wind is half their personality. */
 export function practiceConditions(seed: string, course: CourseSpec): Conditions {

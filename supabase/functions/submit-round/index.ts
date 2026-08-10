@@ -112,6 +112,16 @@ Deno.serve(async (req) => {
     if (!allowed.includes(info.dateKey!)) return json(422, { error: 'daily is not for today' })
   }
 
+  // DogLeg Cup seeds parse (the engine knows the grammar) but the Cup's
+  // submission lane — event boards, per-day one-attempt, the salt check for
+  // 'major' — isn't built yet. Refuse them outright until it is: without
+  // this, a hand-crafted major seed would fall through the practice paths
+  // below with its salt UNVERIFIED, which is a licence to grind dice at the
+  // record boards. Replaced by the real Cup branch when event_scores lands.
+  if (info.mode === 'major') {
+    return json(422, { error: 'Cup rounds are not open for submission yet' })
+  }
+
   // ---- a destined practice round cannot contend for course records ----
   // Practice fortune counters have no server-visible history AT ALL, so a
   // destiny-due tail is unverifiable — anyone could forge `:f500.…` and post

@@ -109,9 +109,20 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
     expect(screen.queryByRole('dialog', { name: /Play Rating/i })).toBeNull()
   })
 
-  it('shows the tutorial to a first-time visitor', () => {
+  it('shows the tutorial to a first-time visitor, opening on the tagline hero', () => {
     localStorage.removeItem('dogleg:tutorial:v1')
     render(<App />)
+    // the hero IS the brand line — the three pillars stacked inside the card
+    // (the home lockup behind the overlay carries the same line, by design:
+    // one brand element, two surfaces — so scope the check to the dialog)
+    const card = within(screen.getByRole('dialog', { name: 'How to play DogLeg' }))
+    expect(card.getByText('Welcome to DogLeg')).toBeTruthy()
+    expect(card.getByText('18 holes.')).toBeTruthy()
+    expect(card.getByText('Play the odds.')).toBeTruthy()
+    expect(card.getByText('Beat the course.')).toBeTruthy()
+    // and each later step wears its pillar as the kicker
+    fireEvent.click(screen.getByText('Next'))
+    expect(screen.getByText(/18 Holes · 2 of/)).toBeTruthy()
     expect(screen.getByText('One round, one goal')).toBeTruthy()
   })
 
@@ -426,7 +437,7 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
     // 1. the tutorial wins — a player who doesn't know the rules can't use
     //    either announcement. The other two wait, unacked.
     const first = render(<App />)
-    expect(screen.getByText('One round, one goal')).toBeTruthy()
+    expect(screen.getByText('Welcome to DogLeg')).toBeTruthy()
     expect(screen.queryByText(/Not all rough is rough/)).toBeNull()
     expect(screen.queryByText(/has begun/)).toBeNull()
     // dismissing it does NOT hand off to the next one — one dialog per arrival
@@ -456,7 +467,7 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
     // the splash owns the landing; dismiss it to reach the home screen
     fireEvent.click(screen.getByText(/I'll find the fairway/))
     fireEvent.click(screen.getByText('How to play'))
-    expect(screen.getByText('One round, one goal')).toBeTruthy()
+    expect(screen.getByText('Welcome to DogLeg')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'Close tutorial' }))
     // closing a MANUAL tutorial returns to home, not to another dialog
     expect(screen.getByText('Tee off')).toBeTruthy()

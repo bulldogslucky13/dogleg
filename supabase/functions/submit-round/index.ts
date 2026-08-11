@@ -568,14 +568,21 @@ Deno.serve(async (req) => {
     toPar: replay.toPar,
     strokes: replay.strokes,
     ...(daily ?? {}),
-    record: isRecord
-      ? { broken: true, toPar: replay.toPar, holder: player.name, character: character ?? null }
-      : {
-          broken: false,
-          toPar: recordHolder?.to_par ?? replay.toPar,
-          holder: recordHolder?.player_name ?? player.name,
-          character: recordHolder?.character ?? null,
-        },
+    // no holder and no claim (an ineligible round on a recordless course) →
+    // omit `record` entirely, like the season path: synthesizing one from
+    // the challenger would show their own score as the standing record
+    ...(isRecord
+      ? { record: { broken: true, toPar: replay.toPar, holder: player.name, character: character ?? null } }
+      : recordHolder
+        ? {
+            record: {
+              broken: false,
+              toPar: recordHolder.to_par,
+              holder: recordHolder.player_name,
+              character: recordHolder.character ?? null,
+            },
+          }
+        : {}),
     ...(seasonRecord ? { seasonRecord } : {}),
     player: { id: player.id, name: player.name, ...(player.secret ? { secret: player.secret } : {}) },
   })

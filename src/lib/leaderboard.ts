@@ -310,6 +310,14 @@ export async function submitRound(round: RoundState, name?: string): Promise<Sub
     })
     const body = (await res.json()) as SubmitResult & { player?: Player & { secret?: string } }
     if (!res.ok) {
+      // a failed submission can still have minted this device's identity —
+      // the server creates first-time players before the writes that can
+      // 500, and attaches the fresh credentials to those errors. Persist
+      // them NOW or the retry goes out nameless, re-claims the same name,
+      // and stalls forever on "that name is taken".
+      if (body.player?.id && body.player.secret) {
+        savePlayerIdentity({ id: body.player.id, secret: body.player.secret, name: body.player.name })
+      }
       return {
         ok: false,
         error: body.error ?? `submit failed (${res.status})`,

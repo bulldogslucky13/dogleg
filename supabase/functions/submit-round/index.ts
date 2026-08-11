@@ -270,6 +270,18 @@ Deno.serve(async (req) => {
     player = { id: data.id, name: data.name, secret: data.secret }
   }
 
+  // Every failure from here on happens AFTER the player row was minted (or
+  // the name claimed): the identity must ride on those error responses, or a
+  // first-time device retries with no credentials, re-claims the same name,
+  // gets "that name is taken", and its posted card is stranded under an
+  // identity it never received. `player.secret` is only set when this very
+  // request created the row — established identities never re-receive theirs.
+  const fail = (status: number, payload: Record<string, unknown>) =>
+    json(status, {
+      ...payload,
+      ...(player.secret ? { player: { id: player.id, name: player.name, secret: player.secret } } : {}),
+    })
+
   // ---- write the validated score ----
   let daily: { rank: number; total: number; duplicate: boolean } | null = null
   if (info.mode === 'daily') {
@@ -286,7 +298,7 @@ Deno.serve(async (req) => {
     }
     // first card of the day stands; a resubmission is ignored
     const { error } = await supabase.from('daily_scores').insert(row)
-    if (error && error.code !== '23505') return json(500, { error: 'could not save score' })
+    if (error && error.code !== '23505') return fail(500, { error: 'could not save score' })
     if (error) {
       // Duplicate resubmission: the first card stands, so records may only
       // contend with THAT card's score. Without this check a player could
@@ -457,7 +469,7 @@ Deno.serve(async (req) => {
         .select('to_par')
     : { data: null, error: null }
   if (seasonClaimError && !missingSeasonTable(seasonClaimError)) {
-    return json(500, { error: 'could not save season record' })
+    return fail(500, { error: 'could not save season record' })
   }
   if (!seasonClaimError) {
     let seasonBroken = ((seasonClaimed as { to_par: number }[] | null)?.length ?? 0) > 0
@@ -472,7 +484,7 @@ Deno.serve(async (req) => {
         .eq('course_slug', info.course.slug)
         .gt('to_par', replay.toPar)
         .select('to_par')
-      if (seasonTakeError) return json(500, { error: 'could not save season record' })
+      if (seasonTakeError) return fail(500, { error: 'could not save season record' })
       seasonBroken = (seasonTaken?.length ?? 0) > 0
     }
     if (seasonBroken) {
@@ -572,7 +584,7 @@ Deno.serve(async (req) => {
         .select('to_par'))
     }
   }
-  if (recordClaimError) return json(500, { error: 'could not save record' })
+  if (recordClaimError) return fail(500, { error: 'could not save record' })
   let isRecord = (recordClaimed?.length ?? 0) > 0
   if (!isRecord && recordEligible) {
     // a record exists — replace it only when this round is strictly better,
@@ -591,7 +603,7 @@ Deno.serve(async (req) => {
         .gt('to_par', replay.toPar)
         .select('to_par'))
     }
-    if (recordTakeError) return json(500, { error: 'could not save record' })
+    if (recordTakeError) return fail(500, { error: 'could not save record' })
     isRecord = (recordTaken?.length ?? 0) > 0
   }
   if (isRecord) {

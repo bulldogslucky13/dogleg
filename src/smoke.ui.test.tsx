@@ -109,9 +109,20 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
     expect(screen.queryByRole('dialog', { name: /Play Rating/i })).toBeNull()
   })
 
-  it('shows the tutorial to a first-time visitor', () => {
+  it('shows the tutorial to a first-time visitor, opening on the tagline hero', () => {
     localStorage.removeItem('dogleg:tutorial:v1')
     render(<App />)
+    // the hero IS the brand line — the three pillars stacked inside the card
+    // (the home lockup behind the overlay carries the same line, by design:
+    // one brand element, two surfaces — so scope the check to the dialog)
+    const card = within(screen.getByRole('dialog', { name: 'How to play DogLeg' }))
+    expect(card.getByText('Welcome to DogLeg')).toBeTruthy()
+    expect(card.getByText('18 holes.')).toBeTruthy()
+    expect(card.getByText('Play the odds.')).toBeTruthy()
+    expect(card.getByText('Beat the course.')).toBeTruthy()
+    // and each later step wears its pillar as the kicker
+    fireEvent.click(screen.getByText('Next'))
+    expect(screen.getByText(/18 Holes · 2 of/)).toBeTruthy()
     expect(screen.getByText('One round, one goal')).toBeTruthy()
   })
 
@@ -137,7 +148,7 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
     while (screen.queryByText('Next')) fireEvent.click(screen.getByText('Next'))
     expect(screen.getByText('Fortunes')).toBeTruthy()
     // (the phrase also lives in the home streak note behind the overlay)
-    expect(screen.getAllByText(/golf gods reward the faithful/).length).toBeGreaterThan(0)
+    expect(screen.getAllByText(/Golf rewards the consistent/).length).toBeGreaterThan(0)
     // no numbers anywhere: the multiplier and the ramp stay under the hood
     expect(screen.queryByText(/[0-9]+(x|×|%)/)).toBeNull()
     // the one quiet sync line routes to the same account flow as the locker CTA
@@ -426,7 +437,7 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
     // 1. the tutorial wins — a player who doesn't know the rules can't use
     //    either announcement. The other two wait, unacked.
     const first = render(<App />)
-    expect(screen.getByText('One round, one goal')).toBeTruthy()
+    expect(screen.getByText('Welcome to DogLeg')).toBeTruthy()
     expect(screen.queryByText(/Not all rough is rough/)).toBeNull()
     expect(screen.queryByText(/has begun/)).toBeNull()
     // dismissing it does NOT hand off to the next one — one dialog per arrival
@@ -456,7 +467,7 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
     // the splash owns the landing; dismiss it to reach the home screen
     fireEvent.click(screen.getByText(/I'll find the fairway/))
     fireEvent.click(screen.getByText('How to play'))
-    expect(screen.getByText('One round, one goal')).toBeTruthy()
+    expect(screen.getByText('Welcome to DogLeg')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'Close tutorial' }))
     // closing a MANUAL tutorial returns to home, not to another dialog
     expect(screen.getByText('Tee off')).toBeTruthy()
@@ -688,7 +699,7 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
 
   it('the streak display carries the fortune disclosure note', () => {
     render(<App />)
-    expect(screen.getByText(/golf gods reward the faithful/)).toBeTruthy()
+    expect(screen.getByText(/Golf rewards the consistent/)).toBeTruthy()
   })
 
   it('the Par 3 tab shows its one-time intro, lists the shorts, and tees one up', async () => {
@@ -1831,6 +1842,36 @@ describe('smoke: landmark holes render', () => {
       )
       expect(container.querySelector('svg'), `${course.slug}:${hole.number}`).toBeTruthy()
       unmount()
+    }
+  })
+})
+
+describe('smoke: links courses grow no decorative groves', () => {
+  it('a links hole draws dune tufts where a parkland hole draws groves', () => {
+    // the map invents scenery for the empty margin; on a treeless links that
+    // fabrication used to plant a wood down both sides of St Andrews.
+    const draw = (slug: string) => {
+      const course = COURSES.find((c) => c.slug === slug)!
+      const layout = buildLayout(slug, course.holes[0])
+      const { container, unmount } = render(
+        <HoleMap layout={layout} ball={{ pos: 0, lie: 'tee', side: 'center' }} previewWindow={null} previewApproach={null} previewChoice={null} />,
+      )
+      const counts = {
+        groves: container.querySelectorAll('[data-deco="grove"]').length,
+        dunes: container.querySelectorAll('[data-deco="dune"]').length,
+      }
+      unmount()
+      return counts
+    }
+    expect(draw('st-andrews-old')).toEqual({ groves: 0, dunes: 16 })
+    expect(draw('augusta-national').groves).toBeGreaterThan(0)
+  })
+
+  it('every course tagged links carries the tag onto its layouts', () => {
+    const links = COURSES.filter((c) => c.scenery === 'links')
+    expect(links.length).toBeGreaterThanOrEqual(10)
+    for (const c of links) {
+      for (const h of c.holes) expect(buildLayout(c.slug, h).scenery, `${c.slug}:${h.number}`).toBe('links')
     }
   })
 })

@@ -46,10 +46,19 @@ export const SITE = 'https://playdogleg.com'
  *  crawler might fetch. The value is the claim, not a secret. */
 export const PINTEREST_VERIFY = '1a5c4413c8c5dfc3cbee237c0da375ee'
 
-/** Cache-bust for the per-course pin cards, same contract as og.png's ?v=:
- *  Pinterest and OG scrapers key their image cache on the URL, so bump this
- *  whenever the card design changes or they keep serving the old picture. */
-export const PIN_IMG_VERSION = 1
+/**
+ * Cache-bust for the pin cards, same contract as og.png's ?v=: Pinterest and
+ * OG scrapers key their image cache on the URL, so bump this whenever the card
+ * artwork changes or they keep serving the old picture forever.
+ *
+ * NOTE THAT "THE ARTWORK CHANGED" INCLUDES CHANGES TO HoleMap ITSELF. The
+ * cards embed the real map component, so a change to how the map draws is a
+ * change to 128 pictures — v2 is exactly that: the map stopped planting woods
+ * on treeless links (#126), which redrew every links course's card. A change
+ * to the map is easy to make without ever opening this file, so if you touched
+ * HoleMap and the cards look different, bump it.
+ */
+export const PIN_IMG_VERSION = 2
 
 /** Webfonts the static pages self-host (the app's own font assets carry
  *  hashed names that change build to build). The entry copies these from
@@ -67,7 +76,10 @@ function esc(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 }
 
-const themeCss = () => readFileSync(resolve(root, 'src/ui/theme.css'), 'utf8')
+let themeCache: string | null = null
+/** theme.css verbatim, read once per process — every page and every one of the
+ *  128 cards inlines it. */
+const themeCss = () => (themeCache ??= readFileSync(resolve(root, 'src/ui/theme.css'), 'utf8'))
 
 // ---------------------------------------------------------------- wordmark --
 
@@ -89,6 +101,27 @@ export function courseYards(c: CourseSpec): number {
  *  else the card's toughest test (stroke index 1). */
 export function signatureHole(c: CourseSpec): HoleSpec {
   return c.holes.find((h) => h.signature) ?? c.holes.reduce((a, b) => (a.strokeIndex < b.strokeIndex ? a : b))
+}
+
+/** Every hole the library wrote editorial copy for. These are the holes with a
+ *  story — the Church Pews, Golden Bell, Shipwreck — which is exactly what
+ *  makes them worth a pin of their own. */
+export function signatureHoles(c: CourseSpec): HoleSpec[] {
+  return c.holes.filter((h) => h.signature)
+}
+
+/**
+ * The holes that get a pin card BEYOND the course card.
+ *
+ * The course card already leads with `signatureHole(c)`, so it is excluded
+ * here — otherwise every course would ship the same picture twice under two
+ * filenames. Courses with no editorial copy contribute nothing: a card whose
+ * only claim is "hole 4" is filler, and filler is what makes a Pinterest
+ * account look automated.
+ */
+export function holePinTargets(c: CourseSpec): HoleSpec[] {
+  const lead = signatureHole(c)
+  return signatureHoles(c).filter((h) => h.number !== lead.number)
 }
 
 /** The real HoleMap, server-rendered at the tee with no round context — the
@@ -335,6 +368,16 @@ export function pinImageUrl(c: CourseSpec): string {
   return `${SITE}/pins/${c.slug}.png?v=${PIN_IMG_VERSION}`
 }
 
+/** dist-relative name for a hole card, e.g. 'oakmont-h3.png'. Shared by the
+ *  renderer and the URL helper so the two can't drift apart. */
+export function holePinFile(c: CourseSpec, hole: HoleSpec): string {
+  return `${c.slug}-h${hole.number}.png`
+}
+
+export function holePinImageUrl(c: CourseSpec, hole: HoleSpec): string {
+  return `${SITE}/pins/${holePinFile(c, hole)}?v=${PIN_IMG_VERSION}`
+}
+
 export function coursePage(c: CourseSpec): string {
   const par = coursePar(c)
   const yards = courseYards(c)
@@ -498,7 +541,7 @@ ${grades}
         <p>Toggle between the modern top-down map and the classic side view any time. Finish the round and copy your score card straight to the group chat — the squares tell the story, no spoilers.</p>
 
         <h2>Fortunes</h2>
-        <p>Every so often the golf gods simply smile on you: a <b>hole in one</b> or an <b>albatross</b>, out of pure luck — the best score a hole can give. That's a <b>Fortune</b>, and it can strike on any hole, any day, for any player. But the golf gods reward the faithful — post your daily cards under a clubhouse name, keep your streak alive, and your odds of striking a Fortune quietly improve.</p>`
+        <p>Every so often the course simply smiles on you: a <b>hole in one</b> or an <b>albatross</b>, out of pure luck — the best score a hole can give. That's a <b>Fortune</b>, and it can strike on any hole, any day, for any player. But golf rewards the consistent — post your daily cards under a clubhouse name, keep your streak alive, and your odds of striking a Fortune quietly improve.</p>`
   return pageShell({
     path: '/how-to-play/',
     title: 'How to play DogLeg — the daily golf strategy game',
@@ -582,39 +625,35 @@ Sitemap: ${SITE}/sitemap.xml
 /** Base64 @font-face block for file:// rasterisation (same trick as the OG
  *  card: a file:// @font-face is a cross-origin fetch Chrome fails silently,
  *  so the fonts ride inline). */
+let fontsCache: string | null = null
+
 function embeddedFontsCss(): string {
+  // Memoised: the three woff2 files are read and base64-encoded once per
+  // process, not once per card. The library now renders 128 cards (and the
+  // test suite builds every one of them), so re-encoding ~400KB of font on
+  // each call was pure repeated work — and the suite's Monte Carlo
+  // calibration shares a CI runner with it.
+  if (fontsCache !== null) return fontsCache
   const face = (family: string, file: string, extra: string) => {
     const b64 = readFileSync(resolve(root, file)).toString('base64')
     return `@font-face{font-family:'${family}';font-style:normal;font-display:block;${extra}src:url(data:font/woff2;base64,${b64}) format('woff2');}`
   }
-  return [
+  fontsCache = [
     face('Archivo Variable', FONT_FILES[0].src, 'font-weight:100 900;font-stretch:62% 125%;'),
     face('Barlow', FONT_FILES[2].src, 'font-weight:600;'),
     face('Barlow', FONT_FILES[3].src, 'font-weight:700;'),
   ].join('\n')
+  return fontsCache
 }
 
 export const PIN_W = 1000
 export const PIN_H = 1500
 
-/**
- * The 2:3 Pinterest card for one course — Pinterest's preferred 1000x1500.
- * Composition: kicker + course name up top, the signature hole's real map as
- * the hero, the stat line and domain at the foot. Rasterised by
- * scripts/pages-entry.tsx --pins via scripts/lib/rasterise.ts.
- */
-export function pinCardHtml(c: CourseSpec): string {
-  const sig = signatureHole(c)
-  const rating = PLAY_RATINGS[c.slug]
-  const stats = [
-    `Par ${coursePar(c)}`,
-    `${fmtYds(courseYards(c))} yds`,
-    rating ? `Play Rating ${rating}/10` : null,
-  ].filter(Boolean)
-  return `<!doctype html>
-<meta charset="utf-8">
-<style>
-${embeddedFontsCss()}
+/** Chrome shared by every 2:3 card — the frame, the wordmark lockup, the
+ *  stat pills and the domain line. One definition so a course card, a hole
+ *  card and the two non-course cards can never drift apart visually. */
+function pinBaseCss(): string {
+  return `${embeddedFontsCss()}
 ${themeCss()}
   html, body { margin: 0; padding: 0; }
   body {
@@ -636,18 +675,129 @@ ${themeCss()}
   .stats { display: flex; gap: 14px; justify-content: center; margin-bottom: 34px; }
   .stats span { border: 1px solid var(--edge-hairline); background: var(--turf-900); border-radius: 999px; padding: 10px 26px; font-family: var(--font-display); font-variation-settings: 'wdth' var(--wdth-standard); font-weight: 700; font-size: 27px; }
   .domain { display: flex; align-items: center; gap: 13px; margin-bottom: 64px; font-family: var(--font-display); font-variation-settings: 'wdth' var(--wdth-standard); font-size: 26px; font-weight: 700; letter-spacing: 0.03em; color: var(--sand-500); }
-  .domain::before { content: ''; width: 12px; height: 12px; border-radius: 999px; background: var(--flag-500); }
+  .domain::before { content: ''; width: 12px; height: 12px; border-radius: 999px; background: var(--flag-500); }`
+}
+
+/**
+ * The 2:3 Pinterest card — Pinterest's preferred 1000x1500.
+ * Composition: kicker + course name up top, a real hole map as the hero, the
+ * stat line and domain at the foot. Rasterised by scripts/pages-entry.tsx
+ * --pins via scripts/lib/rasterise.ts.
+ *
+ * `hole` picks which hole the card leads with, defaulting to the course's
+ * signature. One template rather than two: a hole card and a course card
+ * differ only in which map is the hero and how the kicker reads, and forking
+ * the markup would mean every future retune had to be made twice.
+ */
+export function pinCardHtml(c: CourseSpec, hole?: HoleSpec): string {
+  const sig = hole ?? signatureHole(c)
+  const isHoleCard = Boolean(hole)
+  const rating = PLAY_RATINGS[c.slug]
+  const stats = [
+    `Par ${coursePar(c)}`,
+    `${fmtYds(courseYards(c))} yds`,
+    rating ? `Play Rating ${rating}/10` : null,
+  ].filter(Boolean)
+  return `<!doctype html>
+<meta charset="utf-8">
+<style>
+${pinBaseCss()}
 </style>
 <div class="frame"></div>
 <div class="head">
   <div class="wordmark">${wordmarkSvg()}</div>
-  <p class="kicker">Course Guide · No. ${sig.number} · Par ${sig.par}</p>
+  <p class="kicker">${isHoleCard ? 'Signature Hole' : 'Course Guide'} · No. ${sig.number} · Par ${sig.par}</p>
   <h1>${esc(c.name)}</h1>
   <p class="loc">${esc(c.location)}</p>
 </div>
 <div class="hero">${holeMapSvg(c, sig)}</div>
 ${sig.signature ? `<p class="sigline">${esc(sig.signature)}</p>` : ''}
 <div class="stats">${stats.map((s) => `<span>${esc(s!)}</span>`).join('')}</div>
+<div class="domain">playdogleg.com</div>
+`
+}
+
+/**
+ * The two cards for pages that aren't a course.
+ *
+ * These exist because SmartPin cannot make them. Pointed at /courses/ and
+ * /how-to-play/ — pages with no single hero image to composite — the AI
+ * invented a DogLeg logo (complete with a ® it has no right to) on one and
+ * redrew the real wordmark with illegible text under it on the other. Image
+ * models cannot spell, so any surface carrying the mark has to be rendered
+ * from `Wordmark.tsx` like every other brand asset here. Same rule as the
+ * email masthead and the OG card; see the note at the top of gen-og-image.ts.
+ */
+export function libraryPinCardHtml(): string {
+  const rotation = COURSES.length
+  const marquee = ['Pebble Beach', 'St Andrews', 'Augusta National', 'TPC Sawgrass', 'Kiawah Island']
+  return `<!doctype html>
+<meta charset="utf-8">
+<style>
+${pinBaseCss()}
+  .bignum { font-family: var(--font-display); font-variation-settings: 'wdth' var(--wdth-tower); font-weight: 650; font-size: 210px; line-height: 1; margin: 0; color: var(--text-hi); }
+  .names { margin: 0 80px; text-align: center; }
+  .names span { display: block; font-family: var(--font-display); font-variation-settings: 'wdth' var(--wdth-standard); font-weight: 600; font-size: 34px; line-height: 1.55; color: var(--text-mid); }
+  .names span.more { color: var(--sand-500); font-weight: 700; }
+</style>
+<div class="frame"></div>
+<div class="head">
+  <div class="wordmark">${wordmarkSvg()}</div>
+  <p class="kicker">The Course Library</p>
+  <h1>Famous Golf Courses,<br>Free to Play</h1>
+</div>
+<div class="hero" style="flex-direction: column; gap: 10px;">
+  <p class="bignum">${ALL_COURSES.length}</p>
+  <p class="loc">courses, mapped hole by hole</p>
+</div>
+<div class="names">
+${marquee.map((n) => `  <span>${esc(n)}</span>`).join('\n')}
+  <span class="more">and ${ALL_COURSES.length - marquee.length} more</span>
+</div>
+<div class="stats"><span>${rotation} in the daily rotation</span></div>
+<div class="domain">playdogleg.com</div>
+`
+}
+
+export function howToPlayPinCardHtml(): string {
+  // the odds bar from the tutorial's own second step (.tut-bar in styles.css),
+  // in the same proportions — the single most recognisable thing about the game
+  const segs = [
+    { cls: 'good', w: 62 },
+    { cls: 'neutral', w: 26 },
+    { cls: 'bad', w: 12 },
+  ]
+  return `<!doctype html>
+<meta charset="utf-8">
+<style>
+${pinBaseCss()}
+  .choices { display: flex; flex-direction: column; gap: 22px; margin: 0 100px; width: 800px; }
+  .choice { display: flex; align-items: center; justify-content: space-between; border: 1px solid var(--edge-hairline); background: var(--turf-900); border-radius: var(--r-card); padding: 22px 34px; }
+  .choice b { font-family: var(--font-display); font-variation-settings: 'wdth' var(--wdth-standard); font-weight: 700; font-size: 40px; color: var(--text-hi); }
+  .choice em { font-style: normal; font-size: 27px; color: var(--text-mid); }
+  .oddsbar { display: flex; width: 800px; height: 34px; border-radius: 999px; overflow: hidden; margin: 40px 0 6px; }
+  .oddsbar i { display: block; height: 100%; }
+  .oddsbar i.good { background: #4f9d5d; }
+  .oddsbar i.neutral { background: #c4ac72; }
+  .oddsbar i.bad { background: var(--flag-500); }
+  .barnote { font-size: 25px; color: var(--text-mid); margin: 0 0 30px; text-align: center; }
+</style>
+<div class="frame"></div>
+<div class="head">
+  <div class="wordmark">${wordmarkSvg()}</div>
+  <p class="kicker">How to Play</p>
+  <h1>Every Shot<br>Is a Call</h1>
+</div>
+<div class="hero" style="flex-direction: column;">
+  <div class="choices">
+    <div class="choice"><b>Safe</b><em>Take your medicine</em></div>
+    <div class="choice"><b>Normal</b><em>Play the percentages</em></div>
+    <div class="choice"><b>Aggressive</b><em>Eight per round</em></div>
+  </div>
+  <div class="oddsbar">${segs.map((s) => `<i class="${s.cls}" style="width:${s.w}%"></i>`).join('')}</div>
+  <p class="barnote">The real odds, before you commit</p>
+</div>
+<div class="stats"><span>18 holes · about 2 minutes</span></div>
 <div class="domain">playdogleg.com</div>
 `
 }

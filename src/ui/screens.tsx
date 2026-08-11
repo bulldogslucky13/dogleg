@@ -22,6 +22,7 @@ import { currentHandicap, formatHandicap } from '../state/stats'
 import { characterRecords, computeStreaks, loadArchive, type HistoryEntry, type RoundRecap, type RoundState } from '../state/store'
 import { AccountPanel } from './AccountPanel'
 import { CharacterAvatar } from './Avatars'
+import { TAGLINE_PARTS } from './brand'
 import { DailyBoardView, RecordCrown, ScoreBoard } from './Leaderboard'
 import { PlayRatingChip } from './PlayRating'
 
@@ -248,8 +249,10 @@ export function HomeScreen(props: {
             <Wordmark />
           </h1>
           <span className="lockup-kicker">Daily Golf Challenge · No. {setup.puzzleNumber}</span>
-          <p className="lockup-tag">18 Holes. Play the Odds.</p>
-          <p className="lockup-tag-end">Beat the course.</p>
+          {/* the tagline is a brand element with one home (ui/brand.tsx) —
+              the lockup renders its parts, never retypes them */}
+          <p className="lockup-tag">{`${TAGLINE_PARTS[0]} ${TAGLINE_PARTS[1]}`}</p>
+          <p className="lockup-tag-end">{TAGLINE_PARTS[2]}</p>
         </div>
       </header>
 
@@ -968,7 +971,7 @@ function GhostStakes(props: { courseSlug: string; board: GhostBoard; onBoard: (b
 function StreakNote(props: { onInfo?: () => void }) {
   const copy = (
     <>
-      <em className="streak-note-head">The golf gods reward the faithful</em>
+      <em className="streak-note-head">Golf rewards the consistent</em>
       Dailies under a clubhouse name boost Fortune odds.
     </>
   )

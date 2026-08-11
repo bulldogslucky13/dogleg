@@ -29,6 +29,15 @@ jobs:
       - run: pnpm build
         env:
           VITE_POSTHOG_KEY: ${{ vars.VITE_POSTHOG_KEY }}
+          # unset until a Pinterest ads account exists; setting the repo
+          # variable turns the conversion tag on (src/lib/analytics.ts)
+          VITE_PINTEREST_TAG_ID: ${{ vars.VITE_PINTEREST_TAG_ID }}
+      # The per-course Pinterest/OG cards (dist/pins/) are rasterised here,
+      # not in `pnpm build`, because they need the runner's Chrome — PR CI
+      # builds the site without a browser. The course pages' og:image tags
+      # point at these, so the deploy must fail loudly if rendering breaks.
+      - name: Render pin cards
+        run: pnpm gen:pin-images
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist
@@ -117,6 +126,8 @@ jobs:
           supabase functions deploy link-account \
             --project-ref "$PROJECT_REF" --use-api
           supabase functions deploy mint-player \
+            --project-ref "$PROJECT_REF" --no-verify-jwt --use-api
+          supabase functions deploy receive-email \
             --project-ref "$PROJECT_REF" --no-verify-jwt --use-api
 
   deploy:

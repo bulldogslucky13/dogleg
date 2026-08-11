@@ -119,13 +119,34 @@ alter table season_records add column if not exists mode text not null default '
 -- inserted BEFORE the send, so a duplicate key means "already emailed today"
 -- and the send is skipped. At-most-once beats at-least-once here: a lost
 -- email on a crashed send is fine, a double email is not.
+-- one row per steal email sent: the at-most-once dedupe ledger. `scope`
+-- separates the two boards ('alltime' course records vs 'season' records) —
+-- one round can legitimately trigger both mails to the same holder on the
+-- same course and day, and neither may burn the other's slot.
 create table if not exists record_steal_emails (
+  scope text not null default 'alltime',
   course_slug text not null,
   player_id uuid not null references players (id),
   date_key text not null,
   sent_at timestamptz not null default now(),
-  primary key (course_slug, player_id, date_key)
+  primary key (scope, course_slug, player_id, date_key)
 );
+
+-- migrate databases created before scope existed (idempotent: the alter
+-- no-ops once the column exists, and the do-block only rebuilds the primary
+-- key while scope is still missing from it)
+alter table record_steal_emails add column if not exists scope text not null default 'alltime';
+do $$ begin
+  if not exists (
+    select from information_schema.key_column_usage
+    where table_name = 'record_steal_emails'
+      and constraint_name = 'record_steal_emails_pkey'
+      and column_name = 'scope'
+  ) then
+    alter table record_steal_emails drop constraint record_steal_emails_pkey;
+    alter table record_steal_emails add primary key (scope, course_slug, player_id, date_key);
+  end if;
+end $$;
 
 alter table players enable row level security;
 alter table daily_scores enable row level security;
@@ -237,127 +258,166 @@ create extension if not exists pg_cron;
 select cron.schedule('prune-choice-tallies', '17 8 * * *',
   $$delete from public.daily_choice_tallies where date_key < to_char((now() at time zone 'utc')::date - 2, 'YYYY-MM-DD')$$);
 
+-- Inbound mail. Resend receives everything addressed to @playdogleg.com and
+-- webhooks the receive-email function, which verifies the svix signature,
+-- fetches the full message back from Resend's Received Emails API, and lands
+-- it here. Keyed on Resend's own email id because webhook delivery is
+-- at-least-once — the function upserts, so a redelivery updates in place
+-- instead of duplicating.
+create table if not exists received_emails (
+  email_id text primary key,
+  message_id text,
+  from_address text,
+  to_addresses text[] not null default '{}',
+  cc_addresses text[] not null default '{}',
+  subject text,
+  text_body text,
+  html_body text,
+  attachments jsonb not null default '[]'::jsonb, -- metadata only; files stay on Resend
+  received_at timestamptz,
+  created_at timestamptz not null default now()
+);
+
+-- RLS on, and deliberately NO policies: inbound mail is other people's
+-- private correspondence, not public reading material like the boards. Only
+-- the service role (the receive-email function, or an operator in the
+-- dashboard) can touch it.
+alter table received_emails enable row level security;
+
 -- ============================================================================
--- ONE-TIME BACKFILL (2026-08): daily rounds join the record boards.
+-- CATCH-UP PASS (2026-08): daily rounds join the record boards.
 --
 -- Course records were unlimited-play-only by accident of code path — the
 -- daily branch of submit-round returned before the record claims. A course
 -- record is the best score anyone has posted on the course from ANY
 -- competitive play, so the function now writes both boards for both modes,
--- and this migration reconstructs history: for each course (and each season,
+-- and this pass reconstructs history: for each course (and each season,
 -- attributed by the puzzle's date_key on the ET calendar), the best daily
 -- takes the record it should have held. Strictly-better beats; exact ties go
 -- to the EARLIER round — the referee's live rule projected onto history.
 --
 -- Quiet by construction: nothing here sends mail (only the edge function
--- does), and past-season rows never surface on a client diff. Backfilled
+-- does), and past-season rows never surface on a client diff. Caught-up
 -- records carry no seed/decisions (daily_scores never stored them), so their
 -- ghosts fall back to the challenger's own best until the record next breaks.
 --
--- Idempotent twice over: the marker row gates the whole block, and even
--- without it every statement is a strictly-better-or-earlier-gated no-op on
--- re-run. The marker also keeps this from ever re-fighting the live function:
--- once applied, records move only through submit-round.
-create table if not exists backfill_markers (
-  key text primary key,
-  applied_at timestamptz not null default now()
-);
+-- Deliberately NOT a one-shot behind a marker: the deploy applies schema.sql
+-- BEFORE the new submit-round goes live, so daily cards posted to the OLD
+-- function during that handoff would be snapshotted past by a single run and
+-- then never reconsidered. Instead the pass runs on EVERY deploy, and two
+-- properties make re-running safe against the live function:
+--
+--   * A STRICTLY better daily displaces any holder — strict inequality can
+--     never match the standing record's own card, so a re-run cannot rewrite
+--     an unchanged live record or null its stored ghost round. This is what
+--     lets a better daily posted to the old function during the handoff land
+--     on the next deploy even after an earlier pass stamped the holder
+--     'daily'.
+--   * The tie-goes-to-earlier rule only displaces PRACTICE holders. A tie
+--     against a daily-mode row is left with the live function's outcome:
+--     re-fighting it could only strip the ghost from a record that is
+--     already correct to within the tie.
+--
+-- The inserts take the empty-course slot with on-conflict-do-nothing: the
+-- still-live referee can claim the same empty course mid-pass, and losing
+-- that race must leave the referee's row standing rather than fail the whole
+-- schema apply (a lost race that deserved the record is swept up by the
+-- update on the next deploy).
 
-do $$
-begin
-  if not exists (select from backfill_markers where key = 'daily-rounds-into-records-v1') then
+-- all-time board
+with best_daily as (
+  select distinct on (course_slug)
+    course_slug, player_id, player_name, "character", to_par, created_at
+  from daily_scores
+  order by course_slug, to_par asc, created_at asc
+)
+update course_records cr
+set player_id = bd.player_id,
+    player_name = bd.player_name,
+    "character" = bd."character",
+    to_par = bd.to_par,
+    set_at = bd.created_at,
+    seed = null,
+    decisions = null,
+    mode = 'daily'
+from best_daily bd
+where bd.course_slug = cr.course_slug
+  and (
+    bd.to_par < cr.to_par
+    or (cr.mode = 'practice' and bd.to_par = cr.to_par and bd.created_at < cr.set_at)
+  );
 
-    -- all-time board: displace a standing record only when the best daily on
-    -- that course was strictly better, or equal and earlier
-    with best_daily as (
-      select distinct on (course_slug)
-        course_slug, player_id, player_name, "character", to_par, created_at
-      from daily_scores
-      order by course_slug, to_par asc, created_at asc
-    )
-    update course_records cr
-    set player_id = bd.player_id,
-        player_name = bd.player_name,
-        "character" = bd."character",
-        to_par = bd.to_par,
-        set_at = bd.created_at,
-        seed = null,
-        decisions = null,
-        mode = 'daily'
-    from best_daily bd
-    where bd.course_slug = cr.course_slug
-      and (bd.to_par < cr.to_par or (bd.to_par = cr.to_par and bd.created_at < cr.set_at));
+with best_daily as (
+  select distinct on (course_slug)
+    course_slug, player_id, player_name, "character", to_par, created_at
+  from daily_scores
+  order by course_slug, to_par asc, created_at asc
+)
+insert into course_records (course_slug, player_id, player_name, "character", to_par, set_at, mode)
+select bd.course_slug, bd.player_id, bd.player_name, bd."character", bd.to_par, bd.created_at, 'daily'
+from best_daily bd
+where not exists (select from course_records cr where cr.course_slug = bd.course_slug)
+on conflict (course_slug) do nothing;
 
-    with best_daily as (
-      select distinct on (course_slug)
-        course_slug, player_id, player_name, "character", to_par, created_at
-      from daily_scores
-      order by course_slug, to_par asc, created_at asc
-    )
-    insert into course_records (course_slug, player_id, player_name, "character", to_par, set_at, mode)
-    select bd.course_slug, bd.player_id, bd.player_name, bd."character", bd.to_par, bd.created_at, 'daily'
-    from best_daily bd
-    where not exists (select from course_records cr where cr.course_slug = bd.course_slug);
+-- season boards: same reconstruction per (season, course). The season is
+-- the PUZZLE's season — date_key on the fixed ET calendar (Feb-Apr
+-- spring, May-Jul summer, Aug-Oct fall, Nov-Jan off keyed to the year it
+-- starts) — so a daily from a past season lands in that season's archive.
+with keyed as (
+  select course_slug, player_id, player_name, "character", to_par, created_at,
+    case
+      when substr(date_key, 6, 2)::int between 2 and 4 then substr(date_key, 1, 4) || '-q1-spring'
+      when substr(date_key, 6, 2)::int between 5 and 7 then substr(date_key, 1, 4) || '-q2-summer'
+      when substr(date_key, 6, 2)::int between 8 and 10 then substr(date_key, 1, 4) || '-q3-fall'
+      when substr(date_key, 6, 2)::int >= 11 then substr(date_key, 1, 4) || '-q4-off'
+      else (substr(date_key, 1, 4)::int - 1)::text || '-q4-off'
+    end as season_key
+  from daily_scores
+), best_daily_season as (
+  select distinct on (season_key, course_slug)
+    season_key, course_slug, player_id, player_name, "character", to_par, created_at
+  from keyed
+  order by season_key, course_slug, to_par asc, created_at asc
+)
+update season_records sr
+set player_id = bd.player_id,
+    player_name = bd.player_name,
+    "character" = bd."character",
+    to_par = bd.to_par,
+    set_at = bd.created_at,
+    seed = null,
+    decisions = null,
+    mode = 'daily'
+from best_daily_season bd
+where sr.scope = 'global'
+  and sr.season_key = bd.season_key
+  and sr.course_slug = bd.course_slug
+  and (
+    bd.to_par < sr.to_par
+    or (sr.mode = 'practice' and bd.to_par = sr.to_par and bd.created_at < sr.set_at)
+  );
 
-    -- season boards: same reconstruction per (season, course). The season is
-    -- the PUZZLE's season — date_key on the fixed ET calendar (Feb-Apr
-    -- spring, May-Jul summer, Aug-Oct fall, Nov-Jan off keyed to the year it
-    -- starts) — so a daily from a past season lands in that season's archive.
-    with keyed as (
-      select course_slug, player_id, player_name, "character", to_par, created_at,
-        case
-          when substr(date_key, 6, 2)::int between 2 and 4 then substr(date_key, 1, 4) || '-q1-spring'
-          when substr(date_key, 6, 2)::int between 5 and 7 then substr(date_key, 1, 4) || '-q2-summer'
-          when substr(date_key, 6, 2)::int between 8 and 10 then substr(date_key, 1, 4) || '-q3-fall'
-          when substr(date_key, 6, 2)::int >= 11 then substr(date_key, 1, 4) || '-q4-off'
-          else (substr(date_key, 1, 4)::int - 1)::text || '-q4-off'
-        end as season_key
-      from daily_scores
-    ), best_daily_season as (
-      select distinct on (season_key, course_slug)
-        season_key, course_slug, player_id, player_name, "character", to_par, created_at
-      from keyed
-      order by season_key, course_slug, to_par asc, created_at asc
-    )
-    update season_records sr
-    set player_id = bd.player_id,
-        player_name = bd.player_name,
-        "character" = bd."character",
-        to_par = bd.to_par,
-        set_at = bd.created_at,
-        seed = null,
-        decisions = null,
-        mode = 'daily'
-    from best_daily_season bd
-    where sr.scope = 'global'
-      and sr.season_key = bd.season_key
-      and sr.course_slug = bd.course_slug
-      and (bd.to_par < sr.to_par or (bd.to_par = sr.to_par and bd.created_at < sr.set_at));
-
-    with keyed as (
-      select course_slug, player_id, player_name, "character", to_par, created_at,
-        case
-          when substr(date_key, 6, 2)::int between 2 and 4 then substr(date_key, 1, 4) || '-q1-spring'
-          when substr(date_key, 6, 2)::int between 5 and 7 then substr(date_key, 1, 4) || '-q2-summer'
-          when substr(date_key, 6, 2)::int between 8 and 10 then substr(date_key, 1, 4) || '-q3-fall'
-          when substr(date_key, 6, 2)::int >= 11 then substr(date_key, 1, 4) || '-q4-off'
-          else (substr(date_key, 1, 4)::int - 1)::text || '-q4-off'
-        end as season_key
-      from daily_scores
-    ), best_daily_season as (
-      select distinct on (season_key, course_slug)
-        season_key, course_slug, player_id, player_name, "character", to_par, created_at
-      from keyed
-      order by season_key, course_slug, to_par asc, created_at asc
-    )
-    insert into season_records (scope, season_key, course_slug, player_id, player_name, "character", to_par, set_at, mode)
-    select 'global', bd.season_key, bd.course_slug, bd.player_id, bd.player_name, bd."character", bd.to_par, bd.created_at, 'daily'
-    from best_daily_season bd
-    where not exists (
-      select from season_records sr
-      where sr.scope = 'global' and sr.season_key = bd.season_key and sr.course_slug = bd.course_slug
-    );
-
-    insert into backfill_markers (key) values ('daily-rounds-into-records-v1');
-  end if;
-end $$;
+with keyed as (
+  select course_slug, player_id, player_name, "character", to_par, created_at,
+    case
+      when substr(date_key, 6, 2)::int between 2 and 4 then substr(date_key, 1, 4) || '-q1-spring'
+      when substr(date_key, 6, 2)::int between 5 and 7 then substr(date_key, 1, 4) || '-q2-summer'
+      when substr(date_key, 6, 2)::int between 8 and 10 then substr(date_key, 1, 4) || '-q3-fall'
+      when substr(date_key, 6, 2)::int >= 11 then substr(date_key, 1, 4) || '-q4-off'
+      else (substr(date_key, 1, 4)::int - 1)::text || '-q4-off'
+    end as season_key
+  from daily_scores
+), best_daily_season as (
+  select distinct on (season_key, course_slug)
+    season_key, course_slug, player_id, player_name, "character", to_par, created_at
+  from keyed
+  order by season_key, course_slug, to_par asc, created_at asc
+)
+insert into season_records (scope, season_key, course_slug, player_id, player_name, "character", to_par, set_at, mode)
+select 'global', bd.season_key, bd.course_slug, bd.player_id, bd.player_name, bd."character", bd.to_par, bd.created_at, 'daily'
+from best_daily_season bd
+where not exists (
+  select from season_records sr
+  where sr.scope = 'global' and sr.season_key = bd.season_key and sr.course_slug = bd.course_slug
+)
+on conflict (scope, season_key, course_slug) do nothing;

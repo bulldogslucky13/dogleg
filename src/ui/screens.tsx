@@ -14,14 +14,21 @@ import { FortuneInfo } from './Tutorial'
 import { ChangeLog } from './ChangeLog'
 import { hasEarnedAwards, reconcileAchievements, type Unlock } from '../state/achievements'
 import { Wordmark } from './Wordmark'
-import { dismissSteals, pendingSteals, syncLedger, type StolenRecord } from '../lib/records'
-import { loadGhost, type Ghost } from '../state/ghost'
+import { dismissSteals, pendingSteals, syncLedger, syncSeasonLedger, type PendingSteal } from '../lib/records'
+import { loadBrowsePrefs, saveBrowsePrefs } from '../lib/browsePrefs'
+import { loadFavorites, toggleFavorite } from '../lib/favorites'
+import { loadGhost, loadGhostChoices, type Ghost, type GhostBoard } from '../state/ghost'
 import { currentHandicap, formatHandicap } from '../state/stats'
 import { characterRecords, computeStreaks, loadArchive, type HistoryEntry, type RoundRecap, type RoundState } from '../state/store'
 import { AccountPanel } from './AccountPanel'
 import { CharacterAvatar } from './Avatars'
 import { DailyBoardView, RecordCrown, ScoreBoard } from './Leaderboard'
 import { PlayRatingChip } from './PlayRating'
+
+/** "Attainable record" = active-type record at this to-par OR WORSE (closer
+ * to par reads as beatable). Tunable — what counts as attainable is a design
+ * dial, not a law. */
+export const ATTAINABLE_RECORD_TO_PAR = -4
 
 export function HomeScreen(props: {
   history: HistoryEntry[]
@@ -48,6 +55,23 @@ export function HomeScreen(props: {
   const records = characterRecords(props.history)
   const [showCourses, setShowCourses] = useState(false)
   const [courseTab, setCourseTab] = useState<'courses' | 'par3'>('courses')
+  /** the last-applied browse configuration, restored on every open — set a
+   * view once, come back to it (persists across full reloads; see
+   * lib/browsePrefs.ts for the local-now-portable-later contract) */
+  const savedPrefs = loadBrowsePrefs()
+  /** unlimited-list filters — combinable, all reading existing data: the
+   * archive for played/recent, Play Ratings for difficulty, the two record
+   * maps for the hunt. Record filters obey the season/all-time toggle. */
+  const [recType, setRecType] = useState<'season' | 'alltime'>(savedPrefs.recType)
+  const [playedFilter, setPlayedFilter] = useState<'all' | 'unplayed' | 'played'>(savedPrefs.played)
+  const [ratingFilter, setRatingFilter] = useState<'any' | 'easy' | 'mid' | 'hard'>(savedPrefs.rating)
+  const [recordFilter, setRecordFilter] = useState<'any' | 'open' | 'attainable' | 'mine' | 'notmine'>(savedPrefs.record)
+  const [favsOnly, setFavsOnly] = useState(savedPrefs.favsOnly)
+  const [courseSort, setCourseSort] = useState<'tour' | 'easiest' | 'hardest' | 'beatable' | 'recent' | 'favorites'>(
+    savedPrefs.sort,
+  )
+  const [favs, setFavs] = useState<Set<string>>(() => loadFavorites())
+  const [filterSheet, setFilterSheet] = useState(false)
   const [courseRecs, setCourseRecs] = useState<Map<string, CourseRecord> | null>(null)
   const [seasonRecs, setSeasonRecs] = useState<Map<string, CourseRecord> | null>(null)
   /** which season the loaded seasonRecs belong to — a rollover while the
@@ -89,9 +113,14 @@ export function HomeScreen(props: {
   // the all-time board loads once when the browser opens — the wall of legends
   useEffect(() => {
     if (showCourses && backendEnabled && courseRecs === null) {
-      void fetchCourseRecords().then((r) => setCourseRecs(r ?? new Map()))
+      // a FAILED fetch stays null, same rule the season board follows: an
+      // empty map reads as "every record open — be the first", and 49 rows of
+      // that lie is exactly what a flaky connection must not produce. While
+      // null the rows say the records are still loading and the record
+      // filters stay disabled. Flipping the toggle retries (recType dep).
+      void fetchCourseRecords().then((r) => setCourseRecs(r))
     }
-  }, [showCourses, courseRecs])
+  }, [showCourses, courseRecs, recType])
 
   // the season board is the live race: fetched per season KEY, so any render
   // after a quarterly rollover swaps in the fresh board
@@ -106,7 +135,10 @@ export function HomeScreen(props: {
   }, [showCourses, seasonRecsKey, season.key])
 
   // the record-stolen check: compare the records this device holds against
-  // the server's holders. Purely a read — the "notification" is derived.
+  // the server's holders, on BOTH boards. Purely reads — the "notification"
+  // is derived. Each fetch reconciles its own shelf independently, so one
+  // board being unreachable never silences (or fakes) the other; a failed
+  // fetch stays null and that shelf simply isn't reconciled this visit.
   useEffect(() => {
     if (!backendEnabled) return
     const myName = loadPlayer()?.name ?? null
@@ -122,7 +154,26 @@ export function HomeScreen(props: {
       props.onAwardsChanged?.()
       setSteals(pendingSteals())
     })
+    void fetchSeasonRecords(season.key).then((recs) => {
+      if (!recs) return
+      syncSeasonLedger(recs, season.key, myName)
+      setSteals(pendingSteals())
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+  // remember the browse view as it changes, not on leave — a mid-session
+  // reload (or the tab dying) must not lose the configuration either
+  useEffect(() => {
+    saveBrowsePrefs({
+      recType,
+      played: playedFilter,
+      rating: ratingFilter,
+      record: recordFilter,
+      favsOnly,
+      sort: courseSort,
+    })
+  }, [recType, playedFilter, ratingFilter, recordFilter, favsOnly, courseSort])
+
   const avgLabel = (avg: number) => (avg > 0 ? `+${avg.toFixed(1)}` : avg.toFixed(1))
   // a stale bundle must not START any round — the referee refuses its score,
   // daily or practice alike. Every start path funnels into the remedy: the
@@ -130,6 +181,60 @@ export function HomeScreen(props: {
   const startPractice = stale ? () => window.location.reload() : props.onPractice
   // courses you've completed get their scorecard corner punched (the notch)
   const playedSlugs = new Set(loadArchive().map((r) => r.courseSlug))
+  // Jackson's bands: Easy 1-3 / Medium 4-7 / Hard 8-10
+  const RATING_BAND = { easy: [1, 3], mid: [4, 7], hard: [8, 10] } as const
+  const activeRecs = recType === 'season' ? seasonRecs : courseRecs
+  const recsReady = activeRecs !== null
+  const myName = loadPlayer()?.name ?? null
+  // recent sort reads the archive once per open, not per row: last playedAt
+  // per slug. The archive prunes, so "recent" means what it remembers — the
+  // same source and the same honesty as the played notch itself.
+  const lastPlayed = new Map<string, number>()
+  for (const r of loadArchive()) lastPlayed.set(r.courseSlug, Math.max(lastPlayed.get(r.courseSlug) ?? 0, r.playedAt))
+  const activeFilterCount =
+    (playedFilter !== 'all' ? 1 : 0) + (ratingFilter !== 'any' ? 1 : 0) + (recordFilter !== 'any' ? 1 : 0) + (favsOnly ? 1 : 0)
+  const filtersActive = activeFilterCount > 0 || courseSort !== 'tour'
+  // guest courses browse (and filter, and sort) like everything else — one pool
+  const browsable = [...COURSES, ...GUEST_COURSES]
+  const visibleCourses = browsable.filter((c) => {
+    if (favsOnly && !favs.has(c.slug)) return false
+    if (playedFilter === 'unplayed' && playedSlugs.has(c.slug)) return false
+    if (playedFilter === 'played' && !playedSlugs.has(c.slug)) return false
+    if (ratingFilter !== 'any') {
+      const [lo, hi] = RATING_BAND[ratingFilter]
+      const r = playRatingFor(c.slug)
+      if (r < lo || r > hi) return false
+    }
+    if (recordFilter !== 'any' && recsReady) {
+      const rec = activeRecs.get(c.slug)
+      if (recordFilter === 'open' && rec) return false
+      if (recordFilter === 'attainable' && (!rec || rec.to_par < ATTAINABLE_RECORD_TO_PAR)) return false
+      if (recordFilter === 'mine' && !(rec && myName && rec.player_name === myName)) return false
+      if (recordFilter === 'notmine' && rec && myName && rec.player_name === myName) return false
+    }
+    return true
+  }).sort((a, b) => {
+    if (courseSort === 'easiest') return playRatingFor(a.slug) - playRatingFor(b.slug)
+    if (courseSort === 'hardest') return playRatingFor(b.slug) - playRatingFor(a.slug)
+    if (courseSort === 'recent') return (lastPlayed.get(b.slug) ?? 0) - (lastPlayed.get(a.slug) ?? 0)
+    // starred courses first, tour order within each group — the shortlist
+    // floats to the top without needing the filter sheet at all
+    if (courseSort === 'favorites') return Number(favs.has(b.slug)) - Number(favs.has(a.slug))
+    if (courseSort === 'beatable') {
+      // weakest active record first — open records are the weakest of all
+      const va = activeRecs?.get(a.slug)?.to_par ?? 99
+      const vb = activeRecs?.get(b.slug)?.to_par ?? 99
+      return vb - va
+    }
+    return 0
+  })
+  const resetFilters = () => {
+    setPlayedFilter('all')
+    setRatingFilter('any')
+    setRecordFilter('any')
+    setFavsOnly(false)
+    setCourseSort('tour')
+  }
   return (
     <div className="screen home">
       {/* The masthead is one lockup: the kicker and the tagline sit IN the
@@ -290,38 +395,186 @@ export function HomeScreen(props: {
               ⏳ {season.name} ends in {seasonCountdown(season)} — season records are up for grabs
             </p>
           )}
-          {courseTab === 'courses' &&
-            [...COURSES, ...GUEST_COURSES].map((c) => {
-              const sr = seasonRecs?.get(c.slug)
-              const at = courseRecs?.get(c.slug)
-              return (
-                <button
-                  key={c.slug}
-                  className={`course-row${playedSlugs.has(c.slug) ? ' notched' : ''}`}
-                  onClick={() => startPractice(c.slug)}
-                >
-                  <b>{c.name}</b>
-                  <span>
-                    {c.location} · Play Rating {playRatingFor(c.slug)}/10
-                  </span>
-                  {seasonRecs &&
-                    (sr ? (
-                      <em className="course-cr">
-                        Season {toParLabel(sr.to_par)}
-                        <RecordCrown rec={sr} /> · {characterById(sr.character ?? undefined)?.emoji ?? ''}{' '}
-                        {sr.player_name}
-                      </em>
-                    ) : (
-                      <em className="course-cr open">Season record open — be the first</em>
-                    ))}
-                  {at && (
-                    <em className="course-cr alltime">
-                      All-time {toParLabel(at.to_par)}
-                      <RecordCrown rec={at} /> · {characterById(at.character ?? undefined)?.emoji ?? ''}{' '}
-                      {at.player_name}
-                    </em>
-                  )}
+          {courseTab === 'courses' && (
+            <div className="course-filters">
+              {/* one slim row; the full controls live in the sheet below */}
+              <div className="filter-bar">
+                <div className="rec-toggle" role="group" aria-label="Record type">
+                  <button className={`rec-toggle-btn${recType === 'season' ? ' on' : ''}`} onClick={() => setRecType('season')}>
+                    View Season Records
+                  </button>
+                  <button className={`rec-toggle-btn${recType === 'alltime' ? ' on' : ''}`} onClick={() => setRecType('alltime')}>
+                    View All-Time Records
+                  </button>
+                </div>
+                <div className="filter-bar-actions">
+                  <button className={`filter-chip${activeFilterCount > 0 ? ' on' : ''}`} onClick={() => setFilterSheet(true)}>
+                    ☰ Filters{activeFilterCount > 0 ? ` · ${activeFilterCount}` : ''}
+                  </button>
+                  <button
+                    className={`filter-chip sort${courseSort !== 'tour' ? ' on' : ''}`}
+                    onClick={() =>
+                      setCourseSort(
+                        courseSort === 'tour'
+                          ? 'easiest'
+                          : courseSort === 'easiest'
+                            ? 'hardest'
+                            : courseSort === 'hardest'
+                              ? 'beatable'
+                              : courseSort === 'beatable'
+                                ? 'recent'
+                                : courseSort === 'recent'
+                                  ? 'favorites'
+                                  : 'tour',
+                      )
+                    }
+                    aria-label="Change sort order"
+                  >
+                    ⇅ Sort:{' '}
+                    {courseSort === 'tour'
+                      ? 'Tour'
+                      : courseSort === 'easiest'
+                        ? 'Easiest'
+                        : courseSort === 'hardest'
+                          ? 'Hardest'
+                          : courseSort === 'beatable'
+                            ? 'Beatable'
+                            : courseSort === 'recent'
+                              ? 'Recent'
+                              : '★ Favorites'}
+                  </button>
+                </div>
+              </div>
+              {visibleCourses.length !== browsable.length && (
+                <p className="fine filter-count">
+                  {visibleCourses.length} of {browsable.length} courses
+                </p>
+              )}
+            </div>
+          )}
+          {filterSheet && (
+            <div className="tut-backdrop filter-sheet-backdrop" role="dialog" aria-modal="true" aria-label="Course filters" onClick={() => setFilterSheet(false)}>
+              <div className="tut-card filter-sheet" onClick={(e) => e.stopPropagation()}>
+                <button className="tut-skip" onClick={() => setFilterSheet(false)} aria-label="Close">
+                  Done
                 </button>
+                <div className="kicker">Filter courses</div>
+                <div className="filter-group">
+                  <span className="filter-label">Played</span>
+                  <div className="filter-row" role="group" aria-label="Filter by played">
+                    {(['all', 'unplayed', 'played'] as const).map((f) => (
+                      <button key={f} className={`filter-chip${playedFilter === f ? ' on' : ''}`} onClick={() => setPlayedFilter(f)}>
+                        {f === 'all' ? 'All' : f === 'unplayed' ? 'Never played' : 'Played ▸'}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="filter-group">
+                  <span className="filter-label">Difficulty</span>
+                  <div className="filter-row" role="group" aria-label="Filter by difficulty">
+                    {(['any', 'easy', 'mid', 'hard'] as const).map((f) => (
+                      <button key={f} className={`filter-chip${ratingFilter === f ? ' on' : ''}`} onClick={() => setRatingFilter(f)}>
+                        {f === 'any' ? 'Any' : f === 'easy' ? 'Easy 1–3' : f === 'mid' ? 'Medium 4–7' : 'Hard 8–10'}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="filter-group">
+                  <span className="filter-label">{recType === 'season' ? 'Season record' : 'All-time record'}</span>
+                  <div className="filter-row" role="group" aria-label="Filter by record">
+                    {(['any', 'open', 'attainable', 'mine', 'notmine'] as const).map((f) => (
+                      <button
+                        key={f}
+                        className={`filter-chip${recordFilter === f ? ' on' : ''}`}
+                        disabled={f !== 'any' && !recsReady}
+                        title={f !== 'any' && !recsReady ? 'Records still loading' : undefined}
+                        onClick={() => setRecordFilter(f)}
+                      >
+                        {f === 'any'
+                          ? 'Any'
+                          : f === 'open'
+                            ? 'Open'
+                            : f === 'attainable'
+                              ? `Attainable (${ATTAINABLE_RECORD_TO_PAR} or worse)`
+                              : f === 'mine'
+                                ? 'I hold it'
+                                : "I don't hold it"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="filter-group">
+                  <span className="filter-label">Favorites</span>
+                  <div className="filter-row">
+                    <button className={`filter-chip fav${favsOnly ? ' on' : ''}`} onClick={() => setFavsOnly(!favsOnly)}>
+                      ★ Favorites only{favs.size > 0 ? ` · ${favs.size}` : ''}
+                    </button>
+                  </div>
+                </div>
+                <div className="filter-foot">
+                  {filtersActive && (
+                    <button className="filter-reset" onClick={resetFilters}>
+                      Reset filters
+                    </button>
+                  )}
+                  <button className="cta filter-apply" onClick={() => setFilterSheet(false)}>
+                    Show {visibleCourses.length} course{visibleCourses.length === 1 ? '' : 's'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+          {courseTab === 'courses' && visibleCourses.length === 0 && (
+            <div className="filter-empty">
+              {/* the filters are the cause, and the copy says so — a saved
+                  view can go stale (a rollover reopens every record, so an
+                  "open" filter that matched yesterday matches nothing today)
+                  and a bare "no courses" would read as missing data */}
+              <p className="fine">No courses match your saved filters — every course is still here.</p>
+              <button className="filter-reset" onClick={resetFilters}>
+                Reset filters
+              </button>
+            </div>
+          )}
+          {courseTab === 'courses' &&
+            visibleCourses.map((c) => {
+              // the row shows the ACTIVE record type only, labeled, so nobody
+              // misreads which record they're hunting — the toggle above flips it
+              const rec = activeRecs?.get(c.slug)
+              const mine = Boolean(rec && myName && rec.player_name === myName)
+              const recLabel = recType === 'season' ? 'Season' : 'All-time'
+              return (
+                <div key={c.slug} className="course-row-wrap">
+                  <button
+                    className={`course-row${playedSlugs.has(c.slug) ? ' notched' : ''}`}
+                    onClick={() => startPractice(c.slug)}
+                  >
+                    <b>{c.name}</b>
+                    <span>
+                      {c.location} · Play Rating {playRatingFor(c.slug)}/10
+                    </span>
+                    {!recsReady && <em className="course-cr loading">{recLabel} records loading…</em>}
+                    {recsReady &&
+                      (rec ? (
+                        <em className={`course-cr${recType === 'alltime' ? ' alltime' : ''}`}>
+                          {recLabel} {toParLabel(rec.to_par)}
+                          <RecordCrown rec={rec} /> · {characterById(rec.character ?? undefined)?.emoji ?? ''}{' '}
+                          {rec.player_name}
+                          {mine && <i className="course-cr-you">YOU</i>}
+                        </em>
+                      ) : (
+                        <em className="course-cr open">{recLabel} record open — be the first</em>
+                      ))}
+                  </button>
+                  <button
+                    className={`course-fav${favs.has(c.slug) ? ' on' : ''}`}
+                    aria-label={favs.has(c.slug) ? `Unfavorite ${c.name}` : `Favorite ${c.name}`}
+                    aria-pressed={favs.has(c.slug)}
+                    onClick={() => setFavs(new Set(toggleFavorite(c.slug)))}
+                  >
+                    {favs.has(c.slug) ? '★' : '☆'}
+                  </button>
+                </div>
               )
             })}
           {/* tooltips need a hover no phone has — the crown explains itself
@@ -520,25 +773,45 @@ export function ForecastCard(props: { today: HistoryEntry }) {
  * their putter, not their feelings. "Win it back" deep-links straight into
  * unlimited play on that course.
  */
+/** which wall the name came off — worn by every steal surface so an all-time
+ * fall and a season fall can never be mistaken for each other. Solid gold is
+ * the all-time record, the gold keyline is the season board — the same
+ * convention as the Records tab's badges. */
+function StealTag({ scope }: { scope: PendingSteal['scope'] }) {
+  const label = scope === 'both' ? 'All-time + Season' : scope === 'alltime' ? 'All-time' : 'Season'
+  return <span className={`steal-tag ${scope}`}>{label}</span>
+}
+
 function StealCard(props: {
-  steals: Array<{ courseSlug: string } & StolenRecord>
+  steals: PendingSteal[]
   onDismiss: () => void
   onWinItBack: (slug: string) => void
 }) {
   const [expanded, setExpanded] = useState(props.steals.length === 1)
   const courseName = (slug: string) => courseBySlug(slug)?.name ?? slug
   const one = props.steals.length === 1 ? props.steals[0] : null
+  // the kicker names the board outright when every fall is on the same one
+  const kicker = props.steals.every((s) => s.scope === 'season')
+    ? '🚨 Season record stolen'
+    : props.steals.every((s) => s.scope === 'alltime')
+      ? '🚨 Course record stolen'
+      : '🚨 Records stolen'
   return (
     <div className="steal-card" role="status">
       <button className="steal-x" onClick={props.onDismiss} aria-label="Dismiss">
         ✕
       </button>
-      <div className="kicker">🚨 Course record stolen</div>
+      <div className="kicker">{kicker}</div>
       {one ? (
         <>
           <p>
-            <b>{one.by}</b> shot <b>{toParLabel(one.theirToPar)}</b> at {courseName(one.courseSlug)}, sliding past
-            your {toParLabel(one.myToPar)}. Word travels fast around here.
+            <StealTag scope={one.scope} /> <b>{one.by}</b> shot <b>{toParLabel(one.theirToPar)}</b> at{' '}
+            {courseName(one.courseSlug)}
+            {one.scope === 'season'
+              ? `, knocking your ${toParLabel(one.myToPar)} off the season board. The horn hasn't blown yet — plenty of time to answer.`
+              : one.scope === 'both'
+                ? ` — past your ${toParLabel(one.myToPar)}, taking the all-time record and the season board in one round. The nerve.`
+                : `, sliding past your ${toParLabel(one.myToPar)} on the all-time board. Word travels fast around here.`}
           </p>
           <button className="cta steal-cta" onClick={() => props.onWinItBack(one.courseSlug)}>
             Win it back
@@ -547,15 +820,16 @@ function StealCard(props: {
       ) : (
         <>
           <p>
-            <b>{props.steals.length} of your course records fell</b> while you were gone.
+            <b>{props.steals.length} of your records fell</b> while you were gone.
             {!expanded && ' The nerve.'}
           </p>
           {expanded ? (
             <div className="steal-list">
               {props.steals.map((s) => (
-                <div key={s.courseSlug} className="steal-row">
+                <div key={`${s.scope}:${s.courseSlug}`} className="steal-row">
                   <span>
-                    <b>{courseName(s.courseSlug)}</b> — {s.by}, {toParLabel(s.theirToPar)} (yours: {toParLabel(s.myToPar)})
+                    <StealTag scope={s.scope} /> <b>{courseName(s.courseSlug)}</b> — {s.by},{' '}
+                    {toParLabel(s.theirToPar)} (yours: {toParLabel(s.myToPar)})
                   </span>
                   <button className="cta ghost slim" onClick={() => props.onWinItBack(s.courseSlug)}>
                     Win it back
@@ -575,38 +849,87 @@ function StealCard(props: {
 }
 
 /** what the result screen's quiet close calls the thing that was raced */
-function ghostCloseNoun(close: { kind: 'record' | 'personal'; holder: string | null }): string {
+function ghostCloseNoun(close: { kind: 'record' | 'personal'; board: GhostBoard; holder: string | null }): string {
   if (close.kind !== 'record') return 'your best'
-  return close.holder ? `${close.holder}'s record` : 'your own record'
+  const noun = close.board === 'season' ? 'season record' : 'record'
+  return close.holder ? `${close.holder}'s ${noun}` : `your own ${noun}`
 }
 
 /**
  * The pre-round tale of the tape: who holds the wall, their score, and their
  * actual card hole by hole — so the challenger knows exactly what they're
- * getting into. Self-loading (one fetch + one engine replay) and quick; it
+ * getting into. Self-loading (two fetches + engine replays) and quick; it
  * renders when ready and never delays the tee shot.
+ *
+ * When the all-time and season records are DIFFERENT rounds, a toggle picks
+ * which one the ghost races — the stakes card previews whichever is chosen.
+ * Same round on both boards (or only one board set): no toggle, no choice.
  */
-function GhostStakes(props: { courseSlug: string }) {
-  const [ghost, setGhost] = useState<Ghost | null>(null)
+function GhostStakes(props: { courseSlug: string; board: GhostBoard; onBoard: (b: GhostBoard) => void }) {
+  const [choices, setChoices] = useState<{ alltime: Ghost | null; season: Ghost | null } | null>(null)
+  const [fallback, setFallback] = useState<Ghost | null>(null)
   useEffect(() => {
     let live = true
-    void loadGhost(props.courseSlug).then((g) => {
-      if (live) setGhost(g)
+    void loadGhostChoices(props.courseSlug).then((c) => {
+      if (!live) return
+      setChoices(c)
+      // no record round on either board — show the own-best ghost instead
+      if (!c.alltime && !c.season) {
+        void loadGhost(props.courseSlug).then((g) => {
+          if (live) setFallback(g)
+        })
+      }
     })
     return () => {
       live = false
     }
   }, [props.courseSlug])
+  const canToggle = !!choices?.alltime && !!choices?.season && choices.alltime.seed !== choices.season.seed
+  // a pick with nothing to race snaps to the board that HAS a record, so the
+  // pick and the loaded ghost can't disagree at tee-off. Both directions
+  // matter: an all-time row old enough to predate stored replays leaves the
+  // season round as the only raceable record, and the default pick is
+  // all-time — without the snap the one available ghost is unreachable.
+  const wantSeason = props.board === 'season'
+  useEffect(() => {
+    if (!choices) return
+    if (wantSeason && !choices.season) props.onBoard('alltime')
+    else if (!wantSeason && !choices.alltime && choices.season) props.onBoard('season')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [choices, wantSeason])
+  // the snap above converges the pick, but only on the NEXT render — so the
+  // preview falls through to whichever board actually has a round rather than
+  // blanking the card for a frame
+  const ghost = (wantSeason ? choices?.season : choices?.alltime) ?? choices?.alltime ?? choices?.season ?? fallback
   if (!ghost) return null
   const char = characterById(ghost.character)
+  const boardNoun = ghost.board === 'season' ? 'season record' : 'record'
   const headline =
     ghost.kind === 'record'
       ? ghost.holder
-        ? `The record: ${ghost.holder}`
-        : 'The record is yours — defend it'
+        ? `The ${boardNoun}: ${ghost.holder}`
+        : `The ${boardNoun} is yours — defend it`
       : 'The ghost: your best round here'
   return (
     <div className={`ghost-stakes${ghost.kind === 'record' ? ' cr' : ''}`}>
+      {canToggle && choices?.alltime && choices?.season && (
+        <div className="ghost-board-toggle" role="radiogroup" aria-label="Which record to race">
+          <button
+            className={!wantSeason ? 'on' : ''}
+            aria-pressed={!wantSeason}
+            onClick={() => props.onBoard('alltime')}
+          >
+            All-time {toParLabel(choices.alltime.toPar)}
+          </button>
+          <button
+            className={wantSeason ? 'on' : ''}
+            aria-pressed={wantSeason}
+            onClick={() => props.onBoard('season')}
+          >
+            Season {toParLabel(choices.season.toPar)}
+          </button>
+        </div>
+      )}
       <div className="ghost-stakes-head">
         <b>👻 {headline}</b>
         <span className="ghost-stakes-score">
@@ -626,7 +949,7 @@ function GhostStakes(props: { courseSlug: string }) {
           ))}
         </div>
       </div>
-      <span className="fine">Their card, their luck — you race the pace on your own dice.</span>
+      <span className="fine">Their card, their conditions — you&rsquo;ll play your own.</span>
     </div>
   )
 }
@@ -675,6 +998,10 @@ function HandicapChip(props: { onTap: () => void }) {
 export function CharacterPickScreen(props: {
   setup: DailySetup
   practice: boolean
+  /** which record the ghost will race (practice only) — owned by the app so
+   * the choice survives into the round that starts here */
+  ghostBoard: GhostBoard
+  onGhostBoard: (b: GhostBoard) => void
   onPick: (c: CharacterId) => void
   onBack: () => void
 }) {
@@ -691,7 +1018,9 @@ export function CharacterPickScreen(props: {
         <h2 className="pick-title">Pick your player</h2>
         <p className="tagline">One edge, all {course.holes.length} holes. Choose for the course in front of you:</p>
       </header>
-      {props.practice && <GhostStakes courseSlug={course.slug} />}
+      {props.practice && (
+        <GhostStakes courseSlug={course.slug} board={props.ghostBoard} onBoard={props.onGhostBoard} />
+      )}
       <div className="chips center">
         <span className="chip">{course.holes.reduce((s, h) => s + h.yards, 0).toLocaleString()} yards</span>
         <span className="chip">Wind {cond.wind} mph</span>
@@ -729,7 +1058,7 @@ export function ResultScreen(props: {
   /** the finished round, when it's still in storage — enables board submission */
   boardRound: RoundState | null
   /** the ghost race's quiet close: final margin vs the chased round */
-  ghostClose?: { margin: number; kind: 'record' | 'personal'; holder: string | null } | null
+  ghostClose?: { margin: number; kind: 'record' | 'personal'; board: GhostBoard; holder: string | null } | null
   history: HistoryEntry[]
   /** achievements this round earned — the wrap card renders only when some did */
   unlocks?: Unlock[]

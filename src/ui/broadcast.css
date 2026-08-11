@@ -430,6 +430,17 @@
   color: var(--record-gold);
 }
 
+.screen.home .steal-tag.alltime,
+.screen.home .steal-tag.both {
+  background: var(--record-gold);
+  color: var(--turf-950);
+}
+
+.screen.home .steal-tag.season {
+  border-color: var(--record-gold);
+  color: var(--record-gold);
+}
+
 .screen.home .steal-cta {
   background: linear-gradient(180deg, var(--flag-400), var(--flag-500));
   color: var(--action-on-primary);
@@ -852,6 +863,10 @@
 
 .tut-card.changelog .changelog-tag.feature {
   color: var(--tracer-400);
+}
+
+.tut-card.changelog .changelog-tag.design {
+  color: var(--trophy-400);
 }
 
 .tut-card.changelog .changelog-tag.fix {
@@ -1509,6 +1524,269 @@
 
 .screen.result .ach-earned:active {
   background: var(--bg-elevated);
+}
+
+/* ------------------------------------------- unlimited course filters */
+
+.screen.home .course-filters {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* the bar: two rows of two — record toggle up top, Filters | Sort below.
+   Everything else lives in the sheet. */
+.screen.home .filter-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.screen.home .filter-bar .rec-toggle {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+
+.screen.home .filter-bar .rec-toggle-btn {
+  white-space: nowrap;
+  font-size: 0.66rem;
+  padding: 8px 6px;
+}
+
+/* Filters and Sort are IDENTICAL fixed-size cells: the pill never resizes —
+   only the sort label's text changes inside it, centred, sized to fit the
+   longest label so no state shifts the layout by a pixel. */
+.screen.home .filter-bar-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.screen.home .filter-bar-actions .filter-chip {
+  /* width comes from the CELL, never the label — the pill cannot resize */
+  width: 100%;
+  white-space: nowrap;
+  padding: 8px 6px;
+  font-size: 0.66rem;
+  min-height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.screen.home .course-cr.loading {
+  opacity: 0.55;
+  font-style: italic;
+}
+
+/* the sheet rises from the bottom like a hand of cards */
+.filter-sheet-backdrop {
+  align-items: flex-end;
+}
+
+.tut-card.filter-sheet {
+  width: 100%;
+  max-width: 520px;
+  border-radius: var(--r-card) var(--r-card) 0 0;
+  margin: 0;
+}
+
+.filter-sheet .filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.filter-sheet .filter-label {
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: var(--track-kicker);
+  text-transform: uppercase;
+  color: var(--text-low);
+}
+
+.filter-sheet .filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.filter-sheet .filter-chip {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-mid);
+  background: var(--bg-card);
+  border: 1px solid var(--edge-hairline);
+  border-radius: var(--r-pill);
+  padding: 6px 12px;
+}
+
+.filter-sheet .filter-chip.on {
+  background: var(--bg-blocked);
+  color: var(--text-on-block);
+  border-color: transparent;
+}
+
+.filter-sheet .filter-chip.fav.on {
+  background: var(--trophy-400);
+}
+
+.filter-sheet .filter-chip:disabled {
+  opacity: 0.4;
+}
+
+.filter-sheet .filter-foot {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 2px;
+}
+
+.filter-sheet .filter-apply {
+  flex: 1;
+}
+
+.screen.home .filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.screen.home .filter-chip {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-mid);
+  background: var(--bg-card);
+  border: 1px solid var(--edge-hairline);
+  border-radius: var(--r-pill);
+  padding: 5px 11px;
+}
+
+.screen.home .filter-chip.on {
+  background: var(--bg-blocked);
+  color: var(--text-on-block);
+  border-color: transparent;
+}
+
+/* the sort cycler reads as a control, not a filter state */
+.screen.home .filter-chip.sort {
+  margin-left: auto;
+  color: var(--tracer-400);
+  border-color: var(--edge-strong);
+}
+
+.screen.home .filter-chip:disabled {
+  opacity: 0.4;
+}
+
+.screen.home .filter-chip.fav.on {
+  background: var(--trophy-400);
+}
+
+/* season / all-time: a segmented switch, unmistakable which side is live */
+.screen.home .rec-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.screen.home .rec-toggle-btn {
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-mid);
+  background: var(--bg-card);
+  border: 1px solid var(--edge-strong);
+  padding: 6px 14px;
+}
+
+.screen.home .rec-toggle-btn:first-child {
+  border-radius: var(--r-pill) 0 0 var(--r-pill);
+}
+
+.screen.home .rec-toggle-btn + .rec-toggle-btn {
+  border-radius: 0 var(--r-pill) var(--r-pill) 0;
+  border-left: none;
+}
+
+.screen.home .rec-toggle-btn.on {
+  background: var(--bg-blocked);
+  color: var(--text-on-block);
+}
+
+.screen.home .filter-foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.screen.home .filter-count {
+  text-align: right;
+  margin: 0 0 0 auto;
+}
+
+.screen.home .filter-reset {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--flag-400);
+  padding: 4px 0;
+}
+
+.screen.home .filter-empty {
+  text-align: center;
+  padding: 10px 0 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: center;
+}
+
+/* row wrapper: the star is a SIBLING of the row button (a button inside a
+   button is invalid HTML and unreachable to assistive tech) */
+.screen.home .course-row-wrap {
+  position: relative;
+}
+
+.screen.home .course-row-wrap .course-row {
+  width: 100%;
+  padding-right: 44px;
+}
+
+.screen.home .course-fav {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 32px;
+  height: 32px;
+  font-size: 1.05rem;
+  color: var(--text-low);
+  border-radius: 50%;
+}
+
+.screen.home .course-fav.on {
+  color: var(--trophy-300);
+}
+
+.screen.home .course-cr-you {
+  font-style: normal;
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--tracer-400);
+  border: 1px solid var(--tracer-400);
+  border-radius: 4px;
+  padding: 1px 5px;
+  margin-left: 6px;
+  vertical-align: 1px;
 }
 
 /* --------------------------- paper game screens: brand accents ONLY */

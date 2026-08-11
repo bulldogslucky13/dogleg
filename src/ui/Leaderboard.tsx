@@ -13,7 +13,7 @@ import {
   type SubmitResult,
 } from '../lib/leaderboard'
 import { seasonForDate } from '../engine/season'
-import { recordWon } from '../lib/records'
+import { recordWon, seasonRecordWon } from '../lib/records'
 import { markArchiveRecord, roundToPar, type RoundState } from '../state/store'
 import { courseBySlug } from '../engine/courses'
 import { identifyPlayer, track } from '../lib/analytics'
@@ -111,11 +111,16 @@ export function ScoreBoard(props: {
       if (named) identifyPlayer(named.id, named.name)
     }
     let reclaimed = false
+    // ledger bookkeeping runs for every break on either board; the
+    // CELEBRATION is tiered — an all-time record outranks (and absorbs) the
+    // season one, so exactly one full-screen moment ever shows. The season
+    // shelf still gets its win recorded on the absorbed path, or a stolen
+    // season record would stay "stolen" after the round that took it back.
+    const stolenSeason = r.seasonRecord?.broken
+      ? seasonRecordWon(round.courseSlug, r.seasonRecord.toPar, r.seasonRecord.seasonKey)
+      : null
     if (r.record?.broken) {
       markArchiveRecord(round.seed) // pin it in the locker forever
-      // ledger bookkeeping runs for every all-time break; the CELEBRATION is
-      // tiered — an all-time record outranks (and absorbs) the season one, so
-      // exactly one full-screen moment ever shows
       const stolen = recordWon(round.courseSlug, r.record.toPar)
       reclaimed = !!stolen
       // the ledger moved — let the wrap screen re-check the achievements that
@@ -130,8 +135,9 @@ export function ScoreBoard(props: {
         tookSeason: !!r.seasonRecord?.broken,
       })
     } else if (r.seasonRecord?.broken) {
-      // season title only: the record-reclaim treatment with season copy
-      setCelebrate({ tier: 'season', takenFrom: null })
+      // season title only: the record-reclaim treatment with season copy —
+      // and when this took a STOLEN season record back, the splash says so
+      setCelebrate({ tier: 'season', takenFrom: stolenSeason?.by ?? null })
     }
     // the untracked conversion: a round actually WRITTEN to a board. Only
     // count real writes, so the metric isn't inflated by no-op submits:
@@ -236,6 +242,7 @@ export function ScoreBoard(props: {
             toPar={roundToPar(round)}
             character={round.character}
             season={seasonForDate()}
+            takenFrom={celebrate.takenFrom ?? undefined}
             onClose={() => setCelebrate(null)}
           />
         )}

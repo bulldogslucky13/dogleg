@@ -97,6 +97,12 @@ export const CHANGELOG: ChangeEntry[] = [
     note: 'Every course drawn from real-world maps had its greens come out about half as deep as they really are. That put the front edge too close to the pin, so sand guarding the front of a green was not always counted as guarding it, and those bunkers read as slightly less dangerous than they are. All 199 holes are re-measured against the real green. No course changed its difficulty rating.',
   },
   {
+    date: '2026-07-29',
+    kind: 'feature',
+    title: 'Season records are worth defending too',
+    note: 'Losing a season record now triggers the rivalry card on the teebox. Racing a record? Toggle between ghost balls in Unlimited Play to pace yourself with your actual target. Happy hunting.',
+  },
+  {
     date: '2026-07-27',
     kind: 'feature',
     title: 'Achievements',
@@ -195,8 +201,8 @@ export const CHANGELOG: ChangeEntry[] = [
   {
     date: '2026-07-20',
     kind: 'odds',
-    title: 'Your own dice',
-    note: 'The daily deals every player their own luck instead of one shared roll, so two people on the same course no longer share the same bounces.',
+    title: 'Your own bounces',
+    note: 'Every player now gets their own luck on the daily. Two people playing the same course see the same conditions and the same odds — but not the same bounces.',
   },
   {
     date: '2026-07-20',

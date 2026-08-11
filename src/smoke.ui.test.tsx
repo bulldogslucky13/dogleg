@@ -1010,9 +1010,43 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
     expect(screen.getByText('Pick your player')).toBeTruthy()
     expect(screen.getAllByText(/Pebble Beach Links/).length).toBeGreaterThan(0)
     fireEvent.click(screen.getByText(CHARACTERS[0].name))
-    // the target stays on the wall for the whole chase
-    expect(screen.getByText(/🎯 Record/)).toBeTruthy()
+    // the target stays on the wall for the whole chase, named by its board
+    expect(screen.getByText(/🎯 All-time record/)).toBeTruthy()
     expect(screen.getAllByText(/Hank/).length).toBeGreaterThan(0)
+  })
+
+  it('a stolen SEASON record gets the same rivalry loop, labeled as the season board', () => {
+    const seasonKey = seasonForDate().key
+    localStorage.setItem(
+      'dogleg:records:v1',
+      JSON.stringify({
+        v: 2,
+        held: {},
+        stolen: {},
+        heldSeason: {},
+        stolenSeason: {
+          'pebble-beach': {
+            by: 'Marge',
+            theirToPar: -5,
+            myToPar: -3,
+            at: 1,
+            notifiedOn: '2026-07-19',
+            dismissed: false,
+            seasonKey,
+          },
+        },
+      }),
+    )
+    render(<App />)
+    // the card says which board fell — kicker and tag both
+    expect(screen.getByText(/Season record stolen/i)).toBeTruthy()
+    expect(screen.getByText('Season')).toBeTruthy()
+    expect(screen.getByText(/horn hasn't blown yet/)).toBeTruthy()
+    fireEvent.click(screen.getByText('Win it back'))
+    fireEvent.click(screen.getByText(CHARACTERS[0].name))
+    // the chase chip carries the board too — never mistakable for all-time
+    expect(screen.getByText(/🎯 Season record/)).toBeTruthy()
+    expect(screen.queryByText(/🎯 All-time record/)).toBeNull()
   })
 
   it('the reclaim splash celebrates, offers the share, and dismisses without advancing anything', async () => {
@@ -1038,6 +1072,24 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
     expect(onClose).toHaveBeenCalled()
   })
 
+  it('the season reclaim splash says season, never course', async () => {
+    const { RecordSplash } = await import('./ui/RecordSplash')
+    render(
+      <RecordSplash
+        courseName="Pebble Beach Links"
+        courseSlug="pebble-beach"
+        dateKey="2026-07-20"
+        toPar={-5}
+        character="dart"
+        season={seasonForDate()}
+        takenFrom="Marge"
+        onClose={vi.fn()}
+      />,
+    )
+    expect(screen.getByText('Season record reclaimed')).toBeTruthy()
+    expect(screen.getByText(/takes the season record back from Marge/)).toBeTruthy()
+  })
+
   it('multiple fallen records stack into one expandable summary — never queued banners', () => {
     const steal = (by: string) => ({ by, theirToPar: -6, myToPar: -4, at: 1, notifiedOn: '2026-07-19', dismissed: false })
     localStorage.setItem(
@@ -1045,14 +1097,14 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
       JSON.stringify({ v: 1, held: {}, stolen: { 'pebble-beach': steal('Hank'), 'st-andrews-old': steal('Marge') } }),
     )
     render(<App />)
-    expect(screen.getByText(/2 of your course records fell/)).toBeTruthy()
+    expect(screen.getByText(/2 of your records fell/)).toBeTruthy()
     // one card, not two
     expect(screen.getAllByText(/Course record stolen/i)).toHaveLength(1)
     fireEvent.click(screen.getByText('See the damage'))
     expect(screen.getAllByText('Win it back')).toHaveLength(2)
     // dismiss stands down the whole card and it stays down
     fireEvent.click(screen.getByLabelText('Dismiss'))
-    expect(screen.queryByText(/course records fell/)).toBeNull()
+    expect(screen.queryByText(/records fell/)).toBeNull()
   })
 
   it('walks home → pick → play and commits a real shot', () => {

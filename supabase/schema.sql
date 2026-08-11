@@ -304,16 +304,27 @@ alter table received_emails enable row level security;
 -- Deliberately NOT a one-shot behind a marker: the deploy applies schema.sql
 -- BEFORE the new submit-round goes live, so daily cards posted to the OLD
 -- function during that handoff would be snapshotted past by a single run and
--- then never reconsidered. Instead the pass runs on EVERY deploy and stays
--- safe to re-run because the updates only ever displace records set by
--- PRACTICE play: a record the live function stamped mode 'daily' is never
--- touched again (re-running could only null its stored ghost round), while a
--- practice-held record a missed daily deserved falls on the next deploy.
--- Every statement is also strictly-better-or-earlier-gated, so a re-run with
--- nothing to catch up writes nothing.
+-- then never reconsidered. Instead the pass runs on EVERY deploy, and two
+-- properties make re-running safe against the live function:
+--
+--   * A STRICTLY better daily displaces any holder — strict inequality can
+--     never match the standing record's own card, so a re-run cannot rewrite
+--     an unchanged live record or null its stored ghost round. This is what
+--     lets a better daily posted to the old function during the handoff land
+--     on the next deploy even after an earlier pass stamped the holder
+--     'daily'.
+--   * The tie-goes-to-earlier rule only displaces PRACTICE holders. A tie
+--     against a daily-mode row is left with the live function's outcome:
+--     re-fighting it could only strip the ghost from a record that is
+--     already correct to within the tie.
+--
+-- The inserts take the empty-course slot with on-conflict-do-nothing: the
+-- still-live referee can claim the same empty course mid-pass, and losing
+-- that race must leave the referee's row standing rather than fail the whole
+-- schema apply (a lost race that deserved the record is swept up by the
+-- update on the next deploy).
 
--- all-time board: displace a standing PRACTICE record only when the best
--- daily on that course was strictly better, or equal and earlier
+-- all-time board
 with best_daily as (
   select distinct on (course_slug)
     course_slug, player_id, player_name, "character", to_par, created_at
@@ -331,8 +342,10 @@ set player_id = bd.player_id,
     mode = 'daily'
 from best_daily bd
 where bd.course_slug = cr.course_slug
-  and cr.mode = 'practice'
-  and (bd.to_par < cr.to_par or (bd.to_par = cr.to_par and bd.created_at < cr.set_at));
+  and (
+    bd.to_par < cr.to_par
+    or (cr.mode = 'practice' and bd.to_par = cr.to_par and bd.created_at < cr.set_at)
+  );
 
 with best_daily as (
   select distinct on (course_slug)
@@ -343,7 +356,8 @@ with best_daily as (
 insert into course_records (course_slug, player_id, player_name, "character", to_par, set_at, mode)
 select bd.course_slug, bd.player_id, bd.player_name, bd."character", bd.to_par, bd.created_at, 'daily'
 from best_daily bd
-where not exists (select from course_records cr where cr.course_slug = bd.course_slug);
+where not exists (select from course_records cr where cr.course_slug = bd.course_slug)
+on conflict (course_slug) do nothing;
 
 -- season boards: same reconstruction per (season, course). The season is
 -- the PUZZLE's season — date_key on the fixed ET calendar (Feb-Apr
@@ -378,8 +392,10 @@ from best_daily_season bd
 where sr.scope = 'global'
   and sr.season_key = bd.season_key
   and sr.course_slug = bd.course_slug
-  and sr.mode = 'practice'
-  and (bd.to_par < sr.to_par or (bd.to_par = sr.to_par and bd.created_at < sr.set_at));
+  and (
+    bd.to_par < sr.to_par
+    or (sr.mode = 'practice' and bd.to_par = sr.to_par and bd.created_at < sr.set_at)
+  );
 
 with keyed as (
   select course_slug, player_id, player_name, "character", to_par, created_at,
@@ -403,4 +419,5 @@ from best_daily_season bd
 where not exists (
   select from season_records sr
   where sr.scope = 'global' and sr.season_key = bd.season_key and sr.course_slug = bd.course_slug
-);
+)
+on conflict (scope, season_key, course_slug) do nothing;

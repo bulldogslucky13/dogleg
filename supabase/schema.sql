@@ -288,6 +288,12 @@ create table if not exists backfill_markers (
   key text primary key,
   applied_at timestamptz not null default now()
 );
+-- RLS on, and NO policies: the marker is deploy machinery, not client data.
+-- public-schema tables are exposed through PostgREST under the default
+-- grants, so without this any anon client could delete the marker row and
+-- re-arm a supposedly one-time backfill. Only the service role (the deploy
+-- pipeline, or an operator in the dashboard) can touch it.
+alter table backfill_markers enable row level security;
 
 do $$
 begin

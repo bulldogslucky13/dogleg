@@ -79,6 +79,15 @@ exists, create or replace, drop policy if exists then create). Never add a
 bare `create table`/`create policy`/data migration that would error or
 double-apply on re-run.
 
+**Data backfills go in `supabase/catch-up-records.sql`, not `schema.sql`** —
+applied by the same workflow but AFTER the functions deploy, and rerunnable
+rather than marker-gated. Both properties are the same lesson: a backfill that
+writes a column only the NEW referee understands must not run while the old
+one is still live (it would leave rows the old referee then corrupts), and a
+one-shot would snapshot past anything posted during the deploy. Schema keeps
+the opposite order for the opposite reason — no function may ship ahead of a
+table or column it writes to.
+
 **Conditions are versioned.** Replay links, archived rounds, and course-record
 ghosts persist only a seed + decisions; conditions re-derive from the seed on
 every replay. So anything that changes what a seed reconstructs (new

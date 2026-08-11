@@ -351,6 +351,14 @@ function mergeRecordsJson(local: string, incoming: string): string {
      *  the higher per course — summing would double-count the reclaims both
      *  devices already know about. */
     reclaimed?: Record<string, number>
+    /** the season shelves (ledger v2) merge under exactly the same rules —
+     *  and they MUST be carried: a held season record can be re-adopted from
+     *  the server on the next sync, but a STOLEN one cannot be reconstructed
+     *  from the current holder, so dropping it loses the alert and the chase
+     *  for good. Entries stay stamped with their season; records.ts expires
+     *  the stale ones on the first sync of a new season. */
+    heldSeason?: Record<string, unknown>
+    stolenSeason?: Record<string, unknown>
   }
   let mine: Ledger | null
   let theirs: Ledger | null
@@ -374,14 +382,28 @@ function mergeRecordsJson(local: string, incoming: string): string {
     const b = reclaimed[slug]
     reclaimed[slug] = Math.max(a, typeof b === 'number' && Number.isFinite(b) ? b : 0)
   }
-  for (const slug of Object.keys(held)) {
-    if (!(slug in stolen)) continue
-    // local decides; if it knew the course under neither state, keep the hold
-    // rather than raise a theft notice this device never observed
-    if (mine.stolen && slug in mine.stolen && !(mine.held && slug in mine.held)) delete held[slug]
-    else delete stolen[slug]
+  // held/stolen are mutually exclusive per course on BOTH shelves, and the
+  // union above can break that on either — same restoration, same rule that
+  // the device which has been playing decides
+  const exclude = (
+    held: Record<string, unknown>,
+    stolen: Record<string, unknown>,
+    mineHeld: Record<string, unknown> | undefined,
+    mineStolen: Record<string, unknown> | undefined,
+  ) => {
+    for (const slug of Object.keys(held)) {
+      if (!(slug in stolen)) continue
+      // local decides; if it knew the course under neither state, keep the hold
+      // rather than raise a theft notice this device never observed
+      if (mineStolen && slug in mineStolen && !(mineHeld && slug in mineHeld)) delete held[slug]
+      else delete stolen[slug]
+    }
   }
-  return JSON.stringify({ v: 1, held, stolen, reclaimed })
+  const heldSeason = { ...(theirs.heldSeason ?? {}), ...(mine.heldSeason ?? {}) }
+  const stolenSeason = { ...(theirs.stolenSeason ?? {}), ...(mine.stolenSeason ?? {}) }
+  exclude(held, stolen, mine.held, mine.stolen)
+  exclude(heldSeason, stolenSeason, mine.heldSeason, mine.stolenSeason)
+  return JSON.stringify({ v: 2, held, stolen, reclaimed, heldSeason, stolenSeason })
 }
 
 /**

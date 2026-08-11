@@ -404,6 +404,101 @@ describe('importing onto a device that has already been played on', () => {
     expect(ledger.held.augusta.toPar).toBe(0) // incoming's non-conflicting entry still arrives
   })
 
+  it('carries the season shelves, which a server sync cannot rebuild', async () => {
+    // a HELD season record can be re-adopted from the server on the next sync,
+    // but a STOLEN one leaves no server-side trace of what we lost — dropping
+    // it loses the alert and the chase permanently. Same merge rules as the
+    // all-time shelves, and the payload must stay v2.
+    const target = seeded({
+      'dogleg:player:v1': ANON,
+      'dogleg:records:v1': {
+        v: 2,
+        held: {},
+        stolen: {},
+        heldSeason: { augusta: { toPar: -3, since: 1, seasonKey: '2026-q3-fall' } },
+        stolenSeason: { 'pebble-beach': { by: 'Sandy Lyle', theirToPar: -6, seasonKey: '2026-q3-fall' } },
+      },
+    })
+    await importHandoff(
+      await packHandoff(
+        seeded({
+          ...OLD_DEVICE,
+          'dogleg:records:v1': {
+            v: 2,
+            held: {},
+            stolen: {},
+            heldSeason: { oakmont: { toPar: -1, since: 2, seasonKey: '2026-q3-fall' } },
+            stolenSeason: {},
+          },
+        }),
+      ),
+      target,
+    )
+    const ledger = JSON.parse(target.getItem('dogleg:records:v1')!) as {
+      v: number
+      heldSeason: Record<string, unknown>
+      stolenSeason: Record<string, unknown>
+    }
+    expect(ledger.v).toBe(2)
+    expect('pebble-beach' in ledger.stolenSeason).toBe(true) // the unreconstructable half
+    expect(Object.keys(ledger.heldSeason).sort()).toEqual(['augusta', 'oakmont'])
+  })
+
+  it('keeps the season shelves mutually exclusive too', async () => {
+    const target = seeded({
+      'dogleg:player:v1': ANON,
+      'dogleg:records:v1': {
+        v: 2,
+        held: {},
+        stolen: {},
+        heldSeason: {},
+        stolenSeason: { 'pebble-beach': { by: 'Sandy Lyle', theirToPar: -6, seasonKey: '2026-q3-fall' } },
+      },
+    })
+    await importHandoff(
+      await packHandoff(
+        seeded({
+          ...OLD_DEVICE,
+          'dogleg:records:v1': {
+            v: 2,
+            held: {},
+            stolen: {},
+            heldSeason: { 'pebble-beach': { toPar: -5, since: 1, seasonKey: '2026-q3-fall' } },
+            stolenSeason: {},
+          },
+        }),
+      ),
+      target,
+    )
+    const ledger = JSON.parse(target.getItem('dogleg:records:v1')!) as {
+      heldSeason: Record<string, unknown>
+      stolenSeason: Record<string, unknown>
+    }
+    expect('pebble-beach' in ledger.stolenSeason).toBe(true) // local's view wins
+    expect('pebble-beach' in ledger.heldSeason).toBe(false)
+  })
+
+  it('a v1 ledger merging in still comes out v2, with empty season shelves', async () => {
+    const target = seeded({
+      'dogleg:player:v1': ANON,
+      'dogleg:records:v1': { v: 1, held: { augusta: { toPar: -3, since: 1 } }, stolen: {} },
+    })
+    await importHandoff(
+      await packHandoff(
+        seeded({ ...OLD_DEVICE, 'dogleg:records:v1': { v: 1, held: {}, stolen: {}, reclaimed: { augusta: 2 } } }),
+      ),
+      target,
+    )
+    const ledger = JSON.parse(target.getItem('dogleg:records:v1')!) as {
+      v: number
+      heldSeason: Record<string, unknown>
+      stolenSeason: Record<string, unknown>
+    }
+    expect(ledger.v).toBe(2)
+    expect(ledger.heldSeason).toEqual({})
+    expect(ledger.stolenSeason).toEqual({})
+  })
+
   it('unions the achievements shelf — an append-only record must never lose a grant', async () => {
     const target = seeded({
       'dogleg:player:v1': ANON,

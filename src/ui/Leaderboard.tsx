@@ -299,6 +299,11 @@ export function ScoreBoard(props: {
 
   const shown = board?.slice(0, 10) ?? []
   const ranks = competitionRanks(shown)
+  // the season the SERVER stamped the record with: the puzzle's own day,
+  // anchored mid-day UTC exactly like the referee — not the submission
+  // instant, so a card posted just after the season horn still celebrates
+  // the season its puzzle belonged to
+  const puzzleSeason = seasonForDate(new Date(`${round.dateKey}T12:00:00Z`))
 
   return (
     <div className="board-block">
@@ -312,7 +317,7 @@ export function ScoreBoard(props: {
           dateKey={round.dateKey}
           toPar={roundToPar(round)}
           character={round.character}
-          season={seasonForDate()}
+          season={puzzleSeason}
           previousHolder={celebrate.previousHolder ?? undefined}
           tookSeason={celebrate.tookSeason}
           onClose={() => setCelebrate(null)}
@@ -325,7 +330,7 @@ export function ScoreBoard(props: {
           dateKey={round.dateKey}
           toPar={roundToPar(round)}
           character={round.character}
-          season={seasonForDate()}
+          season={puzzleSeason}
           onClose={() => setCelebrate(null)}
         />
       )}

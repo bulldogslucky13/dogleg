@@ -279,6 +279,23 @@ Deno.serve(async (req) => {
     // first card of the day stands; a resubmission is ignored
     const { error } = await supabase.from('daily_scores').insert(row)
     if (error && error.code !== '23505') return json(500, { error: 'could not save score' })
+    if (error) {
+      // Duplicate resubmission: the first card stands, so records may only
+      // contend with THAT card's score. Without this check a player could
+      // replay the daily with different decisions and use a later, better
+      // result to take a record the one-attempt board never saw. A retry of
+      // the same round (same score) still falls through, so a record write
+      // that failed after the board write self-heals on the client's retry.
+      const { data: first } = await supabase
+        .from('daily_scores')
+        .select('to_par, strokes')
+        .eq('date_key', info.dateKey!)
+        .eq('player_id', player.id)
+        .maybeSingle()
+      if (!first || first.to_par !== replay.toPar || first.strokes !== replay.strokes) {
+        recordEligible = false
+      }
+    }
 
     // ---- clubhouse decision tallies (Layer 2): best-effort, fresh cards only.
     // One atomic RPC bumps the aggregate counters for every (hole,stage) this

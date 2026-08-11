@@ -938,7 +938,7 @@ function GhostStakes(props: { courseSlug: string; board: GhostBoard; onBoard: (b
           ))}
         </div>
       </div>
-      <span className="fine">Their card, their luck — you race the pace on your own dice.</span>
+      <span className="fine">Their card, their conditions — you&rsquo;ll play your own.</span>
     </div>
   )
 }

@@ -194,11 +194,19 @@ Deno.serve(async (req) => {
         // recomputed drought within a small grace of it — a client cannot
         // manufacture a destiny holeout out of a short or fabricated history.
         if (claimsAceDestiny || claimsAlbDestiny) {
+          // the drought is the PRE-round drought: a RETRY of this very
+          // submission may already have its card posted (the insert
+          // committed, a later record write failed), and counting that
+          // card's own destiny moment would zero the drought and reject
+          // the self-heal retry the duplicate path exists to serve
+          const history = ((rows ?? []) as { date_key: string; course_slug: string; results: string[] | null }[]).filter(
+            (r) => r.date_key !== info.dateKey,
+          )
           let sinceAce = 0
           let sinceAlb = 0
           let aceDone = false
           let albDone = false
-          for (const row of (rows ?? []) as { course_slug: string; results: string[] | null }[]) {
+          for (const row of history) {
             const course = courseBySlug(row.course_slug)
             const results = row.results ?? []
             const hasAce = !!course && results.some((r, i) => r === 'eagle' && course.holes[i]?.par === 3)
@@ -481,18 +489,36 @@ Deno.serve(async (req) => {
     } else {
       const { data: seasonHolder } = await supabase
         .from('season_records')
-        .select('to_par, player_name, character')
+        .select('to_par, player_id, player_name, character, seed')
         .eq('scope', 'global')
         .eq('season_key', season.key)
         .eq('course_slug', info.course.slug)
         .maybeSingle()
       if (seasonHolder) {
-        seasonRecord = {
-          broken: false,
-          toPar: seasonHolder.to_par,
-          holder: seasonHolder.player_name,
-          character: seasonHolder.character ?? null,
-          seasonKey: season.key,
+        // retry-aware recovery: the standing row may BE this very round —
+        // the season claim committed, a later write 500'd the response, and
+        // the client retried. The stored ghost seed is exact identity (one
+        // seed, one round), so on a match the win is re-reported as broken
+        // rather than silently downgraded to someone else's record — without
+        // it the client would never run its season bookkeeping/celebration.
+        // No steal email here: the original claim's send already ran, and
+        // the dedupe ledger holds regardless.
+        if (seasonHolder.player_id === player.id && seasonHolder.seed === seed) {
+          seasonRecord = {
+            broken: true,
+            toPar: replay.toPar,
+            holder: player.name,
+            character: character ?? null,
+            seasonKey: season.key,
+          }
+        } else {
+          seasonRecord = {
+            broken: false,
+            toPar: seasonHolder.to_par,
+            holder: seasonHolder.player_name,
+            character: seasonHolder.character ?? null,
+            seasonKey: season.key,
+          }
         }
       }
     }

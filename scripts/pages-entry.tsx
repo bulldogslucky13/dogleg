@@ -21,7 +21,7 @@
 import { copyFileSync, mkdirSync, writeFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { ALL_COURSES } from '../src/engine/courses'
-import { allFiles, pinCardHtml, FONT_FILES, PIN_W, PIN_H } from './lib/pages'
+import { allFiles, pinCardHtml, holePinFile, holePinTargets, FONT_FILES, PIN_W, PIN_H } from './lib/pages'
 import { shotHtml } from './lib/rasterise'
 
 const args = process.argv.slice(2)
@@ -31,12 +31,27 @@ const outDir = resolve(process.cwd(), outFlag !== -1 ? args[outFlag + 1] : 'dist
 if (args.includes('--pins')) {
   const pinsDir = resolve(outDir, 'pins')
   mkdirSync(pinsDir, { recursive: true })
+  let n = 0
   for (const c of ALL_COURSES) {
     const out = resolve(pinsDir, `${c.slug}.png`)
     shotHtml(pinCardHtml(c), out, { width: PIN_W, height: PIN_H, scale: 1, tag: `pin-${c.slug}` })
     console.log(`pins/${c.slug}.png  ${PIN_W}x${PIN_H}`)
+    n++
+    // one card per hole the library wrote copy for — the pinnable inventory
+    // that lets the account post daily without repeating itself
+    for (const hole of holePinTargets(c)) {
+      const file = holePinFile(c, hole)
+      shotHtml(pinCardHtml(c, hole), resolve(pinsDir, file), {
+        width: PIN_W,
+        height: PIN_H,
+        scale: 1,
+        tag: `pin-${c.slug}-h${hole.number}`,
+      })
+      console.log(`pins/${file}  ${PIN_W}x${PIN_H}`)
+      n++
+    }
   }
-  console.log(`${ALL_COURSES.length} pin cards -> ${pinsDir}`)
+  console.log(`${n} pin cards (${ALL_COURSES.length} course + ${n - ALL_COURSES.length} hole) -> ${pinsDir}`)
 } else {
   const files = allFiles()
   for (const f of files) {

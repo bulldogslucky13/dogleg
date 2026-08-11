@@ -91,6 +91,27 @@ export function signatureHole(c: CourseSpec): HoleSpec {
   return c.holes.find((h) => h.signature) ?? c.holes.reduce((a, b) => (a.strokeIndex < b.strokeIndex ? a : b))
 }
 
+/** Every hole the library wrote editorial copy for. These are the holes with a
+ *  story — the Church Pews, Golden Bell, Shipwreck — which is exactly what
+ *  makes them worth a pin of their own. */
+export function signatureHoles(c: CourseSpec): HoleSpec[] {
+  return c.holes.filter((h) => h.signature)
+}
+
+/**
+ * The holes that get a pin card BEYOND the course card.
+ *
+ * The course card already leads with `signatureHole(c)`, so it is excluded
+ * here — otherwise every course would ship the same picture twice under two
+ * filenames. Courses with no editorial copy contribute nothing: a card whose
+ * only claim is "hole 4" is filler, and filler is what makes a Pinterest
+ * account look automated.
+ */
+export function holePinTargets(c: CourseSpec): HoleSpec[] {
+  const lead = signatureHole(c)
+  return signatureHoles(c).filter((h) => h.number !== lead.number)
+}
+
 /** The real HoleMap, server-rendered at the tee with no round context — the
  *  same SVG the app draws, so the guide can never show a hole the game
  *  doesn't. */
@@ -333,6 +354,16 @@ export function coursePath(c: CourseSpec): string {
 
 export function pinImageUrl(c: CourseSpec): string {
   return `${SITE}/pins/${c.slug}.png?v=${PIN_IMG_VERSION}`
+}
+
+/** dist-relative name for a hole card, e.g. 'oakmont-h3.png'. Shared by the
+ *  renderer and the URL helper so the two can't drift apart. */
+export function holePinFile(c: CourseSpec, hole: HoleSpec): string {
+  return `${c.slug}-h${hole.number}.png`
+}
+
+export function holePinImageUrl(c: CourseSpec, hole: HoleSpec): string {
+  return `${SITE}/pins/${holePinFile(c, hole)}?v=${PIN_IMG_VERSION}`
 }
 
 export function coursePage(c: CourseSpec): string {
@@ -598,13 +629,19 @@ export const PIN_W = 1000
 export const PIN_H = 1500
 
 /**
- * The 2:3 Pinterest card for one course — Pinterest's preferred 1000x1500.
- * Composition: kicker + course name up top, the signature hole's real map as
- * the hero, the stat line and domain at the foot. Rasterised by
- * scripts/pages-entry.tsx --pins via scripts/lib/rasterise.ts.
+ * The 2:3 Pinterest card — Pinterest's preferred 1000x1500.
+ * Composition: kicker + course name up top, a real hole map as the hero, the
+ * stat line and domain at the foot. Rasterised by scripts/pages-entry.tsx
+ * --pins via scripts/lib/rasterise.ts.
+ *
+ * `hole` picks which hole the card leads with, defaulting to the course's
+ * signature. One template rather than two: a hole card and a course card
+ * differ only in which map is the hero and how the kicker reads, and forking
+ * the markup would mean every future retune had to be made twice.
  */
-export function pinCardHtml(c: CourseSpec): string {
-  const sig = signatureHole(c)
+export function pinCardHtml(c: CourseSpec, hole?: HoleSpec): string {
+  const sig = hole ?? signatureHole(c)
+  const isHoleCard = Boolean(hole)
   const rating = PLAY_RATINGS[c.slug]
   const stats = [
     `Par ${coursePar(c)}`,
@@ -641,7 +678,7 @@ ${themeCss()}
 <div class="frame"></div>
 <div class="head">
   <div class="wordmark">${wordmarkSvg()}</div>
-  <p class="kicker">Course Guide · No. ${sig.number} · Par ${sig.par}</p>
+  <p class="kicker">${isHoleCard ? 'Signature Hole' : 'Course Guide'} · No. ${sig.number} · Par ${sig.par}</p>
   <h1>${esc(c.name)}</h1>
   <p class="loc">${esc(c.location)}</p>
 </div>

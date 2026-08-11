@@ -478,6 +478,111 @@ describe('importing onto a device that has already been played on', () => {
     expect('pebble-beach' in ledger.heldSeason).toBe(false)
   })
 
+  it('a live season entry beats a stale local one, whichever side it arrives on', async () => {
+    // local-wins is right between two entries from the SAME season, but a
+    // stale local entry would be deleted by the next syncSeasonLedger — and a
+    // stolen entry cannot be rebuilt from the server's current holder, so
+    // preferring it would lose the live chase for good.
+    const target = seeded({
+      'dogleg:player:v1': ANON,
+      'dogleg:records:v1': {
+        v: 2,
+        held: {},
+        stolen: {},
+        heldSeason: {},
+        stolenSeason: { 'pebble-beach': { by: 'Old Hat', theirToPar: -2, seasonKey: '2026-q2-summer' } },
+      },
+    })
+    await importHandoff(
+      await packHandoff(
+        seeded({
+          ...OLD_DEVICE,
+          'dogleg:records:v1': {
+            v: 2,
+            held: {},
+            stolen: {},
+            heldSeason: {},
+            stolenSeason: { 'pebble-beach': { by: 'Sandy Lyle', theirToPar: -6, seasonKey: '2026-q3-fall' } },
+          },
+        }),
+      ),
+      target,
+    )
+    const ledger = JSON.parse(target.getItem('dogleg:records:v1')!) as {
+      stolenSeason: Record<string, { by: string; seasonKey: string }>
+    }
+    expect(ledger.stolenSeason['pebble-beach'].seasonKey).toBe('2026-q3-fall')
+    expect(ledger.stolenSeason['pebble-beach'].by).toBe('Sandy Lyle')
+  })
+
+  it('same-season season entries still let the local device decide', async () => {
+    const target = seeded({
+      'dogleg:player:v1': ANON,
+      'dogleg:records:v1': {
+        v: 2,
+        held: {},
+        stolen: {},
+        heldSeason: {},
+        stolenSeason: { 'pebble-beach': { by: 'Local Truth', theirToPar: -6, seasonKey: '2026-q3-fall' } },
+      },
+    })
+    await importHandoff(
+      await packHandoff(
+        seeded({
+          ...OLD_DEVICE,
+          'dogleg:records:v1': {
+            v: 2,
+            held: {},
+            stolen: {},
+            heldSeason: {},
+            stolenSeason: { 'pebble-beach': { by: 'Stale Bookmark', theirToPar: -4, seasonKey: '2026-q3-fall' } },
+          },
+        }),
+      ),
+      target,
+    )
+    const ledger = JSON.parse(target.getItem('dogleg:records:v1')!) as {
+      stolenSeason: Record<string, { by: string }>
+    }
+    expect(ledger.stolenSeason['pebble-beach'].by).toBe('Local Truth')
+  })
+
+  it('a cross-season held/stolen clash keeps the live one, not the local one', async () => {
+    // the two shelves are only mutually exclusive WITHIN a season; across
+    // seasons one of them is dead history and must not evict the other
+    const target = seeded({
+      'dogleg:player:v1': ANON,
+      'dogleg:records:v1': {
+        v: 2,
+        held: {},
+        stolen: {},
+        heldSeason: { 'pebble-beach': { toPar: -5, since: 1, seasonKey: '2026-q2-summer' } },
+        stolenSeason: {},
+      },
+    })
+    await importHandoff(
+      await packHandoff(
+        seeded({
+          ...OLD_DEVICE,
+          'dogleg:records:v1': {
+            v: 2,
+            held: {},
+            stolen: {},
+            heldSeason: {},
+            stolenSeason: { 'pebble-beach': { by: 'Sandy Lyle', theirToPar: -6, seasonKey: '2026-q3-fall' } },
+          },
+        }),
+      ),
+      target,
+    )
+    const ledger = JSON.parse(target.getItem('dogleg:records:v1')!) as {
+      heldSeason: Record<string, unknown>
+      stolenSeason: Record<string, unknown>
+    }
+    expect('pebble-beach' in ledger.stolenSeason).toBe(true) // the current season survives
+    expect('pebble-beach' in ledger.heldSeason).toBe(false)
+  })
+
   it('a v1 ledger merging in still comes out v2, with empty season shelves', async () => {
     const target = seeded({
       'dogleg:player:v1': ANON,

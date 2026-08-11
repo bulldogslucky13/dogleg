@@ -351,14 +351,38 @@ function mergeRecordsJson(local: string, incoming: string): string {
      *  the higher per course — summing would double-count the reclaims both
      *  devices already know about. */
     reclaimed?: Record<string, number>
-    /** the season shelves (ledger v2) merge under exactly the same rules —
-     *  and they MUST be carried: a held season record can be re-adopted from
-     *  the server on the next sync, but a STOLEN one cannot be reconstructed
-     *  from the current holder, so dropping it loses the alert and the chase
-     *  for good. Entries stay stamped with their season; records.ts expires
-     *  the stale ones on the first sync of a new season. */
+    /** the season shelves (ledger v2). They MUST be carried: a held season
+     *  record can be re-adopted from the server on the next sync, but a
+     *  STOLEN one cannot be reconstructed from the current holder, so
+     *  dropping it loses the alert and the chase for good.
+     *
+     *  Their merge rule differs from the all-time shelves in one way, and it
+     *  matters: entries are stamped with a season, and a NEWER stamp beats
+     *  local. Local-wins is right between two entries from the same season —
+     *  this device has been playing — but preferring a stale local entry
+     *  over a live one hands syncSeasonLedger something it deletes on sight,
+     *  and the current season's chase is then gone for good. Season keys are
+     *  sortable by construction ('2026-q3-fall'), so a string compare orders
+     *  them without this module having to know what today is. */
     heldSeason?: Record<string, unknown>
     stolenSeason?: Record<string, unknown>
+  }
+  /** '' for an unstamped entry, which then loses to any stamped one */
+  const seasonOf = (e: unknown): string => {
+    const k = (e as { seasonKey?: unknown } | null)?.seasonKey
+    return typeof k === 'string' ? k : ''
+  }
+  const mergeSeasonShelf = (
+    theirs: Record<string, unknown> | undefined,
+    mine: Record<string, unknown> | undefined,
+  ): Record<string, unknown> => {
+    const out: Record<string, unknown> = { ...(theirs ?? {}) }
+    for (const [slug, entry] of Object.entries(mine ?? {})) {
+      // local wins ties, and every same-season conflict is a tie
+      if (slug in out && seasonOf(entry) < seasonOf(out[slug])) continue
+      out[slug] = entry
+    }
+    return out
   }
   let mine: Ledger | null
   let theirs: Ledger | null
@@ -399,10 +423,28 @@ function mergeRecordsJson(local: string, incoming: string): string {
       else delete stolen[slug]
     }
   }
-  const heldSeason = { ...(theirs.heldSeason ?? {}), ...(mine.heldSeason ?? {}) }
-  const stolenSeason = { ...(theirs.stolenSeason ?? {}), ...(mine.stolenSeason ?? {}) }
+  const heldSeason = mergeSeasonShelf(theirs.heldSeason, mine.heldSeason)
+  const stolenSeason = mergeSeasonShelf(theirs.stolenSeason, mine.stolenSeason)
   exclude(held, stolen, mine.held, mine.stolen)
-  exclude(heldSeason, stolenSeason, mine.heldSeason, mine.stolenSeason)
+  // the season shelves get the same exclusion, except that entries from
+  // DIFFERENT seasons were never in conflict — one of them is dead history —
+  // so the newer stamp simply survives and only a same-season clash falls
+  // through to the local-decides rule
+  for (const slug of Object.keys(heldSeason)) {
+    if (!(slug in stolenSeason)) continue
+    const h = seasonOf(heldSeason[slug])
+    const s = seasonOf(stolenSeason[slug])
+    if (h !== s) {
+      if (h < s) delete heldSeason[slug]
+      else delete stolenSeason[slug]
+      continue
+    }
+    if (mine.stolenSeason && slug in mine.stolenSeason && !(mine.heldSeason && slug in mine.heldSeason)) {
+      delete heldSeason[slug]
+    } else {
+      delete stolenSeason[slug]
+    }
+  }
   return JSON.stringify({ v: 2, held, stolen, reclaimed, heldSeason, stolenSeason })
 }
 

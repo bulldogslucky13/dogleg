@@ -498,7 +498,7 @@ ${grades}
         <p>Toggle between the modern top-down map and the classic side view any time. Finish the round and copy your score card straight to the group chat — the squares tell the story, no spoilers.</p>
 
         <h2>Fortunes</h2>
-        <p>Every so often the golf gods simply smile on you: a <b>hole in one</b> or an <b>albatross</b>, out of pure luck — the best score a hole can give. That's a <b>Fortune</b>, and it can strike on any hole, any day, for any player. But the golf gods reward the faithful — post your daily cards under a clubhouse name, keep your streak alive, and your odds of striking a Fortune quietly improve.</p>`
+        <p>Every so often the course simply smiles on you: a <b>hole in one</b> or an <b>albatross</b>, out of pure luck — the best score a hole can give. That's a <b>Fortune</b>, and it can strike on any hole, any day, for any player. But golf rewards the consistent — post your daily cards under a clubhouse name, keep your streak alive, and your odds of striking a Fortune quietly improve.</p>`
   return pageShell({
     path: '/how-to-play/',
     title: 'How to play DogLeg — the daily golf strategy game',

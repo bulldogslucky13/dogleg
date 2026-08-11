@@ -137,7 +137,7 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
     while (screen.queryByText('Next')) fireEvent.click(screen.getByText('Next'))
     expect(screen.getByText('Fortunes')).toBeTruthy()
     // (the phrase also lives in the home streak note behind the overlay)
-    expect(screen.getAllByText(/golf gods reward the faithful/).length).toBeGreaterThan(0)
+    expect(screen.getAllByText(/Golf rewards the consistent/).length).toBeGreaterThan(0)
     // no numbers anywhere: the multiplier and the ramp stay under the hood
     expect(screen.queryByText(/[0-9]+(x|×|%)/)).toBeNull()
     // the one quiet sync line routes to the same account flow as the locker CTA
@@ -688,7 +688,7 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
 
   it('the streak display carries the fortune disclosure note', () => {
     render(<App />)
-    expect(screen.getByText(/golf gods reward the faithful/)).toBeTruthy()
+    expect(screen.getByText(/Golf rewards the consistent/)).toBeTruthy()
   })
 
   it('the Par 3 tab shows its one-time intro, lists the shorts, and tees one up', async () => {

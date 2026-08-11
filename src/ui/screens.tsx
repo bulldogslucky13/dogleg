@@ -957,7 +957,7 @@ function GhostStakes(props: { courseSlug: string; board: GhostBoard; onBoard: (b
 function StreakNote(props: { onInfo?: () => void }) {
   const copy = (
     <>
-      <em className="streak-note-head">The golf gods reward the faithful</em>
+      <em className="streak-note-head">Golf rewards the consistent</em>
       Dailies under a clubhouse name boost Fortune odds.
     </>
   )

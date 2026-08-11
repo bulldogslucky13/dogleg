@@ -613,6 +613,25 @@ Deno.serve(async (req) => {
       .maybeSingle()
     recordHolder = raced
   }
+  // retry-aware recovery, the all-time twin of the season one above: the
+  // standing row may BE this very round (the claim committed, the 200 was
+  // lost, the client retried with its unacknowledged marker). Same identity
+  // test — this player AND this exact seed — so the win is re-reported and
+  // the client still runs recordWon/markArchiveRecord/the celebration. The
+  // seed is read separately and guarded: a pre-delta database has no seed
+  // column, and recovery must degrade away there rather than fail the
+  // submission. Runs after the steal-email block by design — the original
+  // claim already sent the mail, and `existing` is the player's own row here
+  // so the block would skip anyway. Writes nothing, so a forged marker only
+  // repeats a splash on the forger's own screen.
+  if (!isRecord && body?.unacknowledged === true && recordHolder?.player_id === player.id) {
+    const { data: ghost, error: ghostError } = await supabase
+      .from('course_records')
+      .select('seed')
+      .eq('course_slug', info.course.slug)
+      .maybeSingle()
+    if (!ghostError && ghost?.seed != null && ghost.seed === seed) isRecord = true
+  }
   // one response shape for both modes: dailies carry their board fields
   // (rank/total/duplicate) AND the record outcomes, so a single flow serves
   // the daily board and the record system together — they cannot diverge.

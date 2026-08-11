@@ -1,4 +1,5 @@
 import { localDateKey } from '../engine/daily'
+import { seasonForDate } from '../engine/season'
 
 /**
  * The record ledger — the local half of the "record stolen" loop, for BOTH
@@ -298,13 +299,24 @@ export interface PendingSteal extends StolenRecord {
   scope: RecordScope | 'both'
 }
 
-/** Steal events awaiting the player's attention, newest first. */
-export function pendingSteals(ledger = loadLedger()): PendingSteal[] {
+/**
+ * Steal events awaiting the player's attention, newest first.
+ *
+ * Season entries are filtered by season HERE as well as expired in
+ * syncSeasonLedger, and the redundancy is the point: this function is read
+ * synchronously at mount, before any fetch, and the sync that would expire a
+ * stale entry needs a network round trip, a clubhouse name, and a live
+ * server. Offline, signed out, or on a failed fetch it never runs at all —
+ * so without this filter a rollover would flash last season's thefts on
+ * every open and, in those cases, keep flashing them forever. A season that
+ * has ended is not a chase, whatever the shelf still holds.
+ */
+export function pendingSteals(ledger = loadLedger(), seasonKey = seasonForDate().key): PendingSteal[] {
   const alltime = Object.entries(ledger.stolen)
     .filter(([, s]) => !s.dismissed)
     .map(([courseSlug, s]) => ({ courseSlug, scope: 'alltime' as const, ...s }))
   const season = Object.entries(ledger.stolenSeason)
-    .filter(([, s]) => !s.dismissed)
+    .filter(([, s]) => !s.dismissed && s.seasonKey === seasonKey)
     .map(([courseSlug, s]) => ({ courseSlug, scope: 'season' as const, ...s }))
   // one better round routinely takes both boards from the same holder — that
   // is one theft, not two cards

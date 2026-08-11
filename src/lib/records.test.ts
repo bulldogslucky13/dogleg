@@ -119,7 +119,7 @@ describe('the season shelf runs the same rivalry, scoped to one season', () => {
   it('a held season record under a new holder becomes a season-scoped steal', () => {
     seasonRecordWon('pebble-beach', -3, SUMMER, 1000)
     syncSeasonLedger(server([['pebble-beach', 'Hank', -5]]), SUMMER, 'Jackson', 2000, '2026-07-20')
-    const steals = pendingSteals()
+    const steals = pendingSteals(loadLedger(), SUMMER)
     expect(steals).toHaveLength(1)
     expect(steals[0]).toMatchObject({ courseSlug: 'pebble-beach', scope: 'season', by: 'Hank' })
     expect(chasingSeason('pebble-beach', SUMMER)?.by).toBe('Hank')
@@ -131,10 +131,13 @@ describe('the season shelf runs the same rivalry, scoped to one season', () => {
     seasonRecordWon('pebble-beach', -3, SUMMER, 1000)
     seasonRecordWon('st-andrews-old', -2, SUMMER, 1000)
     syncSeasonLedger(server([['st-andrews-old', 'Hank', -6]]), SUMMER, 'Jackson', 2000, '2026-07-20')
-    expect(pendingSteals()).toHaveLength(1)
+    expect(pendingSteals(loadLedger(), SUMMER)).toHaveLength(1)
+    // the summer steal is already invisible from the new season's vantage,
+    // BEFORE any sync runs — the offline/failed-fetch case
+    expect(pendingSteals(loadLedger(), FALL)).toHaveLength(0)
     // the horn blows; the new season's board opens with a different holder
     syncSeasonLedger(server([['pebble-beach', 'Marge', -4]]), FALL, 'Jackson', 3000, '2026-08-01')
-    expect(pendingSteals()).toHaveLength(0)
+    expect(pendingSteals(loadLedger(), FALL)).toHaveLength(0)
     expect(loadLedger().heldSeason['pebble-beach']).toBeUndefined()
     expect(chasingSeason('st-andrews-old', FALL)).toBeNull()
   })
@@ -159,7 +162,7 @@ describe('the season shelf runs the same rivalry, scoped to one season', () => {
     seasonRecordWon('pebble-beach', -4, SUMMER, 1000)
     syncLedger(server([['pebble-beach', 'Hank', -6]]), 'Jackson', 2000, '2026-07-20')
     syncSeasonLedger(server([['pebble-beach', 'Hank', -6]]), SUMMER, 'Jackson', 2000, '2026-07-20')
-    const steals = pendingSteals()
+    const steals = pendingSteals(loadLedger(), SUMMER)
     expect(steals).toHaveLength(1)
     expect(steals[0].scope).toBe('both')
   })
@@ -170,7 +173,7 @@ describe('the season shelf runs the same rivalry, scoped to one season', () => {
     // Hank beats the season score but not the legend round
     syncSeasonLedger(server([['pebble-beach', 'Hank', -5]]), SUMMER, 'Jackson', 2000, '2026-07-20')
     syncLedger(server([['pebble-beach', 'Jackson', -8]]), 'Jackson', 2000, '2026-07-20')
-    const steals = pendingSteals()
+    const steals = pendingSteals(loadLedger(), SUMMER)
     expect(steals).toHaveLength(1)
     expect(steals[0].scope).toBe('season')
     expect(chasing('pebble-beach')).toBeNull()
@@ -181,9 +184,9 @@ describe('the season shelf runs the same rivalry, scoped to one season', () => {
     seasonRecordWon('st-andrews-old', -2, SUMMER, 1000)
     syncLedger(server([['pebble-beach', 'Hank', -6]]), 'Jackson', 2000, '2026-07-20')
     syncSeasonLedger(server([['st-andrews-old', 'Marge', -4]]), SUMMER, 'Jackson', 2000, '2026-07-20')
-    expect(pendingSteals()).toHaveLength(2)
+    expect(pendingSteals(loadLedger(), SUMMER)).toHaveLength(2)
     dismissSteals('2026-07-20')
-    expect(pendingSteals()).toHaveLength(0)
+    expect(pendingSteals(loadLedger(), SUMMER)).toHaveLength(0)
   })
 
   it('the default ghost board races what is being won back', () => {
@@ -197,6 +200,27 @@ describe('the season shelf runs the same rivalry, scoped to one season', () => {
     recordWon('pebble-beach', -4, 3000)
     syncLedger(server([['pebble-beach', 'Hank', -5]]), 'Jackson', 4000, '2026-07-20')
     expect(defaultChaseBoard('pebble-beach', SUMMER)).toBe('alltime')
+  })
+
+  it('ROLLOVER NEVER FLASHES: a past-season steal is filtered at read, not just at sync', () => {
+    // pendingSteals() is read synchronously at mount, before any fetch. The
+    // sync that expires a stale entry needs a network round trip, a clubhouse
+    // name and a live server — offline or signed out it never runs. So the
+    // read itself has to refuse last season's thefts, or a rollover greets
+    // the player with a wave of steals on every open, forever.
+    seasonRecordWon('pebble-beach', -3, SUMMER, 1000)
+    syncSeasonLedger(server([['pebble-beach', 'Hank', -5]]), SUMMER, 'Jackson', 2000, '2026-07-20')
+    expect(pendingSteals(loadLedger(), SUMMER)).toHaveLength(1)
+    // no sync has run in the new season, and the entry is still on the shelf
+    expect(loadLedger().stolenSeason['pebble-beach']).toBeDefined()
+    expect(pendingSteals(loadLedger(), FALL)).toHaveLength(0)
+  })
+
+  it('an all-time steal still shows after a rollover — it has no season to expire', () => {
+    recordWon('pebble-beach', -4, 1000)
+    syncLedger(server([['pebble-beach', 'Hank', -6]]), 'Jackson', 2000, '2026-07-20')
+    expect(pendingSteals(loadLedger(), FALL)).toHaveLength(1)
+    expect(pendingSteals(loadLedger(), '2027-q1-winter')).toHaveLength(1)
   })
 
   it('a v1 ledger (pre-season devices) loads with empty season shelves intact', () => {

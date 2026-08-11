@@ -46,10 +46,19 @@ export const SITE = 'https://playdogleg.com'
  *  crawler might fetch. The value is the claim, not a secret. */
 export const PINTEREST_VERIFY = '1a5c4413c8c5dfc3cbee237c0da375ee'
 
-/** Cache-bust for the per-course pin cards, same contract as og.png's ?v=:
- *  Pinterest and OG scrapers key their image cache on the URL, so bump this
- *  whenever the card design changes or they keep serving the old picture. */
-export const PIN_IMG_VERSION = 1
+/**
+ * Cache-bust for the pin cards, same contract as og.png's ?v=: Pinterest and
+ * OG scrapers key their image cache on the URL, so bump this whenever the card
+ * artwork changes or they keep serving the old picture forever.
+ *
+ * NOTE THAT "THE ARTWORK CHANGED" INCLUDES CHANGES TO HoleMap ITSELF. The
+ * cards embed the real map component, so a change to how the map draws is a
+ * change to 128 pictures — v2 is exactly that: the map stopped planting woods
+ * on treeless links (#126), which redrew every links course's card. A change
+ * to the map is easy to make without ever opening this file, so if you touched
+ * HoleMap and the cards look different, bump it.
+ */
+export const PIN_IMG_VERSION = 2
 
 /** Webfonts the static pages self-host (the app's own font assets carry
  *  hashed names that change build to build). The entry copies these from

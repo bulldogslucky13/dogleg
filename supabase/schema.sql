@@ -323,12 +323,23 @@ alter table received_emails enable row level security;
 -- that race must leave the referee's row standing rather than fail the whole
 -- schema apply (a lost race that deserved the record is swept up by the
 -- update on the next deploy).
+--
+-- The pass only considers cards at least an hour old. The live referee
+-- commits the daily_scores insert BEFORE its record claims, so a pass
+-- running in that gap would install the brand-new card itself — null ghost,
+-- and the referee's own claim then loses its upsert and reports broken:
+-- false, costing the player the celebration and the stored round. The race
+-- window is seconds; an hour buries it. Nothing is lost to the cutoff:
+-- any card it defers is either claimed live by the referee moments later
+-- (the normal path) or, if it slipped through a deploy handoff, is old
+-- enough to be swept up by the next deploy's pass.
 
 -- all-time board
 with best_daily as (
   select distinct on (course_slug)
     course_slug, player_id, player_name, "character", to_par, created_at
   from daily_scores
+  where created_at < now() - interval '1 hour'
   order by course_slug, to_par asc, created_at asc
 )
 update course_records cr
@@ -351,6 +362,7 @@ with best_daily as (
   select distinct on (course_slug)
     course_slug, player_id, player_name, "character", to_par, created_at
   from daily_scores
+  where created_at < now() - interval '1 hour'
   order by course_slug, to_par asc, created_at asc
 )
 insert into course_records (course_slug, player_id, player_name, "character", to_par, set_at, mode)
@@ -373,6 +385,7 @@ with keyed as (
       else (substr(date_key, 1, 4)::int - 1)::text || '-q4-off'
     end as season_key
   from daily_scores
+  where created_at < now() - interval '1 hour'
 ), best_daily_season as (
   select distinct on (season_key, course_slug)
     season_key, course_slug, player_id, player_name, "character", to_par, created_at
@@ -407,6 +420,7 @@ with keyed as (
       else (substr(date_key, 1, 4)::int - 1)::text || '-q4-off'
     end as season_key
   from daily_scores
+  where created_at < now() - interval '1 hour'
 ), best_daily_season as (
   select distinct on (season_key, course_slug)
     season_key, course_slug, player_id, player_name, "character", to_par, created_at

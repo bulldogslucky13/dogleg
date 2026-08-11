@@ -338,6 +338,7 @@ export function ScoreBoard(props: {
           toPar={roundToPar(round)}
           character={round.character}
           season={puzzleSeason}
+          takenFrom={celebrate.takenFrom ?? undefined}
           onClose={() => setCelebrate(null)}
         />
       )}

@@ -38,11 +38,27 @@ const args = process.argv.slice(2)
 const outFlag = args.indexOf('--out')
 const outDir = resolve(process.cwd(), outFlag !== -1 ? args[outFlag + 1] : 'dist')
 
+/**
+ * `--only <slug,slug>` renders just those courses' cards.
+ *
+ * The full set is 130 cards and about five minutes of headless Chrome, which
+ * is the right cost on a deploy and the wrong one when you have changed the
+ * map and want to look at a single hole. Deploy passes no filter and still
+ * renders everything.
+ */
+const onlyFlag = args.indexOf('--only')
+const only = onlyFlag !== -1 ? new Set(args[onlyFlag + 1].split(',')) : null
+
 if (args.includes('--pins')) {
   const pinsDir = resolve(outDir, 'pins')
   mkdirSync(pinsDir, { recursive: true })
+  const courses = only ? ALL_COURSES.filter((c) => only.has(c.slug)) : ALL_COURSES
+  if (only && courses.length !== only.size) {
+    const missing = [...only].filter((s) => !ALL_COURSES.some((c) => c.slug === s))
+    throw new Error(`--only: no such course slug: ${missing.join(', ')}`)
+  }
   let n = 0
-  for (const c of ALL_COURSES) {
+  for (const c of courses) {
     const out = resolve(pinsDir, `${c.slug}.png`)
     shotHtml(pinCardHtml(c), out, { width: PIN_W, height: PIN_H, scale: 1, tag: `pin-${c.slug}` })
     console.log(`pins/${c.slug}.png  ${PIN_W}x${PIN_H}`)
@@ -63,15 +79,20 @@ if (args.includes('--pins')) {
   }
   // the two non-course pages, which SmartPin provably cannot render (it
   // invents branding when there is no hero image to composite)
-  for (const [file, html] of [
+  for (const [file, html] of (only ? [] : ([
     ['courses.png', libraryPinCardHtml()],
     ['how-to-play.png', howToPlayPinCardHtml()],
-  ] as const) {
+  ] as const))) {
     shotHtml(html, resolve(pinsDir, file), { width: PIN_W, height: PIN_H, scale: 1, tag: `pin-${file}` })
     console.log(`pins/${file}  ${PIN_W}x${PIN_H}`)
     n++
   }
-  console.log(`${n} pin cards (${ALL_COURSES.length} course + ${n - ALL_COURSES.length - 2} hole + 2 page) -> ${pinsDir}`)
+  // counted, not inferred — with --only the totals are whatever was rendered
+  const holeCards = courses.reduce((t, c) => t + holePinTargets(c).length, 0)
+  const pageCards = only ? 0 : 2
+  console.log(
+    `${n} pin cards (${courses.length} course + ${holeCards} hole + ${pageCards} page) -> ${pinsDir}`,
+  )
 } else {
   const files = allFiles()
   for (const f of files) {

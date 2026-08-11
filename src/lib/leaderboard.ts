@@ -250,6 +250,19 @@ export interface SubmitResult {
  * Read by the store when baking a fortune streak into a daily seed. */
 const POSTED_KEY = 'dogleg:posted:v1'
 
+/** True once this device has had a submission for this daily acknowledged
+ * with a 200. The ledger is the client's persisted receipt — its absence on
+ * a duplicate submission is what distinguishes "retrying because the
+ * response was lost" from "reopened an already-acknowledged card". */
+function hasPostedDaily(dateKey: string): boolean {
+  try {
+    const raw = localStorage.getItem(POSTED_KEY)
+    return raw ? (JSON.parse(raw) as string[]).includes(dateKey) : false
+  } catch {
+    return false
+  }
+}
+
 function recordPostedDaily(dateKey: string): void {
   try {
     const raw = localStorage.getItem(POSTED_KEY)
@@ -285,6 +298,12 @@ export async function submitRound(round: RoundState, name?: string): Promise<Sub
         // the new bundle. Pre-handshake saves carry no stamp and omit the
         // field, taking the legacy replay-and-see path.
         ...(round.engineVersion !== undefined ? { engineVersion: round.engineVersion } : {}),
+        // no-success-acknowledged marker: present until a 200 lands in the
+        // posted ledger. On a duplicate the server only re-reports a season
+        // win it already wrote (the lost-response retry) when this rides
+        // along — a reopened, already-acknowledged card omits it and stays
+        // a quiet duplicate, so no repeat celebration.
+        ...(round.mode === 'daily' && !hasPostedDaily(round.dateKey) ? { unacknowledged: true } : {}),
         ...(player ? { playerId: player.id, playerSecret: player.secret } : {}),
         ...(name && !player?.name ? { name } : {}),
       }),

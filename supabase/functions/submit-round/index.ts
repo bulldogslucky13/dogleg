@@ -501,9 +501,15 @@ Deno.serve(async (req) => {
         // seed, one round), so on a match the win is re-reported as broken
         // rather than silently downgraded to someone else's record — without
         // it the client would never run its season bookkeeping/celebration.
-        // No steal email here: the original claim's send already ran, and
-        // the dedupe ledger holds regardless.
-        if (seasonHolder.player_id === player.id && seasonHolder.seed === seed) {
+        // Gated on the client's `unacknowledged` marker (sent until a 200
+        // lands in its posted ledger): daily seeds are stable per player+day,
+        // so seed identity alone can't tell a lost-response retry from an
+        // already-acknowledged card being reopened and auto-resubmitted —
+        // without the gate every reopen would re-celebrate. A forged marker
+        // buys nothing but a repeat splash on the forger's own screen: this
+        // path writes nothing. No steal email here either way — the original
+        // claim's send already ran, and the dedupe ledger holds.
+        if (body?.unacknowledged === true && seasonHolder.player_id === player.id && seasonHolder.seed === seed) {
           seasonRecord = {
             broken: true,
             toPar: replay.toPar,

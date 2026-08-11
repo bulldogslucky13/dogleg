@@ -1849,6 +1849,32 @@ button {
   line-height: 1.45;
 }
 
+/* which board the name came off. Solid gold = the all-time record, gold
+   keyline = the season board — the Records tab's badge convention, worn
+   here so the two kinds of theft can never be mistaken for each other. */
+.steal-tag {
+  display: inline-block;
+  border-radius: 999px;
+  padding: 1px 8px 2px;
+  font-size: 0.58rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  vertical-align: 2px;
+  white-space: nowrap;
+}
+
+.steal-tag.alltime,
+.steal-tag.both {
+  background: var(--gold);
+  color: var(--ink);
+}
+
+.steal-tag.season {
+  border: 1px solid var(--gold);
+  color: var(--gold);
+}
+
 .steal-x {
   position: absolute;
   top: 10px;
@@ -1911,6 +1937,12 @@ button {
   white-space: nowrap;
 }
 
+/* the season chase wears the keyline only — same board language as the
+   steal tags: filled gold is all-time, outlined gold is the season */
+.chase-chip.season {
+  background: transparent;
+}
+
 /* ghost pace — the ahead/behind state is the emotional core: color + sign,
    legible at a glance, one chip, no crowding */
 .pace-chip {
@@ -1953,6 +1985,32 @@ button {
 .ghost-stakes.cr {
   border-color: rgba(201, 162, 39, 0.6);
   background: rgba(201, 162, 39, 0.08);
+}
+
+/* pick which record the ghost races — only rendered when the two boards
+   hold DIFFERENT rounds. Same gold language as everywhere: filled =
+   all-time, keyline = season; the 'on' state is whichever is picked. */
+.ghost-board-toggle {
+  display: flex;
+  gap: 6px;
+  align-self: center;
+}
+
+.ghost-board-toggle button {
+  border: 1px solid rgba(201, 162, 39, 0.55);
+  border-radius: 999px;
+  padding: 4px 12px;
+  font-size: 0.68rem;
+  font-weight: 800;
+  color: rgba(29, 43, 32, 0.65);
+  background: transparent;
+  white-space: nowrap;
+}
+
+.ghost-board-toggle button.on {
+  background: var(--gold);
+  border-color: var(--gold);
+  color: var(--ink);
 }
 
 .ghost-stakes-head {

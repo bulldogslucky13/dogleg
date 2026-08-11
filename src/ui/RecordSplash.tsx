@@ -51,7 +51,9 @@ export function RecordSplash(props: {
         toPar: props.toPar,
         character: props.character,
         copy: props.season
-          ? { title: `${props.season.name.replace(' Season', '').toUpperCase()} RECORD`, sub: 'Best round of the season on this course.' }
+          ? props.takenFrom
+            ? { title: 'SEASON RECORD RECLAIMED', sub: 'The season board is back in order.' }
+            : { title: `${props.season.name.replace(' Season', '').toUpperCase()} RECORD`, sub: 'Best round of the season on this course.' }
           : props.takenFrom
             ? { title: 'RECORD RECLAIMED', sub: 'The course record is back where it belongs.' }
             : { title: 'COURSE RECORD', sub: 'The whole clubhouse is chasing you now.' },
@@ -62,7 +64,7 @@ export function RecordSplash(props: {
       const outcome = await shareMomentCard(blob, {
         filename: 'dogleg-course-record.png',
         text: props.season
-          ? `${props.season.name} record on ${props.courseName} (${toParLabel(props.toPar)}) — DogLeg`
+          ? `${props.takenFrom ? 'Reclaimed' : 'Set'} the ${props.season.name} record on ${props.courseName} (${toParLabel(props.toPar)}) — DogLeg`
           : `${props.takenFrom ? 'Reclaimed' : 'Set'} the course record on ${props.courseName} (${toParLabel(props.toPar)}) — DogLeg`,
         url: `https://${SITE_URL}`,
       })
@@ -86,11 +88,19 @@ export function RecordSplash(props: {
         <Wordmark className="moment-wordmark" />
         <div className="moment-kicker">{props.courseName}</div>
         <h2 className="record-splash-title">
-          {props.season ? `${props.season.name} record` : props.takenFrom ? 'Record reclaimed' : 'Course record'}
+          {props.season
+            ? props.takenFrom
+              ? 'Season record reclaimed'
+              : `${props.season.name} record`
+            : props.takenFrom
+              ? 'Record reclaimed'
+              : 'Course record'}
         </h2>
         <p className="record-splash-sub">
           {props.season
-            ? `${toParLabel(props.toPar)} — best round of the ${props.season.name.toLowerCase()} on this course. Hold it to the horn.`
+            ? props.takenFrom
+              ? `${toParLabel(props.toPar)} takes the season record back from ${props.takenFrom}. Hold it to the horn this time.`
+              : `${toParLabel(props.toPar)} — best round of the ${props.season.name.toLowerCase()} on this course. Hold it to the horn.`
             : props.takenFrom
               ? `${toParLabel(props.toPar)} takes back the course record from ${props.takenFrom}. Order restored.`
               : `${toParLabel(props.toPar)} — your name's on the wall. Now everyone's chasing you.`}

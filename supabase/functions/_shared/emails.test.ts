@@ -10,6 +10,7 @@ import { fileURLToPath } from 'node:url'
 import { dirname, resolve } from 'node:path'
 import { renderEmail, escapeHtml, WORDMARK_URL, SITE_URL } from './email-chassis.ts'
 import { AUTH_EMAILS } from './auth-emails.ts'
+import { buildStealEmail } from '../submit-round/email.ts'
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../..')
 
@@ -78,6 +79,33 @@ describe('renderEmail', () => {
     expect(img).toContain('width="200"')
     expect(img).not.toMatch(/\sheight="/)
     expect(img).toContain('alt="DogLeg"')
+  })
+})
+
+describe('buildStealEmail tells the two boards apart', () => {
+  const base = { courseName: 'Pebble Beach', thiefName: 'Hank', siteUrl: 'https://example.test' }
+  const alltime = buildStealEmail(base)
+  const seasonal = buildStealEmail({ ...base, seasonLabel: 'Summer 2026' })
+
+  it('an all-time theft names the all-time board, never a season', () => {
+    expect(alltime.subject).toBe('Your record at Pebble Beach just got stolen')
+    expect(alltime.html).toContain('All-time course record')
+    expect(alltime.text).toContain('the all-time board')
+    expect(alltime.html).not.toContain('season')
+  })
+
+  it('a season theft says season everywhere a skim would land', () => {
+    expect(seasonal.subject).toBe('Your season record at Pebble Beach just got stolen')
+    expect(seasonal.html).toContain('Summer 2026 season')
+    expect(seasonal.html).toContain('season record&rsquo;s been stolen')
+    expect(seasonal.text).toContain('the Summer 2026 season board')
+    // the season loss has a clock on it; the copy says so
+    expect(seasonal.text).toContain('before the horn')
+  })
+
+  it('the two variants can never render identically', () => {
+    expect(alltime.subject).not.toBe(seasonal.subject)
+    expect(alltime.html).not.toBe(seasonal.html)
   })
 })
 

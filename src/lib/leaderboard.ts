@@ -161,6 +161,28 @@ export async function fetchRecordReplay(courseSlug: string): Promise<RecordRepla
   }
 }
 
+/** The one course's SEASON record round for the given season — the season
+ * board's twin of fetchRecordReplay. season_records has carried seed and
+ * decisions since the table was born, so unlike the all-time table there is
+ * no pre-ghost era to tolerate; select=* is kept anyway for symmetry. */
+export async function fetchSeasonRecordReplay(courseSlug: string, seasonKey: string): Promise<RecordReplay | null> {
+  if (!backendEnabled) return null
+  try {
+    const url =
+      `${SUPABASE_URL}/rest/v1/season_records` +
+      `?scope=eq.global&season_key=eq.${encodeURIComponent(seasonKey)}` +
+      `&course_slug=eq.${encodeURIComponent(courseSlug)}&select=*`
+    const res = await fetch(url, { headers: REST_HEADERS })
+    if (!res.ok) return null
+    const rows = (await res.json()) as Array<Partial<RecordReplay> & CourseRecord>
+    const r = rows[0]
+    if (!r) return null
+    return { ...r, seed: r.seed ?? null, decisions: r.decisions ?? null }
+  } catch {
+    return null
+  }
+}
+
 export async function fetchCourseRecords(): Promise<Map<string, CourseRecord> | null> {
   if (!backendEnabled) return null
   try {

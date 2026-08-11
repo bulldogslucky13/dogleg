@@ -119,13 +119,34 @@ alter table season_records add column if not exists mode text not null default '
 -- inserted BEFORE the send, so a duplicate key means "already emailed today"
 -- and the send is skipped. At-most-once beats at-least-once here: a lost
 -- email on a crashed send is fine, a double email is not.
+-- one row per steal email sent: the at-most-once dedupe ledger. `scope`
+-- separates the two boards ('alltime' course records vs 'season' records) —
+-- one round can legitimately trigger both mails to the same holder on the
+-- same course and day, and neither may burn the other's slot.
 create table if not exists record_steal_emails (
+  scope text not null default 'alltime',
   course_slug text not null,
   player_id uuid not null references players (id),
   date_key text not null,
   sent_at timestamptz not null default now(),
-  primary key (course_slug, player_id, date_key)
+  primary key (scope, course_slug, player_id, date_key)
 );
+
+-- migrate databases created before scope existed (idempotent: the alter
+-- no-ops once the column exists, and the do-block only rebuilds the primary
+-- key while scope is still missing from it)
+alter table record_steal_emails add column if not exists scope text not null default 'alltime';
+do $$ begin
+  if not exists (
+    select from information_schema.key_column_usage
+    where table_name = 'record_steal_emails'
+      and constraint_name = 'record_steal_emails_pkey'
+      and column_name = 'scope'
+  ) then
+    alter table record_steal_emails drop constraint record_steal_emails_pkey;
+    alter table record_steal_emails add primary key (scope, course_slug, player_id, date_key);
+  end if;
+end $$;
 
 alter table players enable row level security;
 alter table daily_scores enable row level security;

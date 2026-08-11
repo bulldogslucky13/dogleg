@@ -19,6 +19,7 @@ import { HoleMap } from './ui/HoleMap'
 import { forecastSetup, localDateKey, practiceSetup } from './engine/daily'
 import { seasonForDate } from './engine/season'
 import { setupFromSeed } from './engine/replay'
+import { packHandoff, runHandoff } from './lib/handoff'
 import { loadIdentity, loadPlayer } from './lib/leaderboard'
 import { applyChoice, holeInPlay, newRound, saveRound } from './state/store'
 import type { HistoryEntry } from './state/store'
@@ -202,6 +203,96 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
     fireEvent.click(screen.getByRole('button', { name: 'How Fortunes work' }))
     fireEvent.click(screen.getByText('Got it'))
     expect(localStorage.getItem('dogleg:tutorial:v1')).toBeNull()
+  })
+
+  it('unlimited course filters live in a sheet: combine, reset, favorite, toggle', () => {
+    localStorage.setItem('dogleg:tutorial:v1', 'done')
+    render(<App />)
+    fireEvent.click(screen.getByText(/Play unlimited/))
+
+    // the slim bar: toggle + Filters + sort — the chips live in the sheet
+    fireEvent.click(screen.getByText(/☰ Filters/))
+    const apply = () => screen.getByText(/^Show \d+ courses?$/) as HTMLButtonElement
+    const total = Number(apply().textContent!.match(/\d+/)![0])
+
+    fireEvent.click(screen.getByText('Hard 8–10'))
+    const hard = Number(apply().textContent!.match(/\d+/)![0])
+    expect(hard).toBeLessThan(total)
+
+    // record filters are DISABLED until records load (backend off in tests —
+    // they must not pretend to filter on data they don't have)
+    expect((screen.getByText('Open') as HTMLButtonElement).disabled).toBe(true)
+    expect((screen.getByText('I hold it') as HTMLButtonElement).disabled).toBe(true)
+
+    // reset lives in the sheet and restores the world
+    fireEvent.click(screen.getByText('Reset filters'))
+    expect(Number(apply().textContent!.match(/\d+/)![0])).toBe(total)
+
+    // apply closes the sheet; the bar badge reflects active filters
+    fireEvent.click(screen.getByText('Never played'))
+    fireEvent.click(apply())
+    expect(screen.queryByText('Filter courses')).toBeNull()
+    expect(screen.getByText(/☰ Filters · 1/)).toBeTruthy()
+
+    // favorite from the row (outside the sheet), and it persists
+    fireEvent.click(screen.getAllByRole('button', { name: /^Favorite / })[0])
+    expect(JSON.parse(localStorage.getItem('dogleg:favorites:v1')!).slugs.length).toBe(1)
+
+    // the season/all-time toggle sits on the bar and defaults to season
+    expect(screen.getByText('View Season Records').className).toContain(' on')
+    fireEvent.click(screen.getByText('View All-Time Records'))
+    expect(screen.getByText('View All-Time Records').className).toContain(' on')
+    // with records unfetched (backend off), rows say so instead of lying
+    expect(screen.getAllByText(/records loading…/).length).toBeGreaterThan(0)
+  })
+
+  it('the browse view is remembered: sort + filters + toggle survive a full reload, visibly', () => {
+    localStorage.setItem('dogleg:tutorial:v1', 'done')
+    const first = render(<App />)
+    fireEvent.click(screen.getByText(/Play unlimited/))
+
+    // configure a view: hardest-first sort, hard-difficulty filter, all-time records
+    fireEvent.click(screen.getByText(/⇅ Sort/)) // tour → easiest
+    fireEvent.click(screen.getByText(/⇅ Sort/)) // easiest → hardest
+    fireEvent.click(screen.getByText(/☰ Filters/))
+    fireEvent.click(screen.getByText('Hard 8–10'))
+    fireEvent.click(screen.getByText(/^Show \d+ courses?$/))
+    fireEvent.click(screen.getByText('View All-Time Records'))
+
+    // stored for real — this is what survives the reload
+    const stored = JSON.parse(localStorage.getItem('dogleg:course-browse:v1')!)
+    expect(stored).toMatchObject({ sort: 'hardest', rating: 'hard', recType: 'alltime' })
+
+    // the "full reload": tear the app down completely and mount fresh
+    first.unmount()
+    render(<App />)
+    fireEvent.click(screen.getByText(/Play unlimited/))
+
+    // restored AND visibly active — nothing silently applied
+    expect(screen.getByText(/Sort: Hardest/).className).toContain(' on')
+    expect(screen.getByText(/☰ Filters · 1/).className).toContain(' on')
+    expect(screen.getByText('View All-Time Records').className).toContain(' on')
+    expect(screen.getByText(/\d+ of \d+ courses/)).toBeTruthy()
+  })
+
+  it('a stale saved view that matches nothing shows the empty state and reset, never a blank list', () => {
+    localStorage.setItem('dogleg:tutorial:v1', 'done')
+    // a saved favorites-only view… on a device with no favorites (the same
+    // shape as an "open records" view going stale across a season rollover)
+    localStorage.setItem(
+      'dogleg:course-browse:v1',
+      JSON.stringify({ recType: 'season', played: 'all', rating: 'any', record: 'any', favsOnly: true, sort: 'tour' }),
+    )
+    render(<App />)
+    fireEvent.click(screen.getByText(/Play unlimited/))
+
+    // the filters are named as the cause, with the one-tap way out
+    expect(screen.getByText(/No courses match your saved filters/)).toBeTruthy()
+    fireEvent.click(screen.getByText('Reset filters'))
+    expect(screen.queryByText(/No courses match/)).toBeNull()
+    expect(screen.getAllByText(/Par 7\d/).length).toBeGreaterThan(0)
+    // …and the reset is itself remembered
+    expect(JSON.parse(localStorage.getItem('dogleg:course-browse:v1')!).favsOnly).toBe(false)
   })
 
   it('the season splash shows once after a rollover, explains the goal, then never again', () => {
@@ -1718,5 +1809,44 @@ describe('smoke: anonymous identity and per-player daily dice', () => {
     fireEvent.click(screen.getByText(CHARACTERS[0].name))
     const plain = JSON.parse(localStorage.getItem('dogleg:round:v1') ?? 'null')
     expect(setupFromSeed(plain.seed)!.salt).toBeUndefined()
+  })
+})
+
+describe('smoke: a player arriving from the old domain', () => {
+  it('boots as the migrated clubhouse, with its carried history already live in the UI', async () => {
+    // ---- on the old domain: a named clubhouse that has played today ----
+    const identity = { id: 'a3f1c2d4-0000-4000-8000-abcdefabcdef', secret: 's3cret', name: 'Bogey Merchant' }
+    const entry: HistoryEntry = {
+      dateKey: localDateKey(),
+      puzzleNumber: 1,
+      courseSlug: 'pebble-beach',
+      toPar: 0,
+      results: [],
+      character: CHARACTERS[0].id,
+    }
+    localStorage.setItem('dogleg:player:v1', JSON.stringify(identity))
+    localStorage.setItem('dogleg:history:v1', JSON.stringify([entry]))
+    const payload = await packHandoff(localStorage)
+
+    // ---- now the new origin: a different localStorage, i.e. empty ----
+    localStorage.clear()
+    expect(loadIdentity()).toBeNull()
+
+    window.location.hash = `#handoff=${payload}`
+    await act(async () => {
+      await runHandoff()
+    })
+    // the payload must not linger where it can be copied or replayed
+    expect(window.location.hash).toBe('')
+
+    render(<App />)
+    // the clubhouse arrived whole: the name the boards know them by...
+    expect(loadPlayer()?.name).toBe('Bogey Merchant')
+    // ...and the id the daily dice are salted from, which is the part that
+    // would otherwise re-deal a day they have already posted
+    expect(loadIdentity()?.id).toBe(identity.id)
+    // and the history is not just stored but live on screen: today counts as
+    // played, so home reveals tomorrow's forecast
+    expect(screen.getByText(/Tomorrow's forecast/)).toBeTruthy()
   })
 })

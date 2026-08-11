@@ -106,10 +106,50 @@ anywhere. This repo ships with a GitHub Actions workflow that tests, builds, and
 publishes to **GitHub Pages** on every push to `main` (enable it once in the repo's
 Settings → Pages → Source: "GitHub Actions").
 
-To point a custom domain (e.g. `dogleg.cameronbristol.xyz`) at it, add the domain in
-Settings → Pages and create the matching CNAME record at your DNS provider. Update
-`SITE_URL` in `src/engine/daily.ts` to match whatever domain you choose (it appears in
-the share text).
+The live site is **[playdogleg.com](https://playdogleg.com)**. The domain is kept in
+`public/CNAME` (copied to the root of the build by Vite) and must also be set in
+Settings → Pages — that's what provisions the HTTPS certificate — with an `ALIAS`/`A`
+record for the apex and a `CNAME` for `www` at the DNS provider.
+
+Moving to a different domain means changing it in four places, all of which are
+checked by tests or generated from each other:
+
+1. `public/CNAME` and Settings → Pages (where GitHub serves it from)
+2. `SITE_URL` in `src/engine/daily.ts` — the bare host, used in share text and
+   replay links
+3. `SITE_URL` in `supabase/functions/_shared/email-chassis.ts` — every email's
+   masthead, footer and links; re-run `pnpm gen:email-templates` afterwards
+4. the canonical/Open Graph URLs in `index.html`
+
+Two things live outside the repo and have to be changed in the Supabase dashboard:
+the Auth **site URL** and **redirect allow-list** (magic links redirect to
+`window.location.origin`, so the new origin must be allowed), and the Resend sender
+domain behind `EMAIL_FROM`.
+
+### Carrying players across a domain move
+
+`localStorage` is per-origin, so a move strands every player's clubhouse — name,
+streak, round archive, and the player id the daily dice are salted from (losing
+that id deals you *different dice* for a day you already posted). Email accounts
+solve it for anyone who linked one; `handoff/index.html` solves it for everyone
+else.
+
+That page is what the **old** domain serves after the move. It packs every
+`dogleg:` key into a URL fragment and bounces the browser to the new site, where
+`src/lib/handoff.ts` unpacks it, merges it, and strips the fragment. An old
+bookmark migrates its owner with no clicks, and keeps working as long as the page
+is up. Notes:
+
+- Standalone by design — no build step, no imports. It has to run on a host that
+  serves nothing else, long after the app stopped being deployed there.
+- The DNS for the old domain already points at GitHub Pages, so the shortest path
+  is a second repo with Pages enabled claiming that domain (this repo has to
+  release it in Settings → Pages first). Any static host works.
+- Both halves of the wire format are pinned by `src/lib/handoff.test.ts`, which
+  runs the real script out of the real HTML file — they cannot drift apart
+  silently.
+- A device that already holds a *different named* clubhouse is left alone: a
+  merge there would have to guess which identity the person meant.
 
 ### Calibration targets (enforced by tests)
 

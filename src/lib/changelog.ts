@@ -7,7 +7,10 @@
  * the ones a player has a right to know about. Everything else is a new
  * feature or a fix, and the list makes that ratio visible at a glance.
  *
- * MAINTENANCE — this is not optional, and it rides an existing rule:
+ * MAINTENANCE — this is not optional, and it is now MECHANICAL: the
+ * change-log gate (.github/workflows/changelog-check.yml, policy in
+ * scripts/changelog-check.mjs) fails any PR that neither updates this file
+ * nor carries a valid exemption label. It also rides the existing rule:
  * a change that bumps `ENGINE_VERSION` (src/engine/version.ts) MUST add an
  * entry here with kind 'odds', in the same PR. Player-visible features and
  * fixes get an entry too, subject to the two exceptions below; refactors,
@@ -45,7 +48,7 @@
  * plain, specific, no jargon and no PR numbers.
  */
 
-export type ChangeKind = 'odds' | 'feature' | 'fix'
+export type ChangeKind = 'odds' | 'feature' | 'fix' | 'design'
 
 export interface ChangeEntry {
   /** YYYY-MM-DD, the day it reached players */
@@ -59,9 +62,28 @@ export const CHANGE_KIND_LABEL: Record<ChangeKind, string> = {
   odds: 'Odds changed',
   feature: 'New',
   fix: 'Fix',
+  design: 'Design',
 }
 
 export const CHANGELOG: ChangeEntry[] = [
+  {
+    date: '2026-08-10',
+    kind: 'fix',
+    title: 'The course list remembers your sort and filters',
+    note: 'Unlimited play reset its sort and filters every time you left, so a curated view had to be rebuilt on every visit. Your last configuration now sticks — the season/all-time toggle, every filter, favorites, and the sort — and it comes back clearly marked, with a one-tap reset. If a remembered view ever matches nothing (say a season rollover reopened the records an old filter was hunting), the list says the filters are why, not that your courses are gone.',
+  },
+  {
+    date: '2026-08-10',
+    kind: 'feature',
+    title: 'A new address: playdogleg.com',
+    note: 'The game moved to playdogleg.com — shorter, and easier to pass on. Share text and replay links point there from now on. An old bookmark still works and brings your clubhouse with it: your name, streak, records and saved rounds all come across on the first visit. If you had added an email for cross-device sync, that one thing cannot follow you between two addresses — sign in once more and this device is synced exactly as it was.',
+  },
+  {
+    date: '2026-08-10',
+    kind: 'feature',
+    title: 'Find your next record',
+    note: 'Unlimited play’s course list learned to hunt: filter by difficulty, by what you’ve played, by open or beatable records — season or all-time, your pick — star your target courses, and sort the whole board by what’s winnable. Fifty courses, one shortlist.',
+  },
   {
     date: '2026-08-07',
     kind: 'odds',
@@ -91,6 +113,12 @@ export const CHANGELOG: ChangeEntry[] = [
     kind: 'fix',
     title: 'No more trees on treeless courses',
     note: 'Drive it somewhere nobody mapped and the game used to put you "in the trees" — even on a links with not a tree on it, and it drew your ball sitting on the fairway while it said so. Now each course names its own junk, and the ball is drawn where you actually are.',
+  },
+  {
+    date: '2026-07-26',
+    kind: 'design',
+    title: 'Welcome to DogLeg 2.0',
+    note: 'One week after launch, we\u2019ve stepped up our design game: a full rebadge of the menus and branding, a post-round wrap screen that leads with your score, your share card, and a proper leaderboard \u2014 plus small tweaks under the hood to make your card a little sexier when it hits the group chat. The golf is untouched \u2014 keep on swingin\u2019.',
   },
   {
     date: '2026-07-25',

@@ -237,6 +237,32 @@ create extension if not exists pg_cron;
 select cron.schedule('prune-choice-tallies', '17 8 * * *',
   $$delete from public.daily_choice_tallies where date_key < to_char((now() at time zone 'utc')::date - 2, 'YYYY-MM-DD')$$);
 
+-- Inbound mail. Resend receives everything addressed to @playdogleg.com and
+-- webhooks the receive-email function, which verifies the svix signature,
+-- fetches the full message back from Resend's Received Emails API, and lands
+-- it here. Keyed on Resend's own email id because webhook delivery is
+-- at-least-once — the function upserts, so a redelivery updates in place
+-- instead of duplicating.
+create table if not exists received_emails (
+  email_id text primary key,
+  message_id text,
+  from_address text,
+  to_addresses text[] not null default '{}',
+  cc_addresses text[] not null default '{}',
+  subject text,
+  text_body text,
+  html_body text,
+  attachments jsonb not null default '[]'::jsonb, -- metadata only; files stay on Resend
+  received_at timestamptz,
+  created_at timestamptz not null default now()
+);
+
+-- RLS on, and deliberately NO policies: inbound mail is other people's
+-- private correspondence, not public reading material like the boards. Only
+-- the service role (the receive-email function, or an operator in the
+-- dashboard) can touch it.
+alter table received_emails enable row level security;
+
 -- ============================================================================
 -- ONE-TIME BACKFILL (2026-08): daily rounds join the record boards.
 --

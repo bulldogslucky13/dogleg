@@ -201,8 +201,8 @@ export const CHANGELOG: ChangeEntry[] = [
   {
     date: '2026-07-20',
     kind: 'odds',
-    title: 'Your own dice',
-    note: 'The daily deals every player their own luck instead of one shared roll, so two people on the same course no longer share the same bounces.',
+    title: 'Your own bounces',
+    note: 'Every player now gets their own luck on the daily. Two people playing the same course see the same conditions and the same odds — but not the same bounces.',
   },
   {
     date: '2026-07-20',

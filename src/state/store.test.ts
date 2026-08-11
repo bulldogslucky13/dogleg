@@ -24,7 +24,7 @@ const entry = (over: Partial<HistoryEntry>): HistoryEntry => ({
   ...over,
 })
 
-describe('shareText (Break Par card format)', () => {
+describe('shareText (the classic square-grid card format)', () => {
   const course = COURSES[0]
   const par = course.holes.reduce((s, h) => s + h.par, 0)
   const setup: DailySetup = {

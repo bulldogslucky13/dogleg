@@ -58,6 +58,9 @@ export const COURSES: CourseSpec[] = [
     difficulty: 7,
     greens: 'Firm',
     wind: 20,
+    // The most famous treeless golf course on earth, and the map was planting
+    // groves down both sides of it — see CourseSpec.scenery.
+    scenery: 'links',
     blurb: 'The Home of Golf — double greens, the Swilcan Bridge, and Hell Bunker.',
     holes: holes([
       [4, 376, 10, 'S', 'none', 'The Swilcan Burn guards the widest fairway in golf'],
@@ -175,6 +178,7 @@ export const COURSES: CourseSpec[] = [
     difficulty: 10,
     greens: 'Firm',
     wind: 18,
+    scenery: 'links',
     blurb: 'They call it Car-nasty for a reason — the meanest finish in championship golf.',
     // A links with no trees mapped anywhere, so the odds' junk floor had
     // nothing honest to call itself — see CourseSpec.junkLabel. Whins is what
@@ -247,6 +251,7 @@ export const COURSES: CourseSpec[] = [
     // `Rough` note in types.ts and the geometry.ts header.
     rough: 'penal',
     roughLabel: 'gorse',
+    scenery: 'links',
     blurb: 'Dunes and drama on the Antrim coast, home of Calamity Corner.',
     // YDS / PAR / HCP from the club's Open Championship card (par 71, 7,344):
     // course.bluegolf.com/bluegolf/course/course/royalportrushdunluce. Par was
@@ -312,6 +317,7 @@ export const COURSES: CourseSpec[] = [
     difficulty: 9,
     greens: 'Firm',
     wind: 18,
+    scenery: 'links',
     blurb: 'Pete Dye’s faux-Irish links along Lake Michigan with a thousand bunkers.',
     // Real geometry gave this course 1383 bunkers and not one tree, so the
     // odds' junk floor had nothing to name — see CourseSpec.junkLabel. Dye's
@@ -523,6 +529,7 @@ export const COURSES: CourseSpec[] = [
     difficulty: 8,
     greens: 'Firm',
     wind: 20,
+    scenery: 'links',
     blurb: 'Tom Doak’s coastal minimalist masterpiece, no two holes remotely alike.',
     holes: holes([
       [4, 370, 9, 'S', 'sand'],
@@ -608,6 +615,7 @@ export const COURSES: CourseSpec[] = [
     difficulty: 8,
     greens: 'Firm',
     wind: 20,
+    scenery: 'links',
     blurb: 'The course that started a pilgrimage — raw Oregon coast, firm and fast.',
     // Card = the TOURNAMENT tees (BlueGolf `bandondunesgresort`): par 72,
     // 7315 yd, 75.9/145. Par, yardage and stroke index already matched on all
@@ -662,6 +670,7 @@ export const COURSES: CourseSpec[] = [
     difficulty: 9,
     greens: 'Firm',
     wind: 20,
+    scenery: 'links',
     blurb: 'The fairest of the Open rota — walls of bunkers and honest, brutal links wind.',
     holes: holes([
       [4, 446, 5, 'R', 'sand'],
@@ -830,6 +839,7 @@ export const COURSES: CourseSpec[] = [
     difficulty: 7,
     greens: 'Firm',
     wind: 18,
+    scenery: 'links',
     blurb: 'True links on the Nova Scotia shore, every hole in view of the sea.',
     // REBUILT FROM THE CLUB CARD. The shipped tuple was not a transcription of
     // any real card: its par sequence disagreed with the club's on six holes,
@@ -984,6 +994,7 @@ export const COURSES: CourseSpec[] = [
     difficulty: 8,
     greens: 'Firm',
     wind: 16,
+    scenery: 'links',
     blurb: 'Big, rolling glacial terrain in Wisconsin with fescue that swallows loose shots.',
     // The real geometry is sand and glacial grass with not one tree polygon on
     // the property, so the odds' junk floor had nothing to name — see
@@ -1153,6 +1164,7 @@ export const COURSES: CourseSpec[] = [
     difficulty: 9,
     greens: 'Firm',
     wind: 20,
+    scenery: 'links',
     blurb: 'Flat-bottomed fairways winding through towering dunes on the English coast.',
     holes: holes([
       [4, 447, 5, 'R', 'sand'],
@@ -1446,6 +1458,7 @@ export const COURSES: CourseSpec[] = [
     difficulty: 8,
     greens: 'Firm',
     wind: 16,
+    scenery: 'links',
     blurb: 'Remote, ancient, and revered — raised greens far up the Highland shore.',
     holes: holes([
       [4, 331, 12, 'S', 'none'],
@@ -1475,6 +1488,7 @@ export const COURSES: CourseSpec[] = [
     difficulty: 9,
     greens: 'Firm',
     wind: 17,
+    scenery: 'links',
     blurb: 'Home of the Postage Stamp — the tiniest, scariest par 3 in the Open rota.',
     holes: holes([
       [4, 370, 15, 'S', 'none'],
@@ -1593,6 +1607,7 @@ export const COURSES: CourseSpec[] = [
     difficulty: 6,
     greens: 'Fast',
     wind: 18,
+    scenery: 'links',
     blurb: 'Ancient linksland. Pot bunkers with names, wind with opinions.',
     holes: holes([
       [4, 358, 12, 'S', 'sand'],
@@ -1622,6 +1637,7 @@ export const COURSES: CourseSpec[] = [
     difficulty: 9,
     greens: 'Firm',
     wind: 16,
+    scenery: 'links',
     blurb: 'A walking-only quarry links with fescue, humps, and one lonely tree.',
     holes: holes([
       [4, 595, 3, 'R', 'sand'],

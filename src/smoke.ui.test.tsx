@@ -1835,6 +1835,36 @@ describe('smoke: landmark holes render', () => {
   })
 })
 
+describe('smoke: links courses grow no decorative groves', () => {
+  it('a links hole draws dune tufts where a parkland hole draws groves', () => {
+    // the map invents scenery for the empty margin; on a treeless links that
+    // fabrication used to plant a wood down both sides of St Andrews.
+    const draw = (slug: string) => {
+      const course = COURSES.find((c) => c.slug === slug)!
+      const layout = buildLayout(slug, course.holes[0])
+      const { container, unmount } = render(
+        <HoleMap layout={layout} ball={{ pos: 0, lie: 'tee', side: 'center' }} previewWindow={null} previewApproach={null} previewChoice={null} />,
+      )
+      const counts = {
+        groves: container.querySelectorAll('[data-deco="grove"]').length,
+        dunes: container.querySelectorAll('[data-deco="dune"]').length,
+      }
+      unmount()
+      return counts
+    }
+    expect(draw('st-andrews-old')).toEqual({ groves: 0, dunes: 16 })
+    expect(draw('augusta-national').groves).toBeGreaterThan(0)
+  })
+
+  it('every course tagged links carries the tag onto its layouts', () => {
+    const links = COURSES.filter((c) => c.scenery === 'links')
+    expect(links.length).toBeGreaterThanOrEqual(10)
+    for (const c of links) {
+      for (const h of c.holes) expect(buildLayout(c.slug, h).scenery, `${c.slug}:${h.number}`).toBe('links')
+    }
+  })
+})
+
 describe('smoke: anonymous identity and per-player daily dice', () => {
   it('a stored identity (named or not) salts the daily seed; none means the canonical seed', () => {
     // an anonymous minted identity — no name yet — still gets its own dice

@@ -874,14 +874,22 @@ function GhostStakes(props: { courseSlug: string; board: GhostBoard; onBoard: (b
     }
   }, [props.courseSlug])
   const canToggle = !!choices?.alltime && !!choices?.season && choices.alltime.seed !== choices.season.seed
-  // a season default that turned out to have nothing to race snaps back to
-  // all-time, so the pick and the loaded ghost can't disagree at tee-off
+  // a pick with nothing to race snaps to the board that HAS a record, so the
+  // pick and the loaded ghost can't disagree at tee-off. Both directions
+  // matter: an all-time row old enough to predate stored replays leaves the
+  // season round as the only raceable record, and the default pick is
+  // all-time — without the snap the one available ghost is unreachable.
   const wantSeason = props.board === 'season'
   useEffect(() => {
-    if (choices && wantSeason && !choices.season) props.onBoard('alltime')
+    if (!choices) return
+    if (wantSeason && !choices.season) props.onBoard('alltime')
+    else if (!wantSeason && !choices.alltime && choices.season) props.onBoard('season')
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [choices, wantSeason])
-  const ghost = (wantSeason ? choices?.season : choices?.alltime) ?? choices?.alltime ?? fallback
+  // the snap above converges the pick, but only on the NEXT render — so the
+  // preview falls through to whichever board actually has a round rather than
+  // blanking the card for a frame
+  const ghost = (wantSeason ? choices?.season : choices?.alltime) ?? choices?.alltime ?? choices?.season ?? fallback
   if (!ghost) return null
   const char = characterById(ghost.character)
   const boardNoun = ghost.board === 'season' ? 'season record' : 'record'

@@ -67,7 +67,10 @@ function esc(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 }
 
-const themeCss = () => readFileSync(resolve(root, 'src/ui/theme.css'), 'utf8')
+let themeCache: string | null = null
+/** theme.css verbatim, read once per process — every page and every one of the
+ *  128 cards inlines it. */
+const themeCss = () => (themeCache ??= readFileSync(resolve(root, 'src/ui/theme.css'), 'utf8'))
 
 // ---------------------------------------------------------------- wordmark --
 
@@ -613,20 +616,58 @@ Sitemap: ${SITE}/sitemap.xml
 /** Base64 @font-face block for file:// rasterisation (same trick as the OG
  *  card: a file:// @font-face is a cross-origin fetch Chrome fails silently,
  *  so the fonts ride inline). */
+let fontsCache: string | null = null
+
 function embeddedFontsCss(): string {
+  // Memoised: the three woff2 files are read and base64-encoded once per
+  // process, not once per card. The library now renders 128 cards (and the
+  // test suite builds every one of them), so re-encoding ~400KB of font on
+  // each call was pure repeated work — and the suite's Monte Carlo
+  // calibration shares a CI runner with it.
+  if (fontsCache !== null) return fontsCache
   const face = (family: string, file: string, extra: string) => {
     const b64 = readFileSync(resolve(root, file)).toString('base64')
     return `@font-face{font-family:'${family}';font-style:normal;font-display:block;${extra}src:url(data:font/woff2;base64,${b64}) format('woff2');}`
   }
-  return [
+  fontsCache = [
     face('Archivo Variable', FONT_FILES[0].src, 'font-weight:100 900;font-stretch:62% 125%;'),
     face('Barlow', FONT_FILES[2].src, 'font-weight:600;'),
     face('Barlow', FONT_FILES[3].src, 'font-weight:700;'),
   ].join('\n')
+  return fontsCache
 }
 
 export const PIN_W = 1000
 export const PIN_H = 1500
+
+/** Chrome shared by every 2:3 card — the frame, the wordmark lockup, the
+ *  stat pills and the domain line. One definition so a course card, a hole
+ *  card and the two non-course cards can never drift apart visually. */
+function pinBaseCss(): string {
+  return `${embeddedFontsCss()}
+${themeCss()}
+  html, body { margin: 0; padding: 0; }
+  body {
+    width: ${PIN_W}px; height: ${PIN_H}px; overflow: hidden;
+    background: linear-gradient(180deg, var(--turf-800) 0%, var(--turf-900) 60%), var(--bg-page);
+    color: var(--text-hi);
+    font-family: var(--font-ui);
+    display: flex; flex-direction: column; align-items: center;
+  }
+  .frame { position: absolute; inset: 26px; border: 1px solid var(--edge-hairline); border-radius: var(--r-card); pointer-events: none; }
+  .head { text-align: center; padding-top: 78px; }
+  .head .wordmark svg { width: 220px; height: auto; color: var(--text-hi); }
+  .kicker { margin: 26px 0 10px; font-size: 26px; font-weight: 700; letter-spacing: var(--track-kicker); text-transform: uppercase; color: var(--sand-500); }
+  h1 { margin: 0 60px; font-family: var(--font-display); font-variation-settings: 'wdth' var(--wdth-tower); font-weight: 650; font-size: 76px; line-height: 1.02; text-align: center; }
+  .loc { margin: 12px 0 0; font-family: var(--font-display); font-variation-settings: 'wdth' var(--wdth-standard); font-weight: 600; font-size: 28px; color: var(--text-mid); text-align: center; }
+  .hero { flex: 1; display: flex; align-items: center; justify-content: center; min-height: 0; padding: 26px 0 10px; }
+  .hero svg.holemap { height: 100%; max-height: 660px; width: auto; }
+  .sigline { margin: 0 90px 26px; text-align: center; font-size: 25px; line-height: 1.35; color: var(--text-mid); }
+  .stats { display: flex; gap: 14px; justify-content: center; margin-bottom: 34px; }
+  .stats span { border: 1px solid var(--edge-hairline); background: var(--turf-900); border-radius: 999px; padding: 10px 26px; font-family: var(--font-display); font-variation-settings: 'wdth' var(--wdth-standard); font-weight: 700; font-size: 27px; }
+  .domain { display: flex; align-items: center; gap: 13px; margin-bottom: 64px; font-family: var(--font-display); font-variation-settings: 'wdth' var(--wdth-standard); font-size: 26px; font-weight: 700; letter-spacing: 0.03em; color: var(--sand-500); }
+  .domain::before { content: ''; width: 12px; height: 12px; border-radius: 999px; background: var(--flag-500); }`
+}
 
 /**
  * The 2:3 Pinterest card — Pinterest's preferred 1000x1500.
@@ -651,29 +692,7 @@ export function pinCardHtml(c: CourseSpec, hole?: HoleSpec): string {
   return `<!doctype html>
 <meta charset="utf-8">
 <style>
-${embeddedFontsCss()}
-${themeCss()}
-  html, body { margin: 0; padding: 0; }
-  body {
-    width: ${PIN_W}px; height: ${PIN_H}px; overflow: hidden;
-    background: linear-gradient(180deg, var(--turf-800) 0%, var(--turf-900) 60%), var(--bg-page);
-    color: var(--text-hi);
-    font-family: var(--font-ui);
-    display: flex; flex-direction: column; align-items: center;
-  }
-  .frame { position: absolute; inset: 26px; border: 1px solid var(--edge-hairline); border-radius: var(--r-card); pointer-events: none; }
-  .head { text-align: center; padding-top: 78px; }
-  .head .wordmark svg { width: 220px; height: auto; color: var(--text-hi); }
-  .kicker { margin: 26px 0 10px; font-size: 26px; font-weight: 700; letter-spacing: var(--track-kicker); text-transform: uppercase; color: var(--sand-500); }
-  h1 { margin: 0 60px; font-family: var(--font-display); font-variation-settings: 'wdth' var(--wdth-tower); font-weight: 650; font-size: 76px; line-height: 1.02; text-align: center; }
-  .loc { margin: 12px 0 0; font-family: var(--font-display); font-variation-settings: 'wdth' var(--wdth-standard); font-weight: 600; font-size: 28px; color: var(--text-mid); text-align: center; }
-  .hero { flex: 1; display: flex; align-items: center; justify-content: center; min-height: 0; padding: 26px 0 10px; }
-  .hero svg.holemap { height: 100%; max-height: 660px; width: auto; }
-  .sigline { margin: 0 90px 26px; text-align: center; font-size: 25px; line-height: 1.35; color: var(--text-mid); }
-  .stats { display: flex; gap: 14px; justify-content: center; margin-bottom: 34px; }
-  .stats span { border: 1px solid var(--edge-hairline); background: var(--turf-900); border-radius: 999px; padding: 10px 26px; font-family: var(--font-display); font-variation-settings: 'wdth' var(--wdth-standard); font-weight: 700; font-size: 27px; }
-  .domain { display: flex; align-items: center; gap: 13px; margin-bottom: 64px; font-family: var(--font-display); font-variation-settings: 'wdth' var(--wdth-standard); font-size: 26px; font-weight: 700; letter-spacing: 0.03em; color: var(--sand-500); }
-  .domain::before { content: ''; width: 12px; height: 12px; border-radius: 999px; background: var(--flag-500); }
+${pinBaseCss()}
 </style>
 <div class="frame"></div>
 <div class="head">
@@ -685,6 +704,91 @@ ${themeCss()}
 <div class="hero">${holeMapSvg(c, sig)}</div>
 ${sig.signature ? `<p class="sigline">${esc(sig.signature)}</p>` : ''}
 <div class="stats">${stats.map((s) => `<span>${esc(s!)}</span>`).join('')}</div>
+<div class="domain">playdogleg.com</div>
+`
+}
+
+/**
+ * The two cards for pages that aren't a course.
+ *
+ * These exist because SmartPin cannot make them. Pointed at /courses/ and
+ * /how-to-play/ — pages with no single hero image to composite — the AI
+ * invented a DogLeg logo (complete with a ® it has no right to) on one and
+ * redrew the real wordmark with illegible text under it on the other. Image
+ * models cannot spell, so any surface carrying the mark has to be rendered
+ * from `Wordmark.tsx` like every other brand asset here. Same rule as the
+ * email masthead and the OG card; see the note at the top of gen-og-image.ts.
+ */
+export function libraryPinCardHtml(): string {
+  const rotation = COURSES.length
+  const marquee = ['Pebble Beach', 'St Andrews', 'Augusta National', 'TPC Sawgrass', 'Kiawah Island']
+  return `<!doctype html>
+<meta charset="utf-8">
+<style>
+${pinBaseCss()}
+  .bignum { font-family: var(--font-display); font-variation-settings: 'wdth' var(--wdth-tower); font-weight: 650; font-size: 210px; line-height: 1; margin: 0; color: var(--text-hi); }
+  .names { margin: 0 80px; text-align: center; }
+  .names span { display: block; font-family: var(--font-display); font-variation-settings: 'wdth' var(--wdth-standard); font-weight: 600; font-size: 34px; line-height: 1.55; color: var(--text-mid); }
+  .names span.more { color: var(--sand-500); font-weight: 700; }
+</style>
+<div class="frame"></div>
+<div class="head">
+  <div class="wordmark">${wordmarkSvg()}</div>
+  <p class="kicker">The Course Library</p>
+  <h1>Famous Golf Courses,<br>Free to Play</h1>
+</div>
+<div class="hero" style="flex-direction: column; gap: 10px;">
+  <p class="bignum">${ALL_COURSES.length}</p>
+  <p class="loc">courses, mapped hole by hole</p>
+</div>
+<div class="names">
+${marquee.map((n) => `  <span>${esc(n)}</span>`).join('\n')}
+  <span class="more">and ${ALL_COURSES.length - marquee.length} more</span>
+</div>
+<div class="stats"><span>${rotation} in the daily rotation</span></div>
+<div class="domain">playdogleg.com</div>
+`
+}
+
+export function howToPlayPinCardHtml(): string {
+  // the odds bar from the tutorial's own second step (.tut-bar in styles.css),
+  // in the same proportions — the single most recognisable thing about the game
+  const segs = [
+    { cls: 'good', w: 62 },
+    { cls: 'neutral', w: 26 },
+    { cls: 'bad', w: 12 },
+  ]
+  return `<!doctype html>
+<meta charset="utf-8">
+<style>
+${pinBaseCss()}
+  .choices { display: flex; flex-direction: column; gap: 22px; margin: 0 100px; width: 800px; }
+  .choice { display: flex; align-items: center; justify-content: space-between; border: 1px solid var(--edge-hairline); background: var(--turf-900); border-radius: var(--r-card); padding: 22px 34px; }
+  .choice b { font-family: var(--font-display); font-variation-settings: 'wdth' var(--wdth-standard); font-weight: 700; font-size: 40px; color: var(--text-hi); }
+  .choice em { font-style: normal; font-size: 27px; color: var(--text-mid); }
+  .oddsbar { display: flex; width: 800px; height: 34px; border-radius: 999px; overflow: hidden; margin: 40px 0 6px; }
+  .oddsbar i { display: block; height: 100%; }
+  .oddsbar i.good { background: #4f9d5d; }
+  .oddsbar i.neutral { background: #c4ac72; }
+  .oddsbar i.bad { background: var(--flag-500); }
+  .barnote { font-size: 25px; color: var(--text-mid); margin: 0 0 30px; text-align: center; }
+</style>
+<div class="frame"></div>
+<div class="head">
+  <div class="wordmark">${wordmarkSvg()}</div>
+  <p class="kicker">How to Play</p>
+  <h1>Every Shot<br>Is a Call</h1>
+</div>
+<div class="hero" style="flex-direction: column;">
+  <div class="choices">
+    <div class="choice"><b>Safe</b><em>Take your medicine</em></div>
+    <div class="choice"><b>Normal</b><em>Play the percentages</em></div>
+    <div class="choice"><b>Aggressive</b><em>Eight per round</em></div>
+  </div>
+  <div class="oddsbar">${segs.map((s) => `<i class="${s.cls}" style="width:${s.w}%"></i>`).join('')}</div>
+  <p class="barnote">The real odds, before you commit</p>
+</div>
+<div class="stats"><span>18 holes · about 2 minutes</span></div>
 <div class="domain">playdogleg.com</div>
 `
 }

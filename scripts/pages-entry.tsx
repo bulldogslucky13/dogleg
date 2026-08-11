@@ -21,7 +21,17 @@
 import { copyFileSync, mkdirSync, writeFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { ALL_COURSES } from '../src/engine/courses'
-import { allFiles, pinCardHtml, holePinFile, holePinTargets, FONT_FILES, PIN_W, PIN_H } from './lib/pages'
+import {
+  allFiles,
+  pinCardHtml,
+  holePinFile,
+  holePinTargets,
+  libraryPinCardHtml,
+  howToPlayPinCardHtml,
+  FONT_FILES,
+  PIN_W,
+  PIN_H,
+} from './lib/pages'
 import { shotHtml } from './lib/rasterise'
 
 const args = process.argv.slice(2)
@@ -51,7 +61,17 @@ if (args.includes('--pins')) {
       n++
     }
   }
-  console.log(`${n} pin cards (${ALL_COURSES.length} course + ${n - ALL_COURSES.length} hole) -> ${pinsDir}`)
+  // the two non-course pages, which SmartPin provably cannot render (it
+  // invents branding when there is no hero image to composite)
+  for (const [file, html] of [
+    ['courses.png', libraryPinCardHtml()],
+    ['how-to-play.png', howToPlayPinCardHtml()],
+  ] as const) {
+    shotHtml(html, resolve(pinsDir, file), { width: PIN_W, height: PIN_H, scale: 1, tag: `pin-${file}` })
+    console.log(`pins/${file}  ${PIN_W}x${PIN_H}`)
+    n++
+  }
+  console.log(`${n} pin cards (${ALL_COURSES.length} course + ${n - ALL_COURSES.length - 2} hole + 2 page) -> ${pinsDir}`)
 } else {
   const files = allFiles()
   for (const f of files) {

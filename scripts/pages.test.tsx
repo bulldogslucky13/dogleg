@@ -11,8 +11,10 @@
  * themselves are reviewed by eye at /courses/ on a `pnpm preview` build.
  */
 import { describe, it, expect } from 'vitest'
+import { renderToStaticMarkup } from 'react-dom/server'
 import { ALL_COURSES } from '../src/engine/courses'
 import { CHANGELOG } from '../src/lib/changelog'
+import { Wordmark } from '../src/ui/Wordmark'
 import {
   allFiles,
   coursePage,
@@ -28,6 +30,8 @@ import {
   signatureHole,
   holePinTargets,
   holePinFile,
+  libraryPinCardHtml,
+  howToPlayPinCardHtml,
   PINTEREST_VERIFY,
   SITE,
 } from './lib/pages'
@@ -161,6 +165,23 @@ describe('pin cards', () => {
       ...holePinTargets(c).map((h) => holePinFile(c, h)),
     ])
     expect(new Set(names).size).toBe(names.length)
+  })
+
+  it('the two non-course cards render our real wordmark, not a generated one', () => {
+    // These exist because SmartPin invented a fake DogLeg logo (with a ®) for
+    // /courses/ and mangled the wordmark for /how-to-play/. The guard is that
+    // both cards carry the mark straight out of Wordmark.tsx.
+    const realMark = renderToStaticMarkup(<Wordmark />)
+    for (const html of [libraryPinCardHtml(), howToPlayPinCardHtml()]) {
+      expect(html).toContain(realMark)
+      expect(html).toContain('width: 1000px; height: 1500px')
+      expect(html).toContain('playdogleg.com')
+      expect(html).toContain('data:font/woff2;base64,')
+    }
+  })
+
+  it('the library card counts the library, and cannot go stale', () => {
+    expect(libraryPinCardHtml()).toContain(`<p class="bignum">${ALL_COURSES.length}</p>`)
   })
 
   it('gives us enough distinct creative to pin daily without repeating', () => {

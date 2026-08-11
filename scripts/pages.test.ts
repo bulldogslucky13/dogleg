@@ -25,9 +25,17 @@ import {
   sitemapXml,
   robotsTxt,
   coursePath,
+  signatureHole,
+  holePinTargets,
+  holePinFile,
   PINTEREST_VERIFY,
   SITE,
 } from './lib/pages'
+
+/** The same escaping pageShell applies, so a signature line containing an
+ *  apostrophe or ampersand still matches what the card actually renders. */
+const escHtml = (s: string) =>
+  s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 
 describe('course pages', () => {
   it('covers the whole library — rotation, guests, short courses', () => {
@@ -127,5 +135,37 @@ describe('pin cards', () => {
       // fonts must ride inline: a file:// @font-face silently falls back
       expect(html, c.slug).toContain('data:font/woff2;base64,')
     }
+  })
+
+  it('hole cards lead with their own hole and never repeat the course card', () => {
+    for (const c of ALL_COURSES) {
+      const lead = signatureHole(c)
+      for (const hole of holePinTargets(c)) {
+        // the whole point of a hole card: a DIFFERENT map from the course card
+        expect(hole.number, `${c.slug} h${hole.number}`).not.toBe(lead.number)
+        const html = pinCardHtml(c, hole)
+        expect(html, `${c.slug} h${hole.number}`).toContain(`Signature Hole · No. ${hole.number}`)
+        expect(html, `${c.slug} h${hole.number}`).toContain('class="holemap"')
+        // only holes with real editorial copy earn a card — no filler
+        expect(hole.signature, `${c.slug} h${hole.number}`).toBeTruthy()
+        expect(html, `${c.slug} h${hole.number}`).toContain(escHtml(hole.signature!))
+      }
+      // the course card keeps its own wording
+      expect(pinCardHtml(c), c.slug).toContain('Course Guide · No.')
+    }
+  })
+
+  it('hole card filenames are unique across the whole library', () => {
+    const names = ALL_COURSES.flatMap((c) => [
+      `${c.slug}.png`,
+      ...holePinTargets(c).map((h) => holePinFile(c, h)),
+    ])
+    expect(new Set(names).size).toBe(names.length)
+  })
+
+  it('gives us enough distinct creative to pin daily without repeating', () => {
+    const total = ALL_COURSES.length + ALL_COURSES.reduce((n, c) => n + holePinTargets(c).length, 0)
+    // 3 pins/day is the cadence; a month of it must not exhaust the library
+    expect(total).toBeGreaterThan(90)
   })
 })

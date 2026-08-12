@@ -22,6 +22,7 @@ import { loadLedger, syncLedger } from '../lib/records'
 import { hasEarnedAwards, reconcileAchievements } from '../state/achievements'
 import { AccountPanel } from './AccountPanel'
 import { AchievementsView } from './Achievements'
+import { RecordCrown } from './Leaderboard'
 import { RoundScorecard } from './RoundScorecard'
 import { shortCourseName } from './courseName'
 import { track } from '../lib/analytics'
@@ -182,7 +183,15 @@ export function RoundsScreen(props: {
         </b>
         <span>
           {context ? `${context} · ` : ''}
-          {shortDate(r.dateKey)} · {r.mode === 'daily' ? 'Daily' : 'Practice'} · {r.strokes} strokes
+          {shortDate(r.dateKey)} · {r.mode === 'daily' ? 'Daily' : 'Practice'}
+          {/* the crown marks a record SET in daily play — same mark as the
+              course browser (see RecordCrown). Only record rows wear it:
+              a daily in Recent or the PB list is just a daily. */}
+          {badge === 'CR' && r.mode === 'daily' && <RecordCrown rec={{ mode: 'daily' }} />}{' '}
+          {/* no separator dot before the strokes: they usually take the lower
+              line, and a dot dangling at a line break reads as a smudge. The
+              count and its unit still wrap as one word. */}
+          <span className="strokes-part">{r.strokes} strokes</span>
         </span>
       </div>
       {badge && <em className={`round-badge ${badge === 'CR' ? 'cr' : 'pr'}`}>{badge}</em>}
@@ -443,7 +452,13 @@ export function RoundsScreen(props: {
               className={`locker-tab${tab === 'records' ? ' on' : ''}`}
               onClick={() => setTab('records')}
             >
-              Records · {records.length + prs.length}
+              {/* the count is RECORDS HELD — courses where you are the current
+                  record holder — never the tab's row total. Personal bests live
+                  on this screen but they are not records; a player with ten PBs
+                  and no records reads 0 here, honestly. (The empty state below
+                  still keys on the combined total: the SCREEN is empty only
+                  when both lists are.) */}
+              Records · {records.length}
             </button>
             <button
               role="tab"
@@ -491,13 +506,13 @@ export function RoundsScreen(props: {
             <>
               {records.length > 0 && (
                 <section className="rounds-section">
-                  <div className="kicker">🏆 Course records you hold</div>
+                  <div className="kicker">🏆 Course records you hold ({records.length})</div>
                   {records.map((r) => row(toLogged(r), 'CR'))}
                 </section>
               )}
               {prs.length > 0 && (
                 <section className="rounds-section">
-                  <div className="kicker">Personal bests</div>
+                  <div className="kicker">Personal bests ({prs.length})</div>
                   {/* 'PB' on the badge — "personal best", never "personal
                       record"; Jackson's call, it reads more natural. Internal
                       identifiers (prs, .round-badge.pr) deliberately keep the

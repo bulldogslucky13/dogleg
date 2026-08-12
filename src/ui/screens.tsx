@@ -23,7 +23,7 @@ import { characterRecords, computeStreaks, loadArchive, type HistoryEntry, type 
 import { AccountPanel } from './AccountPanel'
 import { CharacterAvatar } from './Avatars'
 import { TAGLINE_PARTS } from './brand'
-import { DailyBoardView, ScoreBoard } from './Leaderboard'
+import { DailyBoardView, RecordCrown, ScoreBoard } from './Leaderboard'
 import { PlayRatingChip } from './PlayRating'
 
 /** "Attainable record" = active-type record at this to-par OR WORSE (closer
@@ -560,7 +560,8 @@ export function HomeScreen(props: {
                     {recsReady &&
                       (rec ? (
                         <em className={`course-cr${recType === 'alltime' ? ' alltime' : ''}`}>
-                          {recLabel} {toParLabel(rec.to_par)} · {characterById(rec.character ?? undefined)?.emoji ?? ''}{' '}
+                          {recLabel} {toParLabel(rec.to_par)}
+                          <RecordCrown rec={rec} /> · {characterById(rec.character ?? undefined)?.emoji ?? ''}{' '}
                           {rec.player_name}
                           {mine && <i className="course-cr-you">YOU</i>}
                         </em>
@@ -579,6 +580,14 @@ export function HomeScreen(props: {
                 </div>
               )
             })}
+          {/* tooltips need a hover no phone has — the crown explains itself
+              here, but only once a crowned record is actually on the list */}
+          {courseTab === 'courses' &&
+            [...(courseRecs?.values() ?? []), ...(seasonRecs?.values() ?? [])].some((r) => r.mode === 'daily') && (
+              <p className="fine crown-legend">
+                <RecordCrown rec={{ mode: 'daily' }} /> Set in daily play – one attempt, one record-setting round.
+              </p>
+            )}
           {courseTab === 'par3' &&
             PAR3_COURSES.map((c) => {
               const sr = seasonRecs?.get(c.slug)
@@ -596,7 +605,8 @@ export function HomeScreen(props: {
                   {seasonRecs &&
                     (sr ? (
                       <em className="course-cr">
-                        Season {toParLabel(sr.to_par)} · {characterById(sr.character ?? undefined)?.emoji ?? ''}{' '}
+                        Season {toParLabel(sr.to_par)}
+                        <RecordCrown rec={sr} /> · {characterById(sr.character ?? undefined)?.emoji ?? ''}{' '}
                         {sr.player_name}
                       </em>
                     ) : (
@@ -604,7 +614,8 @@ export function HomeScreen(props: {
                     ))}
                   {at && (
                     <em className="course-cr alltime">
-                      All-time {toParLabel(at.to_par)} · {characterById(at.character ?? undefined)?.emoji ?? ''}{' '}
+                      All-time {toParLabel(at.to_par)}
+                      <RecordCrown rec={at} /> · {characterById(at.character ?? undefined)?.emoji ?? ''}{' '}
                       {at.player_name}
                     </em>
                   )}

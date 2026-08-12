@@ -26,6 +26,23 @@ import { SyncCta } from './RoundsScreen'
  * rounds contend for the course record. First-time players pick a clubhouse
  * name inline — no account, the device remembers them.
  */
+
+/** Daily-set records wear the crown: one attempt, fixed conditions, the whole
+ * field on the same card — the harder way onto the wall. Drawn inline (not the
+ * emoji) so it renders in the theme's record gold everywhere, instead of
+ * whatever olive the platform's emoji font feels like. Practice-set records
+ * (and rows from before the mode column existed) stay unmarked. */
+export function RecordCrown({ rec }: { rec: Pick<CourseRecord, 'mode'> }) {
+  if (rec.mode !== 'daily') return null
+  return (
+    <span className="rec-crown" title="Set in daily play – one attempt, one record-setting round." aria-label="set in daily play">
+      <svg viewBox="0 0 16 13" aria-hidden>
+        <path d="M1 4.2l3.4 2.6L8 1.6l3.6 5.2L15 4.2v5.2H1z" />
+        <rect x="1" y="10.6" width="14" height="1.8" rx="0.9" />
+      </svg>
+    </span>
+  )
+}
 /**
  * Competition scoreboard ranks, ties awarded: players on the same score share a
  * number and the next distinct score skips the places the tie consumed —
@@ -289,9 +306,49 @@ export function ScoreBoard(props: {
 
   const shown = board?.slice(0, 10) ?? []
   const ranks = competitionRanks(shown)
+  // the season the SERVER stamped the record with: the puzzle's own day,
+  // anchored mid-day UTC exactly like the referee — not the submission
+  // instant, so a card posted just after the season horn still celebrates
+  // the season its puzzle belonged to
+  const puzzleSeason = seasonForDate(new Date(`${round.dateKey}T12:00:00Z`))
 
   return (
     <div className="board-block">
+      {/* daily rounds contend for the record boards too — a daily that takes
+          one celebrates exactly like an unlimited round would, same tiering
+          (all-time outranks and absorbs the season title) */}
+      {celebrate?.tier === 'alltime' && (
+        <AllTimeSplash
+          courseName={courseBySlug(round.courseSlug)?.name ?? round.courseSlug}
+          courseSlug={round.courseSlug}
+          dateKey={round.dateKey}
+          toPar={roundToPar(round)}
+          character={round.character}
+          season={puzzleSeason}
+          previousHolder={celebrate.previousHolder ?? undefined}
+          tookSeason={celebrate.tookSeason}
+          onClose={() => setCelebrate(null)}
+        />
+      )}
+      {celebrate?.tier === 'season' && (
+        <RecordSplash
+          courseName={courseBySlug(round.courseSlug)?.name ?? round.courseSlug}
+          courseSlug={round.courseSlug}
+          dateKey={round.dateKey}
+          toPar={roundToPar(round)}
+          character={round.character}
+          season={puzzleSeason}
+          takenFrom={celebrate.takenFrom ?? undefined}
+          onClose={() => setCelebrate(null)}
+        />
+      )}
+      {result?.record?.broken && (
+        <div className="record-banner">
+          🏆 New course record — {toParLabel(result.record.toPar)}
+          <RecordCrown rec={{ mode: 'daily' }} /> by {player?.name ?? 'you'}
+          {round.character ? ` ${characterById(round.character)?.emoji ?? ''}` : ''}
+        </div>
+      )}
       <div className="kicker">Today's board</div>
       {player && busy && (
         <p className="fine">

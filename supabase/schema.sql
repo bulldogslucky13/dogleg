@@ -79,6 +79,13 @@ create table if not exists course_records (
 alter table course_records add column if not exists seed text;
 alter table course_records add column if not exists decisions jsonb;
 
+-- Which mode set the record. Daily-set records are the harder feat — one
+-- attempt, fixed conditions — and the UI crowns them for it. The default is
+-- historically accurate: every record set before dailies counted (2026-08)
+-- came from unlimited play, by the very bug the backfill below repairs.
+-- (season_records gets the same column after its create, below.)
+alter table course_records add column if not exists mode text not null default 'practice';
+
 -- SEASON course records: one holder per (scope, season, course). Seasons
 -- follow the fixed ET calendar in src/engine/season.ts; the referee stamps
 -- season_key at submission time, which is what makes rollover need no cron
@@ -104,6 +111,9 @@ create table if not exists season_records (
 alter table season_records enable row level security;
 drop policy if exists "anyone can read season records" on season_records;
 create policy "anyone can read season records" on season_records for select using (true);
+
+-- which mode set the record — see the note at course_records' matching column
+alter table season_records add column if not exists mode text not null default 'practice';
 
 -- One row per record-steal email actually attempted, keyed by day. The row is
 -- inserted BEFORE the send, so a duplicate key means "already emailed today"
@@ -273,3 +283,13 @@ create table if not exists received_emails (
 -- the service role (the receive-email function, or an operator in the
 -- dashboard) can touch it.
 alter table received_emails enable row level security;
+
+-- ============================================================================
+-- The records catch-up pass (daily rounds joining the record boards) used to
+-- live here. It now lives in supabase/catch-up-records.sql and is applied by
+-- the deploy workflow AFTER the edge functions deploy: it is the only writer
+-- that stamps mode = 'daily', and stamping while an older referee is still
+-- live would let a practice round inherit a daily crown permanently. Its own
+-- header carries the full reasoning. Everything above must keep running
+-- BEFORE the functions, for the opposite reason — no function may ship ahead
+-- of a table or column it writes to.

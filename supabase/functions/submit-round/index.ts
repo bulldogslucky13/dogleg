@@ -113,22 +113,27 @@ Deno.serve(async (req) => {
     if (!allowed.includes(info.dateKey!)) return json(422, { error: 'daily is not for today' })
   }
 
-  // ---- a destined practice round cannot contend for course records ----
+  // ---- destiny and record contention ----
   // Practice fortune counters have no server-visible history AT ALL, so a
   // destiny-due tail is unverifiable — anyone could forge `:f500.…` and post
-  // a forced ace as a record. And even a legitimately destined round is a
-  // gift, not a record-worthy score. Practice records only accept rounds
-  // whose tail is below every destiny threshold; the round itself still
-  // played fine on the client, it just doesn't claim the CR.
+  // a forced ace as a record. Those rounds still VALIDATE and post like any
+  // other practice round (the moment is the point, and an error banner over
+  // a guaranteed ace would sour the game's biggest gift) — they just quietly
+  // don't contend for either record board.
+  //
+  // DAILY destiny is different, by decision (2026-08-03): the daily drought
+  // is recomputed from posted cards below, so a destined daily is VERIFIED —
+  // and a forced hole-out still needs seventeen other strong holes before it
+  // threatens a record. Verified destiny counts; unverifiable destiny can't.
+  //
   // Fortune-ineligible courses (par-3 shorts) never fire destiny regardless
   // of the tail — the engine ignores fortune there entirely — so a due tail
   // on such a seed is inert, not a forged gift. (Current clients omit the
   // tail on those courses; this guard also accepts any that still carry one.)
+  let recordEligible = true
   if (info.mode === 'practice' && info.fortune && fortuneEligible(info.course)) {
     const due = destinyDue('practice', info.fortune)
-    if (due.ace || due.albatross) {
-      return json(422, { error: 'destined rounds do not contend for course records' })
-    }
+    if (due.ace || due.albatross) recordEligible = false
   }
 
   const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
@@ -189,11 +194,19 @@ Deno.serve(async (req) => {
         // recomputed drought within a small grace of it — a client cannot
         // manufacture a destiny holeout out of a short or fabricated history.
         if (claimsAceDestiny || claimsAlbDestiny) {
+          // the drought is the PRE-round drought: a RETRY of this very
+          // submission may already have its card posted (the insert
+          // committed, a later record write failed), and counting that
+          // card's own destiny moment would zero the drought and reject
+          // the self-heal retry the duplicate path exists to serve
+          const history = ((rows ?? []) as { date_key: string; course_slug: string; results: string[] | null }[]).filter(
+            (r) => r.date_key !== info.dateKey,
+          )
           let sinceAce = 0
           let sinceAlb = 0
           let aceDone = false
           let albDone = false
-          for (const row of (rows ?? []) as { course_slug: string; results: string[] | null }[]) {
+          for (const row of history) {
             const course = courseBySlug(row.course_slug)
             const results = row.results ?? []
             const hasAce = !!course && results.some((r, i) => r === 'eagle' && course.holes[i]?.par === 3)
@@ -257,7 +270,20 @@ Deno.serve(async (req) => {
     player = { id: data.id, name: data.name, secret: data.secret }
   }
 
+  // Every failure from here on happens AFTER the player row was minted (or
+  // the name claimed): the identity must ride on those error responses, or a
+  // first-time device retries with no credentials, re-claims the same name,
+  // gets "that name is taken", and its posted card is stranded under an
+  // identity it never received. `player.secret` is only set when this very
+  // request created the row — established identities never re-receive theirs.
+  const fail = (status: number, payload: Record<string, unknown>) =>
+    json(status, {
+      ...payload,
+      ...(player.secret ? { player: { id: player.id, name: player.name, secret: player.secret } } : {}),
+    })
+
   // ---- write the validated score ----
+  let daily: { rank: number; total: number; duplicate: boolean } | null = null
   if (info.mode === 'daily') {
     const row = {
       date_key: info.dateKey!,
@@ -272,7 +298,24 @@ Deno.serve(async (req) => {
     }
     // first card of the day stands; a resubmission is ignored
     const { error } = await supabase.from('daily_scores').insert(row)
-    if (error && error.code !== '23505') return json(500, { error: 'could not save score' })
+    if (error && error.code !== '23505') return fail(500, { error: 'could not save score' })
+    if (error) {
+      // Duplicate resubmission: the first card stands, so records may only
+      // contend with THAT card's score. Without this check a player could
+      // replay the daily with different decisions and use a later, better
+      // result to take a record the one-attempt board never saw. A retry of
+      // the same round (same score) still falls through, so a record write
+      // that failed after the board write self-heals on the client's retry.
+      const { data: first } = await supabase
+        .from('daily_scores')
+        .select('to_par, strokes')
+        .eq('date_key', info.dateKey!)
+        .eq('player_id', player.id)
+        .maybeSingle()
+      if (!first || first.to_par !== replay.toPar || first.strokes !== replay.strokes) {
+        recordEligible = false
+      }
+    }
 
     // ---- clubhouse decision tallies (Layer 2): best-effort, fresh cards only.
     // One atomic RPC bumps the aggregate counters for every (hole,stage) this
@@ -303,22 +346,24 @@ Deno.serve(async (req) => {
       .from('daily_scores')
       .select('*', { count: 'exact', head: true })
       .eq('date_key', info.dateKey!)
-    return json(200, {
-      mode: 'daily',
-      toPar: replay.toPar,
-      strokes: replay.strokes,
-      rank: (better ?? 0) + 1,
-      total: total ?? 1,
-      duplicate: !!error,
-      player: { id: player.id, name: player.name, ...(player.secret ? { secret: player.secret } : {}) },
-    })
+    daily = { rank: (better ?? 0) + 1, total: total ?? 1, duplicate: !!error }
+    // NO early return: a course record is the best score anyone has posted
+    // on the course from ANY competitive play, so a daily falls through to
+    // the same record claims practice rounds make. Running the claims even
+    // on a duplicate resubmission is deliberate — they're strictly-better-
+    // gated no-ops normally, so a record write that failed after the board
+    // write self-heals on the client's retry instead of diverging forever.
   }
 
-  // ---- practice: SEASON course record first (scope 'global' today —
-  // leagues later filter this same table by scope). The season is stamped
-  // HERE, from the ET calendar, at submission time: that single fact makes
-  // rollover reliable with nobody online, because a season's rows simply
-  // stop changing when submissions start carrying the next key.
+  // ---- SEASON course record (scope 'global' today — leagues later filter
+  // this same table by scope). The season is stamped HERE, from the ET
+  // calendar: that single fact makes rollover reliable with nobody online,
+  // because a season's rows simply stop changing when submissions start
+  // carrying the next key. A practice round is stamped at submission time;
+  // a DAILY is stamped from its own dateKey (anchored mid-day UTC, which is
+  // morning of the same ET day), so a card played before the horn but
+  // posted just after midnight still lands in the season its puzzle
+  // belonged to.
   // The claim is written as two atomic statements rather than a read-then-
   // write: an insert that only wins when no row exists yet, then an update
   // the DATABASE gates on `to_par > ours` — so two concurrent submissions
@@ -377,7 +422,8 @@ Deno.serve(async (req) => {
     else await notify
   }
 
-  const season = seasonForDate(new Date())
+  const season =
+    info.mode === 'daily' ? seasonForDate(new Date(`${info.dateKey}T12:00:00Z`)) : seasonForDate(new Date())
   const seasonRow = {
     scope: 'global',
     season_key: season.key,
@@ -389,6 +435,9 @@ Deno.serve(async (req) => {
     set_at: new Date().toISOString(),
     seed,
     decisions,
+    // which mode set it — daily records are the harder feat (one attempt,
+    // fixed conditions) and the UI crowns them for it
+    mode: info.mode,
   }
   // null → the database predates season_records (the schema update is manual,
   // the function deploy automatic). Practice submissions must keep working
@@ -411,16 +460,20 @@ Deno.serve(async (req) => {
     .eq('season_key', season.key)
     .eq('course_slug', info.course.slug)
     .maybeSingle()
-  const { data: seasonClaimed, error: seasonClaimError } = await supabase
-    .from('season_records')
-    .upsert(seasonRow, { onConflict: 'scope,season_key,course_slug', ignoreDuplicates: true })
-    .select('to_par')
+  // an ineligible round (unverifiable practice destiny) makes no claim, but
+  // still falls through to the holder read so the wrap can show the board
+  const { data: seasonClaimed, error: seasonClaimError } = recordEligible
+    ? await supabase
+        .from('season_records')
+        .upsert(seasonRow, { onConflict: 'scope,season_key,course_slug', ignoreDuplicates: true })
+        .select('to_par')
+    : { data: null, error: null }
   if (seasonClaimError && !missingSeasonTable(seasonClaimError)) {
-    return json(500, { error: 'could not save season record' })
+    return fail(500, { error: 'could not save season record' })
   }
   if (!seasonClaimError) {
-    let seasonBroken = (seasonClaimed?.length ?? 0) > 0
-    if (!seasonBroken) {
+    let seasonBroken = ((seasonClaimed as { to_par: number }[] | null)?.length ?? 0) > 0
+    if (!seasonBroken && recordEligible) {
       // a row exists — replace it only when this round is strictly better,
       // decided by the database in one statement (ties keep the holder)
       const { data: seasonTaken, error: seasonTakeError } = await supabase
@@ -431,7 +484,7 @@ Deno.serve(async (req) => {
         .eq('course_slug', info.course.slug)
         .gt('to_par', replay.toPar)
         .select('to_par')
-      if (seasonTakeError) return json(500, { error: 'could not save season record' })
+      if (seasonTakeError) return fail(500, { error: 'could not save season record' })
       seasonBroken = (seasonTaken?.length ?? 0) > 0
     }
     if (seasonBroken) {
@@ -448,24 +501,48 @@ Deno.serve(async (req) => {
     } else {
       const { data: seasonHolder } = await supabase
         .from('season_records')
-        .select('to_par, player_name, character')
+        .select('to_par, player_id, player_name, character, seed')
         .eq('scope', 'global')
         .eq('season_key', season.key)
         .eq('course_slug', info.course.slug)
         .maybeSingle()
       if (seasonHolder) {
-        seasonRecord = {
-          broken: false,
-          toPar: seasonHolder.to_par,
-          holder: seasonHolder.player_name,
-          character: seasonHolder.character ?? null,
-          seasonKey: season.key,
+        // retry-aware recovery: the standing row may BE this very round —
+        // the season claim committed, a later write 500'd the response, and
+        // the client retried. The stored ghost seed is exact identity (one
+        // seed, one round), so on a match the win is re-reported as broken
+        // rather than silently downgraded to someone else's record — without
+        // it the client would never run its season bookkeeping/celebration.
+        // Gated on the client's `unacknowledged` marker (sent until a 200
+        // lands in its posted ledger): daily seeds are stable per player+day,
+        // so seed identity alone can't tell a lost-response retry from an
+        // already-acknowledged card being reopened and auto-resubmitted —
+        // without the gate every reopen would re-celebrate. A forged marker
+        // buys nothing but a repeat splash on the forger's own screen: this
+        // path writes nothing. No steal email here either way — the original
+        // claim's send already ran, and the dedupe ledger holds.
+        if (body?.unacknowledged === true && seasonHolder.player_id === player.id && seasonHolder.seed === seed) {
+          seasonRecord = {
+            broken: true,
+            toPar: replay.toPar,
+            holder: player.name,
+            character: character ?? null,
+            seasonKey: season.key,
+          }
+        } else {
+          seasonRecord = {
+            broken: false,
+            toPar: seasonHolder.to_par,
+            holder: seasonHolder.player_name,
+            character: seasonHolder.character ?? null,
+            seasonKey: season.key,
+          }
         }
       }
     }
   }
 
-  // practice: ALL-TIME course records (never reset). Same race-safe shape as
+  // ALL-TIME course records (never reset), from EITHER mode. Same race-safe shape as
   // the season write above: claim-if-absent, then a database-gated replace,
   // so two concurrent submissions can't leave a worse round on the row. The
   // pre-write read is NOT part of that decision — it only identifies the
@@ -482,6 +559,7 @@ Deno.serve(async (req) => {
     character: character ?? null,
     to_par: replay.toPar,
     set_at: new Date().toISOString(),
+    mode: info.mode,
   }
   // the record ROUND rides along — the referee just replayed and verified
   // this exact seed + decision list, so keeping it costs nothing and lets
@@ -492,19 +570,23 @@ Deno.serve(async (req) => {
   // migration is manual, the function deploy is automatic). Both writes
   // retry without the ghost round; the client falls back to the
   // challenger's own best. Self-heals once the delta runs.
-  let { data: recordClaimed, error: recordClaimError } = await supabase
-    .from('course_records')
-    .upsert({ ...record, seed, decisions }, { onConflict: 'course_slug', ignoreDuplicates: true })
-    .select('to_par')
-  if (recordClaimError && missingGhostColumns(recordClaimError)) {
+  let recordClaimed: { to_par: number }[] | null = null
+  let recordClaimError: { code?: string; message?: string } | null = null
+  if (recordEligible) {
     ;({ data: recordClaimed, error: recordClaimError } = await supabase
       .from('course_records')
-      .upsert(record, { onConflict: 'course_slug', ignoreDuplicates: true })
+      .upsert({ ...record, seed, decisions }, { onConflict: 'course_slug', ignoreDuplicates: true })
       .select('to_par'))
+    if (recordClaimError && missingGhostColumns(recordClaimError)) {
+      ;({ data: recordClaimed, error: recordClaimError } = await supabase
+        .from('course_records')
+        .upsert(record, { onConflict: 'course_slug', ignoreDuplicates: true })
+        .select('to_par'))
+    }
   }
-  if (recordClaimError) return json(500, { error: 'could not save record' })
+  if (recordClaimError) return fail(500, { error: 'could not save record' })
   let isRecord = (recordClaimed?.length ?? 0) > 0
-  if (!isRecord) {
+  if (!isRecord && recordEligible) {
     // a record exists — replace it only when this round is strictly better,
     // decided by the database in one statement (ties keep the holder)
     let { data: recordTaken, error: recordTakeError } = await supabase
@@ -521,7 +603,7 @@ Deno.serve(async (req) => {
         .gt('to_par', replay.toPar)
         .select('to_par'))
     }
-    if (recordTakeError) return json(500, { error: 'could not save record' })
+    if (recordTakeError) return fail(500, { error: 'could not save record' })
     isRecord = (recordTaken?.length ?? 0) > 0
   }
   if (isRecord) {
@@ -543,18 +625,48 @@ Deno.serve(async (req) => {
       .maybeSingle()
     recordHolder = raced
   }
+  // retry-aware recovery, the all-time twin of the season one above: the
+  // standing row may BE this very round (the claim committed, the 200 was
+  // lost, the client retried with its unacknowledged marker). Same identity
+  // test — this player AND this exact seed — so the win is re-reported and
+  // the client still runs recordWon/markArchiveRecord/the celebration. The
+  // seed is read separately and guarded: a pre-delta database has no seed
+  // column, and recovery must degrade away there rather than fail the
+  // submission. Runs after the steal-email block by design — the original
+  // claim already sent the mail, and `existing` is the player's own row here
+  // so the block would skip anyway. Writes nothing, so a forged marker only
+  // repeats a splash on the forger's own screen.
+  if (!isRecord && body?.unacknowledged === true && recordHolder?.player_id === player.id) {
+    const { data: ghost, error: ghostError } = await supabase
+      .from('course_records')
+      .select('seed')
+      .eq('course_slug', info.course.slug)
+      .maybeSingle()
+    if (!ghostError && ghost?.seed != null && ghost.seed === seed) isRecord = true
+  }
+  // one response shape for both modes: dailies carry their board fields
+  // (rank/total/duplicate) AND the record outcomes, so a single flow serves
+  // the daily board and the record system together — they cannot diverge.
   return json(200, {
-    mode: 'practice',
+    mode: info.mode,
     toPar: replay.toPar,
     strokes: replay.strokes,
-    record: isRecord
-      ? { broken: true, toPar: replay.toPar, holder: player.name, character: character ?? null }
-      : {
-          broken: false,
-          toPar: recordHolder?.to_par ?? replay.toPar,
-          holder: recordHolder?.player_name ?? player.name,
-          character: recordHolder?.character ?? null,
-        },
+    ...(daily ?? {}),
+    // no holder and no claim (an ineligible round on a recordless course) →
+    // omit `record` entirely, like the season path: synthesizing one from
+    // the challenger would show their own score as the standing record
+    ...(isRecord
+      ? { record: { broken: true, toPar: replay.toPar, holder: player.name, character: character ?? null } }
+      : recordHolder
+        ? {
+            record: {
+              broken: false,
+              toPar: recordHolder.to_par,
+              holder: recordHolder.player_name,
+              character: recordHolder.character ?? null,
+            },
+          }
+        : {}),
     ...(seasonRecord ? { seasonRecord } : {}),
     player: { id: player.id, name: player.name, ...(player.secret ? { secret: player.secret } : {}) },
   })

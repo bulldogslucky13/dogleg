@@ -109,6 +109,9 @@ export interface CourseRecord {
   player_name: string
   character: CharacterId | null
   to_par: number
+  /** which mode set it — 'daily' records wear the crown (one attempt, fixed
+   * conditions). Absent on rows read before the column deployed. */
+  mode?: 'daily' | 'practice' | null
 }
 
 /** The season board for one season (scope 'global'): course → holder. A
@@ -120,7 +123,7 @@ export async function fetchSeasonRecords(seasonKey: string): Promise<Map<string,
     const url =
       `${SUPABASE_URL}/rest/v1/season_records` +
       `?scope=eq.global&season_key=eq.${encodeURIComponent(seasonKey)}` +
-      `&select=course_slug,player_name,character,to_par`
+      `&select=course_slug,player_name,character,to_par,mode`
     const res = await fetch(url, { headers: REST_HEADERS })
     if (!res.ok) return null
     const rows = (await res.json()) as CourseRecord[]
@@ -183,7 +186,7 @@ export async function fetchSeasonRecordReplay(courseSlug: string, seasonKey: str
 export async function fetchCourseRecords(): Promise<Map<string, CourseRecord> | null> {
   if (!backendEnabled) return null
   try {
-    const url = `${SUPABASE_URL}/rest/v1/course_records?select=course_slug,player_name,character,to_par`
+    const url = `${SUPABASE_URL}/rest/v1/course_records?select=course_slug,player_name,character,to_par,mode`
     const res = await fetch(url, { headers: REST_HEADERS })
     if (!res.ok) return null
     const rows = (await res.json()) as CourseRecord[]
@@ -247,6 +250,19 @@ export interface SubmitResult {
  * Read by the store when baking a fortune streak into a daily seed. */
 const POSTED_KEY = 'dogleg:posted:v1'
 
+/** True once this device has had a submission for this daily acknowledged
+ * with a 200. The ledger is the client's persisted receipt — its absence on
+ * a duplicate submission is what distinguishes "retrying because the
+ * response was lost" from "reopened an already-acknowledged card". */
+function hasPostedDaily(dateKey: string): boolean {
+  try {
+    const raw = localStorage.getItem(POSTED_KEY)
+    return raw ? (JSON.parse(raw) as string[]).includes(dateKey) : false
+  } catch {
+    return false
+  }
+}
+
 function recordPostedDaily(dateKey: string): void {
   try {
     const raw = localStorage.getItem(POSTED_KEY)
@@ -282,12 +298,26 @@ export async function submitRound(round: RoundState, name?: string): Promise<Sub
         // the new bundle. Pre-handshake saves carry no stamp and omit the
         // field, taking the legacy replay-and-see path.
         ...(round.engineVersion !== undefined ? { engineVersion: round.engineVersion } : {}),
+        // no-success-acknowledged marker: present until a 200 lands in the
+        // posted ledger. On a duplicate the server only re-reports a season
+        // win it already wrote (the lost-response retry) when this rides
+        // along — a reopened, already-acknowledged card omits it and stays
+        // a quiet duplicate, so no repeat celebration.
+        ...(round.mode === 'daily' && !hasPostedDaily(round.dateKey) ? { unacknowledged: true } : {}),
         ...(player ? { playerId: player.id, playerSecret: player.secret } : {}),
         ...(name && !player?.name ? { name } : {}),
       }),
     })
     const body = (await res.json()) as SubmitResult & { player?: Player & { secret?: string } }
     if (!res.ok) {
+      // a failed submission can still have minted this device's identity —
+      // the server creates first-time players before the writes that can
+      // 500, and attaches the fresh credentials to those errors. Persist
+      // them NOW or the retry goes out nameless, re-claims the same name,
+      // and stalls forever on "that name is taken".
+      if (body.player?.id && body.player.secret) {
+        savePlayerIdentity({ id: body.player.id, secret: body.player.secret, name: body.player.name })
+      }
       return {
         ok: false,
         error: body.error ?? `submit failed (${res.status})`,

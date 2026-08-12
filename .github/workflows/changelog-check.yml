@@ -1,0 +1,39 @@
+# The change-log gate: a PR that neither updates the player-facing change log
+# nor is legitimately exempt fails this check. Policy and rationale live in
+# scripts/changelog-check.mjs (unit-tested in the main suite); this workflow
+# only feeds it the PR's changed files and labels.
+#
+# Re-runs on label changes on purpose: adding `course` / `no-changelog` /
+# `changelog-include` is how a red check is resolved without a new push.
+name: Change log
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Check for a change-log entry (or a valid exemption)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+          LABELS_JSON: ${{ toJSON(github.event.pull_request.labels.*.name) }}
+        run: |
+          FILES_JSON=$(gh api "repos/${{ github.repository }}/pulls/$PR/files" --paginate --jq '[.[].filename]' | node -e "
+            let s=''; process.stdin.on('data',d=>s+=d).on('end',()=>{
+              const pages=s.trim().split(/\]\s*\[/).map((p,i,a)=>{
+                if(a.length===1) return p; if(i===0) return p+']'; if(i===a.length-1) return '['+p; return '['+p+']'
+              });
+              console.log(JSON.stringify(pages.flatMap(p=>JSON.parse(p))))
+            })")
+          node scripts/changelog-check.mjs "$FILES_JSON" "$LABELS_JSON"

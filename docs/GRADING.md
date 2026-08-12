@@ -285,9 +285,12 @@ for a negative-to-positive swing before assuming drift.
 - Numbers are always honest — `gradeCopy` never rounds a bucket boundary to
   flatter the framing, and the headline's `skillToPar` is computed, not
   vibes.
-- The framing is playful, the golf-gods/lip-outs/swing-coach voice already used
+- The framing is playful, the lip-outs/swing-coach voice already used
   elsewhere in the game's copy (`resolve.ts`'s shot notes, `fortune.ts`'s
   `MOMENT_COPY`) — never clinical ("decisionLoss: 2.3").
+  - **"the golf gods" is retired** — luck is the course settling up, and the
+  streak line credits consistency ("Golf rewards the consistent"), not divine
+  favor. Don't reintroduce it here or in any other player-facing copy.
   - **"dice" is banned everywhere in this copy**, enforced by test: the game
   presents itself as odds and swings, never as a die roll, even when explaining
   bad luck.

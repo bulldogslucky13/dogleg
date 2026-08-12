@@ -60,6 +60,7 @@ export function buildLayout(courseSlug: string, spec: HoleSpec, cond?: Condition
   const course = courseBySlug(courseSlug)
   const rough = course?.rough
   const roughLabel = course?.roughLabel
+  const scenery = course?.scenery
   const real = OSM_GEOMETRY[`${courseSlug}:${spec.number}`]
   if (real) {
     return {
@@ -75,6 +76,7 @@ export function buildLayout(courseSlug: string, spec: HoleSpec, cond?: Condition
       gust,
       rough,
       roughLabel,
+      scenery,
       junkLabel: resolveJunkLabel(real.zones, course, courseSlug),
     }
   }
@@ -110,7 +112,7 @@ export function buildLayout(courseSlug: string, spec: HoleSpec, cond?: Condition
       add({ kind: 'bunker', from: L - 16, to: L - 2, side: 'right' })
       if (rng() < 0.5) add({ kind: 'bunker', from: L - 34, to: L - 20, side: 'cross' })
     }
-    return { spec, length: L, zones, fairwayFrom: 0, fairwayTo: 0, greenDepth, pin, gust, rough, roughLabel, junkLabel: resolveJunkLabel(zones, course, courseSlug) }
+    return { spec, length: L, zones, fairwayFrom: 0, fairwayTo: 0, greenDepth, pin, gust, rough, roughLabel, scenery, junkLabel: resolveJunkLabel(zones, course, courseSlug) }
   }
 
   // --- par 4 / par 5 ---
@@ -161,7 +163,7 @@ export function buildLayout(courseSlug: string, spec: HoleSpec, cond?: Condition
     add({ kind: 'deeprough', from: fairwayFrom, to: fairwayTo - 40, side: offSide })
   }
 
-  return { spec, length: L, zones, fairwayFrom, fairwayTo, greenDepth, rough, roughLabel, junkLabel: resolveJunkLabel(zones, course, courseSlug) }
+  return { spec, length: L, zones, fairwayFrom, fairwayTo, greenDepth, rough, roughLabel, scenery, junkLabel: resolveJunkLabel(zones, course, courseSlug) }
 }
 
 /**

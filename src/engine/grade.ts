@@ -695,12 +695,12 @@ export function gradeCopy(g: RoundGrade): GradeCopy {
 
   const luck = g.luck
   let luckLine: string
-  if (luck <= -1.5) luckLine = 'The golf gods owed you one — and paid up.'
+  if (luck <= -1.5) luckLine = 'The course owed you one — and paid up.'
   else if (luck <= -0.5) luckLine = 'A few kind bounces went your way.'
   else if (luck < 0.5) luckLine = 'An honest day — the course played it straight.'
   else if (luck < 1.5) luckLine = "A couple of lip-outs that just wouldn't drop."
   else luckLine = 'We all have off days — try getting better sleep.'
-  if (g.destinyBonus < 0) luckLine += ' And when the golf gods finally cashed in your patience, they cashed in big.'
+  if (g.destinyBonus < 0) luckLine += ' And when the course finally settled up for your patience, it settled up big.'
 
   const dl = g.decisionLoss
   const decisionLine =

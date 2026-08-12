@@ -14,6 +14,7 @@ import { FortuneInfo } from './Tutorial'
 import { ChangeLog } from './ChangeLog'
 import { hasEarnedAwards, reconcileAchievements, type Unlock } from '../state/achievements'
 import { Wordmark } from './Wordmark'
+import { recordChurn } from '../lib/churn'
 import { dismissSteals, pendingSteals, syncLedger, syncSeasonLedger, type PendingSteal } from '../lib/records'
 import { loadBrowsePrefs, saveBrowsePrefs, type CourseSort } from '../lib/browsePrefs'
 import { loadFavorites, toggleFavorite } from '../lib/favorites'
@@ -475,6 +476,28 @@ export function HomeScreen(props: {
               ⏳ {season.name} ends in {seasonCountdown(season)} — season records are up for grabs
             </p>
           )}
+          {/* the wall keeps score of itself: how many of the records standing
+              on it were set in the past week, and how many of those fell in
+              daily play (they wear the crown). A quiet week says nothing —
+              drama isn't invented here, and the wording is held to what one
+              row per course can prove: "set in the past week", never "changed
+              hands" (see the note on recordChurn). */}
+          {courseTab === 'courses' &&
+            (() => {
+              const churn = recordChurn(courseRecs)
+              if (!churn || churn.total === 0) return null
+              return (
+                <p className="season-countdown record-churn">
+                  🔥 {churn.total} course record{churn.total === 1 ? '' : 's'} set in the past week
+                  {churn.daily > 0 && (
+                    <>
+                      {' '}— {churn.daily} in daily play
+                      <RecordCrown rec={{ mode: 'daily' }} />
+                    </>
+                  )}
+                </p>
+              )
+            })()}
           {courseTab === 'courses' && (
             <div className="course-filters">
               {/* one slim row; the full controls live in the sheet below */}

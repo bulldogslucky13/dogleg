@@ -87,6 +87,12 @@ export const CHANGELOG: ChangeEntry[] = [
   {
     date: '2026-08-09',
     kind: 'feature',
+    title: 'The wall keeps score of itself',
+    note: 'The course list now says how many course records were set in the past week \u2014 and how many of those fell in daily play, crown and all. A quiet week says nothing.',
+  },
+  {
+    date: '2026-08-09',
+    kind: 'feature',
     title: 'The hunt is on',
     note: 'The Teebox now tells you how many season records are within reach — wide open boards and beatable numbers both — and one tap drops you on the course list sorted by what\u2019s winnable. Go take one.',
   },

@@ -2136,3 +2136,9 @@
 .screen.home .hunt-card em {
   color: var(--text-mid);
 }
+
+/* the churn line rides the countdown's look but stands apart — a hair less
+   margin so the two read as one drama block above the list */
+.screen.home .record-churn {
+  margin-top: -4px;
+}

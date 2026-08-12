@@ -85,6 +85,12 @@ export const CHANGELOG: ChangeEntry[] = [
     note: 'Unlimited play’s course list learned to hunt: filter by difficulty, by what you’ve played, by open or beatable records — season or all-time, your pick — star your target courses, and sort the whole board by what’s winnable. Fifty courses, one shortlist.',
   },
   {
+    date: '2026-08-09',
+    kind: 'feature',
+    title: 'The hunt is on',
+    note: 'The Teebox now tells you how many season records are within reach — wide open boards and beatable numbers both — and one tap drops you on the course list sorted by what\u2019s winnable. Go take one.',
+  },
+  {
     date: '2026-08-07',
     kind: 'odds',
     title: 'You now end up in the bunker — and the lake — you actually found',

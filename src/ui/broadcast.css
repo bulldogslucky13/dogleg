@@ -2122,3 +2122,17 @@
   border-color: var(--edge-strong);
   background: var(--bg-card);
 }
+
+/* the hunt card rides the stat-bug treatment: keyline bar, dark card — the
+   gold keyline is the records signal, same as the trophy tile */
+.screen.home .hunt-card {
+  background: var(--bg-card);
+  border: none;
+  border-left: var(--keyline-w) solid var(--record-gold);
+  border-radius: 3px var(--r-bug) var(--r-bug) 3px;
+  color: var(--text-hi);
+}
+
+.screen.home .hunt-card em {
+  color: var(--text-mid);
+}

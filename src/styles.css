@@ -1799,6 +1799,40 @@ button {
   accent-color: var(--good);
 }
 
+/* a round row's stroke count and its unit wrap as one word — "68 / strokes"
+   split across lines read like a typo */
+.round-row-text .strokes-part {
+  white-space: nowrap;
+}
+
+/* the daily crown: a record set in daily play — one attempt, fixed
+   conditions, the whole field on the same card. Worn just after the score,
+   sized down so it reads as a mark of honor, not a second emoji party.
+   The record lines force a muted text color at heavy weight, which can tip
+   the glyph into monochrome text presentation — pin the color-emoji font
+   so the crown always renders in full gold. */
+.rec-crown {
+  display: inline-block;
+  margin-left: 3px;
+  vertical-align: -1px;
+  /* gold is the reserved records signal — the crown wears it directly
+     instead of gambling on the platform emoji font's idea of gold */
+  color: var(--gold);
+}
+
+.rec-crown svg {
+  width: 0.95rem;
+  height: 0.77rem;
+  display: inline-block;
+  fill: currentColor;
+}
+
+/* the legend under the course list — tooltips need a hover nobody's phone
+   has, so the crown explains itself where it's seen */
+.crown-legend {
+  text-align: center;
+}
+
 /* record stolen: the rivalry card on the home screen */
 .steal-card {
   position: relative;
@@ -1819,6 +1853,32 @@ button {
 .steal-card p {
   font-size: 0.92rem;
   line-height: 1.45;
+}
+
+/* which board the name came off. Solid gold = the all-time record, gold
+   keyline = the season board — the Records tab's badge convention, worn
+   here so the two kinds of theft can never be mistaken for each other. */
+.steal-tag {
+  display: inline-block;
+  border-radius: 999px;
+  padding: 1px 8px 2px;
+  font-size: 0.58rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  vertical-align: 2px;
+  white-space: nowrap;
+}
+
+.steal-tag.alltime,
+.steal-tag.both {
+  background: var(--gold);
+  color: var(--ink);
+}
+
+.steal-tag.season {
+  border: 1px solid var(--gold);
+  color: var(--gold);
 }
 
 .steal-x {
@@ -1883,6 +1943,12 @@ button {
   white-space: nowrap;
 }
 
+/* the season chase wears the keyline only — same board language as the
+   steal tags: filled gold is all-time, outlined gold is the season */
+.chase-chip.season {
+  background: transparent;
+}
+
 /* ghost pace — the ahead/behind state is the emotional core: color + sign,
    legible at a glance, one chip, no crowding */
 .pace-chip {
@@ -1925,6 +1991,32 @@ button {
 .ghost-stakes.cr {
   border-color: rgba(201, 162, 39, 0.6);
   background: rgba(201, 162, 39, 0.08);
+}
+
+/* pick which record the ghost races — only rendered when the two boards
+   hold DIFFERENT rounds. Same gold language as everywhere: filled =
+   all-time, keyline = season; the 'on' state is whichever is picked. */
+.ghost-board-toggle {
+  display: flex;
+  gap: 6px;
+  align-self: center;
+}
+
+.ghost-board-toggle button {
+  border: 1px solid rgba(201, 162, 39, 0.55);
+  border-radius: 999px;
+  padding: 4px 12px;
+  font-size: 0.68rem;
+  font-weight: 800;
+  color: rgba(29, 43, 32, 0.65);
+  background: transparent;
+  white-space: nowrap;
+}
+
+.ghost-board-toggle button.on {
+  background: var(--gold);
+  border-color: var(--gold);
+  color: var(--ink);
 }
 
 .ghost-stakes-head {
@@ -3407,7 +3499,7 @@ button {
   }
 }
 
-/* ---------- classic (original Break Par) view ---------- */
+/* ---------- classic view (the original side-on paper layout) ---------- */
 
 /* side-profile map sits on the pale-green panel from the original */
 .map-wrap.side {

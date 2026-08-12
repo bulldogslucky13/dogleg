@@ -13,7 +13,7 @@ import {
   type SubmitResult,
 } from '../lib/leaderboard'
 import { seasonForDate } from '../engine/season'
-import { recordWon } from '../lib/records'
+import { recordWon, seasonRecordWon } from '../lib/records'
 import { markArchiveRecord, roundToPar, type RoundState } from '../state/store'
 import { courseBySlug } from '../engine/courses'
 import { identifyPlayer, track } from '../lib/analytics'
@@ -26,6 +26,23 @@ import { SyncCta } from './RoundsScreen'
  * rounds contend for the course record. First-time players pick a clubhouse
  * name inline — no account, the device remembers them.
  */
+
+/** Daily-set records wear the crown: one attempt, fixed conditions, the whole
+ * field on the same card — the harder way onto the wall. Drawn inline (not the
+ * emoji) so it renders in the theme's record gold everywhere, instead of
+ * whatever olive the platform's emoji font feels like. Practice-set records
+ * (and rows from before the mode column existed) stay unmarked. */
+export function RecordCrown({ rec }: { rec: Pick<CourseRecord, 'mode'> }) {
+  if (rec.mode !== 'daily') return null
+  return (
+    <span className="rec-crown" title="Set in daily play – one attempt, one record-setting round." aria-label="set in daily play">
+      <svg viewBox="0 0 16 13" aria-hidden>
+        <path d="M1 4.2l3.4 2.6L8 1.6l3.6 5.2L15 4.2v5.2H1z" />
+        <rect x="1" y="10.6" width="14" height="1.8" rx="0.9" />
+      </svg>
+    </span>
+  )
+}
 /**
  * Competition scoreboard ranks, ties awarded: players on the same score share a
  * number and the next distinct score skips the places the tie consumed —
@@ -111,11 +128,16 @@ export function ScoreBoard(props: {
       if (named) identifyPlayer(named.id, named.name)
     }
     let reclaimed = false
+    // ledger bookkeeping runs for every break on either board; the
+    // CELEBRATION is tiered — an all-time record outranks (and absorbs) the
+    // season one, so exactly one full-screen moment ever shows. The season
+    // shelf still gets its win recorded on the absorbed path, or a stolen
+    // season record would stay "stolen" after the round that took it back.
+    const stolenSeason = r.seasonRecord?.broken
+      ? seasonRecordWon(round.courseSlug, r.seasonRecord.toPar, r.seasonRecord.seasonKey)
+      : null
     if (r.record?.broken) {
       markArchiveRecord(round.seed) // pin it in the locker forever
-      // ledger bookkeeping runs for every all-time break; the CELEBRATION is
-      // tiered — an all-time record outranks (and absorbs) the season one, so
-      // exactly one full-screen moment ever shows
       const stolen = recordWon(round.courseSlug, r.record.toPar)
       reclaimed = !!stolen
       // the ledger moved — let the wrap screen re-check the achievements that
@@ -130,8 +152,9 @@ export function ScoreBoard(props: {
         tookSeason: !!r.seasonRecord?.broken,
       })
     } else if (r.seasonRecord?.broken) {
-      // season title only: the record-reclaim treatment with season copy
-      setCelebrate({ tier: 'season', takenFrom: null })
+      // season title only: the record-reclaim treatment with season copy —
+      // and when this took a STOLEN season record back, the splash says so
+      setCelebrate({ tier: 'season', takenFrom: stolenSeason?.by ?? null })
     }
     // the untracked conversion: a round actually WRITTEN to a board. Only
     // count real writes, so the metric isn't inflated by no-op submits:
@@ -236,6 +259,7 @@ export function ScoreBoard(props: {
             toPar={roundToPar(round)}
             character={round.character}
             season={seasonForDate()}
+            takenFrom={celebrate.takenFrom ?? undefined}
             onClose={() => setCelebrate(null)}
           />
         )}
@@ -282,9 +306,49 @@ export function ScoreBoard(props: {
 
   const shown = board?.slice(0, 10) ?? []
   const ranks = competitionRanks(shown)
+  // the season the SERVER stamped the record with: the puzzle's own day,
+  // anchored mid-day UTC exactly like the referee — not the submission
+  // instant, so a card posted just after the season horn still celebrates
+  // the season its puzzle belonged to
+  const puzzleSeason = seasonForDate(new Date(`${round.dateKey}T12:00:00Z`))
 
   return (
     <div className="board-block">
+      {/* daily rounds contend for the record boards too — a daily that takes
+          one celebrates exactly like an unlimited round would, same tiering
+          (all-time outranks and absorbs the season title) */}
+      {celebrate?.tier === 'alltime' && (
+        <AllTimeSplash
+          courseName={courseBySlug(round.courseSlug)?.name ?? round.courseSlug}
+          courseSlug={round.courseSlug}
+          dateKey={round.dateKey}
+          toPar={roundToPar(round)}
+          character={round.character}
+          season={puzzleSeason}
+          previousHolder={celebrate.previousHolder ?? undefined}
+          tookSeason={celebrate.tookSeason}
+          onClose={() => setCelebrate(null)}
+        />
+      )}
+      {celebrate?.tier === 'season' && (
+        <RecordSplash
+          courseName={courseBySlug(round.courseSlug)?.name ?? round.courseSlug}
+          courseSlug={round.courseSlug}
+          dateKey={round.dateKey}
+          toPar={roundToPar(round)}
+          character={round.character}
+          season={puzzleSeason}
+          takenFrom={celebrate.takenFrom ?? undefined}
+          onClose={() => setCelebrate(null)}
+        />
+      )}
+      {result?.record?.broken && (
+        <div className="record-banner">
+          🏆 New course record — {toParLabel(result.record.toPar)}
+          <RecordCrown rec={{ mode: 'daily' }} /> by {player?.name ?? 'you'}
+          {round.character ? ` ${characterById(round.character)?.emoji ?? ''}` : ''}
+        </div>
+      )}
       <div className="kicker">Today's board</div>
       {player && busy && (
         <p className="fine">

@@ -5,6 +5,7 @@ import { courseBySlug } from './engine/courses'
 import { dailySetup, localDateKey, practiceSetup, toParLabel, type DailySetup } from './engine/daily'
 import { longOdds } from './engine/odds'
 import { LOOK_LABEL, madePuttLook, oddsFor, pinChip } from './engine/resolve'
+import { seasonForDate } from './engine/season'
 import type { ApproachOdds, CharacterAdvantage, CharacterId, Choice } from './engine/types'
 import {
   advanceHole,
@@ -29,8 +30,8 @@ import {
   type UiMode,
 } from './state/store'
 import { absorbHistory, logRound } from './state/stats'
-import { ghostBallAt, ghostNoun, loadGhost, paceLabel, paceVs, type Ghost } from './state/ghost'
-import { chasing } from './lib/records'
+import { ghostBallAt, ghostBoardFor, ghostNoun, loadGhost, paceLabel, paceVs, rememberGhostBoard, type Ghost, type GhostBoard } from './state/ghost'
+import { chasing, chasingSeason, defaultChaseBoard } from './lib/records'
 import { identifyPlayer, track } from './lib/analytics'
 import { clubhouseLine, fetchHoleChoices, groupChoices, type TallyRow } from './lib/decisionStats'
 import { ensureIdentity, loadIdentity, loadPlayer } from './lib/leaderboard'
@@ -106,6 +107,11 @@ export default function App() {
   const [lockerAccount, setLockerAccount] = useState(false)
   const [uiMode, setUiMode] = useState<UiMode>(loadUiMode)
   const [pending, setPending] = useState<PendingStart | null>(null)
+  // which record the NEXT practice round's ghost races. Seeded per pick-screen
+  // visit (season when a stolen season record is the thing being won back),
+  // adjustable on the pick screen, stamped onto the round via the seed-keyed
+  // sidecar so a mid-round refresh keeps racing the same target.
+  const [pickBoard, setPickBoard] = useState<GhostBoard>('alltime')
   /** which single announcement this load earns, if any (see pickLandingModal).
    * Only a load that actually LANDS on home earns one: booting straight into
    * an unfinished round or a #watch replay is not an arrival at the home
@@ -291,7 +297,9 @@ export default function App() {
     // a slow or null-returning fetch lets the old course's pace chip, ball,
     // and early-hole comparisons render against the new round
     setGhost(null)
-    void loadGhost(round.courseSlug, round.seed).then((g) => {
+    // the board choice was stamped at tee-off (seed-keyed sidecar), so a
+    // refresh mid-round reloads the same race the player picked
+    void loadGhost(round.courseSlug, round.seed, ghostBoardFor(round.seed)).then((g) => {
       if (live) setGhost(g)
     })
     return () => {
@@ -456,11 +464,14 @@ export default function App() {
           onHistorySynced={handleHistorySynced}
           onTeeOff={() => {
             setPending({ mode: 'daily', setup: dailySetup() })
+            setPickBoard('alltime')
             setView('pick')
           }}
           onResume={() => setView('play')}
           onPractice={(slug) => {
             setPending({ mode: 'practice', setup: practiceSetup(slug, `${Date.now()}`) })
+            // "win it back" on a season-only theft races the season record
+            setPickBoard(defaultChaseBoard(slug, seasonForDate().key))
             setView('pick')
           }}
           onShowResult={() => {
@@ -517,6 +528,8 @@ export default function App() {
       <CharacterPickScreen
         setup={start.setup}
         practice={start.mode === 'practice'}
+        ghostBoard={pickBoard}
+        onGhostBoard={setPickBoard}
         onPick={(character: CharacterId) => {
           // the one doorway every round starts through — daily, practice,
           // and result-screen rematches all land here. A stale bundle would
@@ -527,7 +540,14 @@ export default function App() {
             return
           }
           const r = newRound(start.setup, start.mode, character, loadIdentity()?.id)
-          track('round_started', { mode: start.mode, course: r.courseSlug, puzzle_number: r.puzzleNumber, character })
+          if (start.mode === 'practice') rememberGhostBoard(r.seed, pickBoard)
+          track('round_started', {
+            mode: start.mode,
+            course: r.courseSlug,
+            puzzle_number: r.puzzleNumber,
+            character,
+            ...(start.mode === 'practice' ? { ghost_board: pickBoard } : {}),
+          })
           setRound(r)
           setSelected(null)
           setPending(null)
@@ -575,7 +595,7 @@ export default function App() {
           boardRound={recapSource}
           ghostClose={
             isPractice && round && ghost
-              ? { margin: roundToPar(round) - ghost.toPar, kind: ghost.kind, holder: ghost.holder }
+              ? { margin: roundToPar(round) - ghost.toPar, kind: ghost.kind, board: ghost.board, holder: ghost.holder }
               : null
           }
           character={isPractice && round ? round.character : entry?.character}
@@ -602,6 +622,7 @@ export default function App() {
               // (round_started is tracked by the pick screen's onPick)
               setUnlocks([])
               setPending({ mode: 'practice', setup: practiceSetup(round.courseSlug, `${Date.now()}`) })
+              setPickBoard(defaultChaseBoard(round.courseSlug, seasonForDate().key))
               setView('pick')
             }
           }}
@@ -700,9 +721,25 @@ export default function App() {
 
   const classic = uiMode === 'classic'
   const char = characterById(round.character)
-  // the target on the wall: a stolen record being chased stays visible in
-  // the HUD for the whole unlimited round
+  // the targets on the wall: stolen records being chased stay visible in the
+  // HUD for the whole unlimited round — each labeled with its board. One
+  // round routinely takes both boards with one score; that's one target, one
+  // chip, the merged label.
   const chase = round.mode === 'practice' ? chasing(round.courseSlug) : null
+  const seasonChase = round.mode === 'practice' ? chasingSeason(round.courseSlug, seasonForDate().key) : null
+  const sameTheft =
+    !!chase &&
+    !!seasonChase &&
+    chase.by.toLowerCase() === seasonChase.by.toLowerCase() &&
+    chase.theirToPar === seasonChase.theirToPar
+  // each chase chip stands down when its target is already on screen: the
+  // record round the ghost itself is racing, or (for the season chip) merged
+  // into the all-time chip's combined label
+  const alltimeChipShown = !!chase && (!ghost || ghost.kind === 'personal' || ghost.board === 'season')
+  const seasonChipRedundant =
+    !seasonChase ||
+    (sameTheft && alltimeChipShown) ||
+    (ghost?.kind === 'record' && ghost.board === 'season')
 
   // A Fortune shares the day streak, but the daily in progress isn't in
   // `history` until it's signed (recordResult), so counting from history alone
@@ -806,7 +843,7 @@ export default function App() {
           230px chip inside it squeezed the par/course text to ~11px — "Par 4 ·
           SI 8" wrapped and the course name clipped to its first letter on
           every ghost round. Visually this is where the chips already sat. */}
-      {(ghost || chase) && (
+      {(ghost || chase || seasonChase) && (
         <div className="ghost-chip-row">
           {ghost &&
             (() => {
@@ -823,8 +860,16 @@ export default function App() {
           {/* the stolen record stays on the wall unless the ghost IS that record —
               a personal-best fallback ghost races "your best", so the real target
               (holder + score) must stay visible for a "win it back" attempt */}
-          {chase && (!ghost || ghost.kind === 'personal') && (
-            <div className="chase-chip">🎯 Record {toParLabel(chase.theirToPar)} · {chase.by}</div>
+          {alltimeChipShown && chase && (
+            <div className="chase-chip">
+              🎯 {sameTheft ? 'All-time + season record' : 'All-time record'} {toParLabel(chase.theirToPar)} ·{' '}
+              {chase.by}
+            </div>
+          )}
+          {seasonChase && !seasonChipRedundant && (
+            <div className="chase-chip season">
+              🎯 Season record {toParLabel(seasonChase.theirToPar)} · {seasonChase.by}
+            </div>
           )}
         </div>
       )}

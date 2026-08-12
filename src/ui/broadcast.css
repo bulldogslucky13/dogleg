@@ -388,6 +388,15 @@
   color: var(--text-mid);
 }
 
+/* the crown keeps the broadcast theme's record gold on EVERY dark surface —
+   the span-qualified selectors outrank the `… span` text rules that would
+   otherwise wash it to the row's muted ink (course rows on home, round rows
+   in the Clubhouse, the wrap's record banner) */
+:is(.screen.home, .screen.rounds, .screen.result) .rec-crown,
+:is(.screen.home, .screen.rounds, .screen.result) :is(.course-row, .round-row-text, .record-banner) span.rec-crown {
+  color: var(--record-gold);
+}
+
 .screen.home .course-cr.open {
   color: var(--success);
 }
@@ -418,6 +427,17 @@
 }
 
 .screen.home .steal-card .kicker {
+  color: var(--record-gold);
+}
+
+.screen.home .steal-tag.alltime,
+.screen.home .steal-tag.both {
+  background: var(--record-gold);
+  color: var(--turf-950);
+}
+
+.screen.home .steal-tag.season {
+  border-color: var(--record-gold);
   color: var(--record-gold);
 }
 
@@ -612,6 +632,132 @@
 .screen.rounds .sync-cta,
 .screen.home .sync-cta,
 .screen.result .sync-cta,
+/* ---- HOW TO PLAY, reskinned: the last paper leftover joins the broadcast.
+   Scoped to .tut-card.howto so the filter sheet and the other card riders
+   keep their own treatments. EVERY color is explicit — this card renders
+   outside the .screen scopes, where inherited paper ink vanishes on dark
+   (the podium/splash trap, closed here the same way). ---- */
+
+.tut-card.howto {
+  background: var(--bg-panel);
+  border: 1px solid var(--edge-strong);
+  border-top: 4px solid var(--trophy-400);
+  color: var(--text-hi);
+}
+
+.tut-card.howto .kicker {
+  color: var(--trophy-400);
+}
+
+/* The walkthrough card is ONE SIZE across all nine steps — sized to the
+   tallest (the rough legend), dead space accepted on the short ones. A card
+   that reflows every tap makes the buttons jump under the thumb; this keeps
+   Next exactly where the thumb left it. The dots take the slack, pinning
+   the controls to the bottom. Viewport-capped so short phones still scroll
+   inside the card instead of clipping. (Scoped to the tour: the single-page
+   Fortunes popup doesn't paginate, so it stays content-sized.) */
+.tut-card.howto-tour {
+  min-height: min(560px, calc(100dvh - 36px));
+}
+
+.tut-card.howto-tour .tut-dots {
+  margin-top: auto;
+}
+
+.tut-card.howto .tut-title {
+  color: var(--text-hi);
+  font-family: var(--font-display);
+  font-variation-settings: 'wdth' var(--wdth-tower);
+  text-transform: uppercase;
+  letter-spacing: var(--track-tower);
+  font-size: 1.15rem;
+}
+
+.tut-card.howto .tut-body {
+  color: var(--text-mid);
+}
+
+.tut-card.howto .tut-body b {
+  color: var(--text-hi);
+}
+
+.tut-card.howto .tut-skip {
+  color: var(--text-mid);
+}
+
+.tut-card.howto .tut-dots span {
+  background: var(--edge-strong);
+}
+
+.tut-card.howto .tut-dots span.on {
+  background: var(--trophy-400);
+}
+
+.tut-card.howto .tut-players em {
+  color: var(--text-hi);
+}
+
+.tut-card.howto .tut-players small {
+  color: var(--text-mid);
+}
+
+/* the fake scorecard on the share step: the real wrap's cream card in
+   miniature, so the first thing a new player pictures is the group chat */
+.tut-card.howto .howto-share-demo {
+  display: block;
+  margin: 10px auto 0;
+  max-width: 260px;
+  font-size: 0.78rem;
+  line-height: 1.5;
+  padding: 10px 12px;
+}
+
+/* the hero: the mark, then the tagline as three staggered broadcast lines */
+.tut-card.howto .howto-mark {
+  display: block;
+  width: 110px;
+  height: auto;
+  margin: 2px auto 10px;
+  color: var(--text-hi);
+}
+
+.tut-card.howto.howto-hero .tut-title {
+  text-align: center;
+  font-size: 0.85rem;
+  letter-spacing: 0.14em;
+  color: var(--text-mid);
+}
+
+.tagline-lockup {
+  display: grid;
+  gap: 2px;
+  margin: 6px 0 4px;
+  text-align: center;
+}
+
+.tut-card.howto .tagline-lockup span {
+  font-family: var(--font-display);
+  font-variation-settings: 'wdth' var(--wdth-tower);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: var(--track-tower);
+  font-size: 1.5rem;
+  line-height: 1.15;
+  color: var(--text-hi);
+}
+
+/* the middle move is the game's soul — it wears the gold */
+.tut-card.howto .tagline-lockup span:nth-child(2) {
+  color: var(--trophy-400);
+}
+
+.tut-card.howto .howto-lede {
+  display: block;
+  text-align: center;
+  margin-top: 8px;
+  color: var(--text-mid);
+}
+
 .tut-card .sync-cta {
   background: var(--bg-card);
   border-color: var(--edge-strong);
@@ -843,6 +989,10 @@
 
 .tut-card.changelog .changelog-tag.feature {
   color: var(--tracer-400);
+}
+
+.tut-card.changelog .changelog-tag.design {
+  color: var(--trophy-400);
 }
 
 .tut-card.changelog .changelog-tag.fix {

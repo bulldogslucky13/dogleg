@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#12251a" />
+    <!-- CANONICAL, NOT NOINDEX. A domain move normally passes its search
+         standing on with a 301, which this page cannot be: it has to run JS to
+         pack localStorage, and a 301 would carry the player nowhere with their
+         clubhouse. Player data beat SEO, correctly — but the fallback for
+         "cannot 301" is a canonical, which consolidates this URL's signals
+         into the new domain. `noindex` did the opposite: it removed the old
+         address from the index and threw those signals away rather than
+         forwarding them. The two are contradictory signals and must not be
+         combined, so the canonical replaces it outright. Anyone who does land
+         here from a stale result is forwarded on arrival anyway. -->
+    <link rel="canonical" href="https://playdogleg.com/" />
+    <title>DogLeg has moved — playdogleg.com</title>
+
+    <!--
+      THE OLD DOMAIN'S ONLY PAGE.
+
+      DogLeg now lives at playdogleg.com. localStorage is per-origin, so a
+      player's clubhouse — name, streak, round archive, and the player id the
+      daily dice are salted from — does not follow them across on its own.
+      This page carries it: it packs every `dogleg:` key on THIS origin into a
+      URL fragment and bounces the browser to the new domain, where
+      src/lib/handoff.ts unpacks it and strips the fragment.
+
+      Deliberately standalone: no build step, no imports, no framework. It has
+      to run on a host that serves nothing but this file, long after the app
+      that wrote the data stopped being deployed here. Keep it that way.
+
+      THE WIRE FORMAT IS SHARED WITH src/lib/handoff.ts. `z.` is gzip +
+      base64url, `p.` is base64url of the same JSON when CompressionStream is
+      missing; the body is {"v":1,"keys":{…}}. src/lib/handoff.test.ts pins
+      both directions — change one side and that suite tells you.
+
+      TO DEPLOY: serve this file as the root of whatever now answers for the
+      old domain (its DNS already points at GitHub Pages, so a second repo with
+      Pages enabled and the domain claimed is the shortest path — this repo has
+      to release the domain in Settings → Pages first). See README.
+    -->
+
+    <style>
+      :root { color-scheme: dark; }
+      html, body { margin: 0; height: 100%; }
+      body {
+        background: #12251a;
+        color: #f8f3e4;
+        font-family: 'Barlow', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        display: flex; align-items: center; justify-content: center;
+        padding: 24px; box-sizing: border-box; text-align: center;
+      }
+      .card { max-width: 30rem; }
+      h1 {
+        font-family: 'Archivo', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+        font-size: clamp(1.75rem, 7vw, 2.5rem); font-weight: 700;
+        margin: 0 0 0.5rem; letter-spacing: -0.01em;
+      }
+      .kicker {
+        font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.16em;
+        text-transform: uppercase; color: #c4ac72; margin: 0 0 1rem;
+      }
+      p { line-height: 1.55; color: #cfd8c9; margin: 0 0 1.25rem; }
+      a.cta {
+        display: inline-block; background: #d94a32; color: #fff;
+        text-decoration: none; font-weight: 600; padding: 0.75rem 1.5rem;
+        border-radius: 999px;
+      }
+      .fine { font-size: 0.8125rem; color: #869080; margin-top: 1.25rem; }
+      .fine a { color: #7cc36e; }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <p class="kicker">Daily golf strategy</p>
+      <h1>DogLeg has moved</h1>
+      <p id="status">Taking your clubhouse with you&hellip;</p>
+      <a class="cta" id="go" href="https://playdogleg.com/">Continue to playdogleg.com</a>
+      <p class="fine">
+        Update your bookmark to <a href="https://playdogleg.com/">playdogleg.com</a>.
+      </p>
+    </div>
+
+    <script>
+      ;(function () {
+        var NEW_SITE = 'https://playdogleg.com/'
+        var PREFIX = 'dogleg:'
+        // The Break Par-era prefix. The app migrates these keys on read, but
+        // THIS PAGE now serves in the app's place, so that migration will never
+        // run here again — a player whose last visit predates it holds their
+        // whole history under bp:history:v1 and would otherwise hand over
+        // nothing. Collected as-is; src/lib/handoff.ts renames them on arrival.
+        var LEGACY_PREFIX = 'bp:'
+        // Tells the new origin a sign-in existed here, so it can explain the
+        // one thing this page cannot carry. See src/lib/handoff.ts.
+        var RELINK_KEY = 'dogleg:handoff-relink:v1'
+        var status = document.getElementById('status')
+        var go = document.getElementById('go')
+
+        function toBase64Url(bytes) {
+          var s = ''
+          var CHUNK = 0x8000
+          for (var i = 0; i < bytes.length; i += CHUNK) {
+            s += String.fromCharCode.apply(null, bytes.subarray(i, i + CHUNK))
+          }
+          return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+        }
+
+        // no Blob/Response: this has to work in whatever old browser opened
+        // the bookmark, and the stream plumbing is the widely supported part
+        function through(bytes, ts) {
+          var writer = ts.writable.getWriter()
+          // rejects on both ends for bad input; the read side is the one we
+          // return, so keep the write side's twin rejection from floating
+          writer
+            .write(bytes)
+            .then(function () {
+              return writer.close()
+            })
+            ['catch'](function () {})
+          var reader = ts.readable.getReader()
+          var chunks = []
+          var total = 0
+          function pump() {
+            return reader.read().then(function (r) {
+              if (r.done) {
+                var out = new Uint8Array(total)
+                var at = 0
+                for (var i = 0; i < chunks.length; i++) {
+                  out.set(chunks[i], at)
+                  at += chunks[i].length
+                }
+                return out
+              }
+              if (r.value) {
+                chunks.push(r.value)
+                total += r.value.length
+              }
+              return pump()
+            })
+          }
+          return pump()
+        }
+
+        function collect() {
+          var keys = {}
+          var hadSession = false
+          try {
+            for (var i = 0; i < localStorage.length; i++) {
+              var k = localStorage.key(i)
+              if (!k) continue
+              // The Supabase email session. NEVER carried — it is a refresh
+              // token, and a URL fragment is the wrong place for one. But a
+              // player who had it lands signed out on the new domain with no
+              // explanation, which reads as the migration having lost
+              // something. So note only THAT it existed, never its value.
+              if (/^sb-.+-auth-token$/.test(k)) {
+                hadSession = true
+                continue
+              }
+              if (k.indexOf(PREFIX) !== 0 && k.indexOf(LEGACY_PREFIX) !== 0) continue
+              var v = localStorage.getItem(k)
+              if (v !== null) keys[k] = v
+            }
+            if (hadSession) keys[RELINK_KEY] = '1'
+          } catch (e) {
+            // private mode is the expected case and is silent; anything else
+            // (a patched localStorage, a future browser quirk) at least
+            // leaves a trace, since this page has no other way to be watched
+            if (!(e && (e.name === 'SecurityError' || e.name === 'QuotaExceededError'))) {
+              try {
+                console.error('handoff: storage sweep failed', e)
+              } catch (e2) {
+                /* no console either — truly nothing left to do */
+              }
+            }
+          }
+          return Object.keys(keys).length ? keys : null
+        }
+
+        function pack() {
+          var keys = collect()
+          // never played here (or storage is blocked): send them on clean
+          if (!keys) return Promise.resolve(null)
+          var bytes = new TextEncoder().encode(JSON.stringify({ v: 1, keys: keys }))
+          if (typeof CompressionStream === 'undefined') {
+            return Promise.resolve('p.' + toBase64Url(bytes))
+          }
+          return through(bytes, new CompressionStream('gzip')).then(function (gz) {
+            return 'z.' + toBase64Url(gz)
+          })
+        }
+
+        function leave(payload) {
+          var url = payload ? NEW_SITE + '#handoff=' + payload : NEW_SITE
+          go.setAttribute('href', url)
+          status.textContent = payload
+            ? 'Your clubhouse is packed. Sending you over…'
+            : 'Sending you over…'
+          // replace, not assign: Back should not bounce them into this page again
+          location.replace(url)
+        }
+
+        // A failure here must still deliver the player to the new site — losing
+        // a streak is bad, losing the game is worse. First of {pack settles,
+        // 6s ceiling} wins; gzip of even a heavy archive is native-code-fast
+        // (single-digit milliseconds), so 6s is a last-resort ceiling against
+        // an anomalous browser, not a real budget — it should never be felt.
+        var timedOut = new Promise(function (resolve) {
+          setTimeout(function () {
+            resolve(null)
+          }, 6000)
+        })
+        Promise.race([pack()['catch'](function () { return null }), timedOut]).then(leave)
+      })()
+    </script>
+  </body>
+</html>

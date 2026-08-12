@@ -50,7 +50,16 @@ deliberate exceptions, neither of which is ever logged**:
   what the game did nor what it told you.
 
 Both are spelled out in the note at the top of `changelog.ts`, which is the
-source of truth for this policy. Payloads without
+source of truth for this policy. **The rule is enforced by CI**: the
+change-log gate (`.github/workflows/changelog-check.yml`, policy + tests in
+`scripts/changelog-check.mjs`) fails any PR that neither updates
+`changelog.ts` nor is exempt. Exemptions, by PR label: `course` (course work —
+also auto-detected when a diff touches only course-import paths, so routine
+imports need no label at all) and `no-changelog` (the deliberate skip for
+everything the policy exempts: cosmetic work, refactors, CI, docs). **To log
+course work you DO want players to see**: add `changelog-include` alongside
+`course` and write the entry. Entry kinds: `odds` | `feature` | `fix` |
+`design`. Payloads without
 a version (pre-handshake clients) still replay as before. Preventively, the
 build also emits `version.json` beside the bundle (vite.config.ts) and the
 home screen fetches it no-store (`src/lib/freshness.ts`) — a mismatch shows a
@@ -69,6 +78,15 @@ safe: **every statement in schema.sql must be idempotent** (create ... if not
 exists, create or replace, drop policy if exists then create). Never add a
 bare `create table`/`create policy`/data migration that would error or
 double-apply on re-run.
+
+**Data backfills go in `supabase/catch-up-records.sql`, not `schema.sql`** —
+applied by the same workflow but AFTER the functions deploy, and rerunnable
+rather than marker-gated. Both properties are the same lesson: a backfill that
+writes a column only the NEW referee understands must not run while the old
+one is still live (it would leave rows the old referee then corrupts), and a
+one-shot would snapshot past anything posted during the deploy. Schema keeps
+the opposite order for the opposite reason — no function may ship ahead of a
+table or column it writes to.
 
 **Conditions are versioned.** Replay links, archived rounds, and course-record
 ghosts persist only a seed + decisions; conditions re-derive from the seed on
@@ -93,13 +111,49 @@ you could grind). Destiny (forced holeout at the guarantee threshold) is deliber
 resolved OUTSIDE the displayed odds — the game's one sanctioned exception to
 "the odds never lie", chosen for surprise. Don't add more exceptions.
 
+**The old domain hands players over.** `localStorage` is per-origin, so the
+move to playdogleg.com would otherwise strand every clubhouse — including the
+player id the daily dice are salted from. `handoff/index.html` is the one page
+the OLD domain still serves: it packs every `dogleg:` key into a URL fragment
+and bounces to the new site, where `src/lib/handoff.ts` merges it and strips
+the fragment (in `main.tsx`, before React mounts, so `ensureIdentity` can't
+mint a competing id first). The two halves live on different domains and can
+never share a bundle, so `handoff.test.ts` runs the real script out of the
+real HTML file against the real unpacker — **if you touch the wire format,
+change both sides**. New persistence keys need no change: the sweep is by
+`dogleg:` prefix, not a hand-listed set.
+
+**The email session is the one thing deliberately left behind.** supabase-js
+keeps it at `sb-<ref>-auth-token`, outside the `dogleg:` namespace, so the
+sweep never sees it — and that is the intended outcome, not a gap: it is a
+REFRESH token, and a URL fragment is an acceptable place for the player secret
+(post scores as that clubhouse) and not for one that buys ongoing account
+access. So a linked player arrives with everything except the sign-in, which
+unexplained reads as the move having eaten their account. The old page
+therefore ships a flag — `dogleg:handoff-relink:v1`, a boolean, never the
+credential — and `AccountPanel` turns it into one sentence and clears it.
+Signing back in reconciles rather than duplicates: the account's linked player
+row is the same id the handoff carried, so `link-account` returns `linked` and
+the daily dice keep their salt.
+
 Cross-device sync is optional email magic links (Supabase Auth): the
 `link-account` function ties `auth.users` to a player row (`players.user_id`);
 `src/lib/auth.ts` + `src/ui/AccountPanel.tsx` handle send/reconcile/adopt.
 Auth redirect URLs are configured for the prod domain and localhost:5173.
 Mail goes out through Resend — the edge function POSTs its API directly, and
 Supabase Auth is pointed at `smtp.resend.com` (sender `DogLeg Team
-<team@dogleg.cameronbristol.xyz>`, configured in the dashboard).
+<team@playdogleg.com>`, configured in the dashboard).
+
+**Mail also comes IN through Resend**: the domain has receiving enabled, and a
+Resend webhook (event `email.received`) POSTs to the `receive-email` edge
+function. The webhook carries metadata only, so the function fetches the full
+message from Resend's Received Emails API (same `RESEND_API_KEY`) and upserts
+it into `received_emails` (RLS on, no policies — service-role only; inbound
+mail is private correspondence, not board data). Auth is the svix signature
+(`RESEND_WEBHOOK_SECRET` function secret, verifier in `_shared/svix.ts`,
+tested by `svix.test.ts`), not a JWT — `verify_jwt` is off in config.toml and
+the function fails closed without the secret. Delivery is at-least-once; the
+upsert on `email_id` is what makes retries safe.
 
 **Every email we send renders through one chassis**, `supabase/functions/
 _shared/email-chassis.ts` — the broadcast card, with theme.css's tokens
@@ -176,6 +230,30 @@ one exception — they are square badge/app-icon lockups rather than the wordmar
 so they are exported from the design tool's own files (which live outside this
 repo, with the designer) rather than generated here. Ask for fresh exports when
 the mark changes; there is no `pnpm` command for them.
+
+## Marketing pages, SEO and Pinterest are generated too
+
+The app is a single-URL SPA, so every crawlable surface is prerendered by
+`scripts/lib/pages.tsx` (builders) + `scripts/pages-entry.tsx` (writer),
+bundled by `vite.pages.config.ts` because the builders render real app
+components (HoleMap, Wordmark) — same pattern as `build:validator`. `pnpm
+gen:pages` rides `pnpm build`, so `/courses/<slug>/` (one guide per course in
+ALL_COURSES, signature-hole map included), `/courses/`, `/how-to-play/`,
+`/changelog/`, `sitemap.xml`, `robots.txt` and `404.html` can never go stale —
+a new course gets its page and sitemap line with no wiring. `scripts/
+pages.test.ts` guards the metadata, the Pinterest domain-claim tag
+(`p:domain_verify`, also in index.html — keep the two in step), and that no
+odds internals leak (pages show CourseSpec + Play Rating only, never
+`difficulty`).
+
+The per-course Pinterest cards (2:3, 1000x1500) are rasterised by `pnpm
+gen:pin-images` into `dist/pins/` **in the deploy workflow only** (they need
+the runner's Chrome; PR CI builds pages without a browser). Course pages use
+them as `og:image` with a `?v=` cache-bust (`PIN_IMG_VERSION` in pages.tsx) —
+bump it when the card design changes, same contract as og.png. The Pinterest
+conversion tag (src/lib/analytics.ts) is dormant until the
+`VITE_PINTEREST_TAG_ID` repo variable is set; like PostHog, it never loads in
+tests.
 
 ## Commands
 

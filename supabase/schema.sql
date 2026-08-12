@@ -112,6 +112,13 @@ create table if not exists course_records (
 alter table course_records add column if not exists seed text;
 alter table course_records add column if not exists decisions jsonb;
 
+-- Which mode set the record. Daily-set records are the harder feat — one
+-- attempt, fixed conditions — and the UI crowns them for it. The default is
+-- historically accurate: every record set before dailies counted (2026-08)
+-- came from unlimited play, by the very bug the backfill below repairs.
+-- (season_records gets the same column after its create, below.)
+alter table course_records add column if not exists mode text not null default 'practice';
+
 -- SEASON course records: one holder per (scope, season, course). Seasons
 -- follow the fixed ET calendar in src/engine/season.ts; the referee stamps
 -- season_key at submission time, which is what makes rollover need no cron
@@ -138,17 +145,41 @@ alter table season_records enable row level security;
 drop policy if exists "anyone can read season records" on season_records;
 create policy "anyone can read season records" on season_records for select using (true);
 
+-- which mode set the record — see the note at course_records' matching column
+alter table season_records add column if not exists mode text not null default 'practice';
+
 -- One row per record-steal email actually attempted, keyed by day. The row is
 -- inserted BEFORE the send, so a duplicate key means "already emailed today"
 -- and the send is skipped. At-most-once beats at-least-once here: a lost
 -- email on a crashed send is fine, a double email is not.
+-- one row per steal email sent: the at-most-once dedupe ledger. `scope`
+-- separates the two boards ('alltime' course records vs 'season' records) —
+-- one round can legitimately trigger both mails to the same holder on the
+-- same course and day, and neither may burn the other's slot.
 create table if not exists record_steal_emails (
+  scope text not null default 'alltime',
   course_slug text not null,
   player_id uuid not null references players (id),
   date_key text not null,
   sent_at timestamptz not null default now(),
-  primary key (course_slug, player_id, date_key)
+  primary key (scope, course_slug, player_id, date_key)
 );
+
+-- migrate databases created before scope existed (idempotent: the alter
+-- no-ops once the column exists, and the do-block only rebuilds the primary
+-- key while scope is still missing from it)
+alter table record_steal_emails add column if not exists scope text not null default 'alltime';
+do $$ begin
+  if not exists (
+    select from information_schema.key_column_usage
+    where table_name = 'record_steal_emails'
+      and constraint_name = 'record_steal_emails_pkey'
+      and column_name = 'scope'
+  ) then
+    alter table record_steal_emails drop constraint record_steal_emails_pkey;
+    alter table record_steal_emails add primary key (scope, course_slug, player_id, date_key);
+  end if;
+end $$;
 
 alter table players enable row level security;
 alter table daily_scores enable row level security;
@@ -259,3 +290,39 @@ grant execute on function bump_choice_tallies(text, text, text, smallint[], text
 create extension if not exists pg_cron;
 select cron.schedule('prune-choice-tallies', '17 8 * * *',
   $$delete from public.daily_choice_tallies where date_key < to_char((now() at time zone 'utc')::date - 2, 'YYYY-MM-DD')$$);
+
+-- Inbound mail. Resend receives everything addressed to @playdogleg.com and
+-- webhooks the receive-email function, which verifies the svix signature,
+-- fetches the full message back from Resend's Received Emails API, and lands
+-- it here. Keyed on Resend's own email id because webhook delivery is
+-- at-least-once — the function upserts, so a redelivery updates in place
+-- instead of duplicating.
+create table if not exists received_emails (
+  email_id text primary key,
+  message_id text,
+  from_address text,
+  to_addresses text[] not null default '{}',
+  cc_addresses text[] not null default '{}',
+  subject text,
+  text_body text,
+  html_body text,
+  attachments jsonb not null default '[]'::jsonb, -- metadata only; files stay on Resend
+  received_at timestamptz,
+  created_at timestamptz not null default now()
+);
+
+-- RLS on, and deliberately NO policies: inbound mail is other people's
+-- private correspondence, not public reading material like the boards. Only
+-- the service role (the receive-email function, or an operator in the
+-- dashboard) can touch it.
+alter table received_emails enable row level security;
+
+-- ============================================================================
+-- The records catch-up pass (daily rounds joining the record boards) used to
+-- live here. It now lives in supabase/catch-up-records.sql and is applied by
+-- the deploy workflow AFTER the edge functions deploy: it is the only writer
+-- that stamps mode = 'daily', and stamping while an older referee is still
+-- live would let a practice round inherit a daily crown permanently. Its own
+-- header carries the full reasoning. Everything above must keep running
+-- BEFORE the functions, for the opposite reason — no function may ship ahead
+-- of a table or column it writes to.

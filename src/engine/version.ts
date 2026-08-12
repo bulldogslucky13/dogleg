@@ -307,8 +307,107 @@
 // 0.0469 -> 0.0191. No threshold was moved.
 // Play Ratings regenerated LAST, after every odds change: 22 of 53 courses
 // shift, every one by exactly one point (16 down, 6 up).
-// v19 — Bellerive Country Club imported (OSM_GEOMETRY 'bellerive:*', all 18
+// v19 = FIVE courses, the next real dailies, imported in one PR and sharing
+// one bump — none has shipped, so a generation per course would buy nothing,
+// the call made for v5, v8, v10, v16 and v17.
+//
+// ERIN HILLS real geometry (OSM way 172725497) plus that card's stroke
+// index, which disagreed with the shipped tuple on 15 of 18 holes — and SI
+// feeds pressure() in the odds, so the card half changes replays as much as the
+// geometry does. The yardages move too (7513 -> the card's 7772), matching no
+// published tee set before.
+// The card is the CLUB'S OWN scorecard PDF, read out of the file rather than
+// taken from an aggregator, because Erin Hills is a course whose third-party
+// cards are stale in both directions: the widely-quoted 7800 one is the
+// 2017 U.S. Open-era card, and the club has since shortened 1/3/11/17 and
+// lengthened the 16th from 183 to 247. That history IS the shift story — OSM
+// traced the pre-shortening pads, so seven holes trim and two prepend.
+// Two hand-fixes, both documented at the block in geometry.ts: 7's `cross` is
+// a pair of touching pots spanning 12 yd of a hundred-yard corridor (re-sided
+// right), and 13's is a pond 20 yd off the RIGHT that the coarse line clips by
+// 4 yd — left in, it would have made the card's easiest hole a forced water
+// carry. 12 and 17 import bare and imagery says that is honest.
+// WINGED FOOT WEST real geometry (OSM way 122734591), and the sharpest
+// "which configuration is this card" case in the registry. BlueGolf carries
+// Winged Foot only as the members' par-72 course; the game ships the par-70
+// 2006 U.S. Open setup, which the shipped tuple matches on par and 14 of 18
+// yardages. Par is untouched, four yardages move to the championship card, and
+// the stroke index moves on 17 of 18 to the CLUB's — SI feeds pressure() in the
+// odds, and no USGA card publishes one. OSM's own `par` tags agree with neither
+// configuration in full (9 members', 16 championship), which is why they
+// corroborate and never arbitrate.
+// The trims fall straight out of the split: OSM traced the members' pads (its
+// lengths track that card to ~3 yd a hole), so the holes the championship moved
+// forward come off the front — 9 by 56, the yardage that turned a 572-yd par 5
+// into a 514-yd par 4. One hand-fix: 12's 4-yd tee-chute `cross`.
+//
+// NATIONAL GOLF LINKS OF AMERICA real geometry (OSM way 28989103) — pure
+// geometry, the cleanest import in the registry: the shipped tuple already
+// matched the tips card on par, SI AND yardage for all 18, and fourteen holes
+// land within 7 yd of it raw. Three hand-fixes: the 6th's greenside sand moat
+// read as a carry INTO its own green, and 13 and 14 are real water carries
+// whose fairwayFrom sat inside the water.
+//
+// THE COUNTRY CLUB (Brookline) real geometry (OSM way 29870415, the Main
+// eighteen) — also pure geometry, its tuple matching the club's BLACK card on
+// par, SI and yardage for all 18. Its shifts are the largest in the registry
+// and go both ways, because the mapper picked from 72 tee pads: the 2nd is
+// trimmed 65 (BLACK plays it 220 as a par 3 where every shorter set plays ~288
+// as a par 4) and the 15th 77 (OSM and ProVisualizer both traced the
+// championship pad the 2022 U.S. Open used). Two greenside rings read as
+// carries into their own greens, dropped.
+//
+// v19 ALSO carries three importer changes that alter what FUTURE imports
+// produce (committed geometry is static data and untouched):
+//  - MULTIPOLYGON RINGS ARE STITCHED AND THEIR INNERS HONOURED. Two halves of
+//    one bug. Only outer members were read, so the land an inner ring punches
+//    out of a feature counted as part of it; and each member way was treated as
+//    a complete ring, when a ring is routinely SPLIT across several members
+//    (six of NGLA's arrive that way, 27 of Whispering Pines'). The second half
+//    is the worse one, because point-in-polygon closes whatever it is given
+//    with an artificial last-to-first edge: half a lake becomes a lake bounded
+//    by a straight line through open water. Whispering Pines sits on a
+//    peninsula inside "Lake Livingston" (relation/976304), whose outer arrives
+//    as 26 fragments — read separately they swallowed the property and every
+//    hole imported as a full-width water carry tee to green. Stitched into the
+//    one ring it actually is, all 18 mid-hole points test dry.
+//    The proximity filter that decides whether a polygon is near enough to
+//    matter now scans inner boundaries too: for a hole played along an island
+//    or a peninsula the water's edge IS the inner ring, and scanning only the
+//    outer dropped the polygon before its holes could be used.
+//  - `osmAreaId` pins the golf_course polygon by id, for a course OSM has
+//    mapped but never NAMED — where the anchored-name match has nothing to
+//    bite on and nearest-polygon would be the guess step 0 forbids.
+//  - an `osmHoleWays` id pin is now checked against every golf=hole way rather
+//    than only those already carrying the right `ref`. An id names one specific
+//    way, which is stronger evidence than a ref tag, and it is the only way to
+//    import a hole OSM simply forgot to number.
+// WHISPERING PINES real geometry (OSM way 1472122122) — pure geometry, its
+// tuple already matching the club's Spirit card on par, SI and yardage for all
+// 18, so courses.ts gains only a junkLabel ('pines': OSM has no wood polygon
+// anywhere on a course named for its forest, so it imports treeless and the
+// junk floor had nothing to name).
+// This is the course the ring-stitching fix below was found on, and it does
+// not ship without it: read as 26 separate rings, Lake Livingston swallowed
+// the property and all 18 holes imported as a full-width water carry tee to
+// green. Stitched, the peninsula falls outside and the lake behaves — which
+// matters because five of the six holes the card flags as water get it from
+// that relation, including the 16th, whose signature promises "a 250-yard iron
+// over the water — nowhere to bail" and which now imports `water 118-222
+// cross` against a green starting at 222.
+// Every hole imports SHORT off forward pads and is prepended to the card. Six
+// hand-fixes: four crossings clipped to the green front (they carry TO those
+// greens rather than over them, so clipped rather than dropped), three
+// fairwayFroms moved past the water they sat inside, and a 10-yd tee chute on
+// the 18th.
+// Play Ratings regenerated LAST: only the five imported courses move. Four
+// change their integer rating — Erin Hills 5 -> 6, National Golf Links 5 -> 4,
+// The Country Club 7 -> 6, Whispering Pines 6 -> 8 — and Winged Foot holds at
+// 8. Whispering Pines moving two points is the water arriving: procedural
+// geometry had it as a pleasant tree-lined course, and the real thing carries
+// water on ten of eighteen holes.
+// v20 = Bellerive Country Club imported (OSM_GEOMETRY 'bellerive:*', all 18
 // holes, BlueGolf BLACK card): real geometry for the DogLeg Cup's opening
 // exhibition venue changes what its seeds replay into. Per-course work, so no
 // changelog entry (see changelog.ts's note).
-export const ENGINE_VERSION = 19
+export const ENGINE_VERSION = 20

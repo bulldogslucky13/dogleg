@@ -33,6 +33,10 @@ export type Rough = 'normal' | 'penal' | 'severe'
  * cosmetic only, never touches odds/geometry/seed replay. */
 export type Landmark = 'lighthouse' | 'bridge' | 'billboard'
 
+/** The character of the ground the map INVENTS beside the corridor. Cosmetic
+ * only — see `CourseSpec.scenery`. Absent = parkland (groves). */
+export type Scenery = 'links'
+
 export interface HoleSpec {
   number: number
   par: 3 | 4 | 5
@@ -90,6 +94,19 @@ export interface CourseSpec {
    * never read by the odds, never in replay, so it needs no version bump.
    */
   junkLabel?: string
+  /**
+   * What the ground BESIDE the corridor looks like, for the map's invented
+   * scenery only. The map fills the empty margin with decorative groves; on a
+   * links there is nothing out there but dune and marram, so a St Andrews card
+   * came back looking like a parkland course.
+   *
+   * `'links'` swaps those groves for dune tufts. It does NOT touch anything
+   * drawn from real data: an imported `trees` zone is still trees, because the
+   * importer found trees there (Bandon has pines behind a few holes). This
+   * gates the fabrication, not the truth. Pure scenery — never read by the
+   * odds, never in replay, so it needs no version bump.
+   */
+  scenery?: Scenery
   blurb: string
   holes: HoleSpec[]
   /** true = a par-3 short course: unlimited play only, never in the daily
@@ -212,6 +229,9 @@ export interface HoleLayout {
    * the copy never has to look either up. See `CourseSpec.junkLabel`. Copy
    * only, never read by the odds. */
   junkLabel?: string
+  /** the course's scenery, copied down by `buildLayout` so the map never has
+   * to look a course up. Map decoration only — see `CourseSpec.scenery`. */
+  scenery?: Scenery
 }
 
 // ---------- Ball / stage state ----------

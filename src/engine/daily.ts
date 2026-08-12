@@ -293,10 +293,11 @@ export function toParLabel(toPar: number): string {
   return toPar === 0 ? 'E' : toPar > 0 ? `+${toPar}` : `${toPar}`
 }
 
-/** Shown in share text — update when the final domain is decided. */
-export const SITE_URL = 'dogleg.cameronbristol.xyz'
+/** Canonical host, bare (no scheme) — it reads as an address in share text.
+ *  Callers that need a link build `https://${SITE_URL}`. */
+export const SITE_URL = 'playdogleg.com'
 
-/** Share card in the classic Break Par format, with the character in the rank line's slot. */
+/** Share card in the classic square-grid format, with the character in the rank line's slot. */
 /** "12-day streak", or nothing at all: a 0 or 1 day streak isn't a brag. */
 export function streakTag(streak?: number): string {
   return streak && streak >= 2 ? ` · ${streak}-day streak` : ''

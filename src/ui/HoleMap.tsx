@@ -449,6 +449,33 @@ function Tree({ x, y, s, tone = 0 }: { x: number; y: number; s: number; tone?: n
   )
 }
 
+/**
+ * One dune tuft: marram grass on a pale hummock. The links stand-in for
+ * `Tree` in the map's decorative margin — same signature, so the scenery swaps
+ * without anything else moving. See `CourseSpec.scenery`.
+ */
+function DuneTuft({ x, y, s, tone = 0 }: { x: number; y: number; s: number; tone?: number }) {
+  const sand = tone === 0 ? '#b0a37e' : '#a09372'
+  const grass = tone === 0 ? '#7c8a4e' : '#6c7a45'
+  const blades = [-0.55, -0.22, 0.1, 0.42]
+  return (
+    <g>
+      <ellipse cx={x} cy={y + s * 0.35} rx={s * 1.05} ry={s * 0.36} fill={sand} opacity={0.5} />
+      {blades.map((b, i) => (
+        <path
+          key={i}
+          d={`M${x + b * s * 0.6},${y + s * 0.3} Q${x + b * s},${y - s * 0.25} ${x + b * s * 1.6 + (i % 2 ? s * 0.25 : -s * 0.25)},${y - s * 0.85}`}
+          stroke={grass}
+          strokeWidth={Math.max(0.7, s * 0.16)}
+          strokeLinecap="round"
+          fill="none"
+          opacity={0.9}
+        />
+      ))}
+    </g>
+  )
+}
+
 /** clamp a yard-based size into a readable on-screen range */
 const clampPx = (px: number, min: number, max: number) => Math.max(min, Math.min(max, px))
 
@@ -721,6 +748,10 @@ export function HoleMap(props: {
   const vFrom = view[0]
   const places = useMemo(() => placeZones(layout, geo), [layout, geo])
   const treeSize = (base: number) => clampPx(base * uPerYd, 7, 22)
+  // Links: the margin is dune and marram, not woodland. Scenery only — real
+  // imported `trees` zones still draw as trees. See `CourseSpec.scenery`.
+  const links = layout.scenery === 'links'
+  const tuftSize = (base: number) => clampPx(base * uPerYd * 0.6, 4, 13)
 
   // Merge the zones the OSM importer split from one physical hazard (a waste
   // bunker or a body of water read as left → cross → right as the centreline
@@ -741,22 +772,24 @@ export function HoleMap(props: {
   const greenFromYd = L - layout.greenDepth / 2 - 2
   const greenRxYd = greenRx / uPerYd
 
-  // decorative groves flanking the corridor, anchored in world yards so they
-  // track the camera; sizes clamp so zoomed views don't grow monster trees
+  // decorative scenery flanking the corridor, anchored in world yards so it
+  // tracks the camera; sizes clamp so zoomed views don't grow monster trees.
+  // Links courses get more of it, smaller and further out — a dune field reads
+  // as scattered where a treeline reads as a wall.
   const deco = useMemo(() => {
     const rng = mulberry32(fnv1a(`${layout.spec.number}:${layout.length}:deco`))
     const groves: { yards: number; lat: number; size: number; tone: number }[] = []
-    for (let i = 0; i < 10; i++) {
+    for (let i = 0; i < (links ? 16 : 10); i++) {
       const side = i % 2 === 0 ? 1 : -1
       groves.push({
         yards: rng() * (layout.length + 30),
-        lat: side * (36 + rng() * 26),
+        lat: side * (links ? 30 + rng() * 36 : 36 + rng() * 26),
         size: 8 + rng() * 5,
         tone: rng() < 0.5 ? 0 : 1,
       })
     }
     return groves
-  }, [layout])
+  }, [layout, links])
 
   // where the flag actually stands on the green (par-3 pin side) — shared by
   // the flag sprite, the approach preview's aim point, and the on-green ball
@@ -1236,11 +1269,17 @@ export function HoleMap(props: {
       )}
       {!corridor && <path d={ribbonPath(geo, Math.max(L * 0.62, vFrom), L - layout.greenDepth / 2, (t) => 7 + 7 * t)} fill="#47713f" opacity={0.85} />}
 
-      {/* decorative groves (behind features) */}
+      {/* decorative scenery — groves, or dune tufts on a links (behind features) */}
       {deco.map((g, i) => {
         const p = at(g.yards)
         const n = normalAt(Math.min(g.yards, L - 1))
-        return <Tree key={i} x={p.x + n.x * g.lat * uPerYd} y={p.y + n.y * g.lat * uPerYd} s={treeSize(g.size)} tone={g.tone} />
+        const x = p.x + n.x * g.lat * uPerYd
+        const y = p.y + n.y * g.lat * uPerYd
+        return (
+          <g key={i} data-deco={links ? 'dune' : 'grove'}>
+            {links ? <DuneTuft x={x} y={y} s={tuftSize(g.size)} tone={g.tone} /> : <Tree x={x} y={y} s={treeSize(g.size)} tone={g.tone} />}
+          </g>
+        )
       })}
 
       {zoneEls}

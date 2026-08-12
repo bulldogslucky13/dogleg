@@ -30,3 +30,9 @@ verify_jwt = true
 # all — a JWT gate would defeat its purpose. Rate limits itself per IP.
 [functions.mint-player]
 verify_jwt = false
+
+# Inbound mail webhook. The caller is Resend, which can't mint Supabase JWTs;
+# the function authenticates every request itself via the svix signature
+# (RESEND_WEBHOOK_SECRET) and fails closed when the secret is unset.
+[functions.receive-email]
+verify_jwt = false

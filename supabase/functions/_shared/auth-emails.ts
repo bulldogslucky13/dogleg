@@ -42,7 +42,7 @@ export const AUTH_EMAILS: AuthEmail[] = [
       cta: { label: 'Sign in to DogLeg', url: CONFIRMATION_URL },
       fallbackUrl: CONFIRMATION_URL,
       footerFineHtml:
-        'Didn&rsquo;t ask to sign in? No harm done &mdash; ignore this and the link expires on its own. The golf gods keep no record of it.',
+        'Didn&rsquo;t ask to sign in? No harm done &mdash; ignore this and the link expires on its own. Nothing goes on your card.',
     }),
   },
   {

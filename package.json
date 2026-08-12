@@ -6,7 +6,7 @@
   "packageManager": "pnpm@11.14.0",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "tsc -b && vite build && pnpm gen:pages",
     "preview": "vite preview",
     "test": "vitest run",
     "test:smoke": "vitest run src/smoke.test.ts src/smoke.ui.test.tsx",
@@ -16,6 +16,8 @@
     "gen:ratings": "node scripts/gen-play-ratings.ts",
     "gen:email-wordmark": "node scripts/gen-email-wordmark.ts",
     "gen:og-image": "node scripts/gen-og-image.ts",
+    "gen:pages": "vite build --config vite.pages.config.ts && node scripts-dist/gen-pages.mjs",
+    "gen:pin-images": "vite build --config vite.pages.config.ts && node scripts-dist/gen-pages.mjs --pins",
     "gen:email-templates": "node scripts/gen-email-templates.ts",
     "push:email-templates": "node scripts/push-email-templates.ts",
     "import:osm": "node scripts/import-osm.ts"

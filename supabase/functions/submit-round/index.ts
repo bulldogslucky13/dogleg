@@ -21,6 +21,7 @@ import {
   seasonForDate,
 } from './engine.mjs'
 import { buildStealEmail, sendViaResend } from './email.ts'
+import { SITE_URL } from '../_shared/email-chassis.ts'
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -193,11 +194,19 @@ Deno.serve(async (req) => {
         // recomputed drought within a small grace of it — a client cannot
         // manufacture a destiny holeout out of a short or fabricated history.
         if (claimsAceDestiny || claimsAlbDestiny) {
+          // the drought is the PRE-round drought: a RETRY of this very
+          // submission may already have its card posted (the insert
+          // committed, a later record write failed), and counting that
+          // card's own destiny moment would zero the drought and reject
+          // the self-heal retry the duplicate path exists to serve
+          const history = ((rows ?? []) as { date_key: string; course_slug: string; results: string[] | null }[]).filter(
+            (r) => r.date_key !== info.dateKey,
+          )
           let sinceAce = 0
           let sinceAlb = 0
           let aceDone = false
           let albDone = false
-          for (const row of (rows ?? []) as { course_slug: string; results: string[] | null }[]) {
+          for (const row of history) {
             const course = courseBySlug(row.course_slug)
             const results = row.results ?? []
             const hasAce = !!course && results.some((r, i) => r === 'eagle' && course.holes[i]?.par === 3)
@@ -261,6 +270,18 @@ Deno.serve(async (req) => {
     player = { id: data.id, name: data.name, secret: data.secret }
   }
 
+  // Every failure from here on happens AFTER the player row was minted (or
+  // the name claimed): the identity must ride on those error responses, or a
+  // first-time device retries with no credentials, re-claims the same name,
+  // gets "that name is taken", and its posted card is stranded under an
+  // identity it never received. `player.secret` is only set when this very
+  // request created the row — established identities never re-receive theirs.
+  const fail = (status: number, payload: Record<string, unknown>) =>
+    json(status, {
+      ...payload,
+      ...(player.secret ? { player: { id: player.id, name: player.name, secret: player.secret } } : {}),
+    })
+
   // ---- write the validated score ----
   let daily: { rank: number; total: number; duplicate: boolean } | null = null
   if (info.mode === 'daily') {
@@ -277,7 +298,24 @@ Deno.serve(async (req) => {
     }
     // first card of the day stands; a resubmission is ignored
     const { error } = await supabase.from('daily_scores').insert(row)
-    if (error && error.code !== '23505') return json(500, { error: 'could not save score' })
+    if (error && error.code !== '23505') return fail(500, { error: 'could not save score' })
+    if (error) {
+      // Duplicate resubmission: the first card stands, so records may only
+      // contend with THAT card's score. Without this check a player could
+      // replay the daily with different decisions and use a later, better
+      // result to take a record the one-attempt board never saw. A retry of
+      // the same round (same score) still falls through, so a record write
+      // that failed after the board write self-heals on the client's retry.
+      const { data: first } = await supabase
+        .from('daily_scores')
+        .select('to_par, strokes')
+        .eq('date_key', info.dateKey!)
+        .eq('player_id', player.id)
+        .maybeSingle()
+      if (!first || first.to_par !== replay.toPar || first.strokes !== replay.strokes) {
+        recordEligible = false
+      }
+    }
 
     // ---- clubhouse decision tallies (Layer 2): best-effort, fresh cards only.
     // One atomic RPC bumps the aggregate counters for every (hole,stage) this
@@ -330,6 +368,60 @@ Deno.serve(async (req) => {
   // write: an insert that only wins when no row exists yet, then an update
   // the DATABASE gates on `to_par > ours` — so two concurrent submissions
   // can both race here and the better round holds the row either way.
+  // ---- tell a previous holder their record was stolen (either board) ----
+  // Best effort, entirely behind env config (no RESEND_API_KEY → no-op),
+  // and never allowed to affect the submission response: the record is
+  // already saved, a broken mailer shouldn't unsave it. Runs as a
+  // background task (EdgeRuntime.waitUntil) so a slow mailer can't hold
+  // the response open — a timed-out client would retry, find its own
+  // record already written, get record.broken: false, and never run its
+  // reclaim bookkeeping. The dedupe insert rides inside the task: still
+  // insert-before-send, still at-most-once. `scope` keeps the two boards'
+  // dedupe slots apart — one round can legitimately trigger both mails.
+  const notifyStolen = async (scope: 'alltime' | 'season', stolenFrom: string, seasonLabel?: string) => {
+    const notify = (async () => {
+      const resendKey = Deno.env.get('RESEND_API_KEY')
+      const emailFrom = Deno.env.get('EMAIL_FROM')
+      if (!resendKey || !emailFrom) return
+      // only holders who linked an email account can be reached
+      const { data: prev } = await supabase
+        .from('players')
+        .select('user_id')
+        .eq('id', stolenFrom)
+        .maybeSingle()
+      if (!prev?.user_id) return
+      // dedupe BEFORE sending: one email per holder per record per UTC
+      // day, and a crashed send burns the slot rather than double-mailing
+      const { error: dedupeError } = await supabase.from('record_steal_emails').insert({
+        scope,
+        course_slug: info.course.slug,
+        player_id: stolenFrom,
+        date_key: utcDateKey(0),
+      })
+      if (dedupeError) {
+        if (dedupeError.code !== '23505') {
+          console.error('record-steal email dedupe insert failed:', dedupeError.code)
+        }
+        return
+      }
+      const { data: userData } = await supabase.auth.admin.getUserById(prev.user_id)
+      const email = userData?.user?.email
+      if (!email) return
+      const msg = buildStealEmail({
+        courseName: info.course.name,
+        thiefName: player.name,
+        siteUrl: SITE_URL,
+        seasonLabel,
+      })
+      const sent = await sendViaResend(fetch, resendKey, emailFrom, email, msg)
+      if (!sent.ok) console.error('record-steal email send failed with status', sent.status)
+    })().catch((e) => console.error('record-steal email path threw:', e))
+    const runtime = (globalThis as any).EdgeRuntime
+    if (typeof runtime?.waitUntil === 'function') runtime.waitUntil(notify)
+    // no waitUntil (older local runtime): await rather than lose the send
+    else await notify
+  }
+
   const season =
     info.mode === 'daily' ? seasonForDate(new Date(`${info.dateKey}T12:00:00Z`)) : seasonForDate(new Date())
   const seasonRow = {
@@ -358,6 +450,16 @@ Deno.serve(async (req) => {
     character: string | null
     seasonKey: string
   } | null = null
+  // pre-read the season row purely to identify the previous holder for the
+  // steal email — it is NOT part of the race-safe write decision below, and
+  // on a pre-delta database (no season_records yet) it quietly reads null
+  const { data: seasonExisting } = await supabase
+    .from('season_records')
+    .select('player_id')
+    .eq('scope', 'global')
+    .eq('season_key', season.key)
+    .eq('course_slug', info.course.slug)
+    .maybeSingle()
   // an ineligible round (unverifiable practice destiny) makes no claim, but
   // still falls through to the holder read so the wrap can show the board
   const { data: seasonClaimed, error: seasonClaimError } = recordEligible
@@ -367,7 +469,7 @@ Deno.serve(async (req) => {
         .select('to_par')
     : { data: null, error: null }
   if (seasonClaimError && !missingSeasonTable(seasonClaimError)) {
-    return json(500, { error: 'could not save season record' })
+    return fail(500, { error: 'could not save season record' })
   }
   if (!seasonClaimError) {
     let seasonBroken = ((seasonClaimed as { to_par: number }[] | null)?.length ?? 0) > 0
@@ -382,7 +484,7 @@ Deno.serve(async (req) => {
         .eq('course_slug', info.course.slug)
         .gt('to_par', replay.toPar)
         .select('to_par')
-      if (seasonTakeError) return json(500, { error: 'could not save season record' })
+      if (seasonTakeError) return fail(500, { error: 'could not save season record' })
       seasonBroken = (seasonTaken?.length ?? 0) > 0
     }
     if (seasonBroken) {
@@ -393,21 +495,48 @@ Deno.serve(async (req) => {
         character: character ?? null,
         seasonKey: season.key,
       }
+      if (seasonExisting && seasonExisting.player_id !== player.id) {
+        await notifyStolen('season', seasonExisting.player_id, season.label)
+      }
     } else {
       const { data: seasonHolder } = await supabase
         .from('season_records')
-        .select('to_par, player_name, character')
+        .select('to_par, player_id, player_name, character, seed')
         .eq('scope', 'global')
         .eq('season_key', season.key)
         .eq('course_slug', info.course.slug)
         .maybeSingle()
       if (seasonHolder) {
-        seasonRecord = {
-          broken: false,
-          toPar: seasonHolder.to_par,
-          holder: seasonHolder.player_name,
-          character: seasonHolder.character ?? null,
-          seasonKey: season.key,
+        // retry-aware recovery: the standing row may BE this very round —
+        // the season claim committed, a later write 500'd the response, and
+        // the client retried. The stored ghost seed is exact identity (one
+        // seed, one round), so on a match the win is re-reported as broken
+        // rather than silently downgraded to someone else's record — without
+        // it the client would never run its season bookkeeping/celebration.
+        // Gated on the client's `unacknowledged` marker (sent until a 200
+        // lands in its posted ledger): daily seeds are stable per player+day,
+        // so seed identity alone can't tell a lost-response retry from an
+        // already-acknowledged card being reopened and auto-resubmitted —
+        // without the gate every reopen would re-celebrate. A forged marker
+        // buys nothing but a repeat splash on the forger's own screen: this
+        // path writes nothing. No steal email here either way — the original
+        // claim's send already ran, and the dedupe ledger holds.
+        if (body?.unacknowledged === true && seasonHolder.player_id === player.id && seasonHolder.seed === seed) {
+          seasonRecord = {
+            broken: true,
+            toPar: replay.toPar,
+            holder: player.name,
+            character: character ?? null,
+            seasonKey: season.key,
+          }
+        } else {
+          seasonRecord = {
+            broken: false,
+            toPar: seasonHolder.to_par,
+            holder: seasonHolder.player_name,
+            character: seasonHolder.character ?? null,
+            seasonKey: season.key,
+          }
         }
       }
     }
@@ -455,7 +584,7 @@ Deno.serve(async (req) => {
         .select('to_par'))
     }
   }
-  if (recordClaimError) return json(500, { error: 'could not save record' })
+  if (recordClaimError) return fail(500, { error: 'could not save record' })
   let isRecord = (recordClaimed?.length ?? 0) > 0
   if (!isRecord && recordEligible) {
     // a record exists — replace it only when this round is strictly better,
@@ -474,60 +603,14 @@ Deno.serve(async (req) => {
         .gt('to_par', replay.toPar)
         .select('to_par'))
     }
-    if (recordTakeError) return json(500, { error: 'could not save record' })
+    if (recordTakeError) return fail(500, { error: 'could not save record' })
     isRecord = (recordTaken?.length ?? 0) > 0
   }
   if (isRecord) {
-    // ---- tell the previous holder their record was stolen ----
-    // Best effort, entirely behind env config (no RESEND_API_KEY → no-op),
-    // and never allowed to affect the submission response: the record is
-    // already saved, a broken mailer shouldn't unsave it. Runs as a
-    // background task (EdgeRuntime.waitUntil) so a slow mailer can't hold
-    // the response open — a timed-out client would retry, find its own
-    // record already written, get record.broken: false, and never run its
-    // reclaim bookkeeping. The dedupe insert rides inside the task: still
-    // insert-before-send, still at-most-once.
+    // the previous ALL-TIME holder gets the sterner of the two mails; the
+    // shared helper (defined above the season write) carries the machinery
     if (existing && existing.player_id !== player.id) {
-      const stolenFrom = existing.player_id
-      const notify = (async () => {
-        const resendKey = Deno.env.get('RESEND_API_KEY')
-        const emailFrom = Deno.env.get('EMAIL_FROM')
-        if (!resendKey || !emailFrom) return
-        // only holders who linked an email account can be reached
-        const { data: prev } = await supabase
-          .from('players')
-          .select('user_id')
-          .eq('id', stolenFrom)
-          .maybeSingle()
-        if (!prev?.user_id) return
-        // dedupe BEFORE sending: one email per holder per course per UTC
-        // day, and a crashed send burns the slot rather than double-mailing
-        const { error: dedupeError } = await supabase.from('record_steal_emails').insert({
-          course_slug: info.course.slug,
-          player_id: stolenFrom,
-          date_key: utcDateKey(0),
-        })
-        if (dedupeError) {
-          if (dedupeError.code !== '23505') {
-            console.error('record-steal email dedupe insert failed:', dedupeError.code)
-          }
-          return
-        }
-        const { data: userData } = await supabase.auth.admin.getUserById(prev.user_id)
-        const email = userData?.user?.email
-        if (!email) return
-        const msg = buildStealEmail({
-          courseName: info.course.name,
-          thiefName: player.name,
-          siteUrl: 'https://dogleg.cameronbristol.xyz',
-        })
-        const sent = await sendViaResend(fetch, resendKey, emailFrom, email, msg)
-        if (!sent.ok) console.error('record-steal email send failed with status', sent.status)
-      })().catch((e) => console.error('record-steal email path threw:', e))
-      const runtime = (globalThis as any).EdgeRuntime
-      if (typeof runtime?.waitUntil === 'function') runtime.waitUntil(notify)
-      // no waitUntil (older local runtime): await rather than lose the send
-      else await notify
+      await notifyStolen('alltime', existing.player_id)
     }
   }
   // re-read rather than trust the pre-write snapshot: when our claim lost a
@@ -542,6 +625,25 @@ Deno.serve(async (req) => {
       .maybeSingle()
     recordHolder = raced
   }
+  // retry-aware recovery, the all-time twin of the season one above: the
+  // standing row may BE this very round (the claim committed, the 200 was
+  // lost, the client retried with its unacknowledged marker). Same identity
+  // test — this player AND this exact seed — so the win is re-reported and
+  // the client still runs recordWon/markArchiveRecord/the celebration. The
+  // seed is read separately and guarded: a pre-delta database has no seed
+  // column, and recovery must degrade away there rather than fail the
+  // submission. Runs after the steal-email block by design — the original
+  // claim already sent the mail, and `existing` is the player's own row here
+  // so the block would skip anyway. Writes nothing, so a forged marker only
+  // repeats a splash on the forger's own screen.
+  if (!isRecord && body?.unacknowledged === true && recordHolder?.player_id === player.id) {
+    const { data: ghost, error: ghostError } = await supabase
+      .from('course_records')
+      .select('seed')
+      .eq('course_slug', info.course.slug)
+      .maybeSingle()
+    if (!ghostError && ghost?.seed != null && ghost.seed === seed) isRecord = true
+  }
   // one response shape for both modes: dailies carry their board fields
   // (rank/total/duplicate) AND the record outcomes, so a single flow serves
   // the daily board and the record system together — they cannot diverge.
@@ -550,14 +652,21 @@ Deno.serve(async (req) => {
     toPar: replay.toPar,
     strokes: replay.strokes,
     ...(daily ?? {}),
-    record: isRecord
-      ? { broken: true, toPar: replay.toPar, holder: player.name, character: character ?? null }
-      : {
-          broken: false,
-          toPar: recordHolder?.to_par ?? replay.toPar,
-          holder: recordHolder?.player_name ?? player.name,
-          character: recordHolder?.character ?? null,
-        },
+    // no holder and no claim (an ineligible round on a recordless course) →
+    // omit `record` entirely, like the season path: synthesizing one from
+    // the challenger would show their own score as the standing record
+    ...(isRecord
+      ? { record: { broken: true, toPar: replay.toPar, holder: player.name, character: character ?? null } }
+      : recordHolder
+        ? {
+            record: {
+              broken: false,
+              toPar: recordHolder.to_par,
+              holder: recordHolder.player_name,
+              character: recordHolder.character ?? null,
+            },
+          }
+        : {}),
     ...(seasonRecord ? { seasonRecord } : {}),
     player: { id: player.id, name: player.name, ...(player.secret ? { secret: player.secret } : {}) },
   })

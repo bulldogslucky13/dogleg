@@ -15,7 +15,7 @@
  * backend faked on and the fetches stubbed.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import type { CourseRecord } from '../lib/leaderboard'
 
 vi.mock('../lib/backend', () => ({
@@ -159,6 +159,60 @@ describe('the hunt card opens the hunt it advertised', () => {
 
     expect(await screen.findByText('Play unlimited')).toBeTruthy()
     expect(screen.queryByText(/within reach/)).toBeNull()
+  })
+})
+
+describe('a season board that failed to load is still gettable', () => {
+  beforeEach(() => {
+    localStorage.clear()
+    localStorage.setItem('dogleg:tutorial:v1', 'done')
+    fetchSeasonRecords.mockReset()
+    fetchCourseRecords.mockReset().mockResolvedValue(null)
+  })
+  afterEach(cleanup)
+
+  it('retries on the next open instead of sitting out the whole visit', async () => {
+    // briefly offline at mount: no board, so no card — the never-pretend rule
+    fetchSeasonRecords.mockResolvedValueOnce(null)
+    mount()
+
+    const cta = await screen.findByText('Play unlimited')
+    expect(screen.queryByText(/within reach/)).toBeNull()
+
+    // ...and back online. Opening the list is the interaction that retries;
+    // the failed attempt must not have claimed the season key on its way out
+    fetchSeasonRecords.mockResolvedValue(new Map())
+    fireEvent.click(cta)
+
+    expect(await screen.findByText(/season records within reach/)).toBeTruthy()
+    expect(screen.queryByText(/records loading…/)).toBeNull()
+  })
+
+  it('does not re-read a board it already has', async () => {
+    fetchSeasonRecords.mockResolvedValue(new Map())
+    mount()
+    await screen.findByText(/season records within reach/)
+
+    // the retry deps fire on every open and toggle; a loaded board is done
+    const cta = screen.getByText('Play unlimited')
+    fireEvent.click(cta)
+    fireEvent.click(screen.getByRole('button', { name: /^View All-Time Records/ }))
+    fireEvent.click(cta)
+    expect(fetchSeasonRecords).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not stack reads while the first one is still out', async () => {
+    // a board slow enough that the panel opens before it lands
+    let land: (m: Map<string, CourseRecord>) => void = () => {}
+    fetchSeasonRecords.mockReturnValue(new Promise((r) => (land = r)))
+    mount()
+
+    fireEvent.click(await screen.findByText('Play unlimited'))
+    fireEvent.click(screen.getByRole('button', { name: /^View All-Time Records/ }))
+    expect(fetchSeasonRecords).toHaveBeenCalledTimes(1)
+
+    await act(async () => land(new Map()))
+    expect(fetchSeasonRecords).toHaveBeenCalledTimes(1)
   })
 })
 

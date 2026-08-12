@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { characterById, playableCharacters } from '../engine/characters'
 import { courseBySlug, COURSES, GUEST_COURSES, PAR3_COURSES, playRatingFor } from '../engine/courses'
 import { dailySetup, forecastSetup, RESULT_LABEL, RESULT_SQUARE, shareText, SITE_URL, toParLabel, type DailySetup } from '../engine/daily'
@@ -76,10 +76,14 @@ export function HomeScreen(props: {
   const [filterSheet, setFilterSheet] = useState(false)
   const [courseRecs, setCourseRecs] = useState<Map<string, CourseRecord> | null>(null)
   const [seasonRecs, setSeasonRecs] = useState<Map<string, CourseRecord> | null>(null)
-  /** which season the loaded seasonRecs belong to — a rollover while the
+  /** which season the LOADED seasonRecs belong to — a rollover while the
    * panel sits open must refetch for the new key, not show last season's
-   * holders under the new season's name */
+   * holders under the new season's name. Claimed only by a fetch that came
+   * back with a board, so a failed one leaves the season still to fetch. */
   const [seasonRecsKey, setSeasonRecsKey] = useState<string | null>(null)
+  /** the season key currently being fetched, if any — de-dupes the retry
+   * triggers rather than letting each one start its own read */
+  const seasonFetch = useRef<string | null>(null)
   const [steals, setSteals] = useState(() => pendingSteals())
   /** the Fortune callout's ⓘ opens How to Play's Fortunes page on its own */
   const [fortuneInfo, setFortuneInfo] = useState(false)
@@ -136,13 +140,26 @@ export function HomeScreen(props: {
   useEffect(() => {
     if (!backendEnabled || seasonRecsKey === season.key) return
     const key = season.key
-    setSeasonRecsKey(key)
+    // one request per season key at a time — the retry deps below fire on
+    // every open and toggle, and a slow board must not collect a queue of
+    // identical reads while the first is still out
+    if (seasonFetch.current === key) return
+    seasonFetch.current = key
     setSeasonRecs(null)
-    // a FAILED season fetch stays null (no lines, no hunt) — an empty season
-    // board is "open, be the first"; an unreachable one must not pretend to know
     void fetchSeasonRecords(key).then((recs) => {
-      setSeasonRecs(recs)
+      // a rollover started a newer request while this one was in flight —
+      // last season's holders must not land under the new season's name
+      if (seasonFetch.current !== key) return
+      seasonFetch.current = null
+      // a FAILED season fetch stays null (no lines, no hunt) — an empty season
+      // board is "open, be the first"; an unreachable one must not pretend to
+      // know. The key stays UNCLAIMED so the next open retries, the same
+      // recovery the all-time board gets from its null check: a device that
+      // was briefly offline at mount would otherwise sit on "records
+      // loading…" with no hunt card for the life of the screen.
       if (!recs) return
+      setSeasonRecsKey(key)
+      setSeasonRecs(recs)
       // the name is read HERE, not at effect time: it can be claimed after
       // mount, and an unnamed device holds no records to reconcile anyway
       const name = loadPlayer()?.name ?? null
@@ -150,7 +167,7 @@ export function HomeScreen(props: {
       syncSeasonLedger(recs, key, name)
       setSteals(pendingSteals())
     })
-  }, [seasonRecsKey, season.key])
+  }, [showCourses, recType, seasonRecsKey, season.key])
 
   // the record-stolen check for the ALL-TIME board — the season half rides
   // the board fetch above rather than issuing its own read. Purely reads: the

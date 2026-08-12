@@ -84,6 +84,13 @@ export function HomeScreen(props: {
   /** the season key currently being fetched, if any — de-dupes the retry
    * triggers rather than letting each one start its own read */
   const seasonFetch = useRef<string | null>(null)
+  /** the clubhouse this device posts under. STATE, not a read-per-render,
+   * because signing in can adopt a different clubhouse while this screen sits
+   * there — and every "is this one mine?" on it moves with the answer: the
+   * hunt's trophy exclusion, the mine/not-mine filters, the YOU badge. The
+   * panel at the bottom is the only thing that knows the adoption happened,
+   * so it says so (onIdentity). */
+  const [myName, setMyName] = useState<string | null>(() => loadPlayer()?.name ?? null)
   const [steals, setSteals] = useState(() => pendingSteals())
   /** the Fortune callout's ⓘ opens How to Play's Fortunes page on its own */
   const [fortuneInfo, setFortuneInfo] = useState(false)
@@ -215,7 +222,6 @@ export function HomeScreen(props: {
   const RATING_BAND = { easy: [1, 3], mid: [4, 7], hard: [8, 10] } as const
   const activeRecs = recType === 'season' ? seasonRecs : courseRecs
   const recsReady = activeRecs !== null
-  const myName = loadPlayer()?.name ?? null
   // recent sort reads the archive once per open, not per row: last playedAt
   // per slug. The archive prunes, so "recent" means what it remembers — the
   // same source and the same honesty as the played notch itself.
@@ -713,7 +719,7 @@ export function HomeScreen(props: {
         </button>
       )}
       <HandicapChip onTap={props.onStats} />
-      <AccountPanel onHistorySynced={props.onHistorySynced} />
+      <AccountPanel onHistorySynced={props.onHistorySynced} onIdentity={(p) => setMyName(p.name)} />
       {/* the quiet stuff lives at the foot of the screen: the rules, and the
           receipt showing what has changed since launch */}
       <div className="teebox-footer">

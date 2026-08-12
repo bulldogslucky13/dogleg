@@ -24,23 +24,30 @@ vi.mock('../lib/backend', () => ({
   SUPABASE_ANON_KEY: 'anon',
 }))
 vi.mock('../lib/analytics', () => ({ track: vi.fn(), identifyPlayer: vi.fn() }))
-// the panel would reach for supabase on mount; it has its own tests
+// the account panel is the screen's other half here: it is the only thing
+// that learns this device just adopted a clubhouse. Its own behaviour has its
+// own tests; these stubs are the two calls its mount reconcile makes.
+const currentEmail = vi.fn<() => Promise<string | null>>(async () => null)
+const syncAccount = vi.fn<() => Promise<{ status: string; player?: { id: string; secret: string; name: string } }>>(
+  async () => ({ status: 'signedout' }),
+)
 vi.mock('../lib/auth', () => ({
   supabase: null,
-  currentEmail: vi.fn(async () => null),
+  currentEmail,
   sendMagicLink: vi.fn(async () => ({ ok: true })),
   signOut: vi.fn(async () => {}),
-  syncAccount: vi.fn(async () => ({ status: 'signedout' as const })),
+  syncAccount,
 }))
 // no version.json to fetch in jsdom — the staleness banner is not this test
 vi.mock('../lib/freshness', () => ({ bundleIsStale: vi.fn(async () => false), FRESH_TTL_MS: 600_000 }))
 
 const fetchSeasonRecords = vi.fn<(k: string) => Promise<Map<string, CourseRecord> | null>>()
 const fetchCourseRecords = vi.fn<() => Promise<Map<string, CourseRecord> | null>>(async () => null)
+const fetchMyHistory = vi.fn(async () => null)
 
 vi.mock('../lib/leaderboard', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../lib/leaderboard')>()
-  return { ...actual, fetchSeasonRecords, fetchCourseRecords }
+  return { ...actual, fetchSeasonRecords, fetchCourseRecords, fetchMyHistory }
 })
 
 const { HomeScreen } = await import('./screens')
@@ -213,6 +220,50 @@ describe('a season board that failed to load is still gettable', () => {
 
     await act(async () => land(new Map()))
     expect(fetchSeasonRecords).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('adopting a clubhouse mid-screen stops hunting your own records', () => {
+  const HOLDER = { id: 'p9', secret: 's9', name: 'Bogey Merchant' }
+
+  beforeEach(() => {
+    localStorage.clear()
+    localStorage.setItem('dogleg:tutorial:v1', 'done')
+    fetchCourseRecords.mockReset().mockResolvedValue(null)
+    fetchSeasonRecords.mockReset()
+    currentEmail.mockReset().mockResolvedValue(null)
+    syncAccount.mockReset().mockResolvedValue({ status: 'signedout' })
+  })
+  afterEach(cleanup)
+
+  it('recounts when a fresh device turns out to be the record holder', async () => {
+    // one standing record, soft enough to hunt
+    fetchSeasonRecords.mockResolvedValue(new Map([[COURSES[0].slug, record(COURSES[0].slug, HOLDER.name, 2)]]))
+    // the session is held open so the board lands FIRST: the bug is a card
+    // that already counted, then never recounted. An adoption that beats the
+    // board home is the easy case — the first count is simply correct.
+    let signIn: (addr: string) => void = () => {}
+    currentEmail.mockReturnValue(new Promise((r) => (signIn = r)))
+    // note this account has no submitted dailies — fetchMyHistory returns
+    // null, so the history-sync path tells the screen nothing. A
+    // practice-only record holder is exactly who this has to work for.
+    syncAccount.mockResolvedValue({ status: 'adopted', player: HOLDER })
+
+    mount()
+    // this device knows nobody, so the holder's own record reads as a target
+    const before = (await screen.findByText(/season records within reach/)).textContent ?? ''
+    const target = Number(before.match(/(\d+) season record/)?.[1])
+    expect(screen.getByText(/softest number standing is \+2/)).toBeTruthy()
+
+    // ...and now the magic-link session says this device IS that holder
+    await act(async () => signIn('holder@example.test'))
+    await screen.findByText(/Synced · Bogey Merchant/)
+
+    // their record is a trophy now, not a target — and it was the only
+    // standing number, so the softest-standing line goes with it
+    const after = (await screen.findByText(/season records within reach/)).textContent ?? ''
+    expect(Number(after.match(/(\d+) season record/)?.[1])).toBe(target - 1)
+    expect(screen.queryByText(/softest number standing/)).toBeNull()
   })
 })
 

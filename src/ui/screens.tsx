@@ -15,9 +15,9 @@ import { ChangeLog } from './ChangeLog'
 import { hasEarnedAwards, reconcileAchievements, type Unlock } from '../state/achievements'
 import { Wordmark } from './Wordmark'
 import { dismissSteals, pendingSteals, syncLedger, syncSeasonLedger, type PendingSteal } from '../lib/records'
-import { loadBrowsePrefs, saveBrowsePrefs } from '../lib/browsePrefs'
+import { loadBrowsePrefs, saveBrowsePrefs, type CourseSort } from '../lib/browsePrefs'
 import { loadFavorites, toggleFavorite } from '../lib/favorites'
-import { seasonHunt } from '../lib/hunt'
+import { seasonHunt, type Hunt } from '../lib/hunt'
 import { loadGhost, loadGhostChoices, type Ghost, type GhostBoard } from '../state/ghost'
 import { currentHandicap, formatHandicap } from '../state/stats'
 import { characterRecords, computeStreaks, loadArchive, type HistoryEntry, type RoundRecap, type RoundState } from '../state/store'
@@ -128,21 +128,35 @@ export function HomeScreen(props: {
   // after a quarterly rollover swaps in the fresh board. Fetched on MOUNT
   // (not when the panel opens) because the hunt card below the unlimited CTA
   // reads it before any panel exists — one ~40-row query per home visit.
+  //
+  // That ONE read serves both readers: the hunt card AND the season half of
+  // the record-stolen reconcile below feed off this snapshot rather than
+  // racing a second identical query, so the card and the ledger can never
+  // disagree about who holds what.
   useEffect(() => {
-    if (backendEnabled && seasonRecsKey !== season.key) {
-      setSeasonRecsKey(season.key)
-      setSeasonRecs(null)
-      // a FAILED season fetch stays null (no lines, no hunt) — an empty season
-      // board is "open, be the first"; an unreachable one must not pretend to know
-      void fetchSeasonRecords(season.key).then((r) => setSeasonRecs(r))
-    }
+    if (!backendEnabled || seasonRecsKey === season.key) return
+    const key = season.key
+    setSeasonRecsKey(key)
+    setSeasonRecs(null)
+    // a FAILED season fetch stays null (no lines, no hunt) — an empty season
+    // board is "open, be the first"; an unreachable one must not pretend to know
+    void fetchSeasonRecords(key).then((recs) => {
+      setSeasonRecs(recs)
+      if (!recs) return
+      // the name is read HERE, not at effect time: it can be claimed after
+      // mount, and an unnamed device holds no records to reconcile anyway
+      const name = loadPlayer()?.name ?? null
+      if (!name) return
+      syncSeasonLedger(recs, key, name)
+      setSteals(pendingSteals())
+    })
   }, [seasonRecsKey, season.key])
 
-  // the record-stolen check: compare the records this device holds against
-  // the server's holders, on BOTH boards. Purely reads — the "notification"
-  // is derived. Each fetch reconciles its own shelf independently, so one
-  // board being unreachable never silences (or fakes) the other; a failed
-  // fetch stays null and that shelf simply isn't reconciled this visit.
+  // the record-stolen check for the ALL-TIME board — the season half rides
+  // the board fetch above rather than issuing its own read. Purely reads: the
+  // "notification" is derived. Each board reconciles its own shelf
+  // independently, so one being unreachable never silences (or fakes) the
+  // other; a failed fetch stays null and that shelf isn't reconciled this visit.
   useEffect(() => {
     if (!backendEnabled) return
     const myName = loadPlayer()?.name ?? null
@@ -156,11 +170,6 @@ export function HomeScreen(props: {
       // reconcile. Quiet: nobody earned anything just now, we only found out.
       reconcileAchievements('quiet')
       props.onAwardsChanged?.()
-      setSteals(pendingSteals())
-    })
-    void fetchSeasonRecords(season.key).then((recs) => {
-      if (!recs) return
-      syncSeasonLedger(recs, season.key, myName)
       setSteals(pendingSteals())
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -240,12 +249,30 @@ export function HomeScreen(props: {
     }
     return 0
   })
-  const resetFilters = () => {
+  const resetFilters = (sort: CourseSort = 'tour') => {
     setPlayedFilter('all')
     setRatingFilter('any')
     setRecordFilter('any')
     setFavsOnly(false)
-    setCourseSort('tour')
+    setCourseSort(sort)
+  }
+  /**
+   * Open the list ON the hunt the card just advertised.
+   *
+   * The card counts targets across the whole Courses pool with no filter
+   * applied, so the view it opens has to match that count or the headline
+   * lied: a saved configuration (favorites only, a difficulty band, "I hold
+   * it" — which excludes every hunt target by definition) or the Par 3 tab
+   * left active from a previous open would otherwise hand back an empty or
+   * unrelated list. So the hunt clears the view rather than inheriting it,
+   * and sorts weakest-record-first, which is the hunt's own order.
+   */
+  const openHunt = (h: Hunt) => {
+    track('hunt_opened', { total: h.total, open: h.open })
+    setCourseTab('courses')
+    resetFilters('beatable')
+    setRecType('season')
+    setShowCourses(true)
   }
   return (
     <div className="screen home">
@@ -384,15 +411,7 @@ export function HomeScreen(props: {
           Tapping lands on the list already sorted by what's winnable. Renders
           only when the board is KNOWN and something is actually takeable. */}
       {hunt !== null && hunt.total > 0 && (
-        <button
-          className="hunt-card"
-          onClick={() => {
-            track('hunt_opened', { total: hunt.total, open: hunt.open })
-            setRecType('season')
-            setCourseSort('beatable')
-            setShowCourses(true)
-          }}
-        >
+        <button className="hunt-card" onClick={() => openHunt(hunt)}>
           <b>
             🎯 {hunt.total} season record{hunt.total === 1 ? '' : 's'} within reach
           </b>
@@ -551,7 +570,7 @@ export function HomeScreen(props: {
                 </div>
                 <div className="filter-foot">
                   {filtersActive && (
-                    <button className="filter-reset" onClick={resetFilters}>
+                    <button className="filter-reset" onClick={() => resetFilters()}>
                       Reset filters
                     </button>
                   )}
@@ -569,7 +588,7 @@ export function HomeScreen(props: {
                   "open" filter that matched yesterday matches nothing today)
                   and a bare "no courses" would read as missing data */}
               <p className="fine">No courses match your saved filters — every course is still here.</p>
-              <button className="filter-reset" onClick={resetFilters}>
+              <button className="filter-reset" onClick={() => resetFilters()}>
                 Reset filters
               </button>
             </div>

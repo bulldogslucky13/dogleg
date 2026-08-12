@@ -29,6 +29,15 @@ jobs:
       - run: pnpm build
         env:
           VITE_POSTHOG_KEY: ${{ vars.VITE_POSTHOG_KEY }}
+          # unset until a Pinterest ads account exists; setting the repo
+          # variable turns the conversion tag on (src/lib/analytics.ts)
+          VITE_PINTEREST_TAG_ID: ${{ vars.VITE_PINTEREST_TAG_ID }}
+      # The per-course Pinterest/OG cards (dist/pins/) are rasterised here,
+      # not in `pnpm build`, because they need the runner's Chrome — PR CI
+      # builds the site without a browser. The course pages' og:image tags
+      # point at these, so the deploy must fail loudly if rendering breaks.
+      - name: Render pin cards
+        run: pnpm gen:pin-images
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist
@@ -118,6 +127,29 @@ jobs:
             --project-ref "$PROJECT_REF" --use-api
           supabase functions deploy mint-player \
             --project-ref "$PROJECT_REF" --no-verify-jwt --use-api
+          supabase functions deploy receive-email \
+            --project-ref "$PROJECT_REF" --no-verify-jwt --use-api
+      # Records catch-up: the one piece of SQL that runs AFTER the functions
+      # rather than before them. It is the only writer that stamps
+      # mode = 'daily' on a record, and the older referee it replaces updates
+      # a record's holder and score without touching mode — so stamping while
+      # that referee was still live would let a practice round beat a stamped
+      # row and inherit its crown permanently, with no later pass able to
+      # repair it. Running here, the column is only ever stamped once every
+      # writer understands it. Rerunnable by design (see the file's header),
+      # so a card posted mid-deploy is swept up next time rather than lost.
+      - name: Catch up record boards
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          PROJECT_REF: ${{ vars.SUPABASE_PROJECT_REF }}
+        run: |
+          jq -n --rawfile sql supabase/catch-up-records.sql '{query: $sql}' \
+            | curl -sS --fail-with-body -X POST \
+                "https://api.supabase.com/v1/projects/$PROJECT_REF/database/query" \
+                -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+                -H "Content-Type: application/json" \
+                -H "User-Agent: supabase-cli/2.30.4" \
+                --data @-
 
   deploy:
     needs: functions

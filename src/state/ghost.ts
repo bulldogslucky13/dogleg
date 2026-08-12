@@ -1,7 +1,8 @@
 import { courseBySlug } from '../engine/courses'
 import { replayFrames, replayRound, type ReplayFrame } from '../engine/replay'
+import { seasonForDate } from '../engine/season'
 import type { BallState, CharacterId, Choice, HoleResult } from '../engine/types'
-import { fetchRecordReplay, loadPlayer } from '../lib/leaderboard'
+import { fetchRecordReplay, fetchSeasonRecordReplay, loadPlayer, type RecordReplay } from '../lib/leaderboard'
 import { chasing } from '../lib/records'
 import { loadArchive, type ArchivedRound } from './store'
 
@@ -24,10 +25,17 @@ import { loadArchive, type ArchivedRound } from './store'
  *     best replayable round on the course — clearly labeled as such.
  */
 
+/** which board's record a ghost was loaded from */
+export type GhostBoard = 'alltime' | 'season'
+
 export interface Ghost {
-  /** 'record' = the standing course record; 'personal' = your own best here;
+  /** 'record' = a standing record round; 'personal' = your own best here;
    * 'challenge' = the round a challenge link dared you to beat */
   kind: 'record' | 'personal' | 'challenge'
+  /** the board the round came off — copy reads it so a season-record race
+   * can never masquerade as the all-time one. Absent only for a 'challenge'
+   * ghost, which races one player's card rather than a board. */
+  board?: GhostBoard
   /** the record holder's clubhouse name; null when the ghost is your own round */
   holder: string | null
   seed: string
@@ -40,39 +48,108 @@ export interface Ghost {
   frames: ReplayFrame[]
 }
 
+/** build the record ghost from a fetched record row, null when it has no
+ * stored round (or the round doesn't replay) */
+function recordGhost(rec: RecordReplay | null, excludeSeed: string | undefined, board: GhostBoard): Ghost | null {
+  if (!rec?.seed || !rec.decisions || rec.seed === excludeSeed) return null
+  const myName = loadPlayer()?.name ?? null
+  const mine = !!myName && rec.player_name.toLowerCase() === myName.toLowerCase()
+  return buildGhost(rec.seed, rec.character ?? undefined, rec.decisions, {
+    kind: 'record',
+    board,
+    holder: mine ? null : rec.player_name,
+  })
+}
+
 /**
  * Load the ghost for an unlimited round on this course: the true record
  * round when the server has it, the player's own best otherwise, null when
  * there's nothing to race — normal round, no ghost.
+ *
+ * `board` picks WHICH record to race. A season request that can't be met
+ * (no season record, or its round doesn't replay) falls back to your own
+ * best labeled as such — never silently to the all-time record, which would
+ * mislabel the race the player chose.
  */
-export async function loadGhost(courseSlug: string, excludeSeed?: string): Promise<Ghost | null> {
-  const rec = await fetchRecordReplay(courseSlug)
-  if (rec?.seed && rec.decisions && rec.seed !== excludeSeed) {
-    const myName = loadPlayer()?.name ?? null
-    const mine = !!myName && rec.player_name.toLowerCase() === myName.toLowerCase()
-    const ghost = buildGhost(rec.seed, rec.character ?? undefined, rec.decisions, {
-      kind: 'record',
-      holder: mine ? null : rec.player_name,
-    })
-    if (ghost) return ghost
-    // a stored round that doesn't replay (never expected — the referee
-    // verified it) falls through to the local ghost rather than no ghost
-  }
+export async function loadGhost(
+  courseSlug: string,
+  excludeSeed?: string,
+  board: GhostBoard = 'alltime',
+): Promise<Ghost | null> {
+  const rec =
+    board === 'season'
+      ? await fetchSeasonRecordReplay(courseSlug, seasonForDate().key)
+      : await fetchRecordReplay(courseSlug)
+  const ghost = recordGhost(rec, excludeSeed, board)
+  if (ghost) return ghost
+  // a stored round that doesn't replay (never expected — the referee
+  // verified it) falls through to the local ghost rather than no ghost
   const best = bestReplayable(courseSlug, excludeSeed)
   if (!best) return null
   return buildGhost(best.seed, best.character, best.decisions, {
-    // your own archived round can itself be the standing record (set before
-    // the server kept rounds); the steal ledger knows if it has since fallen
-    kind: best.courseRecord && !chasing(courseSlug) ? 'record' : 'personal',
+    // your own archived round can itself be the standing ALL-TIME record
+    // (set before the server kept rounds); the steal ledger knows if it has
+    // since fallen. A season fallback never claims record status — the
+    // archive's flag speaks only for the all-time board.
+    kind: board === 'alltime' && best.courseRecord && !chasing(courseSlug) ? 'record' : 'personal',
+    board,
     holder: null,
   })
+}
+
+/**
+ * Both boards' record ghosts for one course, for the pre-round picker. A
+ * board with no stored record round is null; when both exist AND are
+ * different rounds, the player has a real choice. (No own-best fallback
+ * here — the picker offers records, loadGhost handles the rest.)
+ */
+export async function loadGhostChoices(
+  courseSlug: string,
+  excludeSeed?: string,
+): Promise<{ alltime: Ghost | null; season: Ghost | null }> {
+  const [alltimeRec, seasonRec] = await Promise.all([
+    fetchRecordReplay(courseSlug),
+    fetchSeasonRecordReplay(courseSlug, seasonForDate().key),
+  ])
+  return {
+    alltime: recordGhost(alltimeRec, excludeSeed, 'alltime'),
+    season: recordGhost(seasonRec, excludeSeed, 'season'),
+  }
+}
+
+// The chosen board rides OUTSIDE round state (adding it there would touch
+// the persisted-round schema for a UI concern): one tiny sidecar keyed by
+// the round's seed, so a mid-round refresh reloads the same race instead of
+// silently swapping the target back to all-time.
+const BOARD_KEY = 'dogleg:ghost-board:v1'
+
+export function rememberGhostBoard(seed: string, board: GhostBoard): void {
+  try {
+    if (board === 'season') localStorage.setItem(BOARD_KEY, JSON.stringify({ seed, board }))
+    else localStorage.removeItem(BOARD_KEY)
+  } catch {
+    /* private mode */
+  }
+}
+
+export function ghostBoardFor(seed: string): GhostBoard {
+  try {
+    const raw = localStorage.getItem(BOARD_KEY)
+    if (raw) {
+      const j = JSON.parse(raw) as { seed?: string; board?: GhostBoard }
+      if (j?.seed === seed && j.board === 'season') return 'season'
+    }
+  } catch {
+    /* fall through */
+  }
+  return 'alltime'
 }
 
 function buildGhost(
   seed: string,
   character: CharacterId | undefined,
   decisions: Choice[][],
-  identity: Pick<Ghost, 'kind' | 'holder'>,
+  identity: Pick<Ghost, 'kind' | 'board' | 'holder'>,
 ): Ghost | null {
   const outcome = replayRound(seed, character, decisions)
   if (!outcome.ok) return null
@@ -163,10 +240,12 @@ export function paceVs(ghost: Ghost, playerScores: Array<{ strokes: number } | n
   return { diff, holesCompared: done, state: diff < 0 ? 'ahead' : diff > 0 ? 'behind' : 'even' }
 }
 
-/** what the chip calls the thing being raced — short, honest */
+/** what the chip calls the thing being raced — short, honest, and never
+ * letting a season race read as the all-time one */
 export function ghostNoun(ghost: Ghost): string {
   if (ghost.kind === 'challenge') return ghost.holder ?? 'your rival'
-  return ghost.kind === 'record' ? 'the record' : 'your best'
+  if (ghost.kind !== 'record') return 'your best'
+  return ghost.board === 'season' ? 'the season record' : 'the record'
 }
 
 /** "−1 vs the record" / "+2 vs your best" / "even with the record" */

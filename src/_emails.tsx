@@ -16,7 +16,7 @@
  */
 import { useState } from 'react'
 import { createRoot } from 'react-dom/client'
-import { WORDMARK_URL } from '../supabase/functions/_shared/email-chassis.ts'
+import { SITE_URL, WORDMARK_URL } from '../supabase/functions/_shared/email-chassis.ts'
 import { AUTH_EMAILS } from '../supabase/functions/_shared/auth-emails.ts'
 import { buildStealEmail } from '../supabase/functions/submit-round/email.ts'
 
@@ -24,11 +24,21 @@ const steal = buildStealEmail({
   courseName: 'Whistling Straits',
   // an apostrophe and an injection attempt, so the escaping is visible here too
   thiefName: "O'Brien <script>",
-  siteUrl: 'https://dogleg.cameronbristol.xyz',
+  siteUrl: SITE_URL,
+})
+
+// the season variant: same chassis, different board — the "Record" row and
+// the horn-urgency copy are what distinguish it, so eyeball both side by side
+const seasonSteal = buildStealEmail({
+  courseName: 'Whistling Straits',
+  thiefName: "O'Brien <script>",
+  siteUrl: SITE_URL,
+  seasonLabel: 'Summer 2026',
 })
 
 const EMAILS = [
-  { name: 'Record stolen', subject: steal.subject, html: steal.html, text: steal.text },
+  { name: 'Record stolen (all-time)', subject: steal.subject, html: steal.html, text: steal.text },
+  { name: 'Record stolen (season)', subject: seasonSteal.subject, html: seasonSteal.html, text: seasonSteal.text },
   ...AUTH_EMAILS.map((e) => ({ name: e.file.replace('.html', ''), subject: e.subject, html: e.html, text: null })),
 ]
 

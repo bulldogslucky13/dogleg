@@ -1656,6 +1656,77 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
     window.location.hash = ''
   })
 
+  it('leaving the wrap of a finished attempt drops the #challenge= hash, so a refresh lands on the Teebox', async () => {
+    vi.useFakeTimers()
+    const { advanceHole } = await import('./state/store')
+    const { decisionsFromScores, encodeReplay } = await import('./engine/replay')
+    let theirs = newRound(practiceSetup('pebble-beach', 'smokeleave'), 'practice', 'dart')
+    let guard = 0
+    while (!theirs.complete && guard++ < 500) {
+      if (theirs.hole?.stage === 'done') {
+        theirs = advanceHole(theirs)
+        continue
+      }
+      const next = applyChoice(theirs, 'normal')
+      theirs = next === theirs ? applyChoice(theirs, 'safe') : next
+    }
+    const code = encodeReplay({
+      seed: theirs.seed,
+      character: 'dart',
+      decisions: decisionsFromScores(theirs.scores)!,
+      name: 'Rival Rob',
+    })
+    localStorage.clear()
+    localStorage.setItem('dogleg:tutorial:v1', 'done')
+    // replaceState, not `location.hash =`: assigning the hash queues a
+    // hashchange jsdom delivers on the next task, which these fake timers would
+    // flush mid-round — the app would route back to the challenge screen on an
+    // event no browser fires for a link the tab opened with
+    window.history.replaceState(null, '', `#challenge=${code}`)
+
+    render(<App />)
+    fireEvent.click(screen.getByText('Take the challenge'))
+    fireEvent.click(screen.getByText(CHARACTERS[0].name))
+    for (let g = 0; g < 400; g++) {
+      if (screen.queryByText('Back to the Teebox')) break
+      const splash = screen.queryByText('HOLE IN ONE') ?? screen.queryByText('ALBATROSS')
+      if (splash) {
+        act(() => {
+          vi.advanceTimersByTime(5100)
+        })
+        fireEvent.click(splash)
+        continue
+      }
+      const advance = screen.queryByText('Next hole') ?? screen.queryByText('Sign the card')
+      if (advance) {
+        fireEvent.click(advance)
+        continue
+      }
+      const card = document.querySelector<HTMLButtonElement>('button.choice')!
+      fireEvent.click(card)
+      fireEvent.click(card)
+      act(() => {
+        vi.advanceTimersByTime(1500)
+      })
+    }
+
+    // the wrap closed the challenge with the head-to-head…
+    expect(screen.getByText('The head-to-head')).toBeTruthy()
+    expect(window.location.hash).toContain('#challenge=')
+    // …and walking off it leaves the challenge for good: the address bar can't
+    // keep pointing at a screen the player just left, or the next refresh (or
+    // a reopened URL) would drop them back on the spent challenge
+    fireEvent.click(screen.getByText('Back to the Teebox'))
+    expect(window.location.hash).toBe('')
+    expect(screen.getByText('Tee off')).toBeTruthy()
+
+    // proof it sticks: a fresh load of that address is the Teebox, not the challenge
+    cleanup()
+    render(<App />)
+    expect(screen.getByText('Tee off')).toBeTruthy()
+    expect(screen.queryByText('The head-to-head')).toBeNull()
+  })
+
   it('a truncated challenge link shows the friendly error, not the home screen', () => {
     window.location.hash = '#challenge=not-a-real-code'
     render(<App />)

@@ -436,6 +436,19 @@ export default function App() {
     return ch ? { challenge: ch, mine: att.done } : null
   }, [round])
 
+  /**
+   * Drop the #challenge= hash and stop routing on it. Leaving a challenge —
+   * from the landing screen or from the wrap that closed it — has to clear the
+   * bar as well as the view, or the address still points at a challenge the
+   * player walked away from: a refresh (or reopening that URL, which is what
+   * the back button restores) would re-land on it instead of the Teebox.
+   */
+  const leaveChallenge = () => {
+    if (!challengeFromHash()) return
+    window.history.replaceState(null, '', window.location.pathname)
+    setChallengeLink(null)
+  }
+
   // is the live round a pending challenge attempt? Keyed on the seed so the
   // ledger isn't re-read on every shot — matching can't change mid-round.
   const liveChallenge = useMemo(
@@ -610,8 +623,7 @@ export default function App() {
 
   if (view === 'challenge' && challengeLink) {
     const exitChallenge = () => {
-      window.history.replaceState(null, '', window.location.pathname)
-      setChallengeLink(null)
+      leaveChallenge()
       const r = loadRound()
       setView(r && !r.complete ? 'play' : 'home')
     }
@@ -787,11 +799,15 @@ export default function App() {
             // different round entirely (or today's daily wearing a practice
             // round's card).
             setUnlocks([])
+            // the head-to-head was the challenge's close: walking off the wrap
+            // walks off the challenge, hash and all
+            leaveChallenge()
             setLockerTab('awards')
             setView('rounds')
           }}
           onHome={() => {
             setUnlocks([])
+            leaveChallenge()
             setView('home')
           }}
           onPracticeAgain={() => {
@@ -799,6 +815,7 @@ export default function App() {
               // rematch on the same course, but pick your player fresh each run
               // (round_started is tracked by the pick screen's onPick)
               setUnlocks([])
+              leaveChallenge()
               setPending({ mode: 'practice', setup: practiceSetup(round.courseSlug, `${Date.now()}`) })
               setPickBoard(defaultChaseBoard(round.courseSlug, seasonForDate().key))
               setView('pick')

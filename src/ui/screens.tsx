@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { characterById, playableCharacters } from '../engine/characters'
 import { courseBySlug, COURSES, GUEST_COURSES, PAR3_COURSES, playRatingFor } from '../engine/courses'
 import { dailySetup, forecastSetup, RESULT_LABEL, RESULT_SQUARE, shareText, SITE_URL, toParLabel, type DailySetup } from '../engine/daily'
@@ -9,7 +9,8 @@ import { track } from '../lib/analytics'
 import { backendEnabled } from '../lib/backend'
 import { bundleIsStale, FRESH_TTL_MS } from '../lib/freshness'
 import { fetchCourseRecords, fetchSeasonRecords, loadPlayer, type CourseRecord } from '../lib/leaderboard'
-import { seasonCountdown, seasonForDate } from '../engine/season'
+import { seasonForDate } from '../engine/season'
+import { SeasonClock } from './SeasonClock'
 import { FortuneInfo } from './Tutorial'
 import { ChangeLog } from './ChangeLog'
 import { hasEarnedAwards, reconcileAchievements, type Unlock } from '../state/achievements'
@@ -32,6 +33,12 @@ import { PlayRatingChip } from './PlayRating'
  * to par reads as beatable). Tunable — what counts as attainable is a design
  * dial, not a law. */
 export const ATTAINABLE_RECORD_TO_PAR = -4
+
+/** How long the season-rollover timer may sleep in one go. Six hours is well
+ * inside setTimeout's ~25-day ceiling, and short enough that a device that
+ * slept through the rollover (timers don't fire while suspended) catches up
+ * within a session rather than sitting on a dead season. */
+const SEASON_REARM_MS = 6 * 3_600_000
 
 export function HomeScreen(props: {
   history: HistoryEntry[]
@@ -99,7 +106,23 @@ export function HomeScreen(props: {
   /** an engine-changing deploy landed after this tab loaded its bundle — a
    * round played now couldn't post, so say "reload" before the first stroke */
   const [stale, setStale] = useState(false)
-  const season = seasonForDate()
+  /** The season is derived from the clock, but nothing here re-renders when
+   * the clock crosses a rollover: SeasonClock's tick is local to its own
+   * subtree, so a home screen left open through a season change would keep
+   * this stale season — frozen at zero under last season's name, with the
+   * season board below it never refetching for the new key. So count ticks
+   * off a timer and recompute. The delay is clamped because setTimeout tops
+   * out near 25 days and a season runs longer than that; a re-arm costs one
+   * recompute of the same season, and the effect depends on the counter so
+   * the clamped case keeps re-arming. Nothing refetches unless season.key
+   * actually moved. */
+  const [seasonTick, setSeasonTick] = useState(0)
+  const season = useMemo(() => seasonForDate(), [seasonTick])
+  useEffect(() => {
+    const untilRollover = Math.max(0, season.endsAt - Date.now()) + 1000
+    const t = setTimeout(() => setSeasonTick((n) => n + 1), Math.min(untilRollover, SEASON_REARM_MS))
+    return () => clearTimeout(t)
+  }, [season.endsAt, seasonTick])
 
   // checked on mount, then again whenever the tab comes back into view and on
   // a slow interval — a home screen left open through a deploy must notice it
@@ -471,11 +494,7 @@ export function HomeScreen(props: {
             </button>
           </div>
           {courseTab === 'par3' && <Par3Intro />}
-          {courseTab === 'courses' && (
-            <p className="season-countdown">
-              ⏳ {season.name} ends in {seasonCountdown(season)} — season records are up for grabs
-            </p>
-          )}
+          {courseTab === 'courses' && <SeasonClock season={season} />}
           {/* the wall keeps score of itself: how many of the records standing
               on it were set in the past week, and how many of those fell in
               daily play (they wear the crown). A quiet week says nothing —

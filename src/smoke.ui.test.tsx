@@ -1727,6 +1727,54 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
     expect(screen.queryByText('The head-to-head')).toBeNull()
   })
 
+  it("today's card is never the last challenge's card — a finished attempt in the slot can't dress the daily", async () => {
+    const { advanceHole, recordResult, saveRound } = await import('./state/store')
+    const { decisionsFromScores, encodeReplay } = await import('./engine/replay')
+    const { acceptChallenge, parseChallenge, syncChallengeRound } = await import('./lib/challenge')
+    const finish = (r: ReturnType<typeof newRound>) => {
+      let st = r
+      let guard = 0
+      while (!st.complete && guard++ < 500) {
+        if (st.hole?.stage === 'done') {
+          st = advanceHole(st)
+          continue
+        }
+        const next = applyChoice(st, 'normal')
+        st = next === st ? applyChoice(st, 'safe') : next
+      }
+      return st
+    }
+    localStorage.clear()
+    localStorage.setItem('dogleg:tutorial:v1', 'done')
+
+    // today's daily is played and recorded (home offers "See today's card")…
+    const { dailySetup } = await import('./engine/daily')
+    recordResult(finish(newRound(dailySetup(), 'daily', 'dart')))
+
+    // …and a finished challenge attempt is what's left in the single round
+    // slot, exactly as it is when a player closes the head-to-head and lands home
+    const theirs = finish(newRound(practiceSetup('pebble-beach', 'smokestale'), 'practice', 'dart'))
+    const ch = parseChallenge(
+      encodeReplay({
+        seed: theirs.seed,
+        character: 'dart',
+        decisions: decisionsFromScores(theirs.scores)!,
+        name: 'Rival Rob',
+      }),
+    )!
+    const mine = finish(newRound(acceptChallenge(ch), 'practice', 'greens'))
+    syncChallengeRound(mine)
+    saveRound(mine)
+
+    render(<App />)
+    fireEvent.click(screen.getByText(/See today's card/))
+    // the daily card is the daily's — no head-to-head, no rival, no rally CTA
+    expect(screen.getByText(/Daily No\./)).toBeTruthy()
+    expect(screen.queryByText('The head-to-head')).toBeNull()
+    expect(screen.queryByText(/Rival Rob/)).toBeNull()
+    expect(screen.queryByText(/Copy (revenge link|your reply)/)).toBeNull()
+  })
+
   it('a truncated challenge link shows the friendly error, not the home screen', () => {
     window.location.hash = '#challenge=not-a-real-code'
     render(<App />)

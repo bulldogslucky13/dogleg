@@ -293,7 +293,12 @@ export function decodeReplay(code: string): ReplayPayload | null {
     if (decisions.length < 1 || decisions.length > 18 || decisions.some((h) => h.some((c) => !c))) return null
     const character = j.c === 'fairway' || j.c === 'dart' || j.c === 'greens' ? j.c : undefined
     const rally = typeof j.r === 'number' && Number.isInteger(j.r) && j.r > 0 ? Math.min(j.r, 999) : undefined
-    return { seed: j.s, character, decisions, name: j.n || undefined, rally }
+    // the name is the one field that reaches the screen verbatim, and a
+    // hand-edited payload can put anything in it — an object here would render
+    // as a React child and take the screen down instead of showing the
+    // friendly bad-link copy. Anything that isn't a string is simply no name.
+    const name = typeof j.n === 'string' && j.n ? j.n : undefined
+    return { seed: j.s, character, decisions, name, rally }
   } catch {
     return null
   }

@@ -769,6 +769,11 @@ export default function App() {
         : null
     // the swing coach's report needs the same shot-by-shot record the recap does
     const grade = recapSource ? roundGrade : null
+    // the head-to-head belongs to the practice round held in memory, so it only
+    // rides the wrap OF that round: re-opening today's daily card with a
+    // finished attempt still in the live slot must not wear the attempt's
+    // challenge (same staleness `recapSource` guards against)
+    const wrapChallenge = isPractice ? challengeCtx : null
     return (
       <>
         {unlocks.length > 0 && !toastsDone && <UnlockToasts unlocks={unlocks} onDone={() => setToastsDone(true)} />}
@@ -780,11 +785,11 @@ export default function App() {
           recap={recapSource ? buildRecap(recapSource) : null}
           grade={grade}
           boardRound={recapSource}
-          challenge={challengeCtx ?? undefined}
+          challenge={wrapChallenge ?? undefined}
           ghostClose={
             // the head-to-head card IS the challenge's close — the ghost line
             // underneath would say the same thing twice
-            isPractice && round && ghost && !challengeCtx
+            isPractice && round && ghost && !wrapChallenge
               ? { margin: roundToPar(round) - ghost.toPar, kind: ghost.kind, board: ghost.board, holder: ghost.holder }
               : null
           }

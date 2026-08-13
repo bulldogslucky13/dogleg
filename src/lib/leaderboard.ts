@@ -82,6 +82,43 @@ const REST_HEADERS = {
   apikey: SUPABASE_ANON_KEY,
 }
 
+export type ClaimResult = { ok: true; player: Player } | { ok: false; error: string }
+
+/**
+ * Claim a clubhouse name outside a round (see supabase/functions/claim-name).
+ *
+ * The other two doors both demand something first — submit-round wants a
+ * finished round, syncAccount wants an email session — so neither can serve
+ * a player mid-round. Names are globally unique (`players_name_ci`), so this
+ * cannot be faked locally and deferred: the claim has to reach the server at
+ * the moment it's made, or the player gets told "taken" much later, having
+ * already been promised the name.
+ *
+ * The name lands on the identity this device already holds, so the round in
+ * flight keeps the dice it was dealt.
+ */
+export async function claimClubhouseName(name: string): Promise<ClaimResult> {
+  if (!backendEnabled) return { ok: false, error: 'leaderboard disabled' }
+  const player = loadIdentity()
+  if (!player) return { ok: false, error: 'no identity on this device yet' }
+  if (player.name) return { ok: true, player }
+  try {
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/claim-name`, {
+      method: 'POST',
+      headers: { ...REST_HEADERS, 'content-type': 'application/json' },
+      body: JSON.stringify({ playerId: player.id, playerSecret: player.secret, name }),
+    })
+    const body = (await res.json()) as { player?: { id: string; name: string }; error?: string }
+    if (!res.ok || !body.player) return { ok: false, error: body.error ?? `could not claim that name (${res.status})` }
+    // keep the device secret — the server never echoes it back on this route
+    const claimed: Player = { id: body.player.id, secret: player.secret, name: body.player.name }
+    savePlayerIdentity(claimed)
+    return { ok: true, player: claimed }
+  } catch {
+    return { ok: false, error: 'network hiccup — try again' }
+  }
+}
+
 export interface BoardRow {
   player_name: string
   character: CharacterId | null

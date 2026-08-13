@@ -13,6 +13,7 @@ import { AllTimeSplash } from './ui/AllTimeSplash'
 import { MomentSplash } from './ui/MomentSplash'
 import { RecordSplash } from './ui/RecordSplash'
 import { SeasonSplash } from './ui/SeasonSplash'
+import { TrophyClaim } from './ui/TrophyClaim'
 import { seasonForDate } from './engine/season'
 import '@fontsource-variable/archivo/wdth.css'
 import '@fontsource/barlow/400.css'
@@ -42,6 +43,34 @@ window.fetch = (input: RequestInfo | URL, init?: RequestInit) => {
       new Response(JSON.stringify(rows), { status: 200, headers: { 'Content-Type': 'application/json' } }),
     )
   }
+  // The unclaimed-trophy card has two faces, and the second one is the whole
+  // point of the feature — so answer its claim locally rather than letting it
+  // fall into the write-blocker below and render as an error. Nothing leaves
+  // the machine: prod never sees a claim from this page.
+  if (/functions\/v1\/claim-name/.test(url)) {
+    const name = (() => {
+      try {
+        return JSON.parse(String(init?.body ?? '{}')).name as string
+      } catch {
+        return 'Demo'
+      }
+    })()
+    // type "taken" into the field to see the failure path instead
+    if (name.toLowerCase() === 'taken') {
+      return Promise.resolve(
+        new Response(JSON.stringify({ error: 'that name is taken' }), {
+          status: 409,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      )
+    }
+    return Promise.resolve(
+      new Response(JSON.stringify({ player: { id: DEMO_ID, name } }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    )
+  }
   // everything else: block writes, allow reads
   const method = (init?.method ?? 'GET').toUpperCase()
   if (/supabase\.co/.test(url) && method !== 'GET') {
@@ -49,6 +78,14 @@ window.fetch = (input: RequestInfo | URL, init?: RequestInit) => {
   }
   return realFetch(input, init)
 }
+
+// The claim card refuses to act without an identity to claim ONTO (that is
+// the property that keeps a mid-round claim from re-salting the round's
+// dice), so the gallery needs a nameless one to stand in for a real
+// anonymous player. Rewritten on every load so the card always opens
+// unclaimed, however the last visit left it.
+const DEMO_ID = '00000000-0000-4000-8000-000000000001'
+localStorage.setItem('dogleg:player:v1', JSON.stringify({ id: DEMO_ID, secret: 'demo-secret', name: null }))
 
 const season = seasonForDate()
 const COMMON = { courseName: 'Royal Portrush — Dunluce Links', courseSlug: 'royal-portrush', dateKey: '2026-07-26', toPar: -6 }
@@ -70,6 +107,15 @@ const CASES: Record<string, (close: () => void) => React.ReactNode> = {
     <AllTimeSplash {...COMMON} character="fairway" season={season} onClose={close} />
   ),
   season: (close) => <SeasonSplash onClose={close} />,
+  // the card an ANONYMOUS player gets once the moment splash is dismissed.
+  // Open 'moment · ace' first to see the pair in the order a player meets
+  // them — the celebration is untouched, and this arrives after it.
+  'trophy claim · ace (daily)': (close) => (
+    <TrophyClaim kind="ace" holeNumber={7} courseName={COMMON.courseName} mode="daily" onClose={close} />
+  ),
+  'trophy claim · albatross (practice)': (close) => (
+    <TrophyClaim kind="albatross" holeNumber={13} courseName={COMMON.courseName} mode="practice" onClose={close} />
+  ),
 }
 
 function Gallery() {

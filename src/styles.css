@@ -3724,3 +3724,123 @@ button {
   font-size: 0.75rem;
   color: rgba(29, 43, 32, 0.65);
 }
+
+/* ------------------------------------------ the unclaimed-trophy card */
+
+/* Shown to ANONYMOUS players after the moment splash is dismissed — never
+   during it. It deliberately does not reuse the moment's full-bleed gradient,
+   rays or display type: this is a tut-card (paper, dimmed backdrop, ordinary
+   type) so it reads as its own screen rather than a second page of the
+   celebration. The only thing it borrows is the moment's colour, and only as
+   an accent rule plus a rim glow — enough to say "this is about what just
+   happened", not enough to be mistaken for the splash itself.
+
+   On colour: .tut-card is repainted DARK by broadcast.css (a turf gradient
+   with --text-hi ink, broadcast.css:1985), which lands after this file. So
+   the trap here is the mirror of the usual one — hard-coding the paper-era
+   ink values that sit next to .tut-card in THIS file gives you dark-on-dark
+   and an invisible title. Anything this card needs to colour comes from a
+   theme token, and everything else inherits the card's own treatment. */
+
+.trophy-backdrop {
+  background: rgba(12, 26, 18, 0.74);
+}
+
+.trophy-claim {
+  /* the accent rule sits flush inside the card's rounded top edge */
+  overflow: hidden;
+  padding-top: 26px;
+}
+
+.trophy-accent {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 5px;
+}
+
+.trophy-claim.ace .trophy-accent {
+  background: linear-gradient(90deg, #7a5a10 0%, #e8b93c 50%, #7a5a10 100%);
+}
+
+.trophy-claim.albatross .trophy-accent {
+  background: linear-gradient(90deg, #4c3378 0%, #a883e8 50%, #4c3378 100%);
+}
+
+.trophy-claim.ace {
+  box-shadow:
+    0 24px 60px rgba(0, 0, 0, 0.5),
+    0 0 0 1px rgba(185, 138, 31, 0.5),
+    0 0 46px rgba(185, 138, 31, 0.32);
+}
+
+.trophy-claim.albatross {
+  box-shadow:
+    0 24px 60px rgba(0, 0, 0, 0.5),
+    0 0 0 1px rgba(124, 86, 184, 0.5),
+    0 0 46px rgba(124, 86, 184, 0.32);
+}
+
+/* The moment's colour reaches the kicker too — it is the one line tying this
+   card to the splash the player just closed.
+
+   Qualified with .tut-card purely for specificity. broadcast.css carries
+   `:is(.screen.home, .screen.rounds, .screen.result) .kicker`, which is also
+   (0,3,0) and lands later, so a plainer selector here loses the tie wherever
+   the card sits inside one of those screens. It never does in the real game
+   (the card fires from .screen.play) — which is exactly what makes it a trap:
+   the splash gallery IS .screen.home, so the bug shows up only in the place
+   we review the card, or only in the place we ship it, depending on which
+   selector we picked. (0,4,0) is true in both. */
+.tut-card.trophy-claim.ace .kicker {
+  color: var(--trophy-400);
+}
+
+.tut-card.trophy-claim.albatross .kicker {
+  color: #a883e8;
+}
+
+.trophy-claim .tut-title {
+  color: var(--text-hi);
+}
+
+/* the form supplies the height here — tut-body's 132px floor is for the
+   tutorial's fixed-height steps and would leave a gap under this one */
+.trophy-claim .tut-body {
+  min-height: 0;
+  color: var(--text-mid);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.trophy-claim .tut-body .fine {
+  color: var(--text-low);
+}
+
+.trophy-claim .name-form {
+  margin-top: 4px;
+}
+
+/* The light end of the flag ramp — --flag-600 is a dark red that all but
+   disappears against the card. Qualified past `.trophy-claim .tut-body .fine`
+   above: the error carries BOTH classes, and the muted one would otherwise
+   win on specificity and swallow the only signal that a claim failed. */
+.tut-card.trophy-claim .tut-body .trophy-error {
+  color: var(--flag-400);
+  font-weight: 700;
+}
+
+.trophy-skip {
+  display: block;
+  margin: 14px auto 0;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-mid);
+  background: none;
+  border: 0;
+  cursor: pointer;
+}

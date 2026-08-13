@@ -67,6 +67,12 @@ export const CHANGE_KIND_LABEL: Record<ChangeKind, string> = {
 
 export const CHANGELOG: ChangeEntry[] = [
   {
+    date: '2026-08-12',
+    kind: 'feature',
+    title: 'Claim the hole in one you just made',
+    note: 'A hole in one or an albatross played without a clubhouse name used to go in the books under nobody — no name on the card, no line on any board, and no way to fix it later. Now the moment plays out exactly as it always has, and when you tap on, you get one card asking if you want to put your name on it. You can claim a clubhouse name right there, mid-round, without waiting for the scorecard — the name lands on the identity you were already playing under, so the round in your hands keeps the dice it was dealt. Tap "not now" and nothing changes.',
+  },
+  {
     date: '2026-08-10',
     kind: 'fix',
     title: 'The course list remembers your sort and filters',

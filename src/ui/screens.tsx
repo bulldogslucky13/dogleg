@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { characterById, playableCharacters } from '../engine/characters'
 import { courseBySlug, COURSES, GUEST_COURSES, PAR3_COURSES, playRatingFor } from '../engine/courses'
 import { dailySetup, forecastSetup, RESULT_LABEL, RESULT_SQUARE, shareText, SITE_URL, toParLabel, type DailySetup } from '../engine/daily'
@@ -11,14 +11,17 @@ import { challengeShareText, challengeUrl, type Challenge, type ChallengeAttempt
 import { ChallengeFaceoff, useShareActions } from './ChallengeScreen'
 import { bundleIsStale, FRESH_TTL_MS } from '../lib/freshness'
 import { fetchCourseRecords, fetchSeasonRecords, loadPlayer, type CourseRecord } from '../lib/leaderboard'
-import { seasonCountdown, seasonForDate } from '../engine/season'
+import { seasonForDate } from '../engine/season'
+import { SeasonClock } from './SeasonClock'
 import { FortuneInfo } from './Tutorial'
 import { ChangeLog } from './ChangeLog'
 import { hasEarnedAwards, reconcileAchievements, type Unlock } from '../state/achievements'
 import { Wordmark } from './Wordmark'
+import { recordChurn } from '../lib/churn'
 import { dismissSteals, pendingSteals, syncLedger, syncSeasonLedger, type PendingSteal } from '../lib/records'
-import { loadBrowsePrefs, saveBrowsePrefs } from '../lib/browsePrefs'
+import { loadBrowsePrefs, saveBrowsePrefs, type CourseSort } from '../lib/browsePrefs'
 import { loadFavorites, toggleFavorite } from '../lib/favorites'
+import { seasonHunt, type Hunt } from '../lib/hunt'
 import { loadGhost, loadGhostChoices, type Ghost, type GhostBoard } from '../state/ghost'
 import { currentHandicap, formatHandicap } from '../state/stats'
 import { characterRecords, computeStreaks, loadArchive, type HistoryEntry, type RoundRecap, type RoundState } from '../state/store'
@@ -32,6 +35,12 @@ import { PlayRatingChip } from './PlayRating'
  * to par reads as beatable). Tunable — what counts as attainable is a design
  * dial, not a law. */
 export const ATTAINABLE_RECORD_TO_PAR = -4
+
+/** How long the season-rollover timer may sleep in one go. Six hours is well
+ * inside setTimeout's ~25-day ceiling, and short enough that a device that
+ * slept through the rollover (timers don't fire while suspended) catches up
+ * within a session rather than sitting on a dead season. */
+const SEASON_REARM_MS = 6 * 3_600_000
 
 export function HomeScreen(props: {
   history: HistoryEntry[]
@@ -77,10 +86,21 @@ export function HomeScreen(props: {
   const [filterSheet, setFilterSheet] = useState(false)
   const [courseRecs, setCourseRecs] = useState<Map<string, CourseRecord> | null>(null)
   const [seasonRecs, setSeasonRecs] = useState<Map<string, CourseRecord> | null>(null)
-  /** which season the loaded seasonRecs belong to — a rollover while the
+  /** which season the LOADED seasonRecs belong to — a rollover while the
    * panel sits open must refetch for the new key, not show last season's
-   * holders under the new season's name */
+   * holders under the new season's name. Claimed only by a fetch that came
+   * back with a board, so a failed one leaves the season still to fetch. */
   const [seasonRecsKey, setSeasonRecsKey] = useState<string | null>(null)
+  /** the season key currently being fetched, if any — de-dupes the retry
+   * triggers rather than letting each one start its own read */
+  const seasonFetch = useRef<string | null>(null)
+  /** the clubhouse this device posts under. STATE, not a read-per-render,
+   * because signing in can adopt a different clubhouse while this screen sits
+   * there — and every "is this one mine?" on it moves with the answer: the
+   * hunt's trophy exclusion, the mine/not-mine filters, the YOU badge. The
+   * panel at the bottom is the only thing that knows the adoption happened,
+   * so it says so (onIdentity). */
+  const [myName, setMyName] = useState<string | null>(() => loadPlayer()?.name ?? null)
   const [steals, setSteals] = useState(() => pendingSteals())
   /** the Fortune callout's ⓘ opens How to Play's Fortunes page on its own */
   const [fortuneInfo, setFortuneInfo] = useState(false)
@@ -88,7 +108,23 @@ export function HomeScreen(props: {
   /** an engine-changing deploy landed after this tab loaded its bundle — a
    * round played now couldn't post, so say "reload" before the first stroke */
   const [stale, setStale] = useState(false)
-  const season = seasonForDate()
+  /** The season is derived from the clock, but nothing here re-renders when
+   * the clock crosses a rollover: SeasonClock's tick is local to its own
+   * subtree, so a home screen left open through a season change would keep
+   * this stale season — frozen at zero under last season's name, with the
+   * season board below it never refetching for the new key. So count ticks
+   * off a timer and recompute. The delay is clamped because setTimeout tops
+   * out near 25 days and a season runs longer than that; a re-arm costs one
+   * recompute of the same season, and the effect depends on the counter so
+   * the clamped case keeps re-arming. Nothing refetches unless season.key
+   * actually moved. */
+  const [seasonTick, setSeasonTick] = useState(0)
+  const season = useMemo(() => seasonForDate(), [seasonTick])
+  useEffect(() => {
+    const untilRollover = Math.max(0, season.endsAt - Date.now()) + 1000
+    const t = setTimeout(() => setSeasonTick((n) => n + 1), Math.min(untilRollover, SEASON_REARM_MS))
+    return () => clearTimeout(t)
+  }, [season.endsAt, seasonTick])
 
   // checked on mount, then again whenever the tab comes back into view and on
   // a slow interval — a home screen left open through a deploy must notice it
@@ -126,22 +162,51 @@ export function HomeScreen(props: {
   }, [showCourses, courseRecs, recType])
 
   // the season board is the live race: fetched per season KEY, so any render
-  // after a quarterly rollover swaps in the fresh board
+  // after a quarterly rollover swaps in the fresh board. Fetched on MOUNT
+  // (not when the panel opens) because the hunt card below the unlimited CTA
+  // reads it before any panel exists — one ~40-row query per home visit.
+  //
+  // That ONE read serves both readers: the hunt card AND the season half of
+  // the record-stolen reconcile below feed off this snapshot rather than
+  // racing a second identical query, so the card and the ledger can never
+  // disagree about who holds what.
   useEffect(() => {
-    if (showCourses && backendEnabled && seasonRecsKey !== season.key) {
-      setSeasonRecsKey(season.key)
-      setSeasonRecs(null)
-      // a FAILED season fetch stays null (no lines) — an empty season board is
-      // "open, be the first"; an unreachable one must not pretend to know
-      void fetchSeasonRecords(season.key).then((r) => setSeasonRecs(r))
-    }
-  }, [showCourses, seasonRecsKey, season.key])
+    if (!backendEnabled || seasonRecsKey === season.key) return
+    const key = season.key
+    // one request per season key at a time — the retry deps below fire on
+    // every open and toggle, and a slow board must not collect a queue of
+    // identical reads while the first is still out
+    if (seasonFetch.current === key) return
+    seasonFetch.current = key
+    setSeasonRecs(null)
+    void fetchSeasonRecords(key).then((recs) => {
+      // a rollover started a newer request while this one was in flight —
+      // last season's holders must not land under the new season's name
+      if (seasonFetch.current !== key) return
+      seasonFetch.current = null
+      // a FAILED season fetch stays null (no lines, no hunt) — an empty season
+      // board is "open, be the first"; an unreachable one must not pretend to
+      // know. The key stays UNCLAIMED so the next open retries, the same
+      // recovery the all-time board gets from its null check: a device that
+      // was briefly offline at mount would otherwise sit on "records
+      // loading…" with no hunt card for the life of the screen.
+      if (!recs) return
+      setSeasonRecsKey(key)
+      setSeasonRecs(recs)
+      // the name is read HERE, not at effect time: it can be claimed after
+      // mount, and an unnamed device holds no records to reconcile anyway
+      const name = loadPlayer()?.name ?? null
+      if (!name) return
+      syncSeasonLedger(recs, key, name)
+      setSteals(pendingSteals())
+    })
+  }, [showCourses, recType, seasonRecsKey, season.key])
 
-  // the record-stolen check: compare the records this device holds against
-  // the server's holders, on BOTH boards. Purely reads — the "notification"
-  // is derived. Each fetch reconciles its own shelf independently, so one
-  // board being unreachable never silences (or fakes) the other; a failed
-  // fetch stays null and that shelf simply isn't reconciled this visit.
+  // the record-stolen check for the ALL-TIME board — the season half rides
+  // the board fetch above rather than issuing its own read. Purely reads: the
+  // "notification" is derived. Each board reconciles its own shelf
+  // independently, so one being unreachable never silences (or fakes) the
+  // other; a failed fetch stays null and that shelf isn't reconciled this visit.
   useEffect(() => {
     if (!backendEnabled) return
     const myName = loadPlayer()?.name ?? null
@@ -155,11 +220,6 @@ export function HomeScreen(props: {
       // reconcile. Quiet: nobody earned anything just now, we only found out.
       reconcileAchievements('quiet')
       props.onAwardsChanged?.()
-      setSteals(pendingSteals())
-    })
-    void fetchSeasonRecords(season.key).then((recs) => {
-      if (!recs) return
-      syncSeasonLedger(recs, season.key, myName)
       setSteals(pendingSteals())
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -188,7 +248,6 @@ export function HomeScreen(props: {
   const RATING_BAND = { easy: [1, 3], mid: [4, 7], hard: [8, 10] } as const
   const activeRecs = recType === 'season' ? seasonRecs : courseRecs
   const recsReady = activeRecs !== null
-  const myName = loadPlayer()?.name ?? null
   // recent sort reads the archive once per open, not per row: last playedAt
   // per slug. The archive prunes, so "recent" means what it remembers — the
   // same source and the same honesty as the played notch itself.
@@ -199,6 +258,14 @@ export function HomeScreen(props: {
   const filtersActive = activeFilterCount > 0 || courseSort !== 'tour'
   // guest courses browse (and filter, and sort) like everything else — one pool
   const browsable = [...COURSES, ...GUEST_COURSES]
+  // the hunt: season records takeable RIGHT NOW (open boards + beatable
+  // numbers, minus my own trophies) — the bait under the unlimited CTA
+  const hunt = seasonHunt(
+    seasonRecs,
+    browsable.map((c) => c.slug),
+    myName,
+    ATTAINABLE_RECORD_TO_PAR,
+  )
   const visibleCourses = browsable.filter((c) => {
     if (favsOnly && !favs.has(c.slug)) return false
     if (playedFilter === 'unplayed' && playedSlugs.has(c.slug)) return false
@@ -231,12 +298,30 @@ export function HomeScreen(props: {
     }
     return 0
   })
-  const resetFilters = () => {
+  const resetFilters = (sort: CourseSort = 'tour') => {
     setPlayedFilter('all')
     setRatingFilter('any')
     setRecordFilter('any')
     setFavsOnly(false)
-    setCourseSort('tour')
+    setCourseSort(sort)
+  }
+  /**
+   * Open the list ON the hunt the card just advertised.
+   *
+   * The card counts targets across the whole Courses pool with no filter
+   * applied, so the view it opens has to match that count or the headline
+   * lied: a saved configuration (favorites only, a difficulty band, "I hold
+   * it" — which excludes every hunt target by definition) or the Par 3 tab
+   * left active from a previous open would otherwise hand back an empty or
+   * unrelated list. So the hunt clears the view rather than inheriting it,
+   * and sorts weakest-record-first, which is the hunt's own order.
+   */
+  const openHunt = (h: Hunt) => {
+    track('hunt_opened', { total: h.total, open: h.open })
+    setCourseTab('courses')
+    resetFilters('beatable')
+    setRecType('season')
+    setShowCourses(true)
   }
   return (
     <div className="screen home">
@@ -372,6 +457,22 @@ export function HomeScreen(props: {
         Play unlimited
         <span className="cta-sub">Browse courses</span>
       </button>
+      {/* the hunt card: why open the course list — records are sitting there.
+          Tapping lands on the list already sorted by what's winnable. Renders
+          only when the board is KNOWN and something is actually takeable. */}
+      {hunt !== null && hunt.total > 0 && (
+        <button className="hunt-card" onClick={() => openHunt(hunt)}>
+          <b>
+            🎯 {hunt.total} season record{hunt.total === 1 ? '' : 's'} within reach
+          </b>
+          <em>
+            {hunt.open > 0 && `${hunt.open} wide open`}
+            {hunt.open > 0 && hunt.worst !== null && ' · '}
+            {hunt.worst !== null && `softest number standing is ${toParLabel(hunt.worst)}`}
+            {' — go take one ›'}
+          </em>
+        </button>
+      )}
       {showCourses && (
         <div className="course-list">
           <div className="course-tabs" role="tablist" aria-label="Course type">
@@ -396,11 +497,29 @@ export function HomeScreen(props: {
             </button>
           </div>
           {courseTab === 'par3' && <Par3Intro />}
-          {courseTab === 'courses' && (
-            <p className="season-countdown">
-              ⏳ {season.name} ends in {seasonCountdown(season)} — season records are up for grabs
-            </p>
-          )}
+          {courseTab === 'courses' && <SeasonClock season={season} />}
+          {/* the wall keeps score of itself: how many of the records standing
+              on it were set in the past week, and how many of those fell in
+              daily play (they wear the crown). A quiet week says nothing —
+              drama isn't invented here, and the wording is held to what one
+              row per course can prove: "set in the past week", never "changed
+              hands" (see the note on recordChurn). */}
+          {courseTab === 'courses' &&
+            (() => {
+              const churn = recordChurn(courseRecs)
+              if (!churn || churn.total === 0) return null
+              return (
+                <p className="season-countdown record-churn">
+                  🔥 {churn.total} course record{churn.total === 1 ? '' : 's'} set in the past week
+                  {churn.daily > 0 && (
+                    <>
+                      {' '}— {churn.daily} in daily play
+                      <RecordCrown rec={{ mode: 'daily' }} />
+                    </>
+                  )}
+                </p>
+              )
+            })()}
           {courseTab === 'courses' && (
             <div className="course-filters">
               {/* one slim row; the full controls live in the sheet below */}
@@ -519,7 +638,7 @@ export function HomeScreen(props: {
                 </div>
                 <div className="filter-foot">
                   {filtersActive && (
-                    <button className="filter-reset" onClick={resetFilters}>
+                    <button className="filter-reset" onClick={() => resetFilters()}>
                       Reset filters
                     </button>
                   )}
@@ -537,7 +656,7 @@ export function HomeScreen(props: {
                   "open" filter that matched yesterday matches nothing today)
                   and a bare "no courses" would read as missing data */}
               <p className="fine">No courses match your saved filters — every course is still here.</p>
-              <button className="filter-reset" onClick={resetFilters}>
+              <button className="filter-reset" onClick={() => resetFilters()}>
                 Reset filters
               </button>
             </div>
@@ -645,7 +764,7 @@ export function HomeScreen(props: {
         </button>
       )}
       <HandicapChip onTap={props.onStats} />
-      <AccountPanel onHistorySynced={props.onHistorySynced} />
+      <AccountPanel onHistorySynced={props.onHistorySynced} onIdentity={(p) => setMyName(p.name)} />
       {/* the quiet stuff lives at the foot of the screen: the rules, and the
           receipt showing what has changed since launch */}
       <div className="teebox-footer">

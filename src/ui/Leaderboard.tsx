@@ -68,6 +68,20 @@ export function competitionRanks(rows: Array<{ to_par: number }>): number[] {
   return out
 }
 
+/**
+ * Where a round WOULD rank on a board it has not been submitted to — used to
+ * tell an unnamed player what their card is worth before they name it.
+ *
+ * Deliberately the same rule as competitionRanks and the referee ("players
+ * strictly better than you, plus one"), so the number a player is shown
+ * before claiming matches the one they are shown after. Provisional either
+ * way: the referee ranks against the whole table, this only against the
+ * fetched top slice, and only the referee's answer is authoritative.
+ */
+export function provisionalRank(board: Array<{ to_par: number }>, toPar: number): number {
+  return board.filter((r) => r.to_par < toPar).length + 1
+}
+
 export function ScoreBoard(props: {
   round: RoundState
   /** the records ledger just moved (a record taken or taken back). Fires
@@ -189,9 +203,12 @@ export function ScoreBoard(props: {
       sent.current = true
       void submit()
     }
-    // an unnamed player's practice round might have beaten the standing
-    // record — fetch it so the claim form can say so
-    if (!player && round.mode === 'practice') {
+    // an unnamed player's round might have beaten the standing record —
+    // fetch it so the claim form can say so. NOT gated to practice: daily
+    // rounds contend for course records too now, and while this gate still
+    // said 'practice' an unnamed player could beat the all-time record on a
+    // daily and be told nothing about it.
+    if (!player) {
       void fetchCourseRecords().then((recs) => setStanding(recs?.get(round.courseSlug) ?? null))
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -231,11 +248,14 @@ export function ScoreBoard(props: {
     </form>
   )
 
+  // an unnamed player just outscored the standing record (or set the first
+  // one) — beating it is the natural moment to claim a name and defend it.
+  // Hoisted out of the practice branch: since daily rounds started counting
+  // for course records, the daily wrap needs to be able to say this too.
+  const beatsStanding = !player && !result && (!standing || roundToPar(round) < standing.to_par)
+
   if (round.mode === 'practice') {
     const rec = result?.record
-    // an unnamed player just outscored the standing record (or set the first
-    // one) — beating it is the natural moment to claim a name and defend it
-    const beatsStanding = !player && !result && (!standing || roundToPar(round) < standing.to_par)
     return (
       <div className="board-block">
         {celebrate?.tier === 'alltime' && (
@@ -306,6 +326,18 @@ export function ScoreBoard(props: {
 
   const shown = board?.slice(0, 10) ?? []
   const ranks = competitionRanks(shown)
+  /**
+   * Where this round WOULD sit if the player put a name on it. The board is
+   * already fetched for the list below, so this costs nothing — and it turns
+   * the claim prompt from a generic request into a fact about the round they
+   * just played, which is the whole reason the practice branch converts.
+   *
+   * Competition ranking, same as the list: count strictly better rounds and
+   * add one, so tying for 2nd reads 2nd rather than 3rd. Provisional by
+   * nature — the referee ranks for real on submission (it is the only side
+   * that can), and this never claims otherwise.
+   */
+  const wouldRank = !player && !result && board ? provisionalRank(board, roundToPar(round)) : null
   // the season the SERVER stamped the record with: the puzzle's own day,
   // anchored mid-day UTC exactly like the referee — not the submission
   // instant, so a card posted just after the season horn still celebrates
@@ -363,7 +395,35 @@ export function ScoreBoard(props: {
       )}
       {nameForm && (
         <>
-          <p className="fine">Put a name on your card and join the daily board — no account needed.</p>
+          {/* Tiered on purpose: a course record is bigger news than a good
+              day, so it outranks (and replaces) the board-place line rather
+              than stacking two asks on top of each other. Below the top ten
+              neither claim is worth making and the plain invitation stands —
+              overselling a mid-table round is how a prompt stops being
+              believed on the day it matters. */}
+          {beatsStanding && standing ? (
+            <SyncCta
+              copy={`That round beats ${standing.player_name}'s course record — claim a clubhouse name to take it and defend it.`}
+              trigger="daily-record-claim"
+              action="Claim"
+              onTap={() => nameInputRef.current?.focus()}
+            />
+          ) : wouldRank && board && board.length > 0 && wouldRank <= 10 ? (
+            <SyncCta
+              copy={
+                wouldRank === 1
+                  ? `That round would lead today's board — put a name on your card and take it.`
+                  : `That round would sit ${ordinal(wouldRank)} on today's board — put a name on your card.`
+              }
+              trigger="daily-rank-claim"
+              action="Post"
+              onTap={() => nameInputRef.current?.focus()}
+            />
+          ) : board && board.length === 0 ? (
+            <p className="fine">Nobody's posted yet — put a name on your card and you're top of the board.</p>
+          ) : (
+            <p className="fine">Put a name on your card and join the daily board — no account needed.</p>
+          )}
           {nameForm}
         </>
       )}
@@ -382,7 +442,9 @@ export function ScoreBoard(props: {
           ))}
         </ol>
       )}
-      {board && board.length === 0 && !result && <p className="fine">Nobody's posted yet — be first.</p>}
+      {/* the claim prompt above already says this, in its own words, to the
+          players who still need to name themselves */}
+      {board && board.length === 0 && !result && !nameForm && <p className="fine">Nobody's posted yet — be first.</p>}
     </div>
   )
 }

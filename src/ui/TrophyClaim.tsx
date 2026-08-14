@@ -75,6 +75,14 @@ export function TrophyClaim(props: {
   }
 
   const dismiss = () => {
+    // "Not now" promises that nothing changes, and while a claim is in flight
+    // that promise is not ours to keep: the write is one-way (claim-name
+    // cannot rename), so a dismissal that races it would leave the player
+    // permanently named without ever seeing it happen. Closing the door is
+    // the only honest option — there is nothing to cancel, the request is
+    // already with the server. Bounded by the claim's own timeout, so a
+    // stalled network can't leave this card with no way out.
+    if (busy) return
     if (!claimed) track('trophy_claim_dismissed', { kind: props.kind, mode: props.mode })
     props.onClose()
   }
@@ -140,7 +148,7 @@ export function TrophyClaim(props: {
               </form>
               {error && <p className="fine trophy-error">{error}</p>}
             </div>
-            <button className="trophy-skip" onClick={dismiss}>
+            <button className="trophy-skip" onClick={dismiss} disabled={busy}>
               Not now
             </button>
           </>

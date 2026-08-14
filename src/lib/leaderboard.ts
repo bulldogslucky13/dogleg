@@ -96,7 +96,18 @@ export type ClaimResult = { ok: true; player: Player } | { ok: false; error: str
  *
  * The name lands on the identity this device already holds, so the round in
  * flight keeps the dice it was dealt.
+ *
+ * Unlike the other calls here this one is BOUNDED, because the card that makes
+ * it disables its own "not now" while the claim is in flight — the write is
+ * one-way, so a dismissal racing it would name the player permanently without
+ * ever showing it. That makes an unbounded fetch a modal with no exit, mid
+ * round, so the request gets a deadline instead. Giving up is safe: the claim
+ * may still land server-side, and a retry from a device that never heard back
+ * hits claim-name's already-named path and is answered with the name that
+ * actually took.
  */
+const CLAIM_TIMEOUT_MS = 15_000
+
 export async function claimClubhouseName(name: string): Promise<ClaimResult> {
   if (!backendEnabled) return { ok: false, error: 'leaderboard disabled' }
   const player = loadIdentity()
@@ -107,6 +118,7 @@ export async function claimClubhouseName(name: string): Promise<ClaimResult> {
       method: 'POST',
       headers: { ...REST_HEADERS, 'content-type': 'application/json' },
       body: JSON.stringify({ playerId: player.id, playerSecret: player.secret, name }),
+      signal: AbortSignal.timeout(CLAIM_TIMEOUT_MS),
     })
     const body = (await res.json()) as { player?: { id: string; name: string }; error?: string }
     if (!res.ok || !body.player) return { ok: false, error: body.error ?? `could not claim that name (${res.status})` }

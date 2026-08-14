@@ -3844,3 +3844,12 @@ button {
   border: 0;
   cursor: pointer;
 }
+
+/* disabled while a claim is in flight, because the write is one-way and a
+   dismissal that raced it would name the player without showing them (see
+   TrophyClaim). It has to LOOK unavailable for those few seconds, or the one
+   honest exit reads as broken instead of busy. */
+.trophy-skip:disabled {
+  opacity: 0.5;
+  cursor: default;
+}

@@ -55,16 +55,21 @@ window.fetch = (input: RequestInfo | URL, init?: RequestInit) => {
         return 'Demo'
       }
     })()
+    // An instant answer hides the card's third face. The claim is a one-way
+    // write, so "not now" is disabled while it runs — and that in-flight state
+    // is exactly the one worth looking at, since it is the seconds in which
+    // the card has no exit. Slow enough to see, short enough to sit through.
+    const after = (res: Response) => new Promise<Response>((r) => setTimeout(() => r(res), 900))
     // type "taken" into the field to see the failure path instead
     if (name.toLowerCase() === 'taken') {
-      return Promise.resolve(
+      return after(
         new Response(JSON.stringify({ error: 'that name is taken' }), {
           status: 409,
           headers: { 'Content-Type': 'application/json' },
         }),
       )
     }
-    return Promise.resolve(
+    return after(
       new Response(JSON.stringify({ player: { id: DEMO_ID, name } }), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },

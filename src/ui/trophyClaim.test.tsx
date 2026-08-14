@@ -130,6 +130,50 @@ describe('the unclaimed-trophy card', () => {
     expect(loadIdentity()?.id).toBe(ANON.id) // still playing, still the same dice
     expect(track).toHaveBeenCalledWith('trophy_claim_dismissed', expect.anything())
   })
+
+  it('cannot be dismissed out from under a claim that is already in flight', async () => {
+    savePlayerIdentity(ANON)
+    const onClose = vi.fn()
+    // a claim that has left the device but not yet come back — the window the
+    // dismissal must not be allowed to race
+    let land!: (res: Response) => void
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => new Promise<Response>((resolve) => (land = resolve))),
+    )
+
+    render(<TrophyClaim kind="ace" holeNumber={7} courseName="Pine Valley" mode="daily" onClose={onClose} />)
+    fireEvent.change(screen.getByLabelText('Clubhouse name'), { target: { value: 'Jace' } })
+    fireEvent.click(screen.getByText('Claim it'))
+    await waitFor(() => expect(screen.getByText('Claiming…')).toBeTruthy())
+
+    // the write is one-way, so closing here would name the player permanently
+    // without ever showing them it happened — "not now" would be a lie
+    const skip = screen.getByText('Not now') as HTMLButtonElement
+    expect(skip.disabled).toBe(true)
+    fireEvent.click(skip)
+    expect(onClose).not.toHaveBeenCalled()
+    expect(track).not.toHaveBeenCalledWith('trophy_claim_dismissed', expect.anything())
+
+    land(new Response(JSON.stringify({ player: { id: ANON.id, name: 'Jace' } }), { status: 200 }))
+    await waitFor(() => expect(screen.getByText(/It's yours, Jace/)).toBeTruthy())
+  })
+
+  it('gives the door back when the claim fails, so a refusal is not a trap', async () => {
+    savePlayerIdentity(ANON)
+    const onClose = vi.fn()
+    vi.stubGlobal('fetch', fetchOnce(409, { error: 'that name is taken' }))
+
+    render(<TrophyClaim kind="ace" holeNumber={7} courseName="Pine Valley" mode="daily" onClose={onClose} />)
+    fireEvent.change(screen.getByLabelText('Clubhouse name'), { target: { value: 'Jace' } })
+    fireEvent.click(screen.getByText('Claim it'))
+
+    await waitFor(() => expect(screen.getByText('that name is taken')).toBeTruthy())
+    expect((screen.getByText('Not now') as HTMLButtonElement).disabled).toBe(false)
+    fireEvent.click(screen.getByText('Not now'))
+    expect(onClose).toHaveBeenCalled()
+    expect(loadPlayer()).toBeNull()
+  })
 })
 
 describe('claimClubhouseName', () => {
@@ -153,5 +197,31 @@ describe('claimClubhouseName', () => {
     // a claimed name is permanent through this door, as through the other two
     expect(fetchMock).not.toHaveBeenCalled()
     expect(localStorage.getItem(PLAYER_KEY)).toContain('Jackson')
+  })
+
+  it('gives the request a deadline, because the card has no exit while it runs', async () => {
+    savePlayerIdentity(ANON)
+    const fetchMock = fetchOnce(200, { player: { id: ANON.id, name: 'Jace' } })
+    vi.stubGlobal('fetch', fetchMock)
+    await claimClubhouseName('Jace')
+    // TrophyClaim disables "not now" for the duration of this call, so an
+    // unbounded one would be a modal with no way out
+    const signal = fetchMock.mock.calls[0]?.[1]?.signal
+    expect(signal).toBeInstanceOf(AbortSignal)
+  })
+
+  it('reports a network failure as retryable rather than claiming it worked', async () => {
+    savePlayerIdentity(ANON)
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        throw new DOMException('timed out', 'TimeoutError')
+      }),
+    )
+    const out = await claimClubhouseName('Jace')
+    expect(out.ok).toBe(false)
+    // the claim may still have landed server-side; retrying is safe because
+    // claim-name answers an already-named row with the name that took
+    expect(loadPlayer()).toBeNull()
   })
 })

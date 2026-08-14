@@ -171,6 +171,20 @@ describe('replayRound is a perfect mirror of the client store', () => {
     expect(finalToPar).toBe(roundToPar(finished))
     // garbage codes are rejected, not crashed on
     expect(decodeReplay('not-a-real-code')).toBeNull()
+
+    // a hand-edited payload can put anything in the name, and the name is the
+    // one field that reaches the screen verbatim — an object there would be
+    // rendered as a React child and take the screen down. Anything that isn't
+    // a string decodes as no name at all, so the round still plays.
+    const b64url = (raw: string) =>
+      btoa(unescape(encodeURIComponent(raw))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+    const d = decisions.map((hole) => hole.map((c) => ({ safe: 's', normal: 'n', aggressive: 'a' })[c]).join('')).join('-')
+    for (const n of [{ toString: 'boom' }, ['a', 'b'], 42, null] as unknown[]) {
+      const forged = decodeReplay(b64url(JSON.stringify({ v: 1, s: finished.seed, c: 'fairway', d, n })))
+      expect(forged).not.toBeNull()
+      expect(forged!.name).toBeUndefined()
+      expect(forged!.decisions).toEqual(decisions)
+    }
   })
 
   it('a salted daily seed replays through frames — share links survive per-player dice', () => {

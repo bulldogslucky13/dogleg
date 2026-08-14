@@ -29,11 +29,13 @@ import { loadArchive, type ArchivedRound } from './store'
 export type GhostBoard = 'alltime' | 'season'
 
 export interface Ghost {
-  /** 'record' = a standing record round; 'personal' = your own best here */
-  kind: 'record' | 'personal'
+  /** 'record' = a standing record round; 'personal' = your own best here;
+   * 'challenge' = the round a challenge link dared you to beat */
+  kind: 'record' | 'personal' | 'challenge'
   /** the board the round came off — copy reads it so a season-record race
-   * can never masquerade as the all-time one */
-  board: GhostBoard
+   * can never masquerade as the all-time one. Absent only for a 'challenge'
+   * ghost, which races one player's card rather than a board. */
+  board?: GhostBoard
   /** the record holder's clubhouse name; null when the ghost is your own round */
   holder: string | null
   seed: string
@@ -171,6 +173,21 @@ function buildGhost(
   }
 }
 
+/**
+ * The challenger's actual round as the ghost — a challenge attempt races the
+ * card that dared it, not the course record. Same pace-race contract as every
+ * ghost: their scoreline is the truth, their ball is atmosphere, and nothing
+ * touches the live round's dice.
+ */
+export function challengerGhost(ch: {
+  from: { seed: string; character?: CharacterId; decisions: Choice[][]; name: string | null }
+}): Ghost | null {
+  return buildGhost(ch.from.seed, ch.from.character, ch.from.decisions, {
+    kind: 'challenge',
+    holder: ch.from.name,
+  })
+}
+
 function bestReplayable(courseSlug: string, excludeSeed?: string): ArchivedRound | null {
   const candidates = loadArchive().filter((r) => r.courseSlug === courseSlug && r.seed !== excludeSeed)
   if (!candidates.length) return null
@@ -226,6 +243,7 @@ export function paceVs(ghost: Ghost, playerScores: Array<{ strokes: number } | n
 /** what the chip calls the thing being raced — short, honest, and never
  * letting a season race read as the all-time one */
 export function ghostNoun(ghost: Ghost): string {
+  if (ghost.kind === 'challenge') return ghost.holder ?? 'your rival'
   if (ghost.kind !== 'record') return 'your best'
   return ghost.board === 'season' ? 'the season record' : 'the record'
 }

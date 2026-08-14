@@ -67,6 +67,12 @@ export const CHANGE_KIND_LABEL: Record<ChangeKind, string> = {
 
 export const CHANGELOG: ChangeEntry[] = [
   {
+    date: '2026-08-12',
+    kind: 'feature',
+    title: 'Claim the hole in one you just made',
+    note: 'A hole in one or an albatross played without a clubhouse name used to go in the books under nobody — no name on the card, no line on any board, and no way to fix it later. Now the moment plays out exactly as it always has, and when you tap on, you get one card asking if you want to put your name on it. You can claim a clubhouse name right there, mid-round, without waiting for the scorecard — the name lands on the identity you were already playing under, so the round in your hands keeps the dice it was dealt. Tap "not now" and nothing changes.',
+  },
+  {
     date: '2026-08-10',
     kind: 'fix',
     title: 'The course list remembers your sort and filters',
@@ -83,6 +89,12 @@ export const CHANGELOG: ChangeEntry[] = [
     kind: 'feature',
     title: 'Find your next record',
     note: 'Unlimited play’s course list learned to hunt: filter by difficulty, by what you’ve played, by open or beatable records — season or all-time, your pick — star your target courses, and sort the whole board by what’s winnable. Fifty courses, one shortlist.',
+  },
+  {
+    date: '2026-08-09',
+    kind: 'feature',
+    title: 'Challenge links: beat this round',
+    note: 'Finish an unlimited round and throw it down as a challenge. Whoever taps the link plays the same course against your actual round — one attempt, their own luck, ties don\'t take it. Beat a challenge and you get to send the revenge link. Challenge rounds are real rounds: course and season records are live the whole way. Settle it in the group chat.',
   },
   {
     date: '2026-08-09',

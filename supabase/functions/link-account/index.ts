@@ -51,6 +51,38 @@ Deno.serve(async (req) => {
     return json(200, { status: 'account', player: accountPlayer })
   }
 
+  /**
+   * Attach this account to a player row that was read as unlinked.
+   *
+   * `user_id` is unique across rows, which stops one account holding two
+   * players — it does NOT stop a second account overwriting the column on the
+   * same row. Reaching here means the lookup above found no player for this
+   * account, so the row must still be unlinked when the write lands, and
+   * `is('user_id', null)` is what makes the read-then-write atomic. As with
+   * the name guard, a miss is reported as success by PostgREST, so the row
+   * has to come back for a miss to be visible at all.
+   */
+  const attach = async (id: string): Promise<'linked' | 'taken' | 'error'> => {
+    const { data, error } = await service
+      .from('players')
+      .update({ user_id: uid })
+      .eq('id', id)
+      .is('user_id', null)
+      .select('user_id')
+      .maybeSingle()
+    if (error) return 'error'
+    if (data) return 'linked'
+    // no row changed: another account signed in against this same identity
+    // between the read and the write, and the first one to land keeps it
+    const { data: row } = await service.from('players').select('user_id').eq('id', id).single()
+    if (!row) return 'error'
+    return row.user_id === uid ? 'linked' : 'taken'
+  }
+  const attachFailure = (outcome: 'taken' | 'error') =>
+    outcome === 'taken'
+      ? json(409, { error: 'that name is synced to another email' })
+      : json(500, { error: 'could not link' })
+
   // fresh account + this device's player → attach it
   if (playerId && playerSecret) {
     const { data: p } = await service.from('players').select('id, secret, name, user_id').eq('id', playerId).single()
@@ -63,16 +95,41 @@ Deno.serve(async (req) => {
       // belonging to them
       if (!name) return json(200, { status: 'needsname' })
       if (!NAME_RE.test(name)) return json(400, { error: 'pick a clubhouse name (2-18 letters/numbers)' })
-      const { error } = await service.from('players').update({ user_id: uid, name }).eq('id', p.id).is('name', null)
+      // Both guards are race guards, and a MISS is not an error — PostgREST
+      // reports a zero-row update as a success. This one statement writes the
+      // name AND the link, so a silent miss dropped BOTH: the caller was told
+      // "linked" while the account stayed unlinked. Ask for the row back so a
+      // miss can be told from a hit.
+      const { data: linked, error } = await service
+        .from('players')
+        .update({ user_id: uid, name })
+        .eq('id', p.id)
+        .is('name', null)
+        .is('user_id', null)
+        .select('id, secret, name')
+        .maybeSingle()
       if (error) {
         return json(error.code === '23505' ? 409 : 500, {
           error: error.code === '23505' ? 'that name is taken' : 'could not link',
         })
       }
-      return json(200, { status: 'linked', player: { id: p.id, secret: p.secret, name } })
+      if (linked) return json(200, { status: 'linked', player: linked })
+
+      // No row changed, so something moved between the read and the write —
+      // either another door (claim-name, submit-round, a second tab) named
+      // this id, or another account linked it. Re-read to find out which.
+      const { data: row } = await service.from('players').select('id, secret, name, user_id').eq('id', p.id).single()
+      if (!row) return json(500, { error: 'could not link' })
+      if (row.user_id && row.user_id !== uid) return json(409, { error: 'that name is synced to another email' })
+      // a name landed first, and only the name lost — the link is still what
+      // this request is for, so attach the account to the name that took
+      if (!row.name) return json(500, { error: 'could not link' })
+      const outcome = await attach(p.id)
+      if (outcome !== 'linked') return attachFailure(outcome)
+      return json(200, { status: 'linked', player: { id: row.id, secret: row.secret, name: row.name } })
     }
-    const { error } = await service.from('players').update({ user_id: uid }).eq('id', p.id)
-    if (error) return json(500, { error: 'could not link' })
+    const outcome = await attach(p.id)
+    if (outcome !== 'linked') return attachFailure(outcome)
     return json(200, { status: 'linked', player: { id: p.id, secret: p.secret, name: p.name } })
   }
 

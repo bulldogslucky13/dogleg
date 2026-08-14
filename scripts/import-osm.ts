@@ -806,11 +806,17 @@ const COURSE_GEO: Record<string, CourseGeo> = {
   // pebble/harbour-town precedent).
   kiawah: {
     name: 'Kiawah Island — Ocean Course',
-    rake: 3,
     center: [32.6122, -80.0215],
     radius: 2800,
     osmName: '^Kiawah Island Golf Resort - The Ocean Course$',
     engineSlug: 'kiawah-ocean',
+    // Rake 3. 23 of 78 bunkers are under the 6-yd default (min 3.2, median 7.7),
+    // and unlike arcadia the outcome check was unambiguous: at rake 6 the 11th
+    // shipped NO greenside zone at all despite three bunkers within 30 yd of its
+    // green (way/884552439 registered at a single sample) — the harbour-town:4
+    // dropped-greenside mode. Rake 3 gives it two, and the course 29 greenside
+    // zones against 26, for one extra `cross` to adjudicate.
+    rake: 3,
   },
   // Arcadia Bluffs — the BLUFFS course, way 293247442 (wikidata Q4785134). The
   // club's South Course is a separate polygon (way 693998226) 2.6 km SE and
@@ -830,11 +836,20 @@ const COURSE_GEO: Record<string, CourseGeo> = {
   // cleared Whistling Straits 9 and 18.
   arcadia: {
     name: 'Arcadia Bluffs — Bluffs Course',
-    rake: 3,
     center: [44.4576, -86.2442],
     radius: 1600,
     osmName: '^Arcadia Bluffs Golf Club$',
     engineSlug: 'arcadia-bluffs',
+    // Rake 3, and this is the case where the SIZE screen and the OUTCOME check
+    // disagreed and the outcome still won — the opposite result from
+    // whispering-pines, so read both entries together. 58 of 202 bunkers are
+    // under the 6-yd default (min 1.7), which says lower it; but at rake 6 every
+    // hole already shipped greenside sand and the audit flagged nothing missing,
+    // which says leave it. Comparing the two passes hole by hole is what decided
+    // it: rake 3 recovers the LEFT-hand greenside bunker on the 7th, the card's
+    // #1 handicap hole, and lifts the course from 32 greenside zones to 35. One
+    // hole that matters is enough.
+    rake: 3,
   },
   // Prairie Dunes Country Club, Hutchinson KS — way 778336759, whose OSM name
   // is the bare "Prairie Dunes". Anchored because the string is generic; it is

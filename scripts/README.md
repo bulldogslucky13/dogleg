@@ -396,6 +396,61 @@ find the polygon name for a new course, query Overpass for
   ring rasterised as a carry these are the real thing — on 15 and 16 they are
   the hole.
 
+- **Royal Birkdale / Merion East / Kiawah Ocean / Arcadia Bluffs / Prairie Dunes
+  (all 18 each)** — five frozen in one pass, and the batch that says **get the
+  CLUB's own card, and be ready for the ground to have moved under it.**
+  **Royal Birkdale is the course you may not import as it stands.** It has been
+  re-routed and OSM has not caught up: the old par-3 14th is out of the rotation,
+  the old 15th is now the 14th off a tee ~64 yd back, and a NEW par-3 15th plays
+  to a green OSM does not have. The tell is cheap and general — cross-match PV's
+  published tee/pin arrays against every OSM centreline END, not just the tees.
+  PV's pin lands 1-7 yd from the OSM end on 16 of 18 holes, but its 14th pin sits
+  5 yd from OSM's FIFTEENTH green and its 15th is 160 yd from any mapped green.
+  PV's own course page warns its satellite is stale here, so the new hole can be
+  neither imported nor QA'd. It ships as the pre-2024 White card / 2017 Open
+  configuration, the winged-foot call. Also the first course in the registry with
+  **no BlueGolf scorecard at all** — royalbirkdale.com's per-hole pages are the
+  card, and note its own course-summary page shows the NEW routing and
+  contradicts them.
+  **Prairie Dunes is the three-source card check.** BlueGolf puts the 11th at 535
+  as a par 4 where PV measures 452 and OSM 440 — which reads like a card typo
+  until the club's own per-tee table shows Gold 535 / Blue 453 and both geometry
+  sources turn out to have traced the BLUE pad. **When ONE hole contradicts the
+  ground by 80+ yd, get the club's per-tee table before calling it a bug.**
+  **Arcadia Bluffs is the club card beating the aggregator outright** — BlueGolf
+  7210 against the club's 7300, and it is the club's that matches the import
+  within 8 yd on 16 of 18. Its 13th is the mirror of Kiawah's 15th: OSM and PV
+  AGREE with each other and disagree with two cards, which looks like the cards
+  being wrong until the mapped pads are projected onto the hole's heading and a
+  tee turns up 51 yd FORWARD.
+  **Kiawah is the doral rule with three live candidates** — club BLACK 7385,
+  BlueGolf CHAMPIONSHIP 7772, PV 7871. Score the import's total deviation against
+  each (345 / 160 / 191) and commit. Worth copying: the card that LOST on yardage
+  still settled the stroke index, because BlueGolf's HCP row and the club's own
+  PDF agree digit for digit.
+  Two more things worth copying from this batch. **A mechanical cross-check beats
+  eyeballing**: flagging every `cross` band that overlaps `fairwayFrom` or runs
+  past the green front caught Merion 9's pond wrapping its green after a hole-by-
+  hole visual pass had missed it, and produced seven of Kiawah's fixes at once.
+  And **use a perpendicular rake, not a nearest-point scan, to project a
+  waterway**: nearest-point put Cobbs Creek ON Merion's 11th centreline for 40 yd,
+  which is an artifact of the confluence where creek and tributary meet. A creek
+  alongside holds one stable offset; a creek crossing sweeps through zero.
+  The `--profile` verdict cuts both ways here, which is the pair to study
+  together: Kiawah's crosses are ruled REAL CARRY and ARE (Dye built the course
+  that way — nothing was dropped as a phantom, and the fixes were all
+  `fairwayFrom` sitting inside a real carry), while Prairie Dunes' 11th is ruled
+  REAL CARRY and is NOT — a per-yard lateral read shows the lake up the left the
+  whole way, poking 2-18 yd across at the dogleg corner. **Necessary, not
+  sufficient, in both directions.**
+  Rake 3 on three of the five. Birkdale is the extreme (117 of 128 bunkers under
+  6 yd); Kiawah's outcome check was unambiguous (the 11th shipped NO greenside
+  sand at rake 6); Arcadia's was NOT — every hole already had greenside sand —
+  and rake 3 was adopted anyway on one hole's evidence, the left-hand greenside
+  bunker of the card's #1 handicap hole. So the whispering-pines rule holds with
+  a rider: **greenside zones shipped decides, and one hole that matters is
+  enough.**
+
 ### Known gaps & importer artifact modes
 
 - **Coverage** — obscure courses may lack `golf=hole` centerlines, and many

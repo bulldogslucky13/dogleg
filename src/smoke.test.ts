@@ -16,7 +16,7 @@ import { castLinesForHole, castRound } from './engine/cast'
 import { CHARACTERS } from './engine/characters'
 import { COURSES, GUEST_COURSES, PAR3_COURSES, courseBySlug, playRatingFor } from './engine/courses'
 import { PLAY_RATINGS } from './engine/playRatings'
-import { DAILY_OVERRIDES, ROTATION_ERAS, courseForPuzzle, dailyConditions, dailySetup, forecastSetup, practiceSetup, puzzleNumberForDateKey, shareText, type DailySetup } from './engine/daily'
+import { DAILY_OVERRIDES, ROTATION_ERAS, SITE_URL, courseForPuzzle, dailyConditions, dailySetup, forecastSetup, practiceSetup, puzzleNumberForDateKey, shareText, type DailySetup } from './engine/daily'
 import { splitFortune } from './engine/fortune'
 import { gradeCopy, gradeRound } from './engine/grade'
 import { decisionsFromScores, destinyPlan, fortuneOddsFor, replayRound, setupFromSeed } from './engine/replay'
@@ -592,6 +592,11 @@ describe('smoke: a finished round produces its result artifacts', () => {
     expect(shareText(setup, results, roundToPar(done), 'dart', 1)).not.toContain('streak')
     expect(shareText(setup, results, roundToPar(done), 'dart', 0)).not.toContain('streak')
     expect(card).not.toContain('streak')
+
+    // the daily card stays the classic squares — challenges are unlimited
+    // play's game, thrown from the practice wrap, never from here
+    expect(card).toContain(SITE_URL)
+    expect(card).not.toContain('challenge')
   })
 
   it('grades the round — the swing coach report identity, determinism, and copy', () => {

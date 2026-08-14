@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { characterById, playableCharacters } from '../engine/characters'
 import { courseBySlug, COURSES, GUEST_COURSES, PAR3_COURSES, playRatingFor } from '../engine/courses'
 import { dailySetup, forecastSetup, RESULT_LABEL, RESULT_SQUARE, shareText, SITE_URL, toParLabel, type DailySetup } from '../engine/daily'
@@ -7,9 +7,12 @@ import { decisionsFromScores, encodeReplay } from '../engine/replay'
 import type { CharacterId, HoleResult } from '../engine/types'
 import { track } from '../lib/analytics'
 import { backendEnabled } from '../lib/backend'
+import { challengeShareText, challengeUrl, type Challenge, type ChallengeAttempt } from '../lib/challenge'
+import { ChallengeFaceoff, useShareActions } from './ChallengeScreen'
 import { bundleIsStale, FRESH_TTL_MS } from '../lib/freshness'
 import { fetchCourseRecords, fetchSeasonRecords, loadPlayer, type CourseRecord } from '../lib/leaderboard'
-import { seasonCountdown, seasonForDate } from '../engine/season'
+import { seasonForDate } from '../engine/season'
+import { SeasonClock } from './SeasonClock'
 import { FortuneInfo } from './Tutorial'
 import { ChangeLog } from './ChangeLog'
 import { hasEarnedAwards, reconcileAchievements, type Unlock } from '../state/achievements'
@@ -33,9 +36,15 @@ import { PlayRatingChip } from './PlayRating'
  * dial, not a law. */
 export const ATTAINABLE_RECORD_TO_PAR = -4
 
+/** How long the season-rollover timer may sleep in one go. Six hours is well
+ * inside setTimeout's ~25-day ceiling, and short enough that a device that
+ * slept through the rollover (timers don't fire while suspended) catches up
+ * within a session rather than sitting on a dead season. */
+const SEASON_REARM_MS = 6 * 3_600_000
+
 export function HomeScreen(props: {
   history: HistoryEntry[]
-  activeRound: { mode: 'daily' | 'practice'; courseName: string } | null
+  activeRound: { mode: 'daily' | 'practice'; courseName: string; challenge?: boolean } | null
   playedToday: HistoryEntry | null
   onTeeOff: () => void
   onResume: () => void
@@ -99,7 +108,23 @@ export function HomeScreen(props: {
   /** an engine-changing deploy landed after this tab loaded its bundle — a
    * round played now couldn't post, so say "reload" before the first stroke */
   const [stale, setStale] = useState(false)
-  const season = seasonForDate()
+  /** The season is derived from the clock, but nothing here re-renders when
+   * the clock crosses a rollover: SeasonClock's tick is local to its own
+   * subtree, so a home screen left open through a season change would keep
+   * this stale season — frozen at zero under last season's name, with the
+   * season board below it never refetching for the new key. So count ticks
+   * off a timer and recompute. The delay is clamped because setTimeout tops
+   * out near 25 days and a season runs longer than that; a re-arm costs one
+   * recompute of the same season, and the effect depends on the counter so
+   * the clamped case keeps re-arming. Nothing refetches unless season.key
+   * actually moved. */
+  const [seasonTick, setSeasonTick] = useState(0)
+  const season = useMemo(() => seasonForDate(), [seasonTick])
+  useEffect(() => {
+    const untilRollover = Math.max(0, season.endsAt - Date.now()) + 1000
+    const t = setTimeout(() => setSeasonTick((n) => n + 1), Math.min(untilRollover, SEASON_REARM_MS))
+    return () => clearTimeout(t)
+  }, [season.endsAt, seasonTick])
 
   // checked on mount, then again whenever the tab comes back into view and on
   // a slow interval — a home screen left open through a deploy must notice it
@@ -411,7 +436,8 @@ export function HomeScreen(props: {
       )}
       {props.activeRound?.mode === 'practice' && (
         <button className="cta ghost" onClick={props.onResume}>
-          Resume practice round · {props.activeRound.courseName}
+          {props.activeRound.challenge ? '⚔️ Resume challenge attempt' : 'Resume practice round'} ·{' '}
+          {props.activeRound.courseName}
         </button>
       )}
       {stale && props.activeRound && !props.playedToday && (
@@ -471,11 +497,7 @@ export function HomeScreen(props: {
             </button>
           </div>
           {courseTab === 'par3' && <Par3Intro />}
-          {courseTab === 'courses' && (
-            <p className="season-countdown">
-              ⏳ {season.name} ends in {seasonCountdown(season)} — season records are up for grabs
-            </p>
-          )}
+          {courseTab === 'courses' && <SeasonClock season={season} />}
           {/* the wall keeps score of itself: how many of the records standing
               on it were set in the past week, and how many of those fell in
               daily play (they wear the crown). A quiet week says nothing —
@@ -952,7 +974,9 @@ function StealCard(props: {
 }
 
 /** what the result screen's quiet close calls the thing that was raced */
-function ghostCloseNoun(close: { kind: 'record' | 'personal'; board: GhostBoard; holder: string | null }): string {
+function ghostCloseNoun(close: { kind: 'record' | 'personal' | 'challenge'; board?: GhostBoard; holder: string | null }): string {
+  // 'challenge' never reaches this line — the head-to-head card is that
+  // round's close (see App's ghostClose) — but the type rides the Ghost union
   if (close.kind !== 'record') return 'your best'
   const noun = close.board === 'season' ? 'season record' : 'record'
   return close.holder ? `${close.holder}'s ${noun}` : `your own ${noun}`
@@ -1101,6 +1125,8 @@ function HandicapChip(props: { onTap: () => void }) {
 export function CharacterPickScreen(props: {
   setup: DailySetup
   practice: boolean
+  /** a challenge attempt's stakes: whose card, what score */
+  challenge?: { from: string | null; toPar: number }
   /** which record the ghost will race (practice only) — owned by the app so
    * the choice survives into the round that starts here */
   ghostBoard: GhostBoard
@@ -1112,17 +1138,27 @@ export function CharacterPickScreen(props: {
   return (
     <div className="screen pick">
       <button className="home-link" onClick={props.onBack}>
-        ‹ Teebox
+        ‹ {props.challenge ? 'The challenge' : 'Teebox'}
       </button>
       <header>
         <div className="kicker">
-          {props.practice ? 'Practice round' : "Today's round"} · {course.name}
+          {props.challenge ? 'Challenge' : props.practice ? 'Practice round' : "Today's round"} · {course.name}
         </div>
         <h2 className="pick-title">Pick your player</h2>
         <p className="tagline">One edge, all {course.holes.length} holes. Choose for the course in front of you:</p>
       </header>
-      {props.practice && (
-        <GhostStakes courseSlug={course.slug} board={props.ghostBoard} onBoard={props.onGhostBoard} />
+      {props.challenge ? (
+        <div className="ghost-stakes cr">
+          <div className="ghost-stakes-head">
+            <b>⚔️ Beat {props.challenge.from ?? 'your rival'}</b>
+            <span className="ghost-stakes-score">{toParLabel(props.challenge.toPar)}</span>
+          </div>
+          <span className="fine">One attempt. Their card, their luck — you get your own.</span>
+        </div>
+      ) : (
+        // a challenge races one card, so the board picker only belongs to a
+        // plain practice round
+        props.practice && <GhostStakes courseSlug={course.slug} board={props.ghostBoard} onBoard={props.onGhostBoard} />
       )}
       <div className="chips center">
         <span className="chip">{course.holes.reduce((s, h) => s + h.yards, 0).toLocaleString()} yards</span>
@@ -1161,7 +1197,10 @@ export function ResultScreen(props: {
   /** the finished round, when it's still in storage — enables board submission */
   boardRound: RoundState | null
   /** the ghost race's quiet close: final margin vs the chased round */
-  ghostClose?: { margin: number; kind: 'record' | 'personal'; board: GhostBoard; holder: string | null } | null
+  ghostClose?: { margin: number; kind: 'record' | 'personal' | 'challenge'; board?: GhostBoard; holder: string | null } | null
+  /** the round that just wrapped was a challenge attempt — the head-to-head
+   * card renders with the signed result from the ledger */
+  challenge?: { challenge: Challenge; mine: NonNullable<ChallengeAttempt['done']> }
   history: HistoryEntry[]
   /** achievements this round earned — the wrap card renders only when some did */
   unlocks?: Unlock[]
@@ -1179,22 +1218,35 @@ export function ResultScreen(props: {
   const streaks = computeStreaks(props.history)
   const broke = toPar < 0
   const char = characterById(props.character)
-  const text = shareText(props.setup, results, toPar, props.character, streaks.dayStreak)
-  // a replay link IS the round: seed + decisions, re-run by the viewer's engine
-  const replayUrl = (() => {
+  // the round as pure data: seed + decisions, re-run by the receiver's engine.
+  // One payload, two doors — #watch replays it, #challenge dares them to beat it.
+  const roundPayload = (() => {
     if (!props.boardRound) return null
     const decisions = decisionsFromScores(props.boardRound.scores)
     if (!decisions) return null
-    const code = encodeReplay({
+    return {
       seed: props.boardRound.seed,
       character: props.boardRound.character,
       decisions,
       // loadPlayer is the NAMED identity — an anonymous player's replay is
       // simply unattributed, it never leaks their minted id as a name
       name: loadPlayer()?.name ?? undefined,
-    })
-    return `https://${SITE_URL}/#watch=${code}`
+    }
   })()
+  const replayUrl = roundPayload ? `https://${SITE_URL}/#watch=${encodeReplay(roundPayload)}` : null
+  // challenges are creatable from PRACTICE rounds only (they're unlimited
+  // play's game — the daily's share card stays the classic squares), and a
+  // finished attempt doesn't re-arm as a fresh gauntlet from the wrap — its
+  // head-to-head card carries the rally's next throw instead
+  const myChallengeUrl = roundPayload && props.practice && !props.challenge ? challengeUrl(roundPayload) : null
+  const text = shareText(props.setup, results, toPar, props.character, streaks.dayStreak)
+  // practice wrap: the challenge share stands alone (the daily's rides its share card)
+  const practiceChallenge = useShareActions(
+    myChallengeUrl
+      ? challengeShareText({ courseName: props.setup.course.name, toPar, url: myChallengeUrl, rally: 0 })
+      : '',
+    (method) => track('challenge_sent', { method, kind: 'fresh', rally: 0, to_par: toPar }),
+  )
   const canNativeShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function'
   const copy = async () => {
     let ok = true
@@ -1234,7 +1286,8 @@ export function ResultScreen(props: {
           take, and the screenshot should carry the brand */}
       <Wordmark className="result-wordmark" />
       <div className="kicker">
-        {props.practice ? 'Practice round' : `Daily No. ${props.setup.puzzleNumber}`} · {props.setup.course.name}
+        {props.challenge ? '⚔️ Challenge' : props.practice ? 'Practice round' : `Daily No. ${props.setup.puzzleNumber}`} ·{' '}
+        {props.setup.course.name}
       </div>
       <h1 className={`final ${broke ? 'good' : ''}`}>{toParLabel(toPar)}</h1>
       {char && (
@@ -1263,10 +1316,14 @@ export function ResultScreen(props: {
           👻 Matched {ghostCloseNoun(props.ghostClose)} to the stroke — ties don't take it. One better.
         </p>
       )}
+      {/* the challenge's close: their signed card against yours, and the
+          rally's next throw. Renders INSTEAD of the practice square rows —
+          the faceoff already shows this round's squares. */}
+      {props.challenge && <ChallengeFaceoff challenge={props.challenge.challenge} mine={props.challenge.mine} />}
       {/* practice only: the square rows ARE the recap there. On the daily the
           share card carries the same squares right above the board — showing
           the block twice was one scorecard too many. */}
-      {props.practice && (
+      {props.practice && !props.challenge && (
         <div className="emoji-grid">
           <div>{results.slice(0, 9).map((r, i) => (
             <span key={i}>{RESULT_SQUARE[r]}</span>
@@ -1321,6 +1378,17 @@ export function ResultScreen(props: {
             )}
           </div>
         </div>
+      )}
+      {/* throw the round down while it stings (or shines) — the challenge
+          share sits above the coach's autopsy. One line, no sub-label: the
+          one-attempt/own-luck contract is told on the receiving end. */}
+      {props.practice && !props.challenge && myChallengeUrl && (
+        <button
+          className="cta"
+          onClick={practiceChallenge.canNativeShare ? practiceChallenge.share : practiceChallenge.copy}
+        >
+          {practiceChallenge.copied ? 'Challenge link copied ✓' : '⚔️ Challenge a friend'}
+        </button>
       )}
       {props.grade && (
         <div className="coach-panel">

@@ -990,7 +990,14 @@ export default function App() {
             // and it is filed under nobody. This is the one instant where
             // asking for a name is a favour rather than an interruption — so
             // the claim card takes the splash's place rather than sharing it.
-            if (!loadPlayer()) setTrophyClaim(moment)
+            //
+            // It takes a minted id, NOT merely the absence of a name: the card
+            // claims onto an existing row and cannot mint one, so a device
+            // whose mint never landed (offline, or the backend off entirely)
+            // would be handed a form that can only fail. `loadPlayer()` alone
+            // can't tell those apart — it returns null for both.
+            const identity = loadIdentity()
+            if (identity && !identity.name) setTrophyClaim(moment)
             setMoment(null)
           }}
         />

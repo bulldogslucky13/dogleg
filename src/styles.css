@@ -3854,80 +3854,245 @@ button {
   cursor: default;
 }
 
+
 /* ---------- sign your scorecard ---------- */
 
-/* The card-signing gate at the tee. It reuses .scorecard wholesale so this is
-   the game's own card rather than a form that resembles one — only the
-   signature row and the pars strip's dimmed treatment are new. */
+/* The card-signing gate at the tee. This is deliberately NOT the in-round
+   .scorecard: that one is a live readout of a round in progress, this one is
+   blank course stationery you put your name on, and the two want opposite
+   things. Printed masthead, both nines with their turns totalled, one ruled
+   line for the signature. */
 .signcard {
-  margin: 12px 0 14px;
+  background: var(--cream);
+  border: 1px solid rgba(29, 43, 32, 0.22);
+  /* punched corner, same gesture the played-course rows use — it is the one
+     detail that reads instantly as "scorecard" rather than "panel" */
+  clip-path: polygon(16px 0, 100% 0, 100% 100%, 0 100%, 0 16px);
+  border-radius: 0;
+  box-shadow: 0 10px 26px rgba(6, 18, 10, 0.34);
+  overflow: hidden;
+  margin: 14px 0 16px;
 }
 
-/* The in-round card hides .sc-line on phones and swaps in the 18-hole
-   .sc-strip, but this card only ever shows the front nine, which fits — and a
-   scorecard with no holes printed on it is just a text box. Equal specificity
-   to the rule that hides it, later in the file, so this wins (the tie-by-file-
-   order rule — do not move this block above .scorecard's). */
-.signcard .sc-line {
-  display: grid;
-  grid-template-columns: 44px repeat(9, 1fr);
+/* --- printed masthead --- */
+
+.signcard-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  background: var(--turf-900, #142c1c);
+  padding: 11px 13px 10px 20px;
 }
 
-/* the pars strip is context, not content: a player is here to sign, and a
-   full-strength card would compete with the one line they have to fill in */
-.signcard .sc-line > span {
-  color: rgba(29, 43, 32, 0.5);
+.signcard-venue {
+  min-width: 0;
+}
+
+.signcard-venue b {
+  display: block;
+  font-family: var(--font-display);
+  font-variation-settings: 'wdth' 84;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: var(--track-tower, 0.02em);
+  /* the condensed face runs words together at tower width — a venue like
+     "Trump National Doral" reads as one word without this */
+  word-spacing: 0.14em;
+  font-size: 0.98rem;
+  line-height: 1.12;
+  /* explicit: this sits on the dark band, not on paper */
+  color: var(--sand-100, #f8f3e4);
+}
+
+.signcard-venue em {
+  display: block;
+  font-style: normal;
+  margin-top: 2px;
   font-size: 0.66rem;
-  padding: 3px 0;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: rgba(248, 243, 228, 0.58);
 }
 
-.signcard .sc-line .sc-label {
-  color: rgba(29, 43, 32, 0.42);
+/* the par bug — a printed stamp, not a chip */
+.signcard-par {
+  flex: none;
+  text-align: center;
+  padding: 3px 10px 4px;
+  border: 1px solid rgba(248, 243, 228, 0.34);
+  border-radius: var(--r-bug, 10px);
 }
 
-/* the signature row — a ruled line under a real input, the way a card is
-   actually signed. The input carries no box of its own: the rule IS the field,
-   which is what makes this read as paper instead of a text box on paper. */
-.signcard .sign-line {
-  display: grid;
-  grid-template-columns: 44px 1fr;
-  align-items: end;
-  gap: 8px;
+.signcard-par span {
+  display: block;
+  font-size: 0.55rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: rgba(248, 243, 228, 0.6);
+}
+
+.signcard-par b {
+  display: block;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.06rem;
+  line-height: 1.05;
+  color: var(--gold);
+}
+
+/* --- the two nines --- */
+
+.sc-nine + .sc-nine {
   border-top: 1px solid var(--line);
-  padding-top: 9px;
-  margin-top: 3px;
 }
 
-.signcard .sign-line .sc-label {
-  padding-bottom: 5px;
+.sc-row {
+  display: grid;
+  /* label + nine holes + the turn total. 1fr columns keep the two nines in
+     lockstep, so Out and In line up column-for-column down the card. */
+  grid-template-columns: 34px repeat(9, 1fr) 30px;
+  align-items: center;
 }
 
-.signcard .sign-line input {
+.sc-row > span {
+  text-align: center;
+  padding: 5px 0;
+  font-size: 0.68rem;
+  font-variant-numeric: tabular-nums;
+  color: rgba(29, 43, 32, 0.78);
+}
+
+.sc-rowlabel {
+  text-align: left !important;
+  padding-left: 8px !important;
+  font-size: 0.55rem !important;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(29, 43, 32, 0.45) !important;
+}
+
+/* the hole-number band is printed darker on a real card, and it doubles as the
+   rule between the two nines */
+.sc-holes {
+  background: rgba(29, 43, 32, 0.055);
+}
+
+.sc-holes > span {
+  font-weight: 700;
+  color: rgba(29, 43, 32, 0.5);
+}
+
+.sc-pars > span {
+  font-weight: 700;
+  color: var(--ink);
+}
+
+/* OUT / IN sit in their own inked column */
+.sc-turn {
+  background: rgba(29, 43, 32, 0.09);
+  font-weight: 800 !important;
+  font-size: 0.6rem !important;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--accent) !important;
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sc-pars .sc-turn {
+  font-size: 0.72rem !important;
+}
+
+/* --- the signature line --- */
+
+.sign-line {
+  display: grid;
+  /* wider than the .sc-row label column on purpose: "Player" is a longer word
+     than "Hole" and overruns 34px, straight into the signature cross */
+  grid-template-columns: 54px 15px 1fr;
+  align-items: center;
+  gap: 0;
+  border-top: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.35);
+  padding: 12px 13px 13px 0;
+}
+
+.sign-x {
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: rgba(29, 43, 32, 0.32);
+  text-align: center;
+}
+
+/* the rule IS the field — no box, which is what keeps this paper rather than
+   a text input sitting on top of paper */
+.sign-line input {
   width: 100%;
+  min-width: 0;
   border: 0;
-  border-bottom: 1.5px solid rgba(29, 43, 32, 0.45);
+  border-bottom: 1.5px solid rgba(29, 43, 32, 0.42);
   border-radius: 0;
   background: none;
-  padding: 3px 2px 4px;
-  font-family: inherit;
-  font-size: 1.02rem;
+  padding: 2px 2px 5px;
+  font-family: var(--font-display);
+  font-variation-settings: 'wdth' 92;
+  font-size: 1.12rem;
   font-weight: 700;
-  color: var(--accent);
   letter-spacing: 0.01em;
+  color: var(--accent);
 }
 
-.signcard .sign-line input::placeholder {
+.sign-line input::placeholder {
+  font-family: var(--font-ui);
   font-weight: 500;
-  font-size: 0.9rem;
-  color: rgba(29, 43, 32, 0.38);
+  font-size: 0.86rem;
   letter-spacing: 0;
+  color: rgba(29, 43, 32, 0.34);
 }
 
-.signcard .sign-line input:focus {
+.sign-line input:focus {
   outline: none;
   border-bottom-color: var(--accent);
 }
 
-.signcard .sign-line input:disabled {
+.sign-line input:disabled {
   opacity: 0.6;
+}
+
+/* very narrow phones: the turn column is the first thing that can give */
+@media (max-width: 359px) {
+  .sc-row {
+    grid-template-columns: 28px repeat(9, 1fr) 26px;
+  }
+
+  .sc-row > span {
+    font-size: 0.62rem;
+  }
+}
+
+/* Centre the card in the viewport instead of hanging it from the top.
+   margin-block:auto rather than align-self:center on purpose: auto margins
+   centre when there is spare room and collapse to zero when there is not, so a
+   card taller than the viewport can never end up with its head scrolled off
+   past the top of #root — which align-self:center does do. */
+.screen.sign {
+  margin-block: auto;
+}
+
+/* the mark at the top of the card, mirroring the wrap screen's. Colour is set
+   EXPLICITLY: the wrap's copy inherits --text-hi, which is sand, and this
+   screen is paper — inheriting it would print cream ink on a cream card. */
+.sign-wordmark {
+  display: block;
+  width: 84px;
+  height: auto;
+  margin: 0 auto -2px;
+  color: var(--ink);
 }

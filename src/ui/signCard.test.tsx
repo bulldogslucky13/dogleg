@@ -18,7 +18,7 @@
  * first-visit tutorial, which is where it would cost us the bounce.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 
 vi.mock('../lib/backend', () => ({
   backendEnabled: true,
@@ -82,13 +82,39 @@ describe('Sign your scorecard', () => {
     return props
   }
 
-  it('shows the course and pars they are about to play — it is a real card', () => {
+  it('prints the whole card — venue, both nines, and the signature line', () => {
     const setup = dailySetup()
+    const { holes } = setup.course
     mount({ setup })
+
+    // masthead
     expect(screen.getByText(setup.course.name)).toBeTruthy()
-    const total = setup.course.holes.reduce((t, h) => t + h.par, 0)
-    expect(screen.getByText(`Par ${total}`)).toBeTruthy()
-    expect(screen.getByText('Hole')).toBeTruthy()
+    expect(screen.getByText(setup.course.location)).toBeTruthy()
+    expect(screen.getByText(String(holes.reduce((t, h) => t + h.par, 0)))).toBeTruthy()
+
+    // ALL EIGHTEEN holes, not just the front nine — a card that stops at the
+    // turn is not a scorecard, and this is the assertion that says so
+    const grid = document.querySelector('.signcard')!
+    holes.forEach((h) => {
+      expect(within(grid as HTMLElement).getAllByText(String(h.number)).length).toBeGreaterThan(0)
+    })
+    // two nines, each with its own Hole and Par rows. Scoped to .sc-nine
+    // because the masthead carries a "Par" of its own (the total bug).
+    const nines = [...document.querySelectorAll<HTMLElement>('.sc-nine')]
+    expect(nines).toHaveLength(2)
+    nines.forEach((nine) => {
+      expect(within(nine).getByText('Hole')).toBeTruthy()
+      expect(within(nine).getByText('Par')).toBeTruthy()
+    })
+
+    // both turns are totalled, the way a real card breaks
+    expect(screen.getByText('Out')).toBeTruthy()
+    expect(screen.getByText('In')).toBeTruthy()
+    const out = holes.slice(0, 9).reduce((t, h) => t + h.par, 0)
+    const back = holes.slice(9).reduce((t, h) => t + h.par, 0)
+    expect(within(grid as HTMLElement).getAllByText(String(out)).length).toBeGreaterThan(0)
+    expect(within(grid as HTMLElement).getAllByText(String(back)).length).toBeGreaterThan(0)
+
     expect(screen.getByText('Player')).toBeTruthy()
   })
 

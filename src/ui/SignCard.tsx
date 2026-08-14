@@ -16,11 +16,17 @@
  * renders once someone has hit Tee off — they want to play, so the ask is a
  * formality rather than a toll gate.
  *
- * It is a real scorecard on purpose, built from the same `.scorecard` /
- * `.sc-head` / `.sc-line` idiom the round screens use, showing the course and
- * pars they are about to play. Signing your card before you tee off is what
- * golfers actually do, so the one piece of friction we are adding to the top
- * of the funnel is dressed as the most ordinary thing in the sport.
+ * It is a real scorecard on purpose — printed masthead, all eighteen holes
+ * broken at the turn with each nine totalled, one ruled line for the
+ * signature. Signing your card before you tee off is what golfers actually do,
+ * so the one piece of friction we are adding to the top of the funnel is
+ * dressed as the most ordinary thing in the sport.
+ *
+ * It does NOT reuse the in-round `.scorecard`, which was the first attempt and
+ * the wrong donor twice over: that component is a live readout of a round in
+ * progress rather than blank stationery, and it hides its hole rows on phones
+ * (the round screens swap in an 18-hole strip), which is why only the front
+ * nine used to survive here.
  *
  * FAILS OPEN, DELIBERATELY. Clubhouse names are globally unique, so claiming
  * one needs the server — but DogLeg plays perfectly well with no backend at
@@ -37,10 +43,33 @@ import type { DailySetup } from '../engine/daily'
 import { claimClubhouseName, type Player } from '../lib/leaderboard'
 import { track } from '../lib/analytics'
 import { Spinner } from './Spinner'
+import { Wordmark } from './Wordmark'
 
-/** Front nine, for the card's pars strip — nine columns is what fits a phone. */
-function frontNine(setup: DailySetup) {
-  return setup.course.holes.slice(0, 9)
+/**
+ * One half of the card. Real scorecards break at the turn and total each nine
+ * — which is also the only way eighteen columns fit a phone, so the honest
+ * layout and the practical one are the same layout.
+ */
+function Nine(props: { holes: DailySetup['course']['holes']; turn: 'Out' | 'In' }) {
+  const total = props.holes.reduce((t, h) => t + h.par, 0)
+  return (
+    <div className="sc-nine">
+      <div className="sc-row sc-holes">
+        <span className="sc-rowlabel">Hole</span>
+        {props.holes.map((h) => (
+          <span key={h.number}>{h.number}</span>
+        ))}
+        <span className="sc-turn">{props.turn}</span>
+      </div>
+      <div className="sc-row sc-pars">
+        <span className="sc-rowlabel">Par</span>
+        {props.holes.map((h) => (
+          <span key={h.number}>{h.par}</span>
+        ))}
+        <span className="sc-turn">{total}</span>
+      </div>
+    </div>
+  )
 }
 
 export function SignCardScreen(props: {
@@ -78,38 +107,43 @@ export function SignCardScreen(props: {
     inputRef.current?.focus()
   }
 
-  const pars = frontNine(setup)
+  const holes = setup.course.holes
+  const par = holes.reduce((t, h) => t + h.par, 0)
 
   return (
     <div className="screen sign">
+      {/* the mark up top, same gesture as the wrap screen — this is the first
+          screen a new player is asked to put their name on, so it should say
+          whose clubhouse they are joining */}
+      <Wordmark className="sign-wordmark" />
       <div className="kicker">{props.practice ? 'Unlimited play' : `Daily · ${setup.dateKey}`}</div>
       <h2>Sign your scorecard</h2>
-      <p className="fine">
-        Every card carries a name. Yours goes on the boards, the records and the trophies you win — no account, no
-        password, just the name you want to be known by.
-      </p>
+      <p className="fine">One line, once — then every board, record and trophy you win has your name on it.</p>
 
-      <div className="scorecard signcard">
-        <div className="sc-head">
-          <span>{setup.course.name}</span>
-          <b>Par {setup.course.holes.reduce((t, h) => t + h.par, 0)}</b>
+      <div className="signcard">
+        {/* printed masthead, the way course stationery actually looks: the
+            venue set in the display face on the dark band, its home
+            underneath, the par bug punched out to the right */}
+        <div className="signcard-head">
+          <div className="signcard-venue">
+            <b>{setup.course.name}</b>
+            <em>{setup.course.location}</em>
+          </div>
+          <div className="signcard-par">
+            <span>Par</span>
+            <b>{par}</b>
+          </div>
         </div>
-        <div className="sc-line">
-          <span className="sc-label">Hole</span>
-          {pars.map((h) => (
-            <span key={h.number}>{h.number}</span>
-          ))}
-        </div>
-        <div className="sc-line sc-scores">
-          <span className="sc-label">Par</span>
-          {pars.map((h) => (
-            <span key={h.number}>{h.par}</span>
-          ))}
-        </div>
+
+        <Nine holes={holes.slice(0, 9)} turn="Out" />
+        <Nine holes={holes.slice(9, 18)} turn="In" />
 
         {/* the signature line — the point of the whole screen */}
         <label className="sign-line">
-          <span className="sc-label">Player</span>
+          <span className="sc-rowlabel">Player</span>
+          <span className="sign-x" aria-hidden="true">
+            ×
+          </span>
           <input
             ref={inputRef}
             autoFocus

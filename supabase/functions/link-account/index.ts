@@ -63,13 +63,35 @@ Deno.serve(async (req) => {
       // belonging to them
       if (!name) return json(200, { status: 'needsname' })
       if (!NAME_RE.test(name)) return json(400, { error: 'pick a clubhouse name (2-18 letters/numbers)' })
-      const { error } = await service.from('players').update({ user_id: uid, name }).eq('id', p.id).is('name', null)
+      // `is('name', null)` is the race guard, and a MISS is not an error —
+      // PostgREST reports a zero-row update as a success. This write carries
+      // the `user_id` as well as the name, so a silent miss dropped BOTH:
+      // the caller was told "linked" while the account stayed unlinked. Ask
+      // for the row back so a miss can be told from a hit.
+      const { data: linked, error } = await service
+        .from('players')
+        .update({ user_id: uid, name })
+        .eq('id', p.id)
+        .is('name', null)
+        .select('id, secret, name')
+        .maybeSingle()
       if (error) {
         return json(error.code === '23505' ? 409 : 500, {
           error: error.code === '23505' ? 'that name is taken' : 'could not link',
         })
       }
-      return json(200, { status: 'linked', player: { id: p.id, secret: p.secret, name } })
+      if (linked) return json(200, { status: 'linked', player: linked })
+
+      // No row changed: another door (claim-name, submit-round, a second tab)
+      // named this id first. Only the name lost the race — the link is still
+      // what this request is for, so attach the account to the name that
+      // actually took rather than reporting a link that never happened.
+      const { data: named } = await service.from('players').select('id, secret, name, user_id').eq('id', p.id).single()
+      if (!named?.name) return json(500, { error: 'could not link' })
+      if (named.user_id && named.user_id !== uid) return json(409, { error: 'that name is synced to another email' })
+      const { error: linkError } = await service.from('players').update({ user_id: uid }).eq('id', p.id)
+      if (linkError) return json(500, { error: 'could not link' })
+      return json(200, { status: 'linked', player: { id: named.id, secret: named.secret, name: named.name } })
     }
     const { error } = await service.from('players').update({ user_id: uid }).eq('id', p.id)
     if (error) return json(500, { error: 'could not link' })

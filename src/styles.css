@@ -3853,3 +3853,81 @@ button {
   opacity: 0.5;
   cursor: default;
 }
+
+/* ---------- sign your scorecard ---------- */
+
+/* The card-signing gate at the tee. It reuses .scorecard wholesale so this is
+   the game's own card rather than a form that resembles one — only the
+   signature row and the pars strip's dimmed treatment are new. */
+.signcard {
+  margin: 12px 0 14px;
+}
+
+/* The in-round card hides .sc-line on phones and swaps in the 18-hole
+   .sc-strip, but this card only ever shows the front nine, which fits — and a
+   scorecard with no holes printed on it is just a text box. Equal specificity
+   to the rule that hides it, later in the file, so this wins (the tie-by-file-
+   order rule — do not move this block above .scorecard's). */
+.signcard .sc-line {
+  display: grid;
+  grid-template-columns: 44px repeat(9, 1fr);
+}
+
+/* the pars strip is context, not content: a player is here to sign, and a
+   full-strength card would compete with the one line they have to fill in */
+.signcard .sc-line > span {
+  color: rgba(29, 43, 32, 0.5);
+  font-size: 0.66rem;
+  padding: 3px 0;
+}
+
+.signcard .sc-line .sc-label {
+  color: rgba(29, 43, 32, 0.42);
+}
+
+/* the signature row — a ruled line under a real input, the way a card is
+   actually signed. The input carries no box of its own: the rule IS the field,
+   which is what makes this read as paper instead of a text box on paper. */
+.signcard .sign-line {
+  display: grid;
+  grid-template-columns: 44px 1fr;
+  align-items: end;
+  gap: 8px;
+  border-top: 1px solid var(--line);
+  padding-top: 9px;
+  margin-top: 3px;
+}
+
+.signcard .sign-line .sc-label {
+  padding-bottom: 5px;
+}
+
+.signcard .sign-line input {
+  width: 100%;
+  border: 0;
+  border-bottom: 1.5px solid rgba(29, 43, 32, 0.45);
+  border-radius: 0;
+  background: none;
+  padding: 3px 2px 4px;
+  font-family: inherit;
+  font-size: 1.02rem;
+  font-weight: 700;
+  color: var(--accent);
+  letter-spacing: 0.01em;
+}
+
+.signcard .sign-line input::placeholder {
+  font-weight: 500;
+  font-size: 0.9rem;
+  color: rgba(29, 43, 32, 0.38);
+  letter-spacing: 0;
+}
+
+.signcard .sign-line input:focus {
+  outline: none;
+  border-bottom-color: var(--accent);
+}
+
+.signcard .sign-line input:disabled {
+  opacity: 0.6;
+}

@@ -58,6 +58,8 @@ import { ChallengeScreen } from './ui/ChallengeScreen'
 import { identifyPlayer, track } from './lib/analytics'
 import { clubhouseLine, fetchHoleChoices, groupChoices, type TallyRow } from './lib/decisionStats'
 import { ensureIdentity, loadIdentity, loadPlayer } from './lib/leaderboard'
+import { backendEnabled } from './lib/backend'
+import { SignCardScreen } from './ui/SignCard'
 import { CharacterAvatar } from './ui/Avatars'
 import { GreenView, HoleMap, useMapSize } from './ui/HoleMap'
 import { SideMap } from './ui/SideMap'
@@ -144,6 +146,11 @@ export default function App() {
   const [lockerAccount, setLockerAccount] = useState(false)
   const [uiMode, setUiMode] = useState<UiMode>(loadUiMode)
   const [pending, setPending] = useState<PendingStart | null>(null)
+  /** Has the card-signing gate been satisfied this session? True from the start
+   * for anyone who already has a clubhouse name; set when they sign at the tee,
+   * and also set by the fail-open path so a player the server could not reach
+   * is asked exactly once rather than on every round. */
+  const [cardSigned, setCardSigned] = useState(() => !!loadPlayer())
   // which record the NEXT practice round's ghost races. Seeded per pick-screen
   // visit (season when a stolen season record is the thing being won back),
   // adjustable on the pick screen, stamped onto the round via the seed-keyed
@@ -713,6 +720,41 @@ export default function App() {
 
   if (view === 'pick') {
     const start = pending ?? { mode: 'daily' as const, setup: dailySetup() }
+    /**
+     * Sign the card before the round, for anyone who has not got a name yet.
+     *
+     * Intercepted HERE rather than at the five call sites that set view
+     * 'pick', because this view is the one doorway every round starts through
+     * — daily, practice, rematches and challenge accepts all land on it — so
+     * one gate covers every path and cannot be routed around by a new one.
+     *
+     * And because it is this view, the ask lands strictly AFTER the player hit
+     * Tee off. The tutorial that auto-opens on a first visit is untouched: we
+     * want somebody who has decided to play, not a stranger who has just been
+     * handed a form.
+     *
+     * The three conditions are all fail-open (see SignCard.tsx): no backend or
+     * no minted identity to claim onto means we never ask, because the round
+     * is playable without either and the alternative is locking an offline
+     * player out of an offline-capable game.
+     */
+    if (backendEnabled && !cardSigned && loadIdentity() && !loadPlayer()) {
+      return (
+        <SignCardScreen
+          setup={start.setup}
+          practice={start.mode === 'practice'}
+          onSigned={(p) => {
+            identifyPlayer(p.id, p.name)
+            setCardSigned(true)
+          }}
+          onPlayUnsigned={() => setCardSigned(true)}
+          onBack={() => {
+            setPending(null)
+            setView(start.challenge && challengeLink && challengeLink !== 'bad' ? 'challenge' : 'home')
+          }}
+        />
+      )
+    }
     return (
       <CharacterPickScreen
         setup={start.setup}

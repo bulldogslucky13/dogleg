@@ -73,6 +73,12 @@ export const CHANGELOG: ChangeEntry[] = [
     note: 'On five holes with a long forced carry off the tee, the safe line was drawn mostly onto water — most of the landing band sat in the hazard, while the odds beside it still read like a fairway. Safe now either takes enough club to clear the carry, where your bag reaches the far side, or stops short of it, where it does not. Because the line moved to ground you can actually hold, the numbers beside it are now the odds for the shot you are being shown. Two things deliberately did not change: where safe only clips the edge of a hazard, that is a real risk you are choosing and it stays priced that way; and the bolder two lines are untouched, because their odds always did tell you how wet they were.',
   },
   {
+    date: '2026-08-14',
+    kind: 'feature',
+    title: 'A badge for the rounds that beat you up',
+    note: 'There is a new hidden achievement waiting in Awards, and you earn it by having a bad day: finish a full round with more bogeys or worse than pars or better and it turns up on your shelf. That takes a card where the damage outnumbers everything that held — some rounds are just for the résumé. It counts every time you manage it.',
+  },
+  {
     date: '2026-08-12',
     kind: 'feature',
     title: 'Claim the hole in one you just made',

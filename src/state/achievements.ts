@@ -252,6 +252,14 @@ export const ONE_OFFS: OneOff[] = [
     repeatable: false, // the roster completes once
   },
   {
+    id: 'characterBuilding',
+    name: 'Character Building',
+    requirement: 'Finish a round with more bogeys or worse than pars or better',
+    hint: 'Some rounds are for the résumé.',
+    hidden: true,
+    repeatable: true,
+  },
+  {
     id: 'comeback',
     name: 'The Comeback',
     requirement: 'Break par after standing +3 or worse through six',
@@ -407,6 +415,7 @@ export function computeProgress(
 
   // per-round event badges
   let spotless = 0
+  let characterBuilding = 0
   let comeback = 0
   let bookends = 0
   let heater = 0
@@ -423,6 +432,15 @@ export function computeProgress(
     // "Play a full round with no bogeys" — full round of whatever course you
     // teed it up on, nine holes included
     if (isFullRound(r) && !res.some(isOver)) spotless++
+    // Spotless's shadow: the round that beat you up. Measured against PARS OR
+    // BETTER, not birdies or better — so it takes a card where the damage
+    // outnumbers everything that held, which is a genuinely rough day rather
+    // than the ordinary one (the game averages a couple over). Pars are on the
+    // good side, so this is simply: more than half the holes went over. Full
+    // rounds only, same as Spotless — a nine-hole card counts at nine, an
+    // abandoned one not at all.
+    const overs = res.filter(isOver).length
+    if (isFullRound(r) && overs > res.length - overs) characterBuilding++
     // Even Steven and Bookends stay EIGHTEEN-hole badges on purpose: their own
     // copy names the distance ("Par all eighteen holes", "Birdie the 1st and
     // the 18th"), so a nine-hole card can't satisfy what the badge says. Same
@@ -472,6 +490,7 @@ export function computeProgress(
     firstRecord: everHeld.size > 0 ? 1 : 0,
     reclaim: reclaims,
     spotless,
+    characterBuilding,
     scratch: handicap.established && handicap.value <= 0 ? 1 : 0,
     fullBag: CHARACTERS.every((c) => charactersUsed.has(c.id)) ? 1 : 0,
     comeback,

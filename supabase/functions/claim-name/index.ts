@@ -63,12 +63,31 @@ Deno.serve(async (req) => {
   if (player.name) return json(200, { player: { id: player.id, name: player.name } })
 
   // `is('name', null)` is the race guard: two devices claiming onto the same
-  // row at once, and only the first update matches.
-  const { error } = await supabase.from('players').update({ name }).eq('id', player.id).is('name', null)
+  // row at once, and only the first update matches. A miss is NOT an error —
+  // PostgREST reports a zero-row update as a success — so the loser has to be
+  // told apart from the winner by asking for the row back. Without the
+  // `select`, both taps would be answered with their own name while the
+  // database kept only one, and the losing device would persist a name it
+  // does not own.
+  const { data: claimed, error } = await supabase
+    .from('players')
+    .update({ name })
+    .eq('id', player.id)
+    .is('name', null)
+    .select('id, name')
+    .maybeSingle()
   if (error) {
     return json(error.code === '23505' ? 409 : 500, {
       error: error.code === '23505' ? 'that name is taken' : 'could not claim that name',
     })
   }
-  return json(200, { player: { id: player.id, name } })
+  if (claimed?.name) return json(200, { player: { id: claimed.id, name: claimed.name } })
+
+  // Zero rows changed: someone named this row between the read above and the
+  // update. Answer with the name that actually landed, exactly as the
+  // already-named path does — the caller wanted an identity with a name on
+  // it, and it has one.
+  const { data: winner } = await supabase.from('players').select('id, name').eq('id', player.id).single()
+  if (winner?.name) return json(200, { player: { id: winner.id, name: winner.name } })
+  return json(500, { error: 'could not claim that name' })
 })

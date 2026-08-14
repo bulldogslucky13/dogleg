@@ -1166,25 +1166,33 @@ export const COURSES: CourseSpec[] = [
     wind: 20,
     scenery: 'links',
     blurb: 'Flat-bottomed fairways winding through towering dunes on the English coast.',
+    // Card = the club's own WHITE (medal) card, 7156 / par 70, taken from
+    // royalbirkdale.com's per-hole pages — BlueGolf has no scorecard for this
+    // course at all. Par already matched on all 18; stroke index moved on 16.
+    // **This is the PRE-2024 routing**, which is what the club's hole pages and
+    // OSM both still describe and what the shipped tuple has always been; the
+    // club has since re-routed 14/15/16. The full evidence is in the
+    // royal-birkdale note in geometry.ts — read it before "correcting" 14 or 15
+    // against a current card.
     holes: holes([
-      [4, 447, 5, 'R', 'sand'],
-      [4, 419, 11, 'S', 'sand'],
+      [4, 447, 11, 'R', 'sand'],
+      [4, 419, 3, 'S', 'sand'],
       [4, 450, 7, 'L', 'sand'],
-      [3, 219, 13, 'S', 'sand'],
-      [4, 321, 17, 'S', 'sand'],
+      [3, 219, 15, 'S', 'sand'],
+      [4, 321, 13, 'S', 'sand'],
       [4, 514, 1, 'R', 'sand'],
-      [3, 151, 15, 'S', 'sand'],
-      [4, 459, 3, 'L', 'sand'],
-      [4, 411, 9, 'R', 'sand'],
-      [4, 408, 8, 'S', 'sand'],
-      [4, 436, 6, 'L', 'sand'],
-      [3, 184, 14, 'S', 'sand', 'A celebrated par 3 framed tight by towering dunes'],
-      [4, 499, 2, 'R', 'sand'],
-      [3, 201, 16, 'S', 'sand'],
-      [5, 544, 10, 'L', 'sand'],
-      [4, 439, 4, 'R', 'sand'],
-      [5, 572, 12, 'S', 'sand'],
-      [4, 508, 18, 'L', 'sand', 'The long march home through the dunes to the clubhouse'],
+      [3, 151, 17, 'S', 'sand'],
+      [4, 459, 9, 'L', 'sand'],
+      [4, 411, 5, 'R', 'sand'],
+      [4, 408, 14, 'S', 'sand'],
+      [4, 436, 8, 'L', 'sand'],
+      [3, 184, 16, 'S', 'sand', 'A celebrated par 3 framed tight by towering dunes'],
+      [4, 499, 4, 'R', 'sand'],
+      [3, 201, 18, 'S', 'sand'],
+      [5, 544, 2, 'L', 'sand'],
+      [4, 439, 12, 'R', 'sand'],
+      [5, 572, 6, 'S', 'sand'],
+      [4, 508, 10, 'L', 'sand', 'The long march home through the dunes to the clubhouse'],
     ]),
   },
   {
@@ -1195,25 +1203,36 @@ export const COURSES: CourseSpec[] = [
     greens: 'Fast',
     wind: 8,
     blurb: 'Small, subtle, and deadly — wicker baskets for flags and no room for error.',
+    // Card = the club's CHAMPIONSHIP card (par 70 / 6946), which is the one that
+    // publishes a stroke index — the 2013 U.S. Open card the shipped yardages
+    // came from does not, as USGA championship cards never do (the winged-foot
+    // rule). SI therefore moved on 16 holes. Yardages are reconciled from the
+    // import; par was already right on all 18.
     holes: holes([
-      [4, 350, 13, 'R', 'sand'],
-      [5, 556, 7, 'S', 'sand'],
-      [3, 256, 9, 'S', 'sand'],
-      [5, 628, 1, 'R', 'sand'],
-      [4, 504, 3, 'L', 'sand'],
+      [4, 350, 15, 'R', 'sand'],
+      [5, 556, 3, 'S', 'sand'],
+      [3, 256, 13, 'S', 'sand'],
+      [5, 628, 9, 'R', 'sand'],
+      [4, 504, 1, 'L', 'sand'],
       [4, 487, 5, 'R', 'sand'],
-      [4, 360, 15, 'S', 'sand'],
-      [4, 359, 11, 'L', 'sand'],
-      [3, 236, 17, 'S', 'sand'],
-      [4, 303, 16, 'S', 'sand', 'The Quarry — all carry to a green cut from the rock'],
-      [4, 367, 14, 'R', 'water', 'Where Bobby Jones sealed the Grand Slam, the brook waiting'],
-      [4, 403, 10, 'S', 'sand'],
+      [4, 360, 11, 'S', 'sand'],
+      [4, 359, 17, 'L', 'sand'],
+      [3, 236, 7, 'S', 'sand'],
+      // The shipped signature here read "The Quarry — all carry to a green cut
+      // from the rock", which is the wrong hole by half a mile: Merion's quarry
+      // sits between the 16th green and the 17th/18th tees, and imagery shows
+      // nothing of the kind on the 10th. Rewritten to the hole the geometry
+      // actually describes — a short four pinched by sand off the tee with the
+      // creek up the right — rather than inventing a quarry to justify the copy.
+      [4, 303, 16, 'S', 'sand', 'A short four, but the drive is pinched between sand and the creek'],
+      [4, 367, 10, 'R', 'water', 'Where Bobby Jones sealed the Grand Slam, the brook waiting'],
+      [4, 403, 14, 'S', 'sand'],
       [3, 115, 18, 'S', 'sand'],
-      [4, 464, 6, 'S', 'sand'],
-      [4, 411, 8, 'S', 'sand'],
-      [4, 430, 4, 'R', 'sand'],
+      [4, 464, 2, 'S', 'sand'],
+      [4, 411, 6, 'S', 'sand'],
+      [4, 430, 8, 'R', 'sand'],
       [3, 246, 12, 'S', 'sand'],
-      [4, 521, 2, 'S', 'sand', 'Hogan’s 1-iron — a long four back over the quarry'],
+      [4, 521, 4, 'S', 'sand', 'Hogan’s 1-iron — a long four back over the quarry'],
     ]),
   },
   {
@@ -1224,25 +1243,31 @@ export const COURSES: CourseSpec[] = [
     greens: 'Firm',
     wind: 18,
     blurb: 'The Ocean Course — wind off the Atlantic and nowhere to hide down the stretch.',
+    // Card = the CHAMPIONSHIP card (par 72 / 7772), picked over the club's own
+    // BLACK (7385) and ProVisualizer's 7871 by scoring the import's deviation
+    // against all three — see the kiawah-ocean note in geometry.ts. Par already
+    // matched on all 18; stroke index moved on 16, and it is trustworthy because
+    // BlueGolf's HCP row and the club's own 2025 scorecard PDF agree digit for
+    // digit even though they disagree about yardage.
     holes: holes([
-      [4, 395, 11, 'S', 'sand'],
-      [5, 543, 9, 'R', 'ocean'],
-      [4, 390, 13, 'S', 'sand'],
-      [4, 453, 5, 'L', 'water'],
-      [3, 207, 15, 'S', 'ocean'],
-      [4, 455, 3, 'R', 'sand'],
+      [4, 395, 15, 'S', 'sand'],
+      [5, 543, 3, 'R', 'ocean'],
+      [4, 390, 9, 'S', 'sand'],
+      [4, 453, 1, 'L', 'water'],
+      [3, 207, 11, 'S', 'ocean'],
+      [4, 455, 13, 'R', 'sand'],
       [5, 579, 7, 'L', 'ocean'],
       [3, 197, 17, 'S', 'water', 'A par 3 over the water — where the War by the Shore was won'],
-      [4, 464, 1, 'R', 'sand'],
-      [4, 439, 8, 'S', 'sand'],
-      [5, 593, 10, 'L', 'water'],
-      [4, 466, 4, 'R', 'sand'],
-      [4, 404, 12, 'S', 'ocean'],
-      [3, 194, 16, 'S', 'ocean'],
-      [4, 470, 2, 'L', 'sand'],
-      [5, 579, 14, 'R', 'ocean'],
-      [3, 221, 6, 'S', 'ocean'],
-      [4, 439, 18, 'S', 'ocean', 'Into the teeth of the wind — the Ocean Course’s cruel last'],
+      [4, 464, 5, 'R', 'sand'],
+      [4, 439, 16, 'S', 'sand'],
+      [5, 593, 8, 'L', 'water'],
+      [4, 466, 10, 'R', 'sand'],
+      [4, 404, 2, 'S', 'ocean'],
+      [3, 194, 14, 'S', 'ocean'],
+      [4, 470, 18, 'L', 'sand'],
+      [5, 579, 4, 'R', 'ocean'],
+      [3, 221, 12, 'S', 'ocean'],
+      [4, 439, 6, 'S', 'ocean', 'Into the teeth of the wind — the Ocean Course’s cruel last'],
     ]),
   },
   {
@@ -1253,6 +1278,12 @@ export const COURSES: CourseSpec[] = [
     greens: 'Firm',
     wind: 18,
     blurb: 'Windswept dunes high above Lake Michigan, links golf transplanted to the Midwest.',
+    // Real geometry gave this course 202 bunkers and not one tree, so the odds'
+    // junk floor had nothing to name — see CourseSpec.junkLabel. What you miss
+    // into here is the native area the club converted its sod-walled bunkers
+    // into: fescue. (The lake is a view from the bluff, not a hazard — the
+    // measurement is in the arcadia-bluffs note in geometry.ts.)
+    junkLabel: 'fescue',
     holes: holes([
       [5, 499, 15, 'R', 'sand'],
       [3, 180, 17, 'S', 'sand'],
@@ -1282,6 +1313,11 @@ export const COURSES: CourseSpec[] = [
     greens: 'Firm',
     wind: 17,
     blurb: 'Sandhills links in Kansas — yucca, cottonwoods, and relentless plains wind.',
+    // Real geometry gave this course 88 bunkers and not one tree polygon (OSM
+    // has no scrub or wood inside the property at all), so the odds' junk floor
+    // had nothing to name — see CourseSpec.junkLabel. Maxwell's sandhills are
+    // yucca and plum thicket, and the blurb already says so.
+    junkLabel: 'yucca',
     holes: holes([
       [4, 452, 7, 'S', 'sand'],
       [3, 164, 15, 'S', 'sand', 'A gem of a par 3 tucked among the yucca and dunes'],

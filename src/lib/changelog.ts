@@ -67,6 +67,12 @@ export const CHANGE_KIND_LABEL: Record<ChangeKind, string> = {
 
 export const CHANGELOG: ChangeEntry[] = [
   {
+    date: '2026-08-14',
+    kind: 'feature',
+    title: 'A badge for the rounds that beat you up',
+    note: 'There is a new hidden achievement waiting in Awards, and you earn it by having a bad day: finish a full round with more bogeys or worse than birdies or better and it turns up on your shelf. Some rounds are just for the résumé. It counts every time, so the tally is its own running joke.',
+  },
+  {
     date: '2026-08-12',
     kind: 'feature',
     title: 'Claim the hole in one you just made',

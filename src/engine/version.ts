@@ -406,4 +406,146 @@
 // 8. Whispering Pines moving two points is the water arriving: procedural
 // geometry had it as a pleasant tree-lined course, and the real thing carries
 // water on ten of eighteen holes.
-export const ENGINE_VERSION = 19
+// v20 = FIVE courses, the next real dailies, imported in one PR and sharing one
+// bump — none has shipped, so a generation per course would buy nothing, the
+// call made for v5, v8, v10, v16, v17 and v19.
+//
+// THREE OF THE FIVE MOVE THE ODDS AS WELL AS THE LAYOUT, because stroke index
+// feeds pressure():
+//  - ROYAL BIRKDALE (OSM way 25720345). SI moves on 16 of 18, to the club's own
+//    WHITE card — BlueGolf carries this course with NO scorecard at all, the
+//    first time the house source simply has nothing, so royalbirkdale.com's
+//    per-hole pages are the card. Par already matched on all 18.
+//  - MERION EAST (way 225722010). SI moves on 14 of 18, to the club's
+//    CHAMPIONSHIP card. The shipped yardages were the 2013 U.S. Open card and no
+//    USGA championship card publishes a stroke index, so the club's has to carry
+//    it — the winged-foot rule. OSM's `handicap` tags are a THIRD sequence and
+//    were ignored: tags corroborate a card, they never arbitrate one.
+//  - KIAWAH OCEAN (relation 17647608). SI moves on 16 of 18, to the
+//    CHAMPIONSHIP card, chosen over the club's own BLACK and ProVisualizer's
+//    tournament card by the doral rule — scoring the import's total deviation
+//    against all three (160 / 345 / 191). What makes the SI safe to take from
+//    the card that LOST on yardage: BlueGolf's HCP row and the club's own 2025
+//    scorecard PDF agree with each other digit for digit.
+//  - ARCADIA BLUFFS (way 293247442) and PRAIRIE DUNES (way 778336759) are pure
+//    geometry — par and SI already matched on all 18, Prairie Dunes' yardages
+//    too — so for those two only the layout a seed replays into moves.
+//
+// THE COURSE THAT NEEDED A DECISION: Royal Birkdale has been RE-ROUTED and OSM
+// has not caught up. This ships the PRE-2024 routing on purpose — the White card
+// / 2017 Open setup, which is what the shipped tuple has always described and
+// what the club's own hole pages still publish. The evidence is numeric and
+// lives at the block in geometry.ts: cross-matching ProVisualizer's published
+// tee/pin arrays against every OSM centreline end puts PV's pin 1-7 yd from the
+// OSM end on 16 of 18 holes, while PV's 14th pin sits 5 yd from OSM's FIFTEENTH
+// green and PV's 15th pin is 160 yd from any mapped green. The new 15th exists
+// in neither OSM nor trustworthy imagery (PV's own page warns its satellite is
+// stale for this course), so importing the current routing would mean inventing
+// a hole. The alternative was never "current Birkdale" — it was old Birkdale
+// with procedural geometry.
+//
+// A COPY BUG FOUND BY THE GEOMETRY CHECK: Merion's 10th carried the signature
+// "The Quarry — all carry to a green cut from the rock", and Merion's quarry is
+// half a mile away, between the 16th green and the 17th and 18th tees. Rewritten
+// to the hole that is actually there. No quarry zones were hand-authored to
+// justify it: OSM maps no `natural=scrub` on the property, so there was nothing
+// measured to cut them from.
+//
+// TWO junkLabels: Prairie Dunes ('yucca') and Arcadia Bluffs ('fescue'). Both
+// import treeless — OSM has no scrub or wood polygon inside either property —
+// so the odds' junk floor had nothing to name.
+//
+// RAKE 3 on three of the five (Birkdale, Arcadia, Kiawah), and the two halves of
+// the muirfield test disagreed on Arcadia, which is worth recording. Birkdale is
+// the extreme case in the registry — 117 of 128 bunkers under the 6-yd default,
+// because they are revetted pots. Kiawah's outcome check was unambiguous: at
+// rake 6 the 11th shipped NO greenside sand despite three bunkers within 30 yd
+// of its green. Arcadia's was not — every hole already had greenside sand at
+// rake 6 — and it was adopted anyway on one hole's evidence: rake 3 recovers the
+// LEFT-hand greenside bunker on the 7th, the card's #1 handicap hole. Merion and
+// Prairie Dunes keep the 6-yd default (14 of 122 and 6 of 88 bunkers under it).
+//
+// HAND-WORK, all documented at the blocks in geometry.ts, and the shape differs
+// per course rather than repeating:
+//  - MERION's brook is hand-authored from measurement. Cobbs Creek is a
+//    `waterway` LINESTRING (43 of them run through the property) so it never
+//    reaches the polygon rasteriser — the carnoustie mode — and it landed on the
+//    hole the game's copy names: the 11th, "the brook waiting", imported with no
+//    water at all. Its three water zones come from intersecting the tagged creek
+//    ways with a perpendicular rake at every yard of the hole's own centreline.
+//    Use the RAKE, not a nearest-point scan: a nearest-point measure put the
+//    creek ON the centreline for 40 yd, which is an artifact of the confluence
+//    where creek and tributary meet. The same projection found the creek
+//    reaching eight other corridors and every one was DECLINED — imagery shows a
+//    wooded boundary ravine, not open water.
+//  - KIAWAH's crosses are mostly REAL, which is the opposite of the other four:
+//    Dye built it as a sequence of forced marsh carries and `--profile` rules
+//    each a carry at 100% of its samples. Nothing was dropped as a phantom. What
+//    was wrong was where the FAIRWAY started — on 1, 2, 3, 10, 13, 15 and 16 the
+//    mapped fairway polygon begins INSIDE the carry, so the raw import promised
+//    a landing area in the marsh (the ngla 13/14 fix). One clip: the 17th's
+//    water ran 14 yd into the green it carries to.
+//  - PRAIRIE DUNES has one fix and it is the reverse of Kiawah's: an
+//    `--profile` REAL CARRY verdict that a per-yard lateral read overturns. The
+//    11th's lake sits 12-60 yd up the left for its whole length and pokes 2-18
+//    yd across the smoothed line at the dogleg corner; OSM's mapper tagged it
+//    `lateral_water_hazard`, and the raw import put fairwayFrom INSIDE the
+//    supposed carry. Left in, the card's #2 handicap hole becomes a 226-yd
+//    forced water carry.
+//  - ARCADIA's three fixes are all one mode: native waste bunkers big enough to
+//    lap the centreline from one flank, read as carries. Explicitly NOT the
+//    seminole mis-tag — the biggest is 0.76 acres and reaches ONE corridor, so
+//    the `golf=bunker` tag is right and only the `cross` reading was wrong.
+//  - BIRKDALE ends with ZERO cross zones on any hole, the links being honest
+//    exactly as Muirfield was. Its fixes are broken lateral hazards: ditches
+//    mapped as water polygons that wander between 11 and 50 yd off the line, so
+//    the rake caught them intermittently and chopped one continuous ditch into
+//    seven zones down the 13th's left. Spanned continuously on 8, 11 and 13;
+//    5, 6 and 15 were checked the same way and left alone.
+//
+// TWO MEASUREMENTS THAT DECLINED TO AUTHOR ANYTHING, both worth keeping because
+// the courses are named for the water: Lake Michigan's nearest approach to any
+// Arcadia centreline is 90 yd (the corridor reaches 50), and the Atlantic's
+// nearest approach to any Ocean Course centreline is 105 yd. Neither is ever in
+// play; both are the view. So Arcadia ships no lake and Kiawah's marsh and
+// lagoons stay `water` rather than being relabelled `ocean` — that would draw
+// open sea where there is spartina. Same call as whistling-straits 9/18.
+//
+// Play Ratings regenerated LAST: only the five imported courses move. Two change
+// their integer rating — Arcadia Bluffs 4 -> 5 and Prairie Dunes 9 -> 8 — and
+// Kiawah lands at 10, the joint-hardest course in the game alongside Pine
+// Valley, which is the marsh carries arriving.
+// v21 = the SAFE tee shot may no longer be aimed mostly at water. This one is
+// an odds fix riding a course PR rather than course work, so unlike a geometry
+// bump it carries a change-log entry of its own.
+// The map draws its aim ribbon from `longOdds(...).window`, and `driveWindow`
+// returns FIXED yardage bands (safe 205-240, normal 235-272, aggressive
+// 262-308) that never consulted the geometry. On a hole whose forced carry ends
+// inside the safe band, the ribbon is drawn in the lake — while the odds beside
+// it still read like a fairway, because safe's trouble bucket is floored by
+// TEE_BASE and pinned near 3% however wet the band is. That floor IS the "safe
+// stays bankable" contract, which is why this is a lie rather than priced risk:
+// kiawah-ocean:16 reported 1.7% water and 59% FAIRWAY for a band lying in 206
+// yards of marsh. whispering-pines 14/18 and seminole 2/15 have shipped the
+// same way; Kiawah's 16th is the fifth instance and the one that surfaced it.
+// The tee path now applies the rule the LAY-UP path already had. It fires when
+// MORE THAN HALF the band sits in a penalty crossing, and then carries where a
+// safe swing can reach the far bank, stops short where stopping short is still
+// a shot (MIN_LAYUP_ADVANCE), and carries anyway where it is neither. All three
+// arms fire somewhere, which is what says the rule is general rather than tuned
+// to one hole: seminole 2/15 and kiawah 16 carry; whispering-pines 14/18 lay up
+// for a standard bag but CARRY for the Fairway Finder, whose +16 yd reaches the
+// bank the others cannot. That per-character split is emergent and correct —
+// the longer hitter takes it on, the shorter one lays up.
+// Deliberately narrow, in three ways. Safe only: `normal` and `aggressive` have
+// no floor and report 8-31% water on these same holes, which is real risk being
+// honestly priced, and flattening it would remove the choice. Majority only: a
+// minority clip is risk too (whistling-straits:5's safe is 40% wet and stays
+// that way). Water only: a cross bunker you can play out of, so a band inside
+// one is a bad break rather than a lie about where you may aim.
+// `engine.test.ts` gains the bracket that catches this class, asserted on the
+// window longOdds RETURNS (what the map draws and what the odds are computed
+// from) and across every character, since the Finder's carry hid three of the
+// five from a stricter first version of the test. Verified to fail without the
+// fix. Play Ratings regenerated after it.
+export const ENGINE_VERSION = 21

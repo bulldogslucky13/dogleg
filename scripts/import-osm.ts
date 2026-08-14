@@ -720,6 +720,159 @@ const COURSE_GEO: Record<string, CourseGeo> = {
     },
     engineSlug: 'whispering-pines',
   },
+  // Royal Birkdale is way 25720345, Southport. Three links share the dune belt
+  // and all three carry a full set of unnamed ref=1..18 hole ways — Hillside
+  // (way 25720410, 946 m) and Southport & Ainsdale (way 25720447, 1471 m) —
+  // so map_to_area on the anchored name is carrying the whole identity check,
+  // the torrey-pines arrangement. It holds exactly 18 hole ways, one per ref,
+  // each starting on a `golf=tee` and ending on one of 18 DISTINCT greens.
+  //
+  // **THIS IS THE PRE-2024 ROUTING, DELIBERATELY.** Royal Birkdale has since
+  // been re-routed and OSM has not caught up: the old par-3 14th is out of the
+  // rotation, the old 15th is now the 14th off a tee ~64 yd further back
+  // (542 -> 602), and a NEW par-3 15th plays to a green that does not exist in
+  // OSM at all. Established by cross-matching ProVisualizer's published tee/pin
+  // arrays against every OSM centreline end: PV's pin lands 1-7 yd from the OSM
+  // end on 16 of 18 holes, but PV's 14th pin sits 5 yd from OSM's FIFTEENTH
+  // green (581 yd from OSM's 14th) and PV's 15th pin is 160 yd from any mapped
+  // green. PV's own course page warns "this course has been recently modified
+  // and satellite image may not be accurate", so the new 15th can be neither
+  // imported nor QA'd — only invented, which step 0 forbids.
+  // So the import commits to the configuration the game already ships and the
+  // club still publishes a per-hole card for: the White/medal card, par 70 /
+  // 7156, which is the 2017 Open setup. That is a real, documented, recently
+  // played course; the alternative is not "current Birkdale" but old Birkdale
+  // with procedural geometry. Same call as winged-foot-west shipping the 2006
+  // U.S. Open setup. Do not "fix" 14/15 against a current card.
+  // CARD: royalbirkdale.com's per-hole pages (the club's summary page is the
+  // NEW routing and disagrees with its own hole pages — read the hole pages)
+  // give YDS/PAR/SI per tee. White totals 7156 / par 70, matching the shipped
+  // par on all 18; stroke index moved on 16 holes and four yardages on 5, 7 and
+  // 18. BlueGolf carries Royal Birkdale with no scorecard at all, so the house
+  // source is unavailable here.
+  // Radius 1200 covers the 854 m of centreline from centre and the course's own
+  // 29 water polygons; the Irish Sea coastline is ~1.1 km west, far outside
+  // OCEAN_REACH_YD, and no hole sees it.
+  birkdale: {
+    name: 'Royal Birkdale',
+    center: [53.6236, -3.0373],
+    radius: 1200,
+    osmName: '^Royal Birkdale Golf Club$',
+    engineSlug: 'royal-birkdale',
+    // Rake 3, the muirfield condition at its most extreme in the registry:
+    // 117 of 128 bunkers are under the 6-yd default (min 2.7, median 4.2), so
+    // most of Birkdale's revetted pots sit between two samples at 6 yd.
+    rake: 3,
+  },
+  // Merion Golf Club — East, way 225722010, Ardmore PA. The West course is its
+  // own polygon (way 225722011) 1.9 km away, so the anchored name plus
+  // map_to_area separates them; the East holds exactly 18 unnamed ref=1..18
+  // hole ways, all starting on a `golf=tee` and ending on 18 DISTINCT greens.
+  // CARD: BlueGolf's `merione` CHAMPIONSHIP card, par 70 / 6946, which matches
+  // the shipped par on all 18. The shipped yardages are the 2013 U.S. Open card
+  // (6996) and the shipped stroke index matches neither that nor the club —
+  // a USGA championship card publishes no SI, so the club card has to carry it
+  // (the winged-foot rule); it moves on 16 holes.
+  // TEE PADS: OSM traced members' pads on most of the course (raw total 6477
+  // against the card's 6946), so this is the shinnecock/quail-hollow per-hole
+  // shift case rather than one constant — diagnosed hole by hole against PV's
+  // published tees projected onto each hole's heading.
+  // Radius 1200 covers the 848 m of centreline from centre plus the quarry
+  // ponds; Cobbs Creek and its tributaries are `waterway` LINES here (40 of
+  // them), which never reach the polygon rasteriser — the carnoustie mode, and
+  // the 11th's brook is the hole the game's copy names.
+  merion: {
+    name: 'Merion Golf Club — East',
+    center: [39.9987, -75.3143],
+    radius: 1200,
+    osmName: '^Merion Golf Club East$',
+    engineSlug: 'merion-east',
+  },
+  // Kiawah Island — Ocean Course, relation 17647608. No other golf_course
+  // polygon inside 2.8 km (the resort's other four courses and the Kiawah
+  // Island Club's two sit further west), and the relation holds exactly 18
+  // unnamed ref=1..18 hole ways, all on a tee, all ending on 18 DISTINCT
+  // greens. Its par tags match the club card on all 18.
+  // CARD: BlueGolf's `kiawahocean` CHAMPIONSHIP card, par 72 / 7772, the only
+  // tee set BlueGolf publishes for it. Par matches the shipped tuple on all 18;
+  // stroke index moves on 14 and the yardages on all 18 (the shipped 7488 is no
+  // published configuration).
+  // Radius 2800 — this is the longest property in the registry, 2115 m of
+  // centreline from centre, and the radius has to reach both the Atlantic
+  // `natural=coastline` on the seaward side and the marsh on the other. Marsh
+  // arrives as `natural=water`/`wetland` polygons and therefore imports as
+  // `water`, while the open Atlantic imports as `ocean`; the game's own tuple
+  // already labels the ocean holes, so relabel by hand to match it (the
+  // pebble/harbour-town precedent).
+  kiawah: {
+    name: 'Kiawah Island — Ocean Course',
+    center: [32.6122, -80.0215],
+    radius: 2800,
+    osmName: '^Kiawah Island Golf Resort - The Ocean Course$',
+    engineSlug: 'kiawah-ocean',
+    // Rake 3. 23 of 78 bunkers are under the 6-yd default (min 3.2, median 7.7),
+    // and unlike arcadia the outcome check was unambiguous: at rake 6 the 11th
+    // shipped NO greenside zone at all despite three bunkers within 30 yd of its
+    // green (way/884552439 registered at a single sample) — the harbour-town:4
+    // dropped-greenside mode. Rake 3 gives it two, and the course 29 greenside
+    // zones against 26, for one extra `cross` to adjudicate.
+    rake: 3,
+  },
+  // Arcadia Bluffs — the BLUFFS course, way 293247442 (wikidata Q4785134). The
+  // club's South Course is a separate polygon (way 693998226) 2.6 km SE and
+  // shares the "Arcadia Bluffs" string, so the name is anchored to the full
+  // club name. Exactly 18 unnamed ref=1..18 hole ways inside, all on a tee, all
+  // ending on 18 DISTINCT greens.
+  // CARD: BlueGolf's `arcadiabluffsgc` BLACK - CHAMPION card, par 72 / 7210.
+  // The shipped tuple already matches it on par AND stroke index for all 18,
+  // and OSM's own `handicap` tags match the same card on all 18 — three
+  // independent sources agreeing, the torrey-pines corroboration. Only the
+  // yardages move (the shipped 6858 is a shorter set).
+  // Radius 1600 covers the 867 m of centreline from centre and reaches Lake
+  // Michigan. **The lake is `natural=water` (relation 1205149), not
+  // `coastline`** — the whistling-straits:17 mode — so it is rasterised like a
+  // pond and only registers inside CORRIDOR_YD (50). Measure centreline-to-
+  // shore before hand-authoring anything on the bluff holes; the same check
+  // cleared Whistling Straits 9 and 18.
+  arcadia: {
+    name: 'Arcadia Bluffs — Bluffs Course',
+    center: [44.4576, -86.2442],
+    radius: 1600,
+    osmName: '^Arcadia Bluffs Golf Club$',
+    engineSlug: 'arcadia-bluffs',
+    // Rake 3, and this is the case where the SIZE screen and the OUTCOME check
+    // disagreed and the outcome still won — the opposite result from
+    // whispering-pines, so read both entries together. 58 of 202 bunkers are
+    // under the 6-yd default (min 1.7), which says lower it; but at rake 6 every
+    // hole already shipped greenside sand and the audit flagged nothing missing,
+    // which says leave it. Comparing the two passes hole by hole is what decided
+    // it: rake 3 recovers the LEFT-hand greenside bunker on the 7th, the card's
+    // #1 handicap hole, and lifts the course from 32 greenside zones to 35. One
+    // hole that matters is enough.
+    rake: 3,
+  },
+  // Prairie Dunes Country Club, Hutchinson KS — way 778336759, whose OSM name
+  // is the bare "Prairie Dunes". Anchored because the string is generic; it is
+  // the only golf_course polygon of that name anywhere in a 2.5-degree box over
+  // Kansas, and the only one inside 1.6 km. Exactly 18 unnamed ref=1..18 hole
+  // ways, all on a tee, all ending on 18 DISTINCT greens. OSM carries no `par`
+  // or `handicap` tags here, so there is no second opinion on the card.
+  // CARD: BlueGolf's `prairiedunes` GOLD card, par 70 / 6916. The shipped tuple
+  // already matches it on par AND stroke index for all 18 — pure geometry, the
+  // camargo/seminole case. Six yardages move by 3-11 yd.
+  // Radius 1200 covers the 879 m of centreline from centre and the four tagged
+  // water hazards inside the property.
+  // NOTE for QA: OSM has ZERO `natural=scrub` or `wood` polygons inside or near
+  // this course, and yucca and cottonwood ARE the course — the torrey-pines
+  // mode. Do not hand-author bare rims from "there is scrub there"; measure, or
+  // leave it to the Rough dial and a `junkLabel` (the erin-hills fix).
+  prairiedunes: {
+    name: 'Prairie Dunes Country Club',
+    center: [38.0924, -97.8477],
+    radius: 1200,
+    osmName: '^Prairie Dunes$',
+    engineSlug: 'prairie-dunes',
+  },
 }
 
 // ---------- Overpass ----------

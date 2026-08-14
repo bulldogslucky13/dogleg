@@ -428,7 +428,17 @@ describe('gradeRound: calibration (Monte Carlo)', () => {
     // signature of an unpriced penalty, not of a harder library.
     expect(Math.abs(meanDiff)).toBeLessThan(0.8)
     expect(meanLoss).toBeLessThan(0.1)
-  }, 30000)
+    // WALL-CLOCK GUARD, not a calibration knob — the two thresholds above are
+    // the contract and neither has moved. 200 rounds of greedy-by-Q is fixed,
+    // deterministic work, so this number only has to outrun the slowest CI
+    // runner: it takes ~13.4s locally and 28.5s on a green main, i.e. it was
+    // sitting at 95% of a 30s budget and the first unlucky runner tipped it
+    // over (30.8s) on a PR that cannot affect it — the calibration walks
+    // COURSES.slice(0, 10) and that PR imported courses at rotation 33-37.
+    // Doubled to 60s so the margin is real. If this ever times out again,
+    // something got genuinely slower; do not "fix" it by shrinking N, which
+    // would quietly widen the confidence interval on both thresholds.
+  }, 60000)
 
   it('all-normal policy has near-zero average luck', () => {
     let sumLuck = 0

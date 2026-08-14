@@ -515,4 +515,37 @@
 // their integer rating — Arcadia Bluffs 4 -> 5 and Prairie Dunes 9 -> 8 — and
 // Kiawah lands at 10, the joint-hardest course in the game alongside Pine
 // Valley, which is the marsh carries arriving.
-export const ENGINE_VERSION = 20
+// v21 = the SAFE tee shot may no longer be aimed mostly at water. This one is
+// an odds fix riding a course PR rather than course work, so unlike a geometry
+// bump it carries a change-log entry of its own.
+// The map draws its aim ribbon from `longOdds(...).window`, and `driveWindow`
+// returns FIXED yardage bands (safe 205-240, normal 235-272, aggressive
+// 262-308) that never consulted the geometry. On a hole whose forced carry ends
+// inside the safe band, the ribbon is drawn in the lake — while the odds beside
+// it still read like a fairway, because safe's trouble bucket is floored by
+// TEE_BASE and pinned near 3% however wet the band is. That floor IS the "safe
+// stays bankable" contract, which is why this is a lie rather than priced risk:
+// kiawah-ocean:16 reported 1.7% water and 59% FAIRWAY for a band lying in 206
+// yards of marsh. whispering-pines 14/18 and seminole 2/15 have shipped the
+// same way; Kiawah's 16th is the fifth instance and the one that surfaced it.
+// The tee path now applies the rule the LAY-UP path already had. It fires when
+// MORE THAN HALF the band sits in a penalty crossing, and then carries where a
+// safe swing can reach the far bank, stops short where stopping short is still
+// a shot (MIN_LAYUP_ADVANCE), and carries anyway where it is neither. All three
+// arms fire somewhere, which is what says the rule is general rather than tuned
+// to one hole: seminole 2/15 and kiawah 16 carry; whispering-pines 14/18 lay up
+// for a standard bag but CARRY for the Fairway Finder, whose +16 yd reaches the
+// bank the others cannot. That per-character split is emergent and correct —
+// the longer hitter takes it on, the shorter one lays up.
+// Deliberately narrow, in three ways. Safe only: `normal` and `aggressive` have
+// no floor and report 8-31% water on these same holes, which is real risk being
+// honestly priced, and flattening it would remove the choice. Majority only: a
+// minority clip is risk too (whistling-straits:5's safe is 40% wet and stays
+// that way). Water only: a cross bunker you can play out of, so a band inside
+// one is a bad break rather than a lie about where you may aim.
+// `engine.test.ts` gains the bracket that catches this class, asserted on the
+// window longOdds RETURNS (what the map draws and what the odds are computed
+// from) and across every character, since the Finder's carry hid three of the
+// five from a stricter first version of the test. Verified to fail without the
+// fix. Play Ratings regenerated after it.
+export const ENGINE_VERSION = 21

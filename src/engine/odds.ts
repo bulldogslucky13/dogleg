@@ -288,6 +288,46 @@ export function longOdds(
         }
       }
     }
+  } else if (choice === 'safe') {
+    // THE SAFE TEE SHOT MAY NOT BE AIMED AT WATER IT MOSTLY CANNOT AVOID.
+    //
+    // `driveWindow` returns fixed yardage bands that never consulted the
+    // geometry, and the map draws its aim ribbon from the window this function
+    // RETURNS. So on a hole whose forced carry ends inside the safe band, the
+    // ribbon is drawn in the lake — while the odds beside it still read like a
+    // fairway, because safe's trouble bucket is floored by TEE_BASE and capped
+    // near 3% however wet the band is. kiawah-ocean:16 reported 1.7% water and
+    // 59% FAIRWAY for a band lying in 206 yards of marsh.
+    //
+    // Safe-only, deliberately. "Safe stays bankable" is an explicit contract
+    // (engine.test.ts) enforced by that floor, so for THIS choice a
+    // majority-water band is not risk being priced, it is the number and the
+    // picture disagreeing. `normal` and `aggressive` carry no such floor — they
+    // report 8-31% water on the same holes — and their overlap is real risk the
+    // player is choosing, so they are left alone.
+    //
+    // Penalty hazards only: a cross bunker you can play out of, so a band
+    // inside one is a bad break rather than a lie about where you may aim.
+    const maxTo = layout.length - 12
+    const width = window[1] - window[0]
+    for (const z of [...layout.zones].sort((a, b) => a.from - b.from)) {
+      if (z.side !== 'cross' || (z.kind !== 'water' && z.kind !== 'ocean')) continue
+      const overlap = Math.min(window[1], z.to) - Math.max(window[0], z.from)
+      if (overlap <= width / 2) continue // a minority clip is risk, not a lie
+      // Carry it where a safe swing can — the far bank is inside this band's own
+      // reach — because the player's own club still gets there and laying up
+      // would throw away a shot the geometry allows. Otherwise stop short, if
+      // stopping short is a shot at all (MIN_LAYUP_ADVANCE); if it is neither,
+      // the hole demands the carry and safe takes the shortest one that clears.
+      const short: [number, number] = [z.from - 32, z.from - 10]
+      const canCarry = z.to <= window[1]
+      const canLayUp = (short[0] + short[1]) / 2 >= ball.pos + MIN_LAYUP_ADVANCE
+      window =
+        canCarry || !canLayUp
+          ? [Math.min(z.to + 4, maxTo - 10), Math.min(z.to + 4 + width, maxTo)]
+          : short
+      break
+    }
   }
 
   const { shares, exposure } = hazardShares(layout, ball, window, choice)

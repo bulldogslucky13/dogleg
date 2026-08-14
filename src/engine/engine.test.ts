@@ -104,6 +104,49 @@ describe('odds invariants', () => {
     }
   })
 
+  // The map draws its aim ribbon from `longOdds(...).window`, so a safe window
+  // sitting mostly in a penalty crossing is the picture and the number
+  // disagreeing: safe's trouble bucket is floored by TEE_BASE (that is the
+  // "stays bankable" contract two brackets down), so it keeps reporting ~1.5%
+  // water however wet the band is. kiawah-ocean:16 reported 1.7% water and 59%
+  // FAIRWAY for a band lying in 206 yards of marsh, and drew the ribbon in the
+  // lake; whispering-pines 14/18 and seminole 2/15 shipped the same way.
+  //
+  // Asserted on the window longOdds RETURNS, not on driveWindow(), because that
+  // is both what the map draws and what the odds are computed from. Checked for
+  // every character, since the Fairway Finder's +16 yd carry shifts the band and
+  // was what hid three of these from a stricter first version of this test.
+  // `normal`/`aggressive` are deliberately not asserted: they carry no floor and
+  // report 8-31% water on these same holes, which is real risk, honestly priced.
+  it('a safe tee shot is never aimed mostly at water', () => {
+    const cond: Conditions = { wind: 12, greens: 'Firm', difficulty: 8 }
+    for (const c of COURSES) {
+      for (const spec of c.holes) {
+        if (spec.par === 3) continue // par 3s tee off through the approach path
+        const layout = buildLayout(c.slug, spec)
+        for (const character of [undefined, 'fairway', 'dart', 'greens'] as const) {
+          const { window } = longOdds(
+            layout,
+            cond,
+            { pos: 0, lie: 'tee', side: 'center' },
+            'safe',
+            'tee',
+            character as never,
+          )
+          const width = window[1] - window[0]
+          for (const z of layout.zones) {
+            if (z.side !== 'cross' || (z.kind !== 'water' && z.kind !== 'ocean')) continue
+            const overlap = Math.min(window[1], z.to) - Math.max(window[0], z.from)
+            expect(
+              overlap,
+              `${c.slug}:${spec.number} safe/${character ?? 'standard'} aims [${window[0]}-${window[1]}], ${Math.round((overlap / width) * 100)}% inside ${z.kind} ${z.from}-${z.to}`,
+            ).toBeLessThanOrEqual(width / 2)
+          }
+        }
+      }
+    }
+  })
+
   it('safe tee shots stay bankable even in brutal conditions', () => {
     const brutal: Conditions = { wind: 25, greens: 'Fast', difficulty: 10 }
     for (const c of COURSES) {

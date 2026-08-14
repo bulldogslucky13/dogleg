@@ -93,6 +93,28 @@ describe('computeProgress', () => {
     expect(computeProgress([stub], [], emptyLedger()).oneOffs.spotless).toBe(0)
   })
 
+  it('scores Character Building against pars or better — the damage has to win the card', () => {
+    // ten holes over, eight that held
+    const rough: HoleResult[] = [...Array(10).fill('bogey'), ...Array(7).fill('par'), 'birdie']
+    expect(computeProgress([round({ results: rough })], [], emptyLedger()).oneOffs.characterBuilding).toBe(1)
+
+    // a TIE is not "more": nine and nine, however ugly the nine were
+    const tied: HoleResult[] = [...Array(8).fill('triple'), 'double', ...Array(8).fill('par'), 'eagle']
+    expect(computeProgress([round({ results: tied })], [], emptyLedger()).oneOffs.characterBuilding).toBe(0)
+
+    // pars are on the GOOD side of this one — a card full of them, or one where
+    // a few blow-ups sit among pars, doesn't qualify however far over it went
+    expect(computeProgress([round()], [], emptyLedger()).oneOffs.characterBuilding).toBe(0)
+    const blowups: HoleResult[] = [...Array(4).fill('triple'), ...Array(14).fill('par')]
+    expect(computeProgress([round({ results: blowups })], [], emptyLedger()).oneOffs.characterBuilding).toBe(0)
+
+    // full rounds only, at whatever length the course actually is
+    const nine = round({ courseSlug: 'cobblestone-creek', results: [...Array(5).fill('bogey'), ...Array(4).fill('par')] })
+    expect(computeProgress([nine], [], emptyLedger()).oneOffs.characterBuilding).toBe(1)
+    const abandoned = round({ results: ['bogey', 'bogey', 'par'] })
+    expect(computeProgress([abandoned], [], emptyLedger()).oneOffs.characterBuilding).toBe(0)
+  })
+
   it('scores the comeback and the bounce-backs', () => {
     // +4 through six, then storms home to -1
     const results: HoleResult[] = [

@@ -82,7 +82,27 @@ interface Ledger {
   attempts: ChallengeAttempt[]
 }
 
+/**
+ * The ledger as this session last wrote it, and whether storage refused that
+ * write (private mode, exhausted quota). The mirror is NOT a cache: storage
+ * stays the source of truth for as long as it accepts writes, so other tabs
+ * and later loads read what they always did.
+ *
+ * It exists because every reader here re-reads the ledger — the attempt a
+ * round belongs to is looked up by seed on each render. A silently dropped
+ * write therefore didn't just cost the resume: the round LOST ITS CHALLENGE
+ * mid-play, went back to racing the course-record ghost, and wrapped with no
+ * head-to-head, as though the link had never been accepted. Falling back to
+ * the mirror keeps the challenge whole for the session; only persistence is
+ * lost, which is the most that failure should ever cost.
+ */
+let mirror: Ledger | null = null
+let storageBroken = false
+
 function loadLedger(): Ledger {
+  // a stale (or empty) read is exactly what a refused write leaves behind, so
+  // once storage has failed this session, our own copy is the truthful one
+  if (storageBroken && mirror) return mirror
   try {
     const raw = localStorage.getItem(LEDGER_KEY)
     if (raw) {
@@ -96,15 +116,19 @@ function loadLedger(): Ledger {
 }
 
 function saveLedger(l: Ledger): void {
+  if (l.attempts.length > MAX_ENTRIES) {
+    const keep = new Set(l.attempts.filter((a) => !a.done).map((a) => a.id))
+    const pruned = l.attempts.filter((a, i) => i < MAX_ENTRIES || keep.has(a.id))
+    l = { v: 1, attempts: pruned }
+  }
+  mirror = l
   try {
-    if (l.attempts.length > MAX_ENTRIES) {
-      const keep = new Set(l.attempts.filter((a) => !a.done).map((a) => a.id))
-      const pruned = l.attempts.filter((a, i) => i < MAX_ENTRIES || keep.has(a.id))
-      l = { v: 1, attempts: pruned }
-    }
     localStorage.setItem(LEDGER_KEY, JSON.stringify(l))
+    storageBroken = false
   } catch {
-    /* private mode / quota — the challenge still plays, it just won't resume */
+    // private mode / quota: the attempt won't survive a reload, but it still
+    // plays out as a challenge — reads fall back to the mirror above
+    storageBroken = true
   }
 }
 

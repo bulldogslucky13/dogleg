@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { dailySetup, practiceSetup } from '../engine/daily'
 import { splitFortune } from '../engine/fortune'
 import { decisionsFromScores, encodeReplay, decodeReplay, replayRound, setupFromSeed } from '../engine/replay'
@@ -117,6 +117,36 @@ describe('one attempt, run like the daily', () => {
     // an unrelated practice round is nobody's attempt
     const other = newRound(practiceSetup('pebble-beach', 'unrelated'), 'practice', 'dart')
     expect(challengeAttemptForRound(other)).toBeNull()
+  })
+
+  it('a storage that refuses the write costs the resume, never the challenge itself', () => {
+    const ch = parseChallenge(codeFor(finishedRound(), 'Rob'))!
+    // private mode / exhausted quota: every write throws, silently
+    const setItem = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new Error('QuotaExceededError')
+    })
+    const setup = acceptChallenge(ch)
+    expect(localStorage.getItem('dogleg:challenges:v1')).toBeNull()
+
+    // the round still knows what it is: the attempt matches, so it wears the
+    // Challenge label, races the challenger's ghost, and can sign its card
+    let round = newRound(setup, 'practice', 'dart')
+    expect(challengeAttemptForRound(round)?.id).toBe(ch.id)
+    expect(attemptFor(ch.id)?.attemptSeed).toBe(setup.seed)
+    round = playRound(round)
+    syncChallengeRound(round)
+    expect(attemptFor(ch.id)?.done?.toPar).toBe(roundToPar(round))
+    // accepting a second time still re-deals nothing — the pin held in memory
+    expect(acceptChallenge(ch).seed).toBe(setup.seed)
+
+    // storage comes back (a tab closed, quota freed): the next write persists
+    // the whole session, this attempt included, and reads go back to storage
+    setItem.mockRestore()
+    const later = parseChallenge(codeFor(finishedRound('recovered'), 'Rob'))!
+    acceptChallenge(later)
+    const stored = JSON.parse(localStorage.getItem('dogleg:challenges:v1')!)
+    expect(stored.attempts.map((a: { id: string }) => a.id).sort()).toEqual([ch.id, later.id].sort())
+    expect(stored.attempts.find((a: { id: string }) => a.id === ch.id).done.toPar).toBe(roundToPar(round))
   })
 
   it('mid-round saves snapshot into the ledger; finishing signs the card and retires the snapshot', () => {

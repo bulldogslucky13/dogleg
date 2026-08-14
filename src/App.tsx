@@ -30,8 +30,31 @@ import {
   type UiMode,
 } from './state/store'
 import { absorbHistory, logRound } from './state/stats'
-import { ghostBallAt, ghostBoardFor, ghostNoun, loadGhost, paceLabel, paceVs, rememberGhostBoard, type Ghost, type GhostBoard } from './state/ghost'
+import {
+  challengerGhost,
+  ghostBallAt,
+  ghostBoardFor,
+  ghostNoun,
+  loadGhost,
+  paceLabel,
+  paceVs,
+  rememberGhostBoard,
+  type Ghost,
+  type GhostBoard,
+} from './state/ghost'
 import { chasing, chasingSeason, defaultChaseBoard } from './lib/records'
+import {
+  acceptChallenge,
+  attemptFor,
+  attemptForSeed,
+  attemptSetup,
+  challengeAttemptForRound,
+  challengeVerdict,
+  parseChallenge,
+  syncChallengeRound,
+  type Challenge,
+} from './lib/challenge'
+import { ChallengeScreen } from './ui/ChallengeScreen'
 import { identifyPlayer, track } from './lib/analytics'
 import { clubhouseLine, fetchHoleChoices, groupChoices, type TallyRow } from './lib/decisionStats'
 import { ensureIdentity, loadIdentity, loadPlayer } from './lib/leaderboard'
@@ -55,7 +78,7 @@ import { ackSeason, needsSeasonSplash } from './state/seasonStore'
 import { WhatsNewSplash } from './ui/WhatsNewSplash'
 import { ackWhatsNew, needsWhatsNew, primeWhatsNew, WHATS_NEW_VERSION } from './state/whatsNew'
 
-type View = 'home' | 'pick' | 'play' | 'result' | 'watch' | 'rounds'
+type View = 'home' | 'pick' | 'play' | 'result' | 'watch' | 'rounds' | 'challenge'
 
 /**
  * The landing modal: AT MOST ONE, ever. Landing on the home screen behind two
@@ -88,15 +111,28 @@ function watchFromHash(): WatchState {
   if (!m) return null
   return decodeReplay(m[1]) ?? 'bad'
 }
-/** setup is generated when the pick screen opens, so the conditions it shows are the ones you play */
-type PendingStart = { mode: 'daily' | 'practice'; setup: DailySetup }
+/** a #challenge=<code> link lands on the challenge screen — same contract as
+ * #watch=: 'bad' is a link that IS a challenge but doesn't parse or replay */
+type ChallengeState = Challenge | 'bad' | null
+function challengeFromHash(): ChallengeState {
+  const m = /#challenge=([A-Za-z0-9_-]+)/.exec(window.location.hash)
+  if (!m) return null
+  return parseChallenge(m[1]) ?? 'bad'
+}
+/** setup is generated when the pick screen opens, so the conditions it shows are the ones you play.
+ * A challenge start carries the challenge along so the pick screen can show the stakes. */
+type PendingStart = { mode: 'daily' | 'practice'; setup: DailySetup; challenge?: Challenge }
 
 export default function App() {
   const [round, setRound] = useState<RoundState | null>(() => loadRound())
   const [history, setHistory] = useState<HistoryEntry[]>(() => loadHistory())
   const [watching, setWatching] = useState<WatchState>(() => watchFromHash())
+  const [challengeLink, setChallengeLink] = useState<ChallengeState>(() => challengeFromHash())
   const [view, setView] = useState<View>(() => {
     if (watchFromHash()) return 'watch'
+    // a challenge link outranks an unfinished round: the link is why the tab
+    // opened, and its own resume path leads back into the round anyway
+    if (challengeFromHash()) return 'challenge'
     const r = loadRound()
     return r && !r.complete ? 'play' : 'home'
   })
@@ -164,6 +200,10 @@ export default function App() {
 
   useEffect(() => {
     saveRound(round)
+    // mirror a challenge attempt into its ledger on every save: mid-round
+    // that's the resume snapshot, at completion it signs the card. No-op for
+    // every other round.
+    if (round) syncChallengeRound(round)
   }, [round])
 
   // mint an anonymous player id early so the daily dice can be salted per
@@ -215,15 +255,43 @@ export default function App() {
         setView('watch')
         return
       }
-      if (watching) {
+      const c = challengeFromHash()
+      if (c) {
+        setChallengeLink(c)
+        // leaving the replay viewer back to a still-hashed challenge — or a
+        // second challenge link arriving in a mounted tab — lands on its screen
+        if (watching) setWatching(null)
+        setView('challenge')
+        return
+      }
+      if (watching || challengeLink) {
         setWatching(null)
+        setChallengeLink(null)
         const r = loadRound()
         setView(r && !r.complete ? 'play' : 'home')
       }
     }
     window.addEventListener('hashchange', onHash)
     return () => window.removeEventListener('hashchange', onHash)
-  }, [watching])
+  }, [watching, challengeLink])
+
+  // one impression per challenge landed on — the top of the challenge funnel
+  useEffect(() => {
+    if (view !== 'challenge' || !challengeLink) return
+    if (challengeLink === 'bad') {
+      track('challenge_opened', { valid: false })
+      return
+    }
+    track('challenge_opened', {
+      valid: true,
+      course: challengeLink.courseSlug,
+      rally: challengeLink.rally,
+      their_to_par: challengeLink.from.toPar,
+      named_sender: !!challengeLink.from.name,
+    })
+    // fire once per challenge identity, not per re-render
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view, challengeLink === 'bad' ? 'bad' : challengeLink?.id])
 
   useEffect(
     () => () => {
@@ -297,6 +365,14 @@ export default function App() {
     // a slow or null-returning fetch lets the old course's pace chip, ball,
     // and early-hole comparisons render against the new round
     setGhost(null)
+    // a challenge attempt races the round that dared it, not the course
+    // record — built locally from the link's payload, no fetch at all
+    const att = challengeAttemptForRound(round)
+    if (att) {
+      const ch = parseChallenge(att.code)
+      if (ch) setGhost(challengerGhost(ch))
+      return
+    }
     // the board choice was stamped at tee-off (seed-keyed sidecar), so a
     // refresh mid-round reloads the same race the player picked
     void loadGhost(round.courseSlug, round.seed, ghostBoardFor(round.seed)).then((g) => {
@@ -348,6 +424,38 @@ export default function App() {
   // the swing coach's report replays the whole round's EV model — memoize so unrelated
   // state changes on the result screen don't recompute it
   const roundGrade = useMemo(() => (round && round.complete ? tryGradeRound(round) : null), [round])
+
+  // was the round that just wrapped a challenge attempt? The ledger holds the
+  // signed card (next() synced it before the wrap rendered) and the code
+  // re-parses into the round-to-beat — everything the head-to-head needs.
+  const challengeCtx = useMemo(() => {
+    if (!round?.complete || round.mode !== 'practice') return null
+    const att = attemptForSeed(round.seed)
+    if (!att?.done) return null
+    const ch = parseChallenge(att.code)
+    return ch ? { challenge: ch, mine: att.done } : null
+  }, [round])
+
+  /**
+   * Drop the #challenge= hash and stop routing on it. Leaving a challenge —
+   * from the landing screen or from the wrap that closed it — has to clear the
+   * bar as well as the view, or the address still points at a challenge the
+   * player walked away from: a refresh (or reopening that URL, which is what
+   * the back button restores) would re-land on it instead of the Teebox.
+   */
+  const leaveChallenge = () => {
+    if (!challengeFromHash()) return
+    window.history.replaceState(null, '', window.location.pathname)
+    setChallengeLink(null)
+  }
+
+  // is the live round a pending challenge attempt? Keyed on the seed so the
+  // ledger isn't re-read on every shot — matching can't change mid-round.
+  const liveChallenge = useMemo(
+    () => (round && !round.complete ? challengeAttemptForRound(round) : null),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [round?.seed, round?.complete],
+  )
 
   const previewWindow = useMemo<[number, number] | null>(() => {
     if (!hole || !selected || animating) return null
@@ -455,7 +563,11 @@ export default function App() {
           }}
           activeRound={
             round && !round.complete
-              ? { mode: round.mode, courseName: courseBySlug(round.courseSlug)?.name ?? '' }
+              ? {
+                  mode: round.mode,
+                  courseName: courseBySlug(round.courseSlug)?.name ?? '',
+                  challenge: !!liveChallenge,
+                }
               : null
           }
           playedToday={playedToday}
@@ -485,6 +597,13 @@ export default function App() {
 
   if (view === 'watch' && watching) {
     const exitWatch = () => {
+      // "watch their round first" from a challenge: the challenge hash never
+      // left the bar, so leaving the viewer goes back to the challenge
+      if (challengeFromHash()) {
+        setWatching(null)
+        setView('challenge')
+        return
+      }
       window.history.replaceState(null, '', window.location.pathname)
       setWatching(null)
       setView('home')
@@ -500,6 +619,71 @@ export default function App() {
       )
     }
     return <ReplayScreen payload={watching} onExit={exitWatch} />
+  }
+
+  if (view === 'challenge' && challengeLink) {
+    const exitChallenge = () => {
+      leaveChallenge()
+      const r = loadRound()
+      setView(r && !r.complete ? 'play' : 'home')
+    }
+    if (challengeLink === 'bad') {
+      return (
+        <div className="screen">
+          <p className="tagline center">
+            That challenge link doesn't parse — maybe it got truncated in the chat? Ask for a fresh one.
+          </p>
+          <button className="cta" onClick={exitChallenge}>
+            Teebox
+          </button>
+        </div>
+      )
+    }
+    const ch = challengeLink
+    const attempt = attemptFor(ch.id)
+    return (
+      <ChallengeScreen
+        challenge={ch}
+        attempt={attempt}
+        onAccept={() => {
+          const setup = acceptChallenge(ch)
+          track('challenge_accepted', { course: ch.courseSlug, rally: ch.rally, their_to_par: ch.from.toPar })
+          setPending({ mode: 'practice', setup, challenge: ch })
+          setView('pick')
+        }}
+        onResume={() => {
+          // the live round slot still holds the attempt → walk straight back
+          // in; otherwise the ledger snapshot restores it exactly where it
+          // stood (a practice round taking the slot can't erase an attempt)
+          const pinned = attempt?.attemptSeed
+          const liveMatches =
+            !!round && !round.complete && !!pinned && challengeAttemptForRound(round)?.id === attempt?.id
+          if (!liveMatches) {
+            if (attempt?.snapshot) {
+              setRound(attempt.snapshot)
+            } else if (pinned) {
+              // accepted but never teed off (or the snapshot was lost): the
+              // pinned seed re-deals the exact same dice, like the daily
+              setPending({ mode: 'practice', setup: attemptSetup(pinned, ch.courseSlug), challenge: ch })
+              setView('pick')
+              return
+            }
+          }
+          setSelected(null)
+          setView('play')
+        }}
+        onWatch={() => {
+          setWatching({
+            seed: ch.from.seed,
+            character: ch.from.character,
+            decisions: ch.from.decisions,
+            name: ch.from.name ?? undefined,
+          })
+          setView('watch')
+        }}
+        onHome={exitChallenge}
+      />
+    )
   }
 
   if (view === 'rounds') {
@@ -528,6 +712,7 @@ export default function App() {
       <CharacterPickScreen
         setup={start.setup}
         practice={start.mode === 'practice'}
+        challenge={start.challenge ? { from: start.challenge.from.name, toPar: start.challenge.from.toPar } : undefined}
         ghostBoard={pickBoard}
         onGhostBoard={setPickBoard}
         onPick={(character: CharacterId) => {
@@ -555,7 +740,9 @@ export default function App() {
         }}
         onBack={() => {
           setPending(null)
-          setView('home')
+          // a challenge start backs out to the challenge, not past it — the
+          // hash is still in the bar and the attempt seed stays pinned
+          setView(start.challenge && challengeLink && challengeLink !== 'bad' ? 'challenge' : 'home')
         }}
       />
     )
@@ -582,6 +769,11 @@ export default function App() {
         : null
     // the swing coach's report needs the same shot-by-shot record the recap does
     const grade = recapSource ? roundGrade : null
+    // the head-to-head belongs to the practice round held in memory, so it only
+    // rides the wrap OF that round: re-opening today's daily card with a
+    // finished attempt still in the live slot must not wear the attempt's
+    // challenge (same staleness `recapSource` guards against)
+    const wrapChallenge = isPractice ? challengeCtx : null
     return (
       <>
         {unlocks.length > 0 && !toastsDone && <UnlockToasts unlocks={unlocks} onDone={() => setToastsDone(true)} />}
@@ -593,8 +785,11 @@ export default function App() {
           recap={recapSource ? buildRecap(recapSource) : null}
           grade={grade}
           boardRound={recapSource}
+          challenge={wrapChallenge ?? undefined}
           ghostClose={
-            isPractice && round && ghost
+            // the head-to-head card IS the challenge's close — the ghost line
+            // underneath would say the same thing twice
+            isPractice && round && ghost && !wrapChallenge
               ? { margin: roundToPar(round) - ghost.toPar, kind: ghost.kind, board: ghost.board, holder: ghost.holder }
               : null
           }
@@ -609,11 +804,15 @@ export default function App() {
             // different round entirely (or today's daily wearing a practice
             // round's card).
             setUnlocks([])
+            // the head-to-head was the challenge's close: walking off the wrap
+            // walks off the challenge, hash and all
+            leaveChallenge()
             setLockerTab('awards')
             setView('rounds')
           }}
           onHome={() => {
             setUnlocks([])
+            leaveChallenge()
             setView('home')
           }}
           onPracticeAgain={() => {
@@ -621,6 +820,7 @@ export default function App() {
               // rematch on the same course, but pick your player fresh each run
               // (round_started is tracked by the pick screen's onPick)
               setUnlocks([])
+              leaveChallenge()
               setPending({ mode: 'practice', setup: practiceSetup(round.courseSlug, `${Date.now()}`) })
               setPickBoard(defaultChaseBoard(round.courseSlug, seasonForDate().key))
               setView('pick')
@@ -647,7 +847,7 @@ export default function App() {
   const spec = course.holes[round.currentHole]
   const toPar = roundToPar(round)
   const holeDone = hole.stage === 'done' && hole.score
-  const modeTag = round.mode === 'daily' ? `Daily · No. ${round.puzzleNumber}` : 'Practice'
+  const modeTag = round.mode === 'daily' ? `Daily · No. ${round.puzzleNumber}` : liveChallenge ? 'Challenge' : 'Practice'
 
   const commit = (choice: Choice) => {
     if (animating || !hole) return
@@ -706,6 +906,23 @@ export default function App() {
     setRound(after)
     setSelected(null)
     if (after.complete) {
+      // a challenge attempt signs its card the moment the round ends — synced
+      // here (not just in the save effect) so the wrap render already finds
+      // the verdict in the ledger, and the funnel event carries it
+      const att = challengeAttemptForRound(after)
+      if (att) {
+        syncChallengeRound(after)
+        const ch = parseChallenge(att.code)
+        if (ch) {
+          track('challenge_completed', {
+            course: after.courseSlug,
+            rally: ch.rally,
+            to_par: roundToPar(after),
+            their_to_par: ch.from.toPar,
+            verdict: challengeVerdict(roundToPar(after), ch.from.toPar),
+          })
+        }
+      }
       const h = recordResult(after)
       setHistory(h)
       archiveRound(after) // into the Clubhouse — replayable forever if it's a PB/CR
@@ -850,7 +1067,7 @@ export default function App() {
               const pace = paceVs(ghost, round.scores, round.courseSlug)
               return (
                 <div className={`pace-chip ${pace.state}`}>
-                  👻{' '}
+                  {ghost.kind === 'challenge' ? '⚔️' : '👻'}{' '}
                   {pace.holesCompared === 0
                     ? `chasing ${ghostNoun(ghost)} · ${toParLabel(ghost.toPar)}`
                     : paceLabel(pace, ghost)}

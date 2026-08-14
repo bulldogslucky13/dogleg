@@ -83,6 +83,55 @@ const REST_HEADERS = {
   apikey: SUPABASE_ANON_KEY,
 }
 
+export type ClaimResult = { ok: true; player: Player } | { ok: false; error: string }
+
+/**
+ * Claim a clubhouse name outside a round (see supabase/functions/claim-name).
+ *
+ * The other two doors both demand something first — submit-round wants a
+ * finished round, syncAccount wants an email session — so neither can serve
+ * a player mid-round. Names are globally unique (`players_name_ci`), so this
+ * cannot be faked locally and deferred: the claim has to reach the server at
+ * the moment it's made, or the player gets told "taken" much later, having
+ * already been promised the name.
+ *
+ * The name lands on the identity this device already holds, so the round in
+ * flight keeps the dice it was dealt.
+ *
+ * Unlike the other calls here this one is BOUNDED, because the card that makes
+ * it disables its own "not now" while the claim is in flight — the write is
+ * one-way, so a dismissal racing it would name the player permanently without
+ * ever showing it. That makes an unbounded fetch a modal with no exit, mid
+ * round, so the request gets a deadline instead. Giving up is safe: the claim
+ * may still land server-side, and a retry from a device that never heard back
+ * hits claim-name's already-named path and is answered with the name that
+ * actually took.
+ */
+const CLAIM_TIMEOUT_MS = 15_000
+
+export async function claimClubhouseName(name: string): Promise<ClaimResult> {
+  if (!backendEnabled) return { ok: false, error: 'leaderboard disabled' }
+  const player = loadIdentity()
+  if (!player) return { ok: false, error: 'no identity on this device yet' }
+  if (player.name) return { ok: true, player }
+  try {
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/claim-name`, {
+      method: 'POST',
+      headers: { ...REST_HEADERS, 'content-type': 'application/json' },
+      body: JSON.stringify({ playerId: player.id, playerSecret: player.secret, name }),
+      signal: AbortSignal.timeout(CLAIM_TIMEOUT_MS),
+    })
+    const body = (await res.json()) as { player?: { id: string; name: string }; error?: string }
+    if (!res.ok || !body.player) return { ok: false, error: body.error ?? `could not claim that name (${res.status})` }
+    // keep the device secret — the server never echoes it back on this route
+    const claimed: Player = { id: body.player.id, secret: player.secret, name: body.player.name }
+    savePlayerIdentity(claimed)
+    return { ok: true, player: claimed }
+  } catch {
+    return { ok: false, error: 'network hiccup — try again' }
+  }
+}
+
 export interface BoardRow {
   player_name: string
   character: CharacterId | null
@@ -113,6 +162,8 @@ export interface CourseRecord {
   /** which mode set it — 'daily' records wear the crown (one attempt, fixed
    * conditions). Absent on rows read before the column deployed. */
   mode?: 'daily' | 'practice' | null
+  /** when the current holder took it — the churn line reads this */
+  set_at?: string
 }
 
 /** The season board for one season (scope 'global'): course → holder. A
@@ -124,7 +175,7 @@ export async function fetchSeasonRecords(seasonKey: string): Promise<Map<string,
     const url =
       `${SUPABASE_URL}/rest/v1/season_records` +
       `?scope=eq.global&season_key=eq.${encodeURIComponent(seasonKey)}` +
-      `&select=course_slug,player_name,character,to_par,mode`
+      `&select=course_slug,player_name,character,to_par,mode,set_at`
     const res = await fetch(url, { headers: REST_HEADERS })
     if (!res.ok) return null
     const rows = (await res.json()) as CourseRecord[]
@@ -187,7 +238,7 @@ export async function fetchSeasonRecordReplay(courseSlug: string, seasonKey: str
 export async function fetchCourseRecords(): Promise<Map<string, CourseRecord> | null> {
   if (!backendEnabled) return null
   try {
-    const url = `${SUPABASE_URL}/rest/v1/course_records?select=course_slug,player_name,character,to_par,mode`
+    const url = `${SUPABASE_URL}/rest/v1/course_records?select=course_slug,player_name,character,to_par,mode,set_at`
     const res = await fetch(url, { headers: REST_HEADERS })
     if (!res.ok) return null
     const rows = (await res.json()) as CourseRecord[]

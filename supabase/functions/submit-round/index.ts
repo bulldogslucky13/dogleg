@@ -253,13 +253,33 @@ Deno.serve(async (req) => {
       // an anonymous minted identity posting its first card: the name is
       // claimed onto THIS row, the one the round's dice were salted for
       if (!name || !NAME_RE.test(name)) return json(400, { error: 'pick a clubhouse name (2-18 letters/numbers)' })
-      const { error } = await supabase.from('players').update({ name }).eq('id', data.id).is('name', null)
+      // `is('name', null)` is the race guard, and a MISS is not an error —
+      // PostgREST reports a zero-row update as a success. That matters more
+      // here than anywhere: `player_name` is denormalised onto daily_scores
+      // and both record boards, so a claim that quietly lost would post this
+      // card under a name the row does not have (and mail a record-steal
+      // notice signed with it). Ask for the row back and use what it says.
+      const { data: claimed, error } = await supabase
+        .from('players')
+        .update({ name })
+        .eq('id', data.id)
+        .is('name', null)
+        .select('name')
+        .maybeSingle()
       if (error) {
         return json(error.code === '23505' ? 409 : 500, {
           error: error.code === '23505' ? 'that name is taken' : 'could not claim that name',
         })
       }
-      data.name = name
+      if (claimed?.name) data.name = claimed.name
+      else {
+        // no row changed: another door (claim-name, link-account, a second
+        // tab) named this id between the read above and this write. The name
+        // it holds now is the real one — the card posts under that.
+        const { data: winner } = await supabase.from('players').select('name').eq('id', data.id).single()
+        if (!winner?.name) return json(500, { error: 'could not claim that name' })
+        data.name = winner.name
+      }
     }
     player = { id: data.id, name: data.name }
   } else {

@@ -67,6 +67,12 @@ export const CHANGE_KIND_LABEL: Record<ChangeKind, string> = {
 
 export const CHANGELOG: ChangeEntry[] = [
   {
+    date: '2026-08-12',
+    kind: 'feature',
+    title: 'Claim the hole in one you just made',
+    note: 'A hole in one or an albatross played without a clubhouse name used to go in the books under nobody — no name on the card, no line on any board, and no way to fix it later. Now the moment plays out exactly as it always has, and when you tap on, you get one card asking if you want to put your name on it. You can claim a clubhouse name right there, mid-round, without waiting for the scorecard — the name lands on the identity you were already playing under, so the round in your hands keeps the dice it was dealt. Tap "not now" and nothing changes.',
+  },
+  {
     date: '2026-08-10',
     kind: 'fix',
     title: 'The course list remembers your sort and filters',
@@ -89,6 +95,24 @@ export const CHANGELOG: ChangeEntry[] = [
     kind: 'feature',
     title: 'The DogLeg Cup',
     note: 'Tournament golf. Four rounds, Thursday through Sunday, one course, one attempt a day — your best three count, and nobody gets cut. The course firms up as the weekend goes: Sunday plays the hardest, and it says so up front. Every event pays points toward the season-long DogLeg Cup. First tee times land this month.',
+  },
+  {
+    date: '2026-08-09',
+    kind: 'feature',
+    title: 'Challenge links: beat this round',
+    note: 'Finish an unlimited round and throw it down as a challenge. Whoever taps the link plays the same course against your actual round — one attempt, their own luck, ties don\'t take it. Beat a challenge and you get to send the revenge link. Challenge rounds are real rounds: course and season records are live the whole way. Settle it in the group chat.',
+  },
+  {
+    date: '2026-08-09',
+    kind: 'feature',
+    title: 'The wall keeps score of itself',
+    note: 'The course list now says how many course records were set in the past week \u2014 and how many of those fell in daily play, crown and all. A quiet week says nothing.',
+  },
+  {
+    date: '2026-08-09',
+    kind: 'feature',
+    title: 'The hunt is on',
+    note: 'The Teebox now tells you how many season records are within reach — wide open boards and beatable numbers both — and one tap drops you on the course list sorted by what\u2019s winnable. Go take one.',
   },
   {
     date: '2026-08-07',

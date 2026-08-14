@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { backendEnabled } from '../lib/backend'
 import { currentEmail, sendMagicLink, signOut, syncAccount } from '../lib/auth'
-import { fetchMyHistory, loadPlayer } from '../lib/leaderboard'
+import { fetchMyHistory, loadPlayer, type Player } from '../lib/leaderboard'
 import { clearRelink, needsRelink } from '../lib/handoff'
 import { mergeHistory, type HistoryEntry } from '../state/store'
 import { identifyPlayer, track } from '../lib/analytics'
@@ -15,7 +15,16 @@ import { Spinner } from './Spinner'
  * pulls the account's submitted rounds into local history so streaks and
  * "played today" follow the player across devices.
  */
-export function AccountPanel(props: { onHistorySynced?: (h: HistoryEntry[]) => void; defaultOpen?: boolean }) {
+export function AccountPanel(props: {
+  onHistorySynced?: (h: HistoryEntry[]) => void
+  /** the signed-in player, whenever signing in settles which one this device
+   * is — a fresh device ADOPTING an existing clubhouse changes the answer to
+   * "is this record mine?" everywhere on the screen above, and this panel is
+   * the only thing that knows it happened. Fires for a re-confirmed identity
+   * too: same name, same no-op for the listener. */
+  onIdentity?: (player: Player) => void
+  defaultOpen?: boolean
+}) {
   // Arrived from the old domain with an email session that couldn't come with
   // them (see handoff.ts). Their clubhouse is intact; only the sign-in is
   // gone, and unexplained that reads as the move having eaten something. Open
@@ -63,6 +72,12 @@ export function AccountPanel(props: { onHistorySynced?: (h: HistoryEntry[]) => v
         // player id, stitching this device to the same person in PostHog
         identifyPlayer(out.player.id, out.player.name)
         setPlayerName(out.player.name)
+        // the screen above asks "is this record mine?" in several places and
+        // has no other way to learn the answer just changed. NOT folded into
+        // pullHistory: that no-ops for an account with no submitted dailies,
+        // which is exactly the practice-only record holder who most needs
+        // their own records to stop reading as targets.
+        props.onIdentity?.(out.player)
         if (out.status === 'adopted') setOpen(true) // show the win on a new device
         await pullHistory()
       }
@@ -97,6 +112,7 @@ export function AccountPanel(props: { onHistorySynced?: (h: HistoryEntry[]) => v
       track('clubhouse_name_claimed', { via: 'account' })
       identifyPlayer(out.player.id, out.player.name)
       setPlayerName(out.player.name)
+      props.onIdentity?.(out.player)
       setNeedsName(false)
       await pullHistory()
     } else setError(out.error ?? 'could not claim that name')

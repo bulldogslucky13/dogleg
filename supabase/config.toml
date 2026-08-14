@@ -31,6 +31,12 @@ verify_jwt = true
 [functions.mint-player]
 verify_jwt = false
 
+# Naming an anonymous identity without posting a card. Authenticates on the
+# player's own device secret, exactly as submit-round does for the same write
+# — a gateway JWT check would lock out every player it exists to serve.
+[functions.claim-name]
+verify_jwt = false
+
 # Inbound mail webhook. The caller is Resend, which can't mint Supabase JWTs;
 # the function authenticates every request itself via the svix signature
 # (RESEND_WEBHOOK_SECRET) and fails closed when the secret is unset.

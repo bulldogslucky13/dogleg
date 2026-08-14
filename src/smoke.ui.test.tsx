@@ -1413,6 +1413,9 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
       'dogleg:fortune:v1',
       JSON.stringify({ p: { ace: 999, aceK: 0, alb: 0, albK: 0 }, d: { ace: 0, alb: 0 } }),
     )
+    // minted but nameless: the state the claim card exists for, and the only
+    // one it can act on — it names an existing row and cannot mint one
+    localStorage.setItem('dogleg:player:v1', JSON.stringify({ id: 'p1', secret: 's1', name: null }))
     render(<App />)
     fireEvent.click(screen.getByText(/Play unlimited/))
     const courseButton = screen
@@ -1451,6 +1454,105 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
     fireEvent.click(screen.getByText('HOLE IN ONE'))
     expect(screen.queryByText('HOLE IN ONE')).toBeNull()
     // the hole card behind it calls it what it is — not "Eagle"
+    expect(screen.getByText('Hole in One')).toBeTruthy()
+
+    // …and because this device has never claimed a clubhouse name, the ace is
+    // filed under nobody — so the unclaimed-trophy card takes the splash's
+    // place. It arrives AFTER the celebration, never during it.
+    expect(screen.getByText('Unclaimed trophy')).toBeTruthy()
+    expect(screen.getByText(/filed under nobody/i)).toBeTruthy()
+    // dismissing it puts the player straight back in the round, unchanged
+    fireEvent.click(screen.getByText('Not now'))
+    expect(screen.queryByText('Unclaimed trophy')).toBeNull()
+    expect(screen.getByText('Hole in One')).toBeTruthy()
+  })
+
+  it('does not ask a player who already has a clubhouse name to claim one', () => {
+    vi.useFakeTimers()
+    // same due-ace counter, but this device is already somebody
+    localStorage.setItem(
+      'dogleg:fortune:v1',
+      JSON.stringify({ p: { ace: 999, aceK: 0, alb: 0, albK: 0 }, d: { ace: 0, alb: 0 } }),
+    )
+    localStorage.setItem('dogleg:player:v1', JSON.stringify({ id: 'p1', secret: 's1', name: 'Rob' }))
+    render(<App />)
+    fireEvent.click(screen.getByText(/Play unlimited/))
+    const courseButton = screen
+      .getAllByText('Pebble Beach Links')
+      .map((el) => el.closest('button'))
+      .find((b): b is HTMLButtonElement => b !== null)!
+    fireEvent.click(courseButton)
+    fireEvent.click(screen.getByText(CHARACTERS[0].name))
+
+    for (let guard = 0; guard < 200; guard++) {
+      if (screen.queryByText('HOLE IN ONE')) break
+      const advance = screen.queryByText('Next hole') ?? screen.queryByText('Sign the card')
+      if (advance) {
+        fireEvent.click(advance)
+        continue
+      }
+      const card = document.querySelector<HTMLButtonElement>('button.choice')!
+      fireEvent.click(card)
+      fireEvent.click(card)
+      act(() => {
+        vi.advanceTimersByTime(1500)
+      })
+    }
+    expect(screen.getByText('HOLE IN ONE')).toBeTruthy()
+    act(() => {
+      vi.advanceTimersByTime(5100)
+    })
+    fireEvent.click(screen.getByText('HOLE IN ONE'))
+    // the celebration ends and play resumes — no card, because there is
+    // nothing to claim; Rob's name is already on it
+    expect(screen.queryByText('HOLE IN ONE')).toBeNull()
+    expect(screen.queryByText('Unclaimed trophy')).toBeNull()
+    expect(screen.getByText('Hole in One')).toBeTruthy()
+  })
+
+  it('does not offer the claim card to a device with no minted identity', () => {
+    vi.useFakeTimers()
+    // same due-ace counter, but nothing was ever minted here — the state of a
+    // player who teed off offline, or whose mint-player call never landed
+    localStorage.setItem(
+      'dogleg:fortune:v1',
+      JSON.stringify({ p: { ace: 999, aceK: 0, alb: 0, albK: 0 }, d: { ace: 0, alb: 0 } }),
+    )
+    localStorage.removeItem('dogleg:player:v1')
+    render(<App />)
+    fireEvent.click(screen.getByText(/Play unlimited/))
+    const courseButton = screen
+      .getAllByText('Pebble Beach Links')
+      .map((el) => el.closest('button'))
+      .find((b): b is HTMLButtonElement => b !== null)!
+    fireEvent.click(courseButton)
+    fireEvent.click(screen.getByText(CHARACTERS[0].name))
+
+    for (let guard = 0; guard < 200; guard++) {
+      if (screen.queryByText('HOLE IN ONE')) break
+      const advance = screen.queryByText('Next hole') ?? screen.queryByText('Sign the card')
+      if (advance) {
+        fireEvent.click(advance)
+        continue
+      }
+      const card = document.querySelector<HTMLButtonElement>('button.choice')!
+      fireEvent.click(card)
+      fireEvent.click(card)
+      act(() => {
+        vi.advanceTimersByTime(1500)
+      })
+    }
+    expect(screen.getByText('HOLE IN ONE')).toBeTruthy()
+    act(() => {
+      vi.advanceTimersByTime(5100)
+    })
+    fireEvent.click(screen.getByText('HOLE IN ONE'))
+    // the celebration ends and play resumes. No card: claim-name names a row
+    // that already exists and cannot mint one, so with no id to claim onto the
+    // form could only ever fail — and "put your name on it" would be a promise
+    // made to somebody the server has never heard of.
+    expect(screen.queryByText('HOLE IN ONE')).toBeNull()
+    expect(screen.queryByText('Unclaimed trophy')).toBeNull()
     expect(screen.getByText('Hole in One')).toBeTruthy()
   })
 
@@ -2024,6 +2126,9 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
       'dogleg:fortune:v1',
       JSON.stringify({ p: { ace: 999, aceK: 0, alb: 0, albK: 0 }, d: { ace: 0, alb: 0 } }),
     )
+    // minted but nameless: the state the claim card exists for, and the only
+    // one it can act on — it names an existing row and cannot mint one
+    localStorage.setItem('dogleg:player:v1', JSON.stringify({ id: 'p1', secret: 's1', name: null }))
     render(<App />)
     fireEvent.click(screen.getByText(/Play unlimited/))
     const courseButton = screen
@@ -2062,6 +2167,16 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
     fireEvent.click(screen.getByText('HOLE IN ONE'))
     expect(screen.queryByText('HOLE IN ONE')).toBeNull()
     // the hole card behind it calls it what it is — not "Eagle"
+    expect(screen.getByText('Hole in One')).toBeTruthy()
+
+    // …and because this device has never claimed a clubhouse name, the ace is
+    // filed under nobody — so the unclaimed-trophy card takes the splash's
+    // place. It arrives AFTER the celebration, never during it.
+    expect(screen.getByText('Unclaimed trophy')).toBeTruthy()
+    expect(screen.getByText(/filed under nobody/i)).toBeTruthy()
+    // dismissing it puts the player straight back in the round, unchanged
+    fireEvent.click(screen.getByText('Not now'))
+    expect(screen.queryByText('Unclaimed trophy')).toBeNull()
     expect(screen.getByText('Hole in One')).toBeTruthy()
   })
 

@@ -127,6 +127,8 @@ jobs:
             --project-ref "$PROJECT_REF" --use-api
           supabase functions deploy mint-player \
             --project-ref "$PROJECT_REF" --no-verify-jwt --use-api
+          supabase functions deploy claim-name \
+            --project-ref "$PROJECT_REF" --no-verify-jwt --use-api
           supabase functions deploy receive-email \
             --project-ref "$PROJECT_REF" --no-verify-jwt --use-api
       # Records catch-up: the one piece of SQL that runs AFTER the functions

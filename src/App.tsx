@@ -67,6 +67,7 @@ import { UnlockToasts } from './ui/Achievements'
 import { prefersReducedMotion } from './ui/motion'
 import type { MomentKind } from './engine/fortune'
 import { MomentSplash } from './ui/MomentSplash'
+import { TrophyClaim } from './ui/TrophyClaim'
 import { decodeReplay, type ReplayPayload } from './engine/replay'
 import { ReplayScreen } from './ui/ReplayScreen'
 import { RoundsScreen } from './ui/RoundsScreen'
@@ -164,6 +165,10 @@ export default function App() {
   const [splash, setSplash] = useState<CharacterAdvantage | null>(null)
   const [splashKey, setSplashKey] = useState(0)
   const [moment, setMoment] = useState<{ kind: MomentKind; holeNumber: number } | null>(null)
+  /** The unclaimed-trophy card, queued when an ANONYMOUS player's moment
+   * splash is dismissed. Kept separate from `moment` so the celebration is
+   * never competing with a form — one closes, then the other opens. */
+  const [trophyClaim, setTrophyClaim] = useState<{ kind: MomentKind; holeNumber: number } | null>(null)
   /** Clubhouse decision stats (Layer 2): real tallies of what the field chose
    * on the CURRENT hole, fetched only after that hole is committed. Null until
    * fetched (or unavailable) — the cast block degrades gracefully to cast-only
@@ -980,7 +985,30 @@ export default function App() {
           toPar={toPar}
           character={round.character}
           streak={shareStreak}
-          onClose={() => setMoment(null)}
+          onClose={() => {
+            // an anonymous player just banked the rarest thing the game makes,
+            // and it is filed under nobody. This is the one instant where
+            // asking for a name is a favour rather than an interruption — so
+            // the claim card takes the splash's place rather than sharing it.
+            //
+            // It takes a minted id, NOT merely the absence of a name: the card
+            // claims onto an existing row and cannot mint one, so a device
+            // whose mint never landed (offline, or the backend off entirely)
+            // would be handed a form that can only fail. `loadPlayer()` alone
+            // can't tell those apart — it returns null for both.
+            const identity = loadIdentity()
+            if (identity && !identity.name) setTrophyClaim(moment)
+            setMoment(null)
+          }}
+        />
+      )}
+      {trophyClaim && (
+        <TrophyClaim
+          kind={trophyClaim.kind}
+          holeNumber={trophyClaim.holeNumber}
+          courseName={course.name}
+          mode={round.mode === 'practice' ? 'practice' : 'daily'}
+          onClose={() => setTrophyClaim(null)}
         />
       )}
       <div className="top-row">

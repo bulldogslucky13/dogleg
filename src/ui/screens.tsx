@@ -2,8 +2,11 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { characterById, playableCharacters } from '../engine/characters'
 import { courseBySlug, COURSES, GUEST_COURSES, PAR3_COURSES, playRatingFor } from '../engine/courses'
 import { dailySetup, forecastSetup, RESULT_LABEL, RESULT_SQUARE, shareText, SITE_URL, toParLabel, type DailySetup } from '../engine/daily'
+import { cupShareText, type CupEvent } from '../engine/events'
+import { eventStandings, fetchEventScores } from '../lib/cup'
 import { gradeCopy, type RoundGrade } from '../engine/grade'
 import { decisionsFromScores, encodeReplay } from '../engine/replay'
+import { CupHomeCard } from './CupBoard'
 import type { CharacterId, HoleResult } from '../engine/types'
 import { track } from '../lib/analytics'
 import { backendEnabled } from '../lib/backend'
@@ -44,11 +47,13 @@ const SEASON_REARM_MS = 6 * 3_600_000
 
 export function HomeScreen(props: {
   history: HistoryEntry[]
-  activeRound: { mode: 'daily' | 'practice'; courseName: string; challenge?: boolean } | null
+  activeRound: { mode: 'daily' | 'practice' | 'major'; courseName: string; challenge?: boolean } | null
   playedToday: HistoryEntry | null
   onTeeOff: () => void
   onResume: () => void
   onPractice: (slug: string) => void
+  /** start today's Cup round (App resolves the live event) */
+  onCup: () => void
   onShowResult: () => void
   onHowToPlay: () => void
   onMyRounds: () => void
@@ -434,9 +439,14 @@ export function HomeScreen(props: {
           Tee off
         </button>
       )}
-      {props.activeRound?.mode === 'practice' && (
+      {(props.activeRound?.mode === 'practice' || props.activeRound?.mode === 'major') && (
         <button className="cta ghost" onClick={props.onResume}>
-          {props.activeRound.challenge ? '⚔️ Resume challenge attempt' : 'Resume practice round'} ·{' '}
+          {props.activeRound.mode === 'major'
+            ? '🏆 Resume Cup round'
+            : props.activeRound.challenge
+              ? '⚔️ Resume challenge attempt'
+              : 'Resume practice round'}{' '}
+          ·{' '}
           {props.activeRound.courseName}
         </button>
       )}
@@ -452,6 +462,10 @@ export function HomeScreen(props: {
       )}
 
       {props.playedToday && <ForecastCard today={props.playedToday} />}
+
+      {/* the Cup: the live event card during an event week, the next-event
+          teaser between weeks. A stale bundle can't start a Cup round either. */}
+      <CupHomeCard onTee={stale ? () => window.location.reload() : props.onCup} />
 
       <button className="cta ghost" onClick={() => setShowCourses((v) => !v)}>
         Play unlimited
@@ -1125,6 +1139,8 @@ function HandicapChip(props: { onTap: () => void }) {
 export function CharacterPickScreen(props: {
   setup: DailySetup
   practice: boolean
+  /** a Cup round's stakes: which event, which of its four days */
+  cup?: { name: string; day: number }
   /** a challenge attempt's stakes: whose card, what score */
   challenge?: { from: string | null; toPar: number }
   /** which record the ghost will race (practice only) — owned by the app so
@@ -1142,12 +1158,25 @@ export function CharacterPickScreen(props: {
       </button>
       <header>
         <div className="kicker">
-          {props.challenge ? 'Challenge' : props.practice ? 'Practice round' : "Today's round"} · {course.name}
+          {props.cup
+            ? `🏆 ${props.cup.name} · Round ${props.cup.day} of 4`
+            : `${props.challenge ? 'Challenge' : props.practice ? 'Practice round' : "Today's round"} · ${course.name}`}
         </div>
         <h2 className="pick-title">Pick your player</h2>
         <p className="tagline">One edge, all {course.holes.length} holes. Choose for the course in front of you:</p>
       </header>
-      {props.challenge ? (
+      {props.cup ? (
+        <div className="ghost-stakes cr">
+          <div className="ghost-stakes-head">
+            <b>🏆 One attempt today</b>
+            <span className="ghost-stakes-score">Rd {props.cup.day}/4</span>
+          </div>
+          <span className="fine">
+            Best three of your four rounds count.{' '}
+            {props.cup.day >= 3 ? 'Weekend setup — the course is biting now.' : 'The course firms up through the weekend.'}
+          </span>
+        </div>
+      ) : props.challenge ? (
         <div className="ghost-stakes cr">
           <div className="ghost-stakes-head">
             <b>⚔️ Beat {props.challenge.from ?? 'your rival'}</b>
@@ -1156,8 +1185,8 @@ export function CharacterPickScreen(props: {
           <span className="fine">One attempt. Their card, their luck — you get your own.</span>
         </div>
       ) : (
-        // a challenge races one card, so the board picker only belongs to a
-        // plain practice round
+        // a Cup round races its event board and a challenge races one card, so
+        // the board picker only belongs to a plain practice round
         props.practice && <GhostStakes courseSlug={course.slug} board={props.ghostBoard} onBoard={props.onGhostBoard} />
       )}
       <div className="chips center">
@@ -1190,6 +1219,9 @@ export function ResultScreen(props: {
   results: HoleResult[]
   toPar: number
   practice: boolean
+  /** the round that just wrapped was a Cup round — event share card, event
+   * board via ScoreBoard, none of the daily's streak furniture */
+  cup?: { event: CupEvent; day: number }
   character?: CharacterId
   recap: RoundRecap | null
   /** the swing coach's report — decision quality vs. luck, null when ungradeable */
@@ -1218,6 +1250,33 @@ export function ResultScreen(props: {
   const streaks = computeStreaks(props.history)
   const broke = toPar < 0
   const char = characterById(props.character)
+  // the Cup share card carries the tournament line too: my counted total so
+  // far, with TODAY's round folded in locally so the line is right even
+  // while the board fetch races the post
+  const [cupStanding, setCupStanding] = useState<{ total: number; played: number; rank?: number } | null>(null)
+  useEffect(() => {
+    if (!props.cup) return
+    let live = true
+    void fetchEventScores(props.cup.event.key).then((rows) => {
+      if (!live) return
+      const mine = loadPlayer()?.name?.toLowerCase()
+      const myRows = (rows ?? []).filter((r) => !!mine && r.player_name.toLowerCase() === mine)
+      const days = new Map(myRows.map((r) => [r.day, r.to_par]))
+      if (!days.has(props.cup!.day)) days.set(props.cup!.day, toPar)
+      const posted = [...days.values()].sort((a, b) => a - b)
+      const me = rows ? eventStandings(rows).find((s) => !!mine && s.name.toLowerCase() === mine) : undefined
+      setCupStanding({
+        total: posted.slice(0, 3).reduce((s, v) => s + v, 0),
+        played: posted.length,
+        rank: me?.eligible ? me.rank : undefined,
+      })
+    })
+    return () => {
+      live = false
+    }
+    // one fetch per event/day — toPar is fixed for a finished round
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [props.cup?.event.key, props.cup?.day])
   // the round as pure data: seed + decisions, re-run by the receiver's engine.
   // One payload, two doors — #watch replays it, #challenge dares them to beat it.
   const roundPayload = (() => {
@@ -1239,7 +1298,9 @@ export function ResultScreen(props: {
   // finished attempt doesn't re-arm as a fresh gauntlet from the wrap — its
   // head-to-head card carries the rally's next throw instead
   const myChallengeUrl = roundPayload && props.practice && !props.challenge ? challengeUrl(roundPayload) : null
-  const text = shareText(props.setup, results, toPar, props.character, streaks.dayStreak)
+  const text = props.cup
+    ? cupShareText(props.cup.event, props.cup.day, results, toPar, props.character, cupStanding ?? undefined)
+    : shareText(props.setup, results, toPar, props.character, streaks.dayStreak)
   // practice wrap: the challenge share stands alone (the daily's rides its share card)
   const practiceChallenge = useShareActions(
     myChallengeUrl
@@ -1286,8 +1347,9 @@ export function ResultScreen(props: {
           take, and the screenshot should carry the brand */}
       <Wordmark className="result-wordmark" />
       <div className="kicker">
-        {props.challenge ? '⚔️ Challenge' : props.practice ? 'Practice round' : `Daily No. ${props.setup.puzzleNumber}`} ·{' '}
-        {props.setup.course.name}
+        {props.cup
+          ? `🏆 ${props.cup.event.name} · Round ${props.cup.day} of 4`
+          : `${props.challenge ? '⚔️ Challenge' : props.practice ? 'Practice round' : `Daily No. ${props.setup.puzzleNumber}`} · ${props.setup.course.name}`}
       </div>
       <h1 className={`final ${broke ? 'good' : ''}`}>{toParLabel(toPar)}</h1>
       {char && (
@@ -1458,9 +1520,9 @@ export function ResultScreen(props: {
         // round took the slot, or a refreshed device only kept the day's
         // history entry): the card was already posted, so show the standings
         // read-only rather than dropping the board entirely
-        !props.practice && <DailyBoardView dateKey={props.setup.dateKey} />
+        !props.practice && !props.cup && <DailyBoardView dateKey={props.setup.dateKey} />
       )}
-      {!props.practice && (
+      {!props.practice && !props.cup && (
         <>
           <div className="stats-row">
             <div className="stat">

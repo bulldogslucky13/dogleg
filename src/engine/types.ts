@@ -31,7 +31,7 @@ export type Rough = 'normal' | 'penal' | 'severe'
 
 /** A recognizable structure drawn behind the green as pure map flavor —
  * cosmetic only, never touches odds/geometry/seed replay. */
-export type Landmark = 'lighthouse' | 'bridge'
+export type Landmark = 'lighthouse' | 'bridge' | 'billboard'
 
 /** The character of the ground the map INVENTS beside the corridor. Cosmetic
  * only — see `CourseSpec.scenery`. Absent = parkland (groves). */
@@ -152,8 +152,11 @@ export type ZoneSide = 'left' | 'right' | 'cross' | 'green'
  * replay-affecting and needs no ENGINE_VERSION bump — same contract as
  * `bend` and `landmark`. Reach for it only when a hole's signature copy
  * names a feature by name; otherwise the normal shapes are the house style.
+ *
+ * letterD / letterL are The DogLeg's house initials, cut into the sand
+ * either side of its home green — same contract, pure flavor.
  */
-export type ZoneStyle = 'pews'
+export type ZoneStyle = 'pews' | 'letterD' | 'letterL'
 
 /** A hazard zone along the hole line. from/to are yards from the tee. */
 export interface HazardZone {

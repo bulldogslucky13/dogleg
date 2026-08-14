@@ -42,6 +42,9 @@ beforeEach(() => {
   // ...and the what's-new drop, which any test that seeds history would
   // otherwise land behind (its own tests clear this)
   localStorage.setItem('dogleg:whatsnew-ack:v1', WHATS_NEW_VERSION)
+  // ...and the Cup's one-time introduction, which outranks both above
+  // (its own tests clear this)
+  localStorage.setItem('dogleg:cup-intro-ack:v1', 'seen')
 })
 
 afterEach(() => {
@@ -1661,6 +1664,70 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
     fireEvent.click(screen.getByText('Teebox'))
     expect(screen.getByText('Tee off')).toBeTruthy()
     window.location.hash = ''
+  })
+
+  it('an event week: the Cup card is live, tees off into the event, and the round wears the tag', async () => {
+    const { seasonForDate } = await import('./engine/season')
+    vi.useFakeTimers()
+    // Friday of the Cup's first confirmed week (Pinehurst No. 2, Sept 3–6)
+    vi.setSystemTime(new Date(2026, 8, 4, 12))
+    // re-ack the season splash for the season the FAKE date lands in
+    localStorage.setItem('dogleg:season-ack:v1', seasonForDate().key)
+    render(<App />)
+
+    // the first landing of an event week is the event's welcome splash:
+    // the course, the format, and a first tee straight from the card
+    expect(screen.getByText(/is on$|This week|Major week/)).toBeTruthy()
+    expect(screen.getByText(/one attempt a day, best three count/)).toBeTruthy()
+    fireEvent.click(screen.getByText(/Later — to the Teebox/))
+
+    expect(screen.getByText('DogLeg Cup at Pinehurst No. 2')).toBeTruthy()
+    expect(screen.getByText(/Round 2 of 4 · Friday/)).toBeTruthy()
+    // the arc is DISCLOSED on the card — the odds-never-lie condition
+    expect(screen.getByText(/firms up through the weekend/)).toBeTruthy()
+
+    fireEvent.click(screen.getByText('Tee off in the Cup'))
+    expect(screen.getByText('Pick your player')).toBeTruthy()
+    expect(screen.getByText(/DogLeg Cup at Pinehurst No\. 2 · Round 2 of 4/)).toBeTruthy()
+    expect(screen.getByText(/Best three of your four rounds count/)).toBeTruthy()
+
+    fireEvent.click(screen.getByText(CHARACTERS[0].name))
+    expect(screen.getAllByText(/· Cup · Rd 2/).length).toBeGreaterThan(0)
+    const safeCard = screen.getByText('Safe').closest('button')!
+    fireEvent.click(safeCard)
+    fireEvent.click(safeCard)
+    const save = JSON.parse(localStorage.getItem('dogleg:round:v1') ?? 'null')
+    expect(save.mode).toBe('major')
+    expect(save.seed.startsWith('major:pinehurst-no2-2026:2026-09-04:pinehurst-no2')).toBe(true)
+    // no fortune tail on a Cup seed — the Cup sits outside fortune
+    expect(save.seed.includes(':f')).toBe(false)
+  })
+
+  it('between events the Teebox bills the next tournament over a live countdown', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date(2026, 7, 31, 12)) // the Monday before the opener
+    render(<App />)
+    expect(screen.getByText(/Next on the DogLeg Cup/)).toBeTruthy()
+    expect(screen.getByText('DogLeg Cup at Pinehurst No. 2')).toBeTruthy()
+    // the clock is live and counting days until Thursday's first tee
+    expect(screen.getByText(/First tee in/)).toBeTruthy()
+    expect(screen.getByText(/2d /)).toBeTruthy()
+    // the season race is one tap away
+    expect(screen.getByText(/DogLeg Cup standings/)).toBeTruthy()
+  })
+
+  it('the podium is owed only for an event this device posted to, and only while fresh', async () => {
+    const { podiumDue, ackPodium } = await import('./ui/CupBoard')
+    const { recordPostedCupRound } = await import('./lib/cup')
+    // played nothing → no ceremony
+    expect(podiumDue('2026-09-08')).toBeNull()
+    // posted a round → the just-ended event is due, until it ages out or acks
+    recordPostedCupRound('pinehurst-no2-2026', 2)
+    expect(podiumDue('2026-09-08')?.key).toBe('pinehurst-no2-2026')
+    expect(podiumDue('2026-09-05')).toBeNull() // still running
+    expect(podiumDue('2026-09-20')).toBeNull() // old news
+    ackPodium('pinehurst-no2-2026')
+    expect(podiumDue('2026-09-08')).toBeNull() // shown once, never again
   })
 
   it('a #challenge= link lands on the challenge screen; accepting pins ONE attempt and resumes like the daily', async () => {

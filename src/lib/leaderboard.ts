@@ -2,6 +2,7 @@ import { decisionsFromScores } from '../engine/replay'
 import type { CharacterId, Choice, HoleResult } from '../engine/types'
 import type { HistoryEntry, RoundState } from '../state/store'
 import { SUPABASE_ANON_KEY, SUPABASE_URL, backendEnabled } from './backend'
+import { recordPostedCupRound } from './cup'
 
 /** Clubhouse identity: a device-held id/secret pair, plus a name once the
  * player has claimed one. Anonymous players carry a nameless identity — the
@@ -288,11 +289,14 @@ export interface SubmitResult {
   /** machine-readable rejection reason — 'stale_client' when the bundle's
    * engine generation no longer matches the referee's (refresh to fix) */
   code?: string
-  mode?: 'daily' | 'practice'
+  mode?: 'daily' | 'practice' | 'major'
   toPar?: number
   rank?: number
   total?: number
   duplicate?: boolean
+  /** major submissions only: which event and which of its four rounds */
+  eventKey?: string
+  day?: number
   record?: { broken: boolean; toPar: number; holder: string; character?: CharacterId | null }
   seasonRecord?: { broken: boolean; toPar: number; holder: string; character?: CharacterId | null; seasonKey: string }
 }
@@ -386,6 +390,11 @@ export async function submitRound(round: RoundState, name?: string): Promise<Sub
     // daily_scores table can't corroborate (duplicates count: the card for
     // that day is on the board either way)
     if (round.mode === 'daily') recordPostedDaily(round.dateKey)
+    // …and which Cup rounds posted — the event card reads this to swap its
+    // CTA to "posted ✓" (duplicates count for the same reason as dailies)
+    if (round.mode === 'major' && body.eventKey && typeof body.day === 'number') {
+      recordPostedCupRound(body.eventKey, body.day)
+    }
     return { ...body, ok: true }
   } catch {
     return { ok: false, error: 'network hiccup — your score is safe locally, try again' }

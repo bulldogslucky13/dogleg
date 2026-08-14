@@ -1806,6 +1806,87 @@ export const GUEST_COURSES: CourseSpec[] = [
       [5, 575, 8, 'L', 'water'],
     ]),
   },
+  {
+    // Bellerive CC — the DogLeg Cup's opening exhibition venue (Aug 20 2026,
+    // events.ts 'bellerive-2026'). A guest like Kings Creek: never in the
+    // daily rotation or the practice browser. BlueGolf BLACK card: par 72
+    // (36/36), 7506 yds, 76.5/146; SI is the card's HCP row (OSM's own
+    // handicap tags corroborate 16 of 18). Geometry: OSM_GEOMETRY
+    // 'bellerive:*' — see its block note for the tee-pad shifts and the
+    // hand-laid Smith Creek water.
+    slug: 'bellerive',
+    name: 'Bellerive Country Club',
+    location: 'St. Louis, Missouri',
+    difficulty: 8,
+    greens: 'Fast',
+    wind: 10,
+    blurb: 'The Green Monster of Ladue. Robert Trent Jones built everything big — the greens, the sand, and the creek that owns the closing stretch.',
+    // No wood polygons reached any corridor, so the junk floor needs the
+    // course's own word (rough.test.ts). The misses here die under the old
+    // oaks that line every fairway — unmapped, but very much there.
+    junkLabel: 'oaks',
+    holes: holes([
+      [4, 436, 7, 'L', 'sand'],
+      [4, 427, 13, 'L', 'water'],
+      [3, 168, 17, 'S', 'water', 'All carry — the pond swallows everything short and right'],
+      [5, 562, 9, 'L', 'water'],
+      [4, 489, 3, 'S', 'water'],
+      [3, 215, 11, 'S', 'water'],
+      [4, 395, 15, 'L', 'sand'],
+      [5, 612, 1, 'L', 'water', 'The creek stalks the right of the layup on the hardest hole on the card'],
+      [4, 438, 5, 'L', 'sand'],
+      [5, 515, 10, 'L', 'water', 'The creek crosses sixty short of the green — lay back or fly it'],
+      [4, 361, 14, 'S', 'water'],
+      [4, 468, 4, 'L', 'sand'],
+      [3, 187, 18, 'S', 'sand'],
+      [4, 417, 12, 'L', 'sand'],
+      [4, 495, 2, 'R', 'sand'],
+      [3, 237, 16, 'S', 'sand'],
+      [5, 624, 6, 'R', 'water', 'The creek crosses the layup twice — thread it, carry it, or lay well back'],
+      [4, 460, 8, 'L', 'sand'],
+    ]),
+  },
+  {
+    // THE DOGLEG — the game's own course, host of the DogLeg Cup Championship
+    // every year. A guest on purpose: it never enters the daily rotation, and
+    // it isn't in the practice browser — the only week you can play the
+    // course is the week the Cup comes home. The course is the name: every
+    // two-shotter on the card turns (seven left, seven right, trading blows),
+    // the corners sharpen as the round goes, and the closer is the mark
+    // itself — a double dogleg, left off the tee and right at the last turn.
+    slug: 'the-dogleg',
+    name: 'TPC DogLeg at Barksdale',
+    location: 'Barksdale, Virginia',
+    difficulty: 8,
+    greens: 'Firm',
+    wind: 12,
+    blurb: 'Eighteen holes and every one of them turns. Our house. The Cup comes home every August.',
+    // Every hole's geometry is HAND-DESIGNED (OSM_GEOMETRY 'the-dogleg:*') —
+    // the one course in the library that is drawn, not imported, because the
+    // place doesn't exist anywhere but here. The signature holes carry the
+    // house easter eggs: the billboard off the first tee, Jack's Corner (9),
+    // Cam's Bite (11), and the D and L cut into the sand at the last green.
+    holes: holes([
+      [4, 452, 5, 'R', 'sand', 'First Turn — the sign by the tee says it all: long, hard, and it turns', false, 'billboard'],
+      [4, 401, 13, 'L', 'sand'],
+      [3, 176, 15, 'S', 'water'],
+      [5, 528, 7, 'R', 'water', 'The creek crosses twice — pick which one to challenge'],
+      [4, 431, 9, 'L', 'sand'],
+      [4, 366, 17, 'R', 'water'],
+      [3, 149, 11, 'S', 'sand'],
+      [4, 445, 1, 'L', 'water', 'The Elbow — the sharpest corner on the card, water all down the inside'],
+      [5, 556, 3, 'R', 'water', "Jack's Corner — the turn for home runs through the architect's bunker"],
+      [4, 397, 12, 'L', 'sand'],
+      [4, 430, 4, 'R', 'water', "Cam's Bite — the lake takes a mouthful out of the corner; carry it or go the long way"],
+      [3, 188, 14, 'S', 'water', 'Even the short holes turn here — lay up left, or take the flag over water'],
+      [5, 572, 8, 'L', 'water', 'The Staircase — three bunkers climb the corner, and the brave line skips the steps'],
+      [4, 449, 2, 'R', 'water'],
+      [4, 318, 18, 'L', 'water', 'Snap Hook — drivable if you dare the corner; the safe line leaves a flip wedge'],
+      [3, 203, 16, 'S', 'sand'],
+      [4, 428, 6, 'R', 'water'],
+      [5, 566, 10, 'L', 'water', 'The Long Way Home — a double dogleg drawn in the shape of the mark: left off the tee, right at the last turn', false, 'bridge'],
+    ]),
+  },
 ]
 
 export const ALL_COURSES: CourseSpec[] = [...COURSES, ...PAR3_COURSES, ...GUEST_COURSES]

@@ -406,4 +406,8 @@
 // 8. Whispering Pines moving two points is the water arriving: procedural
 // geometry had it as a pleasant tree-lined course, and the real thing carries
 // water on ten of eighteen holes.
-export const ENGINE_VERSION = 19
+// v20 = Bellerive Country Club imported (OSM_GEOMETRY 'bellerive:*', all 18
+// holes, BlueGolf BLACK card): real geometry for the DogLeg Cup's opening
+// exhibition venue changes what its seeds replay into. Per-course work, so no
+// changelog entry (see changelog.ts's note).
+export const ENGINE_VERSION = 20

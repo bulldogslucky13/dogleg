@@ -423,6 +423,41 @@ export const OSM_BEND: Record<string, number[]> = {
   'doral-blue-monster:16': [0, -8, -16, -24, -33, -41, -46, -50, -50, -45, -33, -16, 0],
   'doral-blue-monster:17': [0, 5, 9, 14, 18, 23, 26, 28, 28, 25, 19, 9, 0],
   'doral-blue-monster:18': [0, -7, -14, -21, -28, -35, -40, -42, -42, -37, -26, -13, 0],
+
+  // THE DOGLEG — hand-designed profiles (>0 = golfer-left bow = right
+  // dogleg, matching the sign convention proven on harbour-town:2). The
+  // corners sharpen through the round by design: compare 1's late 52-yard
+  // peak with 8's 60, and 18 is the only S-curve in the library — left off
+  // the tee, right at the last turn, the mark drawn at course scale.
+  'the-dogleg:1': [0, 4, 9, 15, 22, 30, 39, 47, 52, 50, 40, 23, 0],
+  'the-dogleg:2': [0, -4, -9, -14, -19, -24, -27, -28, -26, -22, -16, -8, 0],
+  'the-dogleg:4': [0, 3, 7, 12, 18, 25, 31, 36, 38, 35, 27, 15, 0],
+  'the-dogleg:5': [0, -4, -10, -16, -23, -30, -35, -38, -37, -32, -24, -13, 0],
+  'the-dogleg:6': [0, 3, 6, 10, 15, 20, 25, 28, 29, 26, 20, 11, 0],
+  'the-dogleg:8': [0, -3, -7, -13, -21, -31, -43, -54, -60, -56, -42, -22, 0],
+  'the-dogleg:9': [0, 4, 8, 14, 20, 27, 33, 37, 38, 34, 26, 14, 0],
+  'the-dogleg:10': [0, -3, -7, -11, -15, -19, -22, -24, -24, -21, -15, -8, 0],
+  'the-dogleg:11': [0, 3, 8, 14, 21, 28, 34, 38, 39, 35, 26, 14, 0],
+  'the-dogleg:13': [0, -4, -10, -17, -24, -30, -35, -37, -36, -31, -23, -12, 0],
+  'the-dogleg:14': [0, 4, 9, 15, 21, 27, 32, 35, 35, 31, 23, 12, 0],
+  'the-dogleg:15': [0, -5, -12, -20, -28, -34, -38, -39, -36, -30, -21, -11, 0],
+  'the-dogleg:17': [0, 4, 8, 13, 18, 23, 27, 30, 30, 27, 20, 10, 0],
+  'the-dogleg:18': [0, -8, -18, -27, -32, -30, -20, -4, 14, 28, 32, 22, 0],
+  // bellerive — measured on the SHIFTED centreline where one applies (2, 5,
+  // 8, 17; see the bellerive note in OSM_GEOMETRY). RTJ turned this course
+  // LEFT: nine of twelve bends bow left, 17 is the big right-hander.
+  'bellerive:1': [0, -2, -4, -6, -8, -10, -11, -11, -11, -9, -6, -3, 0],
+  'bellerive:2': [0, -8, -15, -23, -30, -38, -45, -50, -53, -53, -44, -23, 0],
+  'bellerive:4': [0, -11, -23, -34, -43, -49, -49, -47, -41, -31, -21, -10, 0],
+  'bellerive:7': [0, -4, -8, -12, -16, -20, -23, -25, -25, -24, -20, -10, 0],
+  'bellerive:8': [0, -10, -21, -31, -41, -47, -50, -50, -45, -36, -24, -12, 0],
+  'bellerive:9': [0, -4, -9, -13, -17, -21, -24, -27, -27, -26, -20, -10, 0],
+  'bellerive:10': [0, -10, -21, -31, -42, -49, -53, -53, -48, -39, -26, -13, 0],
+  'bellerive:12': [0, -5, -9, -14, -19, -24, -27, -30, -31, -30, -25, -13, 0],
+  'bellerive:14': [0, -6, -12, -18, -24, -30, -35, -38, -40, -39, -32, -16, 0],
+  'bellerive:15': [0, 1, 3, 4, 5, 6, 7, 8, 8, 7, 5, 2, 0],
+  'bellerive:17': [0, 10, 21, 31, 41, 46, 47, 45, 39, 30, 20, 10, 0],
+  'bellerive:18': [0, -7, -14, -20, -27, -33, -37, -38, -37, -32, -22, -11, 0],
   // erin-hills — measured on the SHIFTED centreline (see the erin-hills note in
   // OSM_GEOMETRY).
   'erin-hills:1': [0, -18, -35, -53, -68, -76, -75, -69, -60, -45, -30, -15, 0],
@@ -7627,6 +7662,528 @@ export const OSM_GEOMETRY: Record<string, OsmHoleGeometry> = {
       { id: 'z9', kind: 'bunker', from: 470, to: 477, side: 'right' },
     ],
   },
+
+  // ---------------------------------------------------------------------
+  // THE DOGLEG — Clubhouse, USA. HAND-DESIGNED, not imported: the course
+  // exists nowhere but here, so every zone below is original architecture
+  // (no OSM, no ODbL note). The design brief: every two-shotter turns, the
+  // corners sharpen as the round goes, and the trouble always lives down
+  // the INSIDE of the bend — cutting the corner is the whole game. House
+  // easter eggs: the billboard off the first tee (landmark), Jack's Corner
+  // at 9 and Cam's Bite at 11 (the architects' initials), and the D and L
+  // cut into the sand flanking the last green (ZoneStyle letterD/letterL).
+  // ---------------------------------------------------------------------
+  // 1 — First Turn: the brand statement. Long, hard corner right; the
+  // bunker complex stacked on the inside is what "sharp" looks like.
+  'the-dogleg:1': {
+    length: 452,
+    fairwayFrom: 178,
+    fairwayTo: 434,
+    greenDepth: 31,
+    zones: [
+      { id: 'z1', kind: 'trees', from: 140, to: 440, side: 'left' },
+      { id: 'z2', kind: 'deeprough', from: 180, to: 260, side: 'right' },
+      { id: 'z3', kind: 'bunker', from: 262, to: 318, side: 'right' },
+      { id: 'z4', kind: 'bunker', from: 315, to: 352, side: 'right' },
+      { id: 'z5', kind: 'bunker', from: 424, to: 452, side: 'left' },
+      { id: 'z6', kind: 'bunker', from: 430, to: 452, side: 'right' },
+    ],
+  },
+  // 2 — the counter-turn: gentler left, pond short-left of the green
+  'the-dogleg:2': {
+    length: 401,
+    fairwayFrom: 168,
+    fairwayTo: 386,
+    greenDepth: 29,
+    zones: [
+      { id: 'z1', kind: 'trees', from: 150, to: 380, side: 'right' },
+      { id: 'z2', kind: 'bunker', from: 240, to: 290, side: 'left' },
+      { id: 'z3', kind: 'water', from: 330, to: 372, side: 'left' },
+      { id: 'z4', kind: 'bunker', from: 384, to: 401, side: 'right' },
+    ],
+  },
+  // 3 — short hole over water down the left
+  'the-dogleg:3': {
+    length: 176,
+    fairwayFrom: 60,
+    fairwayTo: 160,
+    greenDepth: 27,
+    zones: [
+      { id: 'z1', kind: 'water', from: 90, to: 158, side: 'left' },
+      { id: 'z2', kind: 'bunker', from: 160, to: 176, side: 'right' },
+    ],
+  },
+  // 4 — the creek crosses twice, exactly as the signature promises: once in
+  // the landing zone, once at the green's doorstep feeding the right pond
+  'the-dogleg:4': {
+    length: 528,
+    fairwayFrom: 172,
+    fairwayTo: 506,
+    greenDepth: 30,
+    zones: [
+      { id: 'z1', kind: 'trees', from: 160, to: 480, side: 'left' },
+      { id: 'z2', kind: 'water', from: 292, to: 312, side: 'cross' },
+      { id: 'z3', kind: 'bunker', from: 318, to: 352, side: 'left' },
+      { id: 'z4', kind: 'water', from: 452, to: 472, side: 'cross' },
+      { id: 'z5', kind: 'water', from: 470, to: 510, side: 'right' },
+      { id: 'z6', kind: 'bunker', from: 508, to: 528, side: 'right' },
+    ],
+  },
+  // 5 — the double-stack corner left
+  'the-dogleg:5': {
+    length: 431,
+    fairwayFrom: 175,
+    fairwayTo: 414,
+    greenDepth: 30,
+    zones: [
+      { id: 'z1', kind: 'trees', from: 150, to: 420, side: 'right' },
+      { id: 'z2', kind: 'bunker', from: 258, to: 306, side: 'left' },
+      { id: 'z3', kind: 'bunker', from: 300, to: 340, side: 'left' },
+      { id: 'z4', kind: 'bunker', from: 398, to: 431, side: 'right' },
+    ],
+  },
+  // 6 — short and tactical: sand inside, a pondlet guarding the lay-up side
+  'the-dogleg:6': {
+    length: 366,
+    fairwayFrom: 160,
+    fairwayTo: 350,
+    greenDepth: 27,
+    zones: [
+      { id: 'z1', kind: 'deeprough', from: 200, to: 330, side: 'left' },
+      { id: 'z2', kind: 'bunker', from: 228, to: 268, side: 'right' },
+      { id: 'z3', kind: 'bunker', from: 262, to: 292, side: 'right' },
+      { id: 'z4', kind: 'water', from: 300, to: 352, side: 'right' },
+      { id: 'z5', kind: 'bunker', from: 344, to: 366, side: 'left' },
+    ],
+  },
+  // 7 — the flick: tiny, ringed by sand (front band ends short of the green
+  // face — never a cross into the putting surface)
+  'the-dogleg:7': {
+    length: 149,
+    fairwayFrom: 55,
+    fairwayTo: 130,
+    greenDepth: 27,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 108, to: 126, side: 'cross' },
+      { id: 'z2', kind: 'bunker', from: 126, to: 149, side: 'left' },
+      { id: 'z3', kind: 'bunker', from: 128, to: 149, side: 'right' },
+    ],
+  },
+  // 8 — THE ELBOW, SI 1: the sharpest corner on the card, and the lake owns
+  // the entire inside of it. The brave line carries water the whole way.
+  'the-dogleg:8': {
+    length: 445,
+    fairwayFrom: 180,
+    fairwayTo: 428,
+    greenDepth: 30,
+    zones: [
+      { id: 'z1', kind: 'trees', from: 150, to: 430, side: 'right' },
+      { id: 'z2', kind: 'water', from: 210, to: 400, side: 'left' },
+      { id: 'z3', kind: 'bunker', from: 300, to: 345, side: 'right' },
+      { id: 'z4', kind: 'bunker', from: 418, to: 445, side: 'left' },
+    ],
+  },
+  // 9 — JACK'S CORNER: the turn for home. The architect's bunker sits square
+  // on the corner; the pond waits for the second shot that bails right.
+  'the-dogleg:9': {
+    length: 556,
+    fairwayFrom: 175,
+    fairwayTo: 534,
+    greenDepth: 32,
+    zones: [
+      { id: 'z1', kind: 'trees', from: 170, to: 520, side: 'left' },
+      { id: 'z2', kind: 'bunker', from: 268, to: 330, side: 'right' },
+      { id: 'z3', kind: 'bunker', from: 356, to: 410, side: 'left' },
+      { id: 'z4', kind: 'water', from: 420, to: 500, side: 'right' },
+      { id: 'z5', kind: 'bunker', from: 528, to: 556, side: 'left' },
+    ],
+  },
+  // 10 — the back nine opens gently left
+  'the-dogleg:10': {
+    length: 397,
+    fairwayFrom: 165,
+    fairwayTo: 380,
+    greenDepth: 28,
+    zones: [
+      { id: 'z1', kind: 'trees', from: 160, to: 380, side: 'right' },
+      { id: 'z2', kind: 'bunker', from: 244, to: 292, side: 'left' },
+      { id: 'z3', kind: 'bunker', from: 372, to: 397, side: 'right' },
+    ],
+  },
+  // 11 — CAM'S BITE: the lake takes a mouthful out of the inside corner.
+  // Carry it or go the long way — the signature is the geometry.
+  'the-dogleg:11': {
+    length: 430,
+    fairwayFrom: 172,
+    fairwayTo: 412,
+    greenDepth: 30,
+    zones: [
+      { id: 'z1', kind: 'deeprough', from: 180, to: 250, side: 'right' },
+      { id: 'z2', kind: 'water', from: 250, to: 390, side: 'right' },
+      { id: 'z3', kind: 'bunker', from: 300, to: 350, side: 'left' },
+      { id: 'z4', kind: 'bunker', from: 404, to: 430, side: 'left' },
+    ],
+  },
+  // 12 — even the short holes turn here: a bail-out par 3 that doglegs
+  // left around the water. Safe/normal lay up; only aggressive takes the
+  // flag over the wet stuff. (Hand-authored bailout, house precedent.)
+  'the-dogleg:12': {
+    length: 188,
+    fairwayFrom: 58,
+    fairwayTo: 170,
+    greenDepth: 28,
+    zones: [
+      { id: 'z1', kind: 'water', from: 96, to: 188, side: 'right' },
+      { id: 'z2', kind: 'bunker', from: 168, to: 188, side: 'left' },
+    ],
+    bailout: { side: 'left', safe: [92, 122], normal: [132, 162] },
+  },
+  // 13 — THE STAIRCASE: three bunkers climb the inside of the long left
+  // sweep; the creek crosses once more before the green
+  'the-dogleg:13': {
+    length: 572,
+    fairwayFrom: 180,
+    fairwayTo: 548,
+    greenDepth: 33,
+    zones: [
+      { id: 'z1', kind: 'trees', from: 160, to: 540, side: 'right' },
+      { id: 'z2', kind: 'bunker', from: 262, to: 300, side: 'left' },
+      { id: 'z3', kind: 'bunker', from: 318, to: 356, side: 'left' },
+      { id: 'z4', kind: 'bunker', from: 372, to: 410, side: 'left' },
+      { id: 'z5', kind: 'water', from: 500, to: 522, side: 'cross' },
+      { id: 'z6', kind: 'bunker', from: 548, to: 572, side: 'right' },
+    ],
+  },
+  // 14 — the long right-hander; water guards the approach-side bail
+  'the-dogleg:14': {
+    length: 449,
+    fairwayFrom: 178,
+    fairwayTo: 430,
+    greenDepth: 31,
+    zones: [
+      { id: 'z1', kind: 'trees', from: 150, to: 430, side: 'left' },
+      { id: 'z2', kind: 'bunker', from: 270, to: 330, side: 'right' },
+      { id: 'z3', kind: 'water', from: 396, to: 440, side: 'right' },
+      { id: 'z4', kind: 'bunker', from: 420, to: 449, side: 'left' },
+    ],
+  },
+  // 15 — SNAP HOOK: the drivable dare. The carry over the inside water is
+  // the tee shot the hole is named for; the safe line is all fairway.
+  'the-dogleg:15': {
+    length: 318,
+    fairwayFrom: 150,
+    fairwayTo: 300,
+    greenDepth: 27,
+    zones: [
+      { id: 'z1', kind: 'water', from: 208, to: 268, side: 'left' },
+      { id: 'z2', kind: 'bunker', from: 270, to: 302, side: 'left' },
+      { id: 'z3', kind: 'bunker', from: 240, to: 290, side: 'right' },
+      { id: 'z4', kind: 'bunker', from: 296, to: 318, side: 'right' },
+    ],
+  },
+  // 16 — the long-iron exam: sand both sides, scrub short-right
+  'the-dogleg:16': {
+    length: 203,
+    fairwayFrom: 70,
+    fairwayTo: 186,
+    greenDepth: 30,
+    zones: [
+      { id: 'z1', kind: 'deeprough', from: 120, to: 180, side: 'right' },
+      { id: 'z2', kind: 'bunker', from: 178, to: 203, side: 'left' },
+      { id: 'z3', kind: 'bunker', from: 182, to: 203, side: 'right' },
+    ],
+  },
+  // 17 — the penultimate turn: sand at the corner, water left of the green
+  'the-dogleg:17': {
+    length: 428,
+    fairwayFrom: 170,
+    fairwayTo: 410,
+    greenDepth: 29,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 250, to: 300, side: 'left' },
+      { id: 'z2', kind: 'bunker', from: 258, to: 312, side: 'right' },
+      { id: 'z3', kind: 'trees', from: 312, to: 410, side: 'right' },
+      { id: 'z4', kind: 'water', from: 380, to: 420, side: 'left' },
+      { id: 'z5', kind: 'bunker', from: 402, to: 428, side: 'right' },
+    ],
+  },
+  // 18 — THE LONG WAY HOME: the double dogleg in the shape of the mark.
+  // Left off the tee (water inside the first corner), right at the last
+  // turn, the home creek crossed by the footbridge (landmark), and the
+  // D and L cut into the sand either side of the green — the house
+  // initials, waiting for anyone who looks twice.
+  'the-dogleg:18': {
+    length: 566,
+    fairwayFrom: 182,
+    fairwayTo: 540,
+    greenDepth: 34,
+    zones: [
+      { id: 'z1', kind: 'trees', from: 150, to: 360, side: 'right' },
+      { id: 'z2', kind: 'water', from: 210, to: 320, side: 'left' },
+      { id: 'z3', kind: 'bunker', from: 250, to: 300, side: 'right' },
+      { id: 'z4', kind: 'water', from: 452, to: 474, side: 'cross' },
+      { id: 'z5', kind: 'bunker', from: 480, to: 520, side: 'left' },
+      { id: 'z6', kind: 'bunker', from: 476, to: 516, side: 'right' },
+      { id: 'z7', kind: 'bunker', from: 538, to: 566, side: 'left', style: 'letterD' },
+      { id: 'z8', kind: 'bunker', from: 540, to: 566, side: 'right', style: 'letterL' },
+    ],
+  },
+  // ===================== Bellerive Country Club (all 18) =====================
+  // DogLeg Cup opening-exhibition venue (bellerive-2026). OSM way 617944761,
+  // one clean polygon, 18 unnamed ref=1..18 hole ways. IDENTITY: PV's per-hole
+  // tee sits 1-7 yd from every OSM centreline start and its pin 1-11 yd from
+  // every end (the shinnecock/doral numeric pass, id=368), and OSM's par tags
+  // match BlueGolf's BLACK card on all 18.
+  // CARD: BlueGolf BLACK, par 72 / 7506, 76.5/146 (bluegolf course id
+  // 'bellerivecc'). OSM handicap tags corroborate 16 of 18 (they swap 12 and
+  // 17's 4/6; the card wins). Rake stays 6 (3 of 88 bunkers under 6 yd,
+  // median 14.3).
+  // TEE PADS: four holes import short of the card past tee-box variance —
+  // 2 (+28), 5 (+18), 8 (+14), 17 (+31) — and on every one the centreline
+  // already starts on the BACKMOST mapped pad with PV agreeing (its tee-to-pin
+  // tracks OSM, e.g. 412 and 605 against the card's 427 and 624). So the card
+  // is carrying those four alone: the BLACK pads are simply unmapped and
+  // unimaged — the muirfield-15 / camargo-16 call — and they take a positive
+  // --shift. Hole 2 note: 11 of its 28 is Chaikin corner-cutting (raw arc 410,
+  // smoothed 399), so its post-corner zones sit truest and its driving bunker
+  // carries up to ~10 yd of shift error — accepted, within QA tolerance.
+  // THE CREEK (carnoustie linestring mode): Smith Creek (way 469780839) and a
+  // second stream (350712126) are waterway=stream lines, invisible to the
+  // polygon rasterizer, so a course whose closing holes are defined by a creek
+  // imported water-free outside the ponds. Both were projected onto every
+  // shifted centreline: crossings at 82-194 yd on 2/8/9/12/13 are short of any
+  // landing area and stay out (the quail-hollow:18 no-invented-carry call; 12
+  // and 13 instead move fairwayFrom past a creek AT the fairway start), while
+  // 8, 10 and 17 carry hand-laid zones — see the HAND comments inline.
+  // QA: every hole walked in PV's 3D planner from the tee; per-side greenside
+  // census against the polygons (one clipped pin-high bunker restored on 14).
+  'bellerive:1': {
+    length: 429,
+    fairwayFrom: 150,
+    fairwayTo: 412,
+    greenDepth: 29,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 28, to: 44, side: 'right' },
+      { id: 'z2', kind: 'bunker', from: 260, to: 304, side: 'left' },
+      { id: 'z3', kind: 'bunker', from: 300, to: 326, side: 'right' },
+      { id: 'z4', kind: 'bunker', from: 400, to: 429, side: 'left' },
+      { id: 'z5', kind: 'bunker', from: 412, to: 429, side: 'right' },
+    ],
+  },
+  'bellerive:2': {
+    length: 427,
+    fairwayFrom: 149,
+    fairwayTo: 412,
+    greenDepth: 25,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 28, to: 46, side: 'right' },
+      { id: 'z2', kind: 'water', from: 254, to: 424, side: 'left' },
+      { id: 'z3', kind: 'bunker', from: 318, to: 338, side: 'right' },
+      { id: 'z4', kind: 'bunker', from: 406, to: 427, side: 'right' },
+    ],
+  },
+  'bellerive:3': {
+    length: 162,
+    fairwayFrom: 57,
+    fairwayTo: 145,
+    greenDepth: 30,
+    zones: [
+      { id: 'z1', kind: 'water', from: 74, to: 142, side: 'cross' },
+      { id: 'z2', kind: 'water', from: 142, to: 162, side: 'right' },
+    ],
+  },
+  'bellerive:4': {
+    length: 552,
+    fairwayFrom: 193,
+    fairwayTo: 535,
+    greenDepth: 30,
+    zones: [
+      { id: 'z1', kind: 'water', from: 0, to: 12, side: 'right' },
+      { id: 'z2', kind: 'bunker', from: 236, to: 266, side: 'left' },
+      { id: 'z3', kind: 'bunker', from: 300, to: 332, side: 'right' },
+      { id: 'z4', kind: 'bunker', from: 468, to: 504, side: 'right' },
+      { id: 'z5', kind: 'bunker', from: 508, to: 548, side: 'left' },
+      { id: 'z6', kind: 'bunker', from: 524, to: 544, side: 'right' },
+    ],
+  },
+  'bellerive:5': {
+    length: 489,
+    fairwayFrom: 171,
+    fairwayTo: 473,
+    greenDepth: 27,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 6, to: 30, side: 'right' },
+      { id: 'z2', kind: 'bunker', from: 52, to: 82, side: 'left' },
+      { id: 'z3', kind: 'bunker', from: 102, to: 122, side: 'left' },
+      { id: 'z4', kind: 'water', from: 260, to: 294, side: 'right' },
+      { id: 'z5', kind: 'bunker', from: 456, to: 474, side: 'right' },
+      { id: 'z6', kind: 'bunker', from: 480, to: 489, side: 'left' },
+    ],
+  },
+  'bellerive:6': {
+    length: 215,
+    fairwayFrom: 75,
+    fairwayTo: 201,
+    greenDepth: 23,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 2, to: 6, side: 'right' },
+      { id: 'z2', kind: 'bunker', from: 48, to: 82, side: 'left' },
+      { id: 'z3', kind: 'water', from: 146, to: 180, side: 'cross' },
+      { id: 'z4', kind: 'water', from: 180, to: 210, side: 'right' },
+      { id: 'z5', kind: 'bunker', from: 196, to: 210, side: 'left' },
+    ],
+  },
+  'bellerive:7': {
+    length: 390,
+    fairwayFrom: 137,
+    fairwayTo: 373,
+    greenDepth: 30,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 0, to: 12, side: 'right' },
+      { id: 'z2', kind: 'bunker', from: 34, to: 52, side: 'right' },
+      { id: 'z3', kind: 'bunker', from: 248, to: 272, side: 'right' },
+      { id: 'z4', kind: 'bunker', from: 274, to: 300, side: 'left' },
+      { id: 'z5', kind: 'bunker', from: 298, to: 332, side: 'right' },
+      { id: 'z6', kind: 'bunker', from: 362, to: 374, side: 'left' },
+      { id: 'z7', kind: 'bunker', from: 370, to: 390, side: 'right' },
+    ],
+  },
+  'bellerive:8': {
+    length: 612,
+    fairwayFrom: 214,
+    fairwayTo: 597,
+    greenDepth: 26,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 308, to: 336, side: 'right' },
+      { id: 'z2', kind: 'water', from: 410, to: 520, side: 'right' }, // HAND: Smith Creek runs 9-17 yd off the right through the layup zone (waterway=stream linestring, invisible to the polygon rasterizer — carnoustie mode). Projected onto the shifted centreline; the trivial tee-front crossing at 84 stays out (fairway already starts at 214).
+      { id: 'z3', kind: 'bunker', from: 486, to: 520, side: 'left' },
+      { id: 'z4', kind: 'bunker', from: 584, to: 612, side: 'left' },
+      { id: 'z5', kind: 'bunker', from: 586, to: 604, side: 'right' },
+    ],
+  },
+  'bellerive:9': {
+    length: 435,
+    fairwayFrom: 152,
+    fairwayTo: 417,
+    greenDepth: 31,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 56, to: 74, side: 'right' },
+      { id: 'z2', kind: 'bunker', from: 276, to: 322, side: 'left' },
+      { id: 'z3', kind: 'bunker', from: 408, to: 426, side: 'right' },
+      { id: 'z4', kind: 'bunker', from: 412, to: 430, side: 'left' },
+    ],
+  },
+  'bellerive:10': {
+    length: 505,
+    fairwayFrom: 177,
+    fairwayTo: 493,
+    greenDepth: 20,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 94, to: 104, side: 'left' },
+      { id: 'z2', kind: 'bunker', from: 302, to: 330, side: 'left' },
+      { id: 'z3', kind: 'water', from: 444, to: 460, side: 'cross' }, // HAND: the creek crosses the corridor at ~452, 60 yd short of the green — the go-for-it-in-two carry. Projected from the waterway linestring (carnoustie mode) and confirmed in the planner.
+      { id: 'z4', kind: 'bunker', from: 472, to: 482, side: 'left' },
+      { id: 'z5', kind: 'bunker', from: 482, to: 502, side: 'right' },
+    ],
+  },
+  'bellerive:11': {
+    length: 368,
+    fairwayFrom: 129,
+    fairwayTo: 354,
+    greenDepth: 24,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 222, to: 238, side: 'right' },
+      { id: 'z2', kind: 'water', from: 294, to: 356, side: 'right' },
+    ],
+  },
+  'bellerive:12': {
+    length: 473,
+    fairwayFrom: 185,
+    fairwayTo: 455,
+    greenDepth: 31,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 318, to: 338, side: 'left' },
+      { id: 'z2', kind: 'bunker', from: 358, to: 372, side: 'left' },
+      { id: 'z3', kind: 'bunker', from: 446, to: 466, side: 'left' },
+      { id: 'z4', kind: 'bunker', from: 454, to: 473, side: 'right' },
+    ],
+  },
+  'bellerive:13': {
+    length: 190,
+    fairwayFrom: 90,
+    fairwayTo: 168,
+    greenDepth: 40,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 154, to: 180, side: 'right' },
+      { id: 'z2', kind: 'bunker', from: 176, to: 190, side: 'left' },
+    ],
+  },
+  'bellerive:14': {
+    length: 415,
+    fairwayFrom: 145,
+    fairwayTo: 394,
+    greenDepth: 37,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 282, to: 300, side: 'right' },
+      { id: 'z2', kind: 'bunker', from: 310, to: 328, side: 'right' },
+      { id: 'z3', kind: 'bunker', from: 398, to: 415, side: 'right' },
+      { id: 'z4', kind: 'bunker', from: 400, to: 415, side: 'left' }, // HAND: pin-high left sand (way 617907439) sits at raw arc 420-421, past the smoothed length, so the rasterizer clipped it to nothing — harbour-town:4 mode. Confirmed in the planner; spanned to the green edge.
+    ],
+  },
+  'bellerive:15': {
+    length: 495,
+    fairwayFrom: 173,
+    fairwayTo: 482,
+    greenDepth: 21,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 318, to: 344, side: 'left' },
+      { id: 'z2', kind: 'bunker', from: 466, to: 484, side: 'right' },
+      { id: 'z3', kind: 'bunker', from: 470, to: 484, side: 'left' },
+    ],
+  },
+  'bellerive:16': {
+    length: 240,
+    fairwayFrom: 84,
+    fairwayTo: 219,
+    greenDepth: 38,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 202, to: 218, side: 'left' },
+      { id: 'z2', kind: 'bunker', from: 206, to: 222, side: 'right' },
+    ],
+  },
+  'bellerive:17': {
+    length: 624,
+    fairwayFrom: 218,
+    fairwayTo: 605,
+    greenDepth: 34,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 0, to: 16, side: 'right' },
+      { id: 'z2', kind: 'water', from: 72, to: 128, side: 'right' },
+      { id: 'z3', kind: 'water', from: 190, to: 455, side: 'right' }, // HAND: Smith Creek hugs the right at 1-23 yd off from the drive through the layup (carnoustie mode; quail-hollow:18 long-lateral precedent). The treed near-tee run down the left and its crossing at ~180 stay out — short of the fairway (218), no invented carry.
+      { id: 'z4', kind: 'bunker', from: 288, to: 332, side: 'left' },
+      { id: 'z5', kind: 'water', from: 455, to: 468, side: 'cross' }, // HAND: first genuine layup crossing, measured at ~460-465 on the shifted line.
+      { id: 'z6', kind: 'water', from: 468, to: 518, side: 'left' }, // HAND: between its two crossings the creek runs 3-7 yd left of the line — the layup corridor is a sliver right of it.
+      { id: 'z7', kind: 'bunker', from: 516, to: 532, side: 'left' },
+      { id: 'z8', kind: 'water', from: 518, to: 530, side: 'cross' }, // HAND: second crossing at ~519-525; the imported 516-532 left bunker is real sand beside the same weave.
+      { id: 'z9', kind: 'water', from: 530, to: 590, side: 'right' }, // HAND: the creek exits right and runs 4-24 yd off toward the green, fading out past 590.
+      { id: 'z10', kind: 'bunker', from: 554, to: 570, side: 'left' },
+      { id: 'z11', kind: 'bunker', from: 596, to: 606, side: 'right' },
+      { id: 'z12', kind: 'bunker', from: 604, to: 616, side: 'left' },
+    ],
+  },
+  'bellerive:18': {
+    length: 455,
+    fairwayFrom: 159,
+    fairwayTo: 436,
+    greenDepth: 33,
+    zones: [
+      { id: 'z1', kind: 'bunker', from: 244, to: 290, side: 'left' },
+      { id: 'z2', kind: 'bunker', from: 298, to: 324, side: 'right' },
+      { id: 'z3', kind: 'bunker', from: 422, to: 440, side: 'left' },
+      { id: 'z4', kind: 'bunker', from: 422, to: 452, side: 'right' },
+    ],
+  },
+
   // Erin Hills. Frozen on the CLUB'S OWN scorecard PDF (04/26), BLACK tees,
   // par 72 / 7772 — verified glyph by glyph out of the PDF rather than taken on
   // trust, because this is a course whose cards disagree with each other. The

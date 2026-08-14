@@ -556,6 +556,61 @@ function Lighthouse({ x, y, s }: { x: number; y: number; s: number }) {
   )
 }
 
+/**
+ * The DogLeg's tee-box billboard: a small sign carrying the house mark — a
+ * kinked shaft, the pennant, the cup. Purely decorative — gated on the
+ * hole's `landmark` field, never in play. `s` is the board width in px.
+ */
+function Billboard({ x, y, s }: { x: number; y: number; s: number }) {
+  const bw = s
+  const bh = s * 0.62
+  const post = s * 0.28
+  const cx = x
+  const my = y - post - bh / 2 // board centre
+  const m = bh * 0.62 // mark height inside the board
+  return (
+    <g aria-hidden opacity={0.96}>
+      <ellipse cx={x} cy={y + 2} rx={s * 0.5} ry={s * 0.07} fill="#101f15" opacity={0.3} />
+      {/* posts */}
+      <line x1={x - bw * 0.32} y1={y} x2={x - bw * 0.32} y2={y - post} stroke="#5a4634" strokeWidth={s * 0.07} />
+      <line x1={x + bw * 0.32} y1={y} x2={x + bw * 0.32} y2={y - post} stroke="#5a4634" strokeWidth={s * 0.07} />
+      {/* the board */}
+      <rect x={x - bw / 2} y={y - post - bh} width={bw} height={bh} rx={s * 0.06} fill="#f4efe3" stroke="#5a4634" strokeWidth={s * 0.045} />
+      {/* the mark: dogleg shaft kinking right, pennant up top, cup at the base */}
+      <path
+        d={`M${cx - m * 0.1},${my - m * 0.5} L${cx - m * 0.1},${my + m * 0.1} L${cx + m * 0.22},${my + m * 0.42}`}
+        fill="none"
+        stroke="#1d2b20"
+        strokeWidth={s * 0.075}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path d={`M${cx - m * 0.1},${my - m * 0.5} L${cx + m * 0.34},${my - m * 0.38} L${cx - m * 0.1},${my - m * 0.26} Z`} fill="#c9463b" />
+      <ellipse cx={cx + m * 0.22} cy={my + m * 0.46} rx={m * 0.16} ry={m * 0.07} fill="#1d2b20" />
+    </g>
+  )
+}
+
+/**
+ * The DogLeg's house initials — a D or an L cut into greenside sand. Drawn
+ * as thick sand strokes over the usual dark lip so the letter reads at a
+ * glance without pretending to be anything but a bunker. Pure map flavor.
+ */
+function LetterBunker({ x, y, s, letter }: { x: number; y: number; s: number; letter: 'D' | 'L' }) {
+  const w = s * 0.34 // stroke width — fat enough to putt out of
+  const half = s / 2
+  const d =
+    letter === 'D'
+      ? `M${x - s * 0.28},${y - half} L${x - s * 0.28},${y + half} M${x - s * 0.28},${y - half} A${s * 0.62},${half} 0 0 1 ${x - s * 0.28},${y + half}`
+      : `M${x - s * 0.22},${y - half} L${x - s * 0.22},${y + half} L${x + s * 0.38},${y + half}`
+  return (
+    <g aria-hidden>
+      <path d={d} fill="none" stroke="#a8916a" strokeWidth={w + 2.4} strokeLinecap="round" strokeLinejoin="round" opacity={0.7} />
+      <path d={d} fill="none" stroke="#e2d2a8" strokeWidth={w} strokeLinecap="round" strokeLinejoin="round" />
+    </g>
+  )
+}
+
 /** flank water at least this long is a lake shoreline, not a pond ellipse */
 const LAKE_SPAN_YD = 60
 
@@ -1030,6 +1085,13 @@ export function HoleMap(props: {
         </g>
       )
     }
+    // The DogLeg's greenside initials: the letterform replaces the ellipse
+    // entirely — the zone is still an ordinary bunker to the odds
+    if (z.kind === 'bunker' && (z.style === 'letterD' || z.style === 'letterL')) {
+      const pp = place.anchor
+      const s = clampPx(13 * uPerYd, 16, 30)
+      return <LetterBunker key={z.id} x={pp.x} y={pp.y} s={s} letter={z.style === 'letterD' ? 'D' : 'L'} />
+    }
     // singleton bunkers & side/greenside water: pre-placed ellipses
     return (
       <g key={z.id}>
@@ -1236,6 +1298,16 @@ export function HoleMap(props: {
       {/* landmark on the burn (Carnoustie's Barry Burn footbridge) — straddles
           the last water crossing short of the green, nudged off the aim line
           so the flag and preview stay readable */}
+      {layout.spec.landmark === 'billboard' &&
+        (() => {
+          // by the tee, off the golfer's right shoulder — the first thing
+          // the opening hole shows you is the house mark
+          const p = at(14)
+          const n = normalAt(14)
+          const s = clampPx(20 * uPerYd, 24, 40)
+          return <Billboard x={p.x - n.x * 16 * uPerYd} y={p.y - n.y * 16 * uPerYd} s={s} />
+        })()}
+
       {layout.spec.landmark === 'bridge' &&
         (() => {
           const wet = layout.zones.filter((z) => z.kind === 'water' && z.side === 'cross' && z.to < L - layout.greenDepth)

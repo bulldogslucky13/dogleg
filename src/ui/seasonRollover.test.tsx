@@ -56,6 +56,7 @@ const mount = () =>
       onTeeOff={() => {}}
       onResume={() => {}}
       onPractice={() => {}}
+      onCup={() => {}}
       onShowResult={() => {}}
       onHowToPlay={() => {}}
       onMyRounds={() => {}}

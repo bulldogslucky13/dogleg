@@ -93,6 +93,12 @@ export const CHANGELOG: ChangeEntry[] = [
   {
     date: '2026-08-09',
     kind: 'feature',
+    title: 'The DogLeg Cup',
+    note: 'Tournament golf. Four rounds, Thursday through Sunday, one course, one attempt a day — your best three count, and nobody gets cut. The course firms up as the weekend goes: Sunday plays the hardest, and it says so up front. Every event pays points toward the season-long DogLeg Cup. First tee times land this month.',
+  },
+  {
+    date: '2026-08-09',
+    kind: 'feature',
     title: 'Challenge links: beat this round',
     note: 'Finish an unlimited round and throw it down as a challenge. Whoever taps the link plays the same course against your actual round — one attempt, their own luck, ties don\'t take it. Beat a challenge and you get to send the revenge link. Challenge rounds are real rounds: course and season records are live the whole way. Settle it in the group chat.',
   },

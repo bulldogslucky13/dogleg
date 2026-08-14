@@ -60,6 +60,39 @@ create table if not exists daily_scores (
 );
 create index if not exists daily_scores_board on daily_scores (date_key, to_par, created_at);
 
+-- DOGLEG CUP: one validated row per (event, round day, player). The referee
+-- writes here after replaying the round; the event board (best 3 of 4) and
+-- the season points race are DERIVED reads over these immutable rows — no
+-- finalize step, no cron, same philosophy as season_records. `day` is the
+-- event's round number (1=Thursday … 4=Sunday); date_key is the calendar day
+-- it was actually posted for, kept for audit and the daily-window check.
+create table if not exists event_scores (
+  event_key text not null,
+  day int not null check (day between 1 and 4),
+  date_key text not null,
+  course_slug text not null,
+  player_id uuid not null references players (id),
+  player_name text not null,
+  character text,
+  to_par int not null,
+  strokes int not null,
+  results jsonb not null,
+  created_at timestamptz not null default now(),
+  primary key (event_key, day, player_id)
+);
+create index if not exists event_scores_board on event_scores (event_key, to_par);
+
+-- The round ITSELF (seed + decision list), exactly as course_records keeps
+-- record rounds: the podium's "watch the winning rounds" replays real golf,
+-- not a summary. Public read is deliberate — this is the same payload a
+-- replay share link carries, and a champion's rounds are bragging material.
+alter table event_scores add column if not exists seed text;
+alter table event_scores add column if not exists decisions jsonb;
+
+alter table event_scores enable row level security;
+drop policy if exists "anyone can read event scores" on event_scores;
+create policy "anyone can read event scores" on event_scores for select using (true);
+
 create table if not exists course_records (
   course_slug text primary key,
   player_id uuid not null references players (id),

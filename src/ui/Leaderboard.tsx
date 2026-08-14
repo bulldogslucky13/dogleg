@@ -12,8 +12,10 @@ import {
   type CourseRecord,
   type SubmitResult,
 } from '../lib/leaderboard'
+import { dayOfEvent, eventForKey } from '../engine/events'
 import { seasonForDate } from '../engine/season'
 import { recordWon, seasonRecordWon } from '../lib/records'
+import { CupEventBoard } from './CupBoard'
 import { markArchiveRecord, roundToPar, type RoundState } from '../state/store'
 import { courseBySlug } from '../engine/courses'
 import { identifyPlayer, track } from '../lib/analytics'
@@ -179,7 +181,9 @@ export function ScoreBoard(props: {
     //    record or the season record (a season-only break still lands on
     //    season_records); ordinary practice completions submit for validation
     //    but write nothing
-    const wroteToBoard = round.mode === 'daily' ? !r.duplicate : !!r.record?.broken || !!r.seasonRecord?.broken
+    //  - major: every non-duplicate post lands on the event board, like daily
+    const wroteToBoard =
+      round.mode === 'daily' || round.mode === 'major' ? !r.duplicate : !!r.record?.broken || !!r.seasonRecord?.broken
     if (wroteToBoard) {
       track('board_submitted', {
         mode: round.mode,
@@ -241,6 +245,8 @@ export function ScoreBoard(props: {
           </>
         ) : round.mode === 'daily' ? (
           'Post my card'
+        ) : round.mode === 'major' ? (
+          'Post my round'
         ) : (
           'Claim records'
         )}
@@ -321,6 +327,48 @@ export function ScoreBoard(props: {
         )}
         {error && <p className="fine board-error">{error}</p>}
       </div>
+    )
+  }
+
+  // a Cup round: post it, note where the ROUND landed as a footnote, and give
+  // the stage to the TOURNAMENT standings — the number that actually matters
+  // is your best-3-of-4, not today's mini-board. One block, one kicker. No
+  // record banners: Cup rounds don't contend for course records (deliberate).
+  if (round.mode === 'major') {
+    const parsed = /^major:([a-z0-9-]+):(\d{4}-\d{2}-\d{2}):/.exec(round.seed)
+    const event = parsed ? eventForKey(parsed[1]) : null
+    const day = event && parsed ? dayOfEvent(event, parsed[2]) : null
+    const status = (
+      <>
+        {player && busy && (
+          <p className="fine">
+            <Spinner />
+            Posting your round…
+          </p>
+        )}
+        {result?.rank && day && (
+          <p className="board-rank">
+            Round {day}: <b>{toParLabel(roundToPar(round))}</b> · {ordinal(result.rank)} of {result.total} today
+          </p>
+        )}
+        {result?.duplicate && <p className="fine">Today's round was already on the card — the first one stands.</p>}
+        {nameForm && (
+          <>
+            <p className="fine">Put a name on your card and post your Cup round — no account needed.</p>
+            {nameForm}
+          </>
+        )}
+        {error && <p className="fine board-error">{error}</p>}
+      </>
+    )
+    if (!event) return <div className="board-block cup-board">{status}</div>
+    return (
+      <CupEventBoard
+        event={event}
+        title={`${event.name} · Tournament standings`}
+        head={status}
+        refreshKey={result ? 1 : 0}
+      />
     )
   }
 

@@ -16,6 +16,8 @@ import {
   courseBySlug,
   dailySalt,
   destinyDue,
+  eventForKey,
+  eventPlayable,
   fortuneEligible,
   replayRound,
   seasonForDate,
@@ -113,6 +115,21 @@ Deno.serve(async (req) => {
     if (!allowed.includes(info.dateKey!)) return json(422, { error: 'daily is not for today' })
   }
 
+  // ---- DogLeg Cup policy checks ----
+  // setupFromSeed already proved the seed names a real event, that event's
+  // course, and a day inside its Thursday–Sunday window. Two things are
+  // policy, not grammar, and live here: the event must actually be RUNNING
+  // (a placeholder on the calendar parses so history replays, but takes no
+  // submissions), and each round must be posted on (about) its own calendar
+  // day — the daily's exact freshness rule, so a player can't bank Thursday
+  // and post it Sunday with the whole week's boards in view.
+  if (info.mode === 'major') {
+    const event = eventForKey(info.eventKey!)
+    if (!event || !eventPlayable(event)) return json(422, { error: 'that Cup event is not running' })
+    const allowed = [utcDateKey(-1), utcDateKey(0), utcDateKey(1)]
+    if (!allowed.includes(info.dateKey!)) return json(422, { error: 'this Cup round is not for today' })
+  }
+
   // ---- destiny and record contention ----
   // Practice fortune counters have no server-visible history AT ALL, so a
   // destiny-due tail is unverifiable — anyone could forge `:f500.…` and post
@@ -155,7 +172,8 @@ Deno.serve(async (req) => {
     // rather than trusting the seed. An absent salt is still accepted: that is
     // the single canonical daily seed with no freedom to grind — the fallback
     // for clients that could not reach mint-player before teeing off.
-    if (info.mode === 'daily' && info.salt && info.salt !== dailySalt(data.id, info.dateKey!)) {
+    // Cup rounds live under the identical rule — same derivation, same day.
+    if ((info.mode === 'daily' || info.mode === 'major') && info.salt && info.salt !== dailySalt(data.id, info.dateKey!)) {
       return json(422, { error: 'round rejected: seed is not yours' })
     }
 
@@ -268,8 +286,8 @@ Deno.serve(async (req) => {
     // A salted seed can never belong to a player that doesn't exist yet: the
     // salt derives from a server-minted id, and this row hasn't been minted.
     // Rejected here, before the insert, so the doomed submission can't
-    // reserve a name on its way out.
-    if (info.mode === 'daily' && info.salt) return json(422, { error: 'round rejected: seed is not yours' })
+    // reserve a name on its way out. Cup rounds under the same rule.
+    if ((info.mode === 'daily' || info.mode === 'major') && info.salt) return json(422, { error: 'round rejected: seed is not yours' })
     // a brand-new player row has zero posted dailies, so neither a streak
     // multiplier nor a destiny-due counter can ever be credible here —
     // rejected BEFORE the insert, same ordering rule as the salt check above.
@@ -373,6 +391,60 @@ Deno.serve(async (req) => {
     // on a duplicate resubmission is deliberate — they're strictly-better-
     // gated no-ops normally, so a record write that failed after the board
     // write self-heals on the client's retry instead of diverging forever.
+  }
+
+  // ---- write a validated Cup round ----
+  // One row per (event, day, player): the first signed card for a round day
+  // stands, a resubmission is a duplicate — the daily's exact contract. The
+  // board (best 3 of 4, ties by best single round) and the season points
+  // race are DERIVED from these rows client-side; nothing is finalized here.
+  // Deliberately NOT contending for course/season records in this lane —
+  // whether Cup rounds join the record boards is an open design call, and
+  // conservative-by-default means no accidental record churn from events.
+  if (info.mode === 'major') {
+    const row = {
+      event_key: info.eventKey!,
+      day: info.eventDay!,
+      date_key: info.dateKey!,
+      course_slug: info.course.slug,
+      player_id: player.id,
+      player_name: player.name,
+      character: character ?? null,
+      to_par: replay.toPar,
+      strokes: replay.strokes,
+      results: replay.results,
+      // the validated round itself, kept like course_records keeps record
+      // rounds — the podium replays a champion's actual golf
+      seed,
+      decisions,
+    }
+    const { error } = await supabase.from('event_scores').insert(row)
+    if (error && error.code !== '23505') return json(500, { error: 'could not save score' })
+
+    // where this round sits among today's field — the wrap's one-liner;
+    // the full best-3-of-4 board is a client-side read
+    const { count: better } = await supabase
+      .from('event_scores')
+      .select('*', { count: 'exact', head: true })
+      .eq('event_key', info.eventKey!)
+      .eq('day', info.eventDay!)
+      .lt('to_par', replay.toPar)
+    const { count: total } = await supabase
+      .from('event_scores')
+      .select('*', { count: 'exact', head: true })
+      .eq('event_key', info.eventKey!)
+      .eq('day', info.eventDay!)
+    return json(200, {
+      mode: 'major',
+      eventKey: info.eventKey,
+      day: info.eventDay,
+      toPar: replay.toPar,
+      strokes: replay.strokes,
+      rank: (better ?? 0) + 1,
+      total: total ?? 1,
+      duplicate: !!error,
+      player: { id: player.id, name: player.name, ...(player.secret ? { secret: player.secret } : {}) },
+    })
   }
 
   // ---- SEASON course record (scope 'global' today — leagues later filter

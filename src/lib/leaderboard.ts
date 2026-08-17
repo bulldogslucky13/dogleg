@@ -82,7 +82,13 @@ const REST_HEADERS = {
   apikey: SUPABASE_ANON_KEY,
 }
 
-export type ClaimResult = { ok: true; player: Player } | { ok: false; error: string }
+/** `retryable` means the player can fix this themselves by typing a
+ * different (or differently-spelled) name — a taken name (409) or one that
+ * fails the server's grammar (400). Anything else (unknown identity, a
+ * disabled backend, a network failure, a server error) is not theirs to fix,
+ * and callers that offer a fail-open escape hatch should gate it on this
+ * rather than pattern-matching the error text. */
+export type ClaimResult = { ok: true; player: Player } | { ok: false; error: string; retryable: boolean }
 
 /**
  * Claim a clubhouse name outside a round (see supabase/functions/claim-name).
@@ -109,9 +115,9 @@ export type ClaimResult = { ok: true; player: Player } | { ok: false; error: str
 const CLAIM_TIMEOUT_MS = 15_000
 
 export async function claimClubhouseName(name: string): Promise<ClaimResult> {
-  if (!backendEnabled) return { ok: false, error: 'leaderboard disabled' }
+  if (!backendEnabled) return { ok: false, error: 'leaderboard disabled', retryable: false }
   const player = loadIdentity()
-  if (!player) return { ok: false, error: 'no identity on this device yet' }
+  if (!player) return { ok: false, error: 'no identity on this device yet', retryable: false }
   if (player.name) return { ok: true, player }
   try {
     const res = await fetch(`${SUPABASE_URL}/functions/v1/claim-name`, {
@@ -121,13 +127,21 @@ export async function claimClubhouseName(name: string): Promise<ClaimResult> {
       signal: AbortSignal.timeout(CLAIM_TIMEOUT_MS),
     })
     const body = (await res.json()) as { player?: { id: string; name: string }; error?: string }
-    if (!res.ok || !body.player) return { ok: false, error: body.error ?? `could not claim that name (${res.status})` }
+    if (!res.ok || !body.player) {
+      return {
+        ok: false,
+        error: body.error ?? `could not claim that name (${res.status})`,
+        // 400 = failed the name grammar, 409 = taken — both fixed by typing
+        // a different name, so neither should read as a wire failure
+        retryable: res.status === 400 || res.status === 409,
+      }
+    }
     // keep the device secret — the server never echoes it back on this route
     const claimed: Player = { id: body.player.id, secret: player.secret, name: body.player.name }
     savePlayerIdentity(claimed)
     return { ok: true, player: claimed }
   } catch {
-    return { ok: false, error: 'network hiccup — try again' }
+    return { ok: false, error: 'network hiccup — try again', retryable: false }
   }
 }
 

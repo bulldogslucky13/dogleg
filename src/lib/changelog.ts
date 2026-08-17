@@ -75,6 +75,12 @@ export const CHANGELOG: ChangeEntry[] = [
   {
     date: '2026-08-14',
     kind: 'feature',
+    title: 'Sign your scorecard before you tee off',
+    note: 'Golfers sign their card, so now you do too. Tap Tee off without a clubhouse name and you get the card for the course you are about to play — holes, pars and a line for your name. Sign it and you go straight to the tee. It is one line, once: the name sticks to the identity your dice were already salted for, so nothing about the round changes, and every board, record and trophy you win from then on has somebody standing behind it. Names are first come, first served. If we cannot reach the clubhouse to check yours, you tee off anyway — a lost signal has never stopped a round of DogLeg and it does not start now.',
+  },
+  {
+    date: '2026-08-14',
+    kind: 'feature',
     title: 'A badge for the rounds that beat you up',
     note: 'There is a new hidden achievement waiting in Awards, and you earn it by having a bad day: finish a full round with more bogeys or worse than pars or better and it turns up on your shelf. That takes a card where the damage outnumbers everything that held — some rounds are just for the résumé. It counts every time you manage it.',
   },

@@ -148,6 +148,39 @@ describe('Sign your scorecard', () => {
     expect(screen.queryByRole('button', { name: /without signing/i })).toBeNull()
   })
 
+  it('a grammar-invalid name is retryable, and offers no way past the gate', async () => {
+    // the server rejects on grammar (e.g. punctuation-only input the client's
+    // own length check lets through), not on identity or the network — so
+    // this must read the same as a taken name, never as a wire failure
+    stubClaim(
+      () => new Response(JSON.stringify({ error: 'pick a clubhouse name (2-18 letters/numbers)' }), { status: 400 }),
+    )
+    const props = mount()
+    fireEvent.change(screen.getByLabelText('Clubhouse name'), { target: { value: '!!' } })
+    fireEvent.click(screen.getByRole('button', { name: /sign and tee off/i }))
+    await waitFor(() => expect(screen.getByText(/pick a clubhouse name/i)).toBeTruthy())
+    expect(props.onSigned).not.toHaveBeenCalled()
+    expect(screen.queryByRole('button', { name: /without signing/i })).toBeNull()
+  })
+
+  it('will not let Back through while a claim is in flight', async () => {
+    let resolve!: (r: Response) => void
+    stubClaim(() => {
+      const p = new Promise<Response>((r) => (resolve = r))
+      // stubClaim's mock awaits its reply synchronously, so hand back a
+      // thenable-shaped Response via a pending promise the test controls
+      return p as unknown as Response
+    })
+    const props = mount()
+    fireEvent.change(screen.getByLabelText('Clubhouse name'), { target: { value: 'Doral Dan' } })
+    fireEvent.click(screen.getByRole('button', { name: /sign and tee off/i }))
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Back' })).toHaveProperty('disabled', true))
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }))
+    expect(props.onBack).not.toHaveBeenCalled()
+    resolve(okReply('Doral Dan'))
+    await waitFor(() => expect(props.onSigned).toHaveBeenCalled())
+  })
+
   it('fails open when the wire fails — the round is not held hostage', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => { throw new Error('offline') }))
     const props = mount()

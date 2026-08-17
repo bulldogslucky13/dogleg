@@ -101,10 +101,20 @@ export function SignCardScreen(props: {
       return
     }
     setError(res.error)
-    // a name that is merely taken is worth another try; a network or identity
-    // failure is not the player's problem and must not cost them the round
-    if (!/taken|already/i.test(res.error)) setWireFailed(true)
+    // a taken or grammar-invalid name is worth another try; a network or
+    // identity failure is not the player's problem and must not cost them
+    // the round (retryable comes from the actual HTTP status, not a guess
+    // at the error text — a validation typo must not read as a wire failure)
+    if (!res.retryable) setWireFailed(true)
     inputRef.current?.focus()
+  }
+
+  const back = () => {
+    // the write is one-way (claim-name cannot rename), so leaving mid-claim
+    // would let a request that lands after unmount silently name the player
+    // permanently — same race the trophy-claim card guards against
+    if (busy) return
+    props.onBack()
   }
 
   const holes = setup.course.holes
@@ -183,7 +193,7 @@ export function SignCardScreen(props: {
           Tee off without signing
         </button>
       )}
-      <button className="cta ghost" onClick={props.onBack}>
+      <button className="cta ghost" onClick={back} disabled={busy}>
         Back
       </button>
     </div>

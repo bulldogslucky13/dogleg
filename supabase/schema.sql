@@ -275,8 +275,21 @@ create table if not exists received_emails (
   html_body text,
   attachments jsonb not null default '[]'::jsonb, -- metadata only; files stay on Resend
   received_at timestamptz,
+  -- why this row has no body, when it has none. The body needs a SECOND call to
+  -- Resend (the webhook is metadata only), and that call has its own failure
+  -- modes — a key without permission to read inbound mail, a message not
+  -- readable back yet, an outage. The function records the status and Resend's
+  -- own error here and clears it on the fetch that finally lands, so
+  --   select email_id, subject, body_error from received_emails
+  --   where text_body is null and html_body is null
+  -- is the whole "what's missing and why" query. Null against no body means the
+  -- fetch worked and the message genuinely had neither part — or the row
+  -- predates this column.
+  body_error text,
   created_at timestamptz not null default now()
 );
+-- for databases created before body_error existed
+alter table received_emails add column if not exists body_error text;
 
 -- RLS on, and deliberately NO policies: inbound mail is other people's
 -- private correspondence, not public reading material like the boards. Only

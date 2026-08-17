@@ -155,6 +155,30 @@ tested by `svix.test.ts`), not a JWT — `verify_jwt` is off in config.toml and
 the function fails closed without the secret. Delivery is at-least-once; the
 upsert on `email_id` is what makes retries safe.
 
+**The body fetch is the part that fails, so it is classified rather than
+retried blindly** (`receive-email/body.ts`, tested by `body.test.ts` — pure,
+fetch injected, because `index.ts` needs Deno and a live PostgREST). Reading
+inbound mail requires a Resend key with **full access**; a sending-only key
+sends perfectly and is refused by `/emails/receiving`, which is exactly how
+every inbound body silently failed to land for a week. So: `RESEND_INBOUND_API_
+KEY` (falling back to `RESEND_API_KEY`) lets a full-access key serve this one
+call without repointing the key that sends, the failure reason now carries the
+status and Resend's own error, and non-2xx — the thing that asks Resend to
+redeliver — is **reserved for failures a redelivery can fix**. A 404 straight
+after arrival is one (the webhook can beat Resend's own read-after-write), so
+it gets a short in-handler retry and then a redelivery window bounded by the
+message's AGE rather than an attempt count; the payload is byte-identical on
+every redelivery, so age is the only attempt counter that needs no state. A
+401 is not one, and answering it with a 500 forever only gets the endpoint
+disabled (Resend drops one whose attempts have all failed for five days),
+costing the metadata too. Every failure is recorded
+on the row in `body_error` (cleared by the fetch that finally lands) and in the
+function log, so the diagnosis is one query: `select email_id, subject,
+body_error from received_emails where text_body is null and html_body is null`.
+To backfill a message whose body never arrived, fix the cause and replay the
+delivery from the Resend webhook log (Resend keeps the message; the upsert
+fills the body in place).
+
 **Every email we send renders through one chassis**, `supabase/functions/
 _shared/email-chassis.ts` — the broadcast card, with theme.css's tokens
 resolved to literals (mail has no custom properties, and Outlook's Word engine

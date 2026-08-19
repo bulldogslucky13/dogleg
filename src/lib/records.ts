@@ -246,7 +246,15 @@ function reconcile(
       delete stolen[slug]
       continue
     }
-    if (rec.player_id !== stolenRec.byId || rec.to_par !== stolenRec.theirToPar) {
+    // A legacy entry (written before `byId` existed) has no id to compare
+    // yet — fall back to the only signal it has (name + score). Without this,
+    // EVERY legacy entry looks "changed" on its first post-migration sync
+    // (undefined never equals a real id) and would reopen an already-dismissed
+    // card with no actual record change behind it.
+    const unchanged = stolenRec.byId
+      ? rec.player_id === stolenRec.byId && rec.to_par === stolenRec.theirToPar
+      : rec.player_name === stolenRec.by && rec.to_par === stolenRec.theirToPar
+    if (!unchanged) {
       const newDay = stolenRec.notifiedOn !== today
       stolen[slug] = {
         ...stolenRec,
@@ -256,6 +264,9 @@ function reconcile(
         dismissed: newDay ? false : stolenRec.dismissed,
         notifiedOn: newDay ? today : stolenRec.notifiedOn,
       }
+    } else if (!stolenRec.byId) {
+      // pure backfill: attach the id without touching notification state
+      stolen[slug] = { ...stolenRec, byId: rec.player_id }
     }
   }
 }

@@ -8,6 +8,7 @@ import {
   loadLedger,
   pendingSteals,
   recordWon,
+  saveLedger,
   seasonRecordWon,
   syncLedger,
   syncSeasonLedger,
@@ -76,6 +77,45 @@ describe('the record ledger notices thefts by diffing against the server', () =>
     syncLedger(server([['pebble-beach', 'Hank', -6]]), null, 2000, '2026-07-20')
     expect(pendingSteals()).toHaveLength(0)
     expect(loadLedger().held['pebble-beach']).toBeDefined()
+  })
+
+  it('backfilling a legacy entry\'s id does not reopen an already-dismissed steal', () => {
+    // a ledger written before `byId` existed has none on disk — the very
+    // first sync after upgrading must not read that missing id as "the
+    // holder changed" and undo a dismissal the player already acted on
+    const legacy = loadLedger()
+    legacy.stolen['pebble-beach'] = {
+      by: 'Hank',
+      // no byId — this is the pre-migration shape
+      theirToPar: -6,
+      myToPar: -4,
+      at: 1000,
+      notifiedOn: '2026-07-19',
+      dismissed: true,
+    }
+    saveLedger(legacy)
+    // same holder, same score, but a NEW day — the old bug's trigger
+    syncLedger(server([['pebble-beach', 'Hank', -6, 'id-hank']]), ME, 2000, '2026-07-20')
+    expect(loadLedger().stolen['pebble-beach']).toMatchObject({ dismissed: true, byId: 'id-hank' })
+    expect(pendingSteals()).toHaveLength(0)
+  })
+
+  it('a genuine new theft on top of a legacy entry still surfaces normally', () => {
+    const legacy = loadLedger()
+    legacy.stolen['pebble-beach'] = {
+      by: 'Hank',
+      theirToPar: -6,
+      myToPar: -4,
+      at: 1000,
+      notifiedOn: '2026-07-19',
+      dismissed: true,
+    }
+    saveLedger(legacy)
+    // a DIFFERENT holder takes it from Hank — a real change, must resurface
+    syncLedger(server([['pebble-beach', 'Marge', -8, 'id-marge']]), ME, 2000, '2026-07-20')
+    const steals = pendingSteals()
+    expect(steals).toHaveLength(1)
+    expect(steals[0]).toMatchObject({ by: 'Marge', dismissed: false })
   })
 })
 

@@ -15,7 +15,7 @@ import { describe, expect, it } from 'vitest'
 import { readdirSync, readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, resolve } from 'node:path'
-import { NAME_RE, checkName, isNameConflict } from './names.ts'
+import { NAME_RE, checkName, claimName, isNameConflict } from './names.ts'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const schema = readFileSync(resolve(here, '../../schema.sql'), 'utf8')
@@ -44,6 +44,40 @@ describe('checkName asks the database, and fails closed', () => {
     // callers must treat this as a refusal: handing out a reserved name on a
     // transient blip is unfixable, because names are permanent
     expect(await checkName(service({ error: { message: 'boom' } }), 'Jacob')).toBe('unknown')
+  })
+})
+
+describe('claimName folds the check and the write into one atomic call', () => {
+  it('reports the row it claimed', async () => {
+    const s = service({ data: [{ id: 'p1', name: 'Jacob', claimed: true }] })
+    expect(await claimName(s, 'p1', 'Jacob')).toEqual({ outcome: 'claimed', name: 'Jacob' })
+    expect(s.calls).toEqual([{ fn: 'claim_name_if_free', args: { p_id: 'p1', p_name: 'Jacob' } }])
+  })
+
+  it('reports a reservation as blocked, not merely absent', () => {
+    // claimed=false with no name at all: the row is still nameless, so the
+    // one thing that could have stopped the write is the reservation guard
+    return expect(
+      claimName(service({ data: [{ id: 'p1', name: null, claimed: false }] }), 'p1', 'Jacob'),
+    ).resolves.toEqual({ outcome: 'reserved' })
+  })
+
+  it('tells a race on the row apart from a reservation', () => {
+    // claimed=false but a name IS present: a different door named this row
+    // first — that name is the truth, and it isn't a reservation refusal
+    return expect(
+      claimName(service({ data: [{ id: 'p1', name: 'Hank', claimed: false }] }), 'p1', 'Jacob'),
+    ).resolves.toEqual({ outcome: 'raced', name: 'Hank' })
+  })
+
+  it("returns 'unknown' rather than throwing when the call itself fails", () => {
+    return expect(claimName(service({ error: { message: 'boom' } }), 'p1', 'Jacob')).resolves.toEqual({
+      outcome: 'unknown',
+    })
+  })
+
+  it("returns 'unknown' if the row vanished (no rows back at all)", () => {
+    return expect(claimName(service({ data: [] }), 'p1', 'Jacob')).resolves.toEqual({ outcome: 'unknown' })
   })
 })
 
@@ -78,12 +112,27 @@ describe('the schema backs the rule the functions enforce', () => {
   })
 
   it('reserves names only among LINKED rows, via a partial unique index', () => {
-    // this is the actual guarantee — see the two-layer note in names.ts and
-    // schema.sql. checkName is a courtesy that runs before this; this index
-    // is what a write can't get past even when two requests race it at once.
+    // this is the actual guarantee for writes that set user_id — see the
+    // layered note in names.ts and schema.sql. checkName is a courtesy that
+    // runs before this; this index is what a write can't get past even when
+    // two requests race it at once.
     expect(schema).toMatch(
       /create unique index if not exists players_name_reserved_ci on players \(lower\(name\)\) where user_id is not null;/,
     )
+  })
+
+  it('claims an anonymous name atomically, with the reservation check inside the same statement', () => {
+    // the guarantee for writes that DON'T set user_id, which the partial
+    // index above can't protect — the check has to be part of the same
+    // statement as the write, not a separate round trip before it
+    expect(schema).toMatch(/create or replace function claim_name_if_free\(p_id uuid, p_name text\)/)
+    expect(schema).toMatch(/revoke all on function claim_name_if_free\(uuid, text\) from public, anon, authenticated/)
+    // the guard has to live INSIDE the update's own where clause, not a
+    // preceding statement, or this function is no more atomic than the
+    // checkName-then-write shape it exists to replace
+    const fn = /create or replace function claim_name_if_free[\s\S]*?\$\$;/.exec(schema)?.[0] ?? ''
+    expect(fn).toMatch(/update players/)
+    expect(fn).toMatch(/not exists/)
   })
 })
 
@@ -112,8 +161,14 @@ describe('every door that writes a name asks first', () => {
   const allDirs = readdirSync(resolve(here, '..'), { withFileTypes: true })
     .filter((e) => e.isDirectory() && !e.name.startsWith('_'))
     .map((e) => e.name)
+  // Two write shapes now: a direct `.from('players').update/insert({ name`
+  // (link-account, submit-round's legacy insert), and the atomic RPC that
+  // claimName() wraps (submit-round's claim, claim-name) — the RPC call
+  // itself lives in _shared/names.ts, not the door, so a door using it is
+  // detected by the call to claimName(), not by the SQL function's name.
   const writesPlayerName = (code: string) =>
-    [...code.matchAll(/\.from\('players'\)[\s\S]{0,400}?\.(update|insert)\(\{[\s\S]{0,200}?\bname\b/g)].length > 0
+    [...code.matchAll(/\.from\('players'\)[\s\S]{0,400}?\.(update|insert)\(\{[\s\S]{0,200}?\bname\b/g)].length > 0 ||
+    /\bclaimName\(/.test(code)
   const doors = allDirs.filter((dir) =>
     writesPlayerName(readFileSync(resolve(here, '..', dir, 'index.ts'), 'utf8')),
   )
@@ -123,14 +178,16 @@ describe('every door that writes a name asks first', () => {
   })
 
   for (const door of doors) {
-    it(`${door} consults checkName and refuses both non-free answers`, () => {
+    it(`${door} consults the reservation rule and refuses both non-free answers`, () => {
       const code = readFileSync(resolve(here, '..', door, 'index.ts'), 'utf8')
       // it imports the shared rule rather than re-deriving one
       expect(code).toMatch(/from '\.\.\/_shared\/names\.ts'/)
-      // ...and every name it writes went past a check
+      // ...and every name it writes went past a check — checkName (courtesy,
+      // for writes an index protects) or claimName (atomic, for writes one
+      // doesn't) are both valid; a door only needs one
       const writes = [...code.matchAll(/\bname\b\s*[,}]/g)].length
       expect(writes).toBeGreaterThan(0)
-      const checks = [...code.matchAll(/await checkName\(/g)].length
+      const checks = [...code.matchAll(/await (checkName|claimName)\(/g)].length
       expect(checks).toBeGreaterThan(0)
       expect(code).toMatch(/=== 'reserved'\) return json\(409/)
       expect(code).toMatch(/=== 'unknown'\) return json\(503/)

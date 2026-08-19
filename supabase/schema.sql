@@ -40,20 +40,28 @@ alter table players alter column name drop not null;
 -- what that account is FOR. Anonymous rows that already share a reserved name
 -- keep it (grandfathered); they simply stop being joined by new ones.
 --
--- Enforced TWICE, on purpose, because the two enforcement points guard
--- different things:
+-- Enforced in layers, because different writers need different guarantees:
 --
 -- 1. name_reserved() below, called by all three claim doors (submit-round,
 --    claim-name, link-account) BEFORE they write, is what turns a collision
 --    into a clean "that name belongs to a synced player" instead of a raw
---    23505. It is a courtesy, not a guarantee — checked, then written, two
---    round trips apart.
+--    23505. On its own it's a courtesy, not a guarantee — checked, then
+--    written, a round trip apart.
 --
--- 2. players_name_reserved_ci below is the guarantee: a PARTIAL unique index
---    over only the linked rows (`where user_id is not null`), so it enforces
---    "at most one linked row per name" at the one layer nothing can race
---    around. It does NOT touch anonymous rows — two anonymous "Jacob"s are
---    still fine, unindexed, exactly as the design intends.
+-- 2. players_name_reserved_ci below is a real guarantee for any write that
+--    sets user_id and name TOGETHER (link-account's two claim branches
+--    always do): a PARTIAL unique index over only the linked rows (`where
+--    user_id is not null`) enforces "at most one linked row per name" the
+--    same way any unique index enforces anything — Postgres serializes
+--    concurrent writers of the same key regardless of which row they're on.
+--    It does NOT touch anonymous rows — two anonymous "Jacob"s are still
+--    fine, unindexed, exactly as the design intends.
+--
+-- 3. claim_name_if_free() below is for the two doors that write name WITHOUT
+--    ever setting user_id (submit-round's and claim-name's anonymous
+--    claims) — an index can't protect a write that never touches the
+--    indexed condition (user_id is not null), so the check and the write are
+--    folded into one atomic statement instead of two round trips.
 --
 -- An earlier version of this file rejected a reserved-name index entirely,
 -- reasoning that it would refuse the one flow that must never fail: an
@@ -96,6 +104,55 @@ as $$
 $$;
 revoke all on function name_reserved(text) from public, anon, authenticated;
 grant execute on function name_reserved(text) to service_role;
+
+-- Atomically claims p_name onto a row that is already known nameless — the
+-- write path for submit-round's and claim-name's anonymous claims.
+--
+-- Those two doors never set user_id, so players_name_reserved_ci (linked
+-- rows only) never applies to their write and can't protect it — an
+-- anonymous claim has no unique index backing it at all, by design, since
+-- anonymous rows must be free to share any name. That leaves name_reserved()
+-- as the only guard, and calling it as a SEPARATE read before a separate
+-- guarded write is check-then-act: a linked reservation for the same name
+-- can land in the round trip between the two. Folding both into one
+-- statement narrows that gap from a full network round trip down to this
+-- statement's own snapshot — the same level of rigor an ordinary
+-- NOT EXISTS-guarded write gets anywhere else, and the best available
+-- without a cross-transaction lock, which link-account's writes don't need
+-- because they get a real index instead (see the note above).
+--
+-- Always returns exactly one row (the row's state AFTER the attempt) rather
+-- than nothing-on-failure, so the caller can tell apart, in one round trip:
+-- claimed=true (this call set it), claimed=false with a name (someone else
+-- named this exact row first — an ordinary race, not a reservation), and
+-- claimed=false with no name (blocked — p_name is reserved).
+create or replace function claim_name_if_free(p_id uuid, p_name text)
+returns table(id uuid, name text, claimed boolean)
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_name text := btrim(p_name);
+  v_claimed boolean := false;
+begin
+  update players
+  set name = v_name
+  where players.id = p_id
+    and players.name is null
+    and not exists (
+      select 1 from players r where r.user_id is not null and lower(r.name) = lower(v_name)
+    )
+  returning true into v_claimed;
+
+  return query
+    select players.id, players.name, coalesce(v_claimed, false)
+    from players
+    where players.id = p_id;
+end;
+$$;
+revoke all on function claim_name_if_free(uuid, text) from public, anon, authenticated;
+grant execute on function claim_name_if_free(uuid, text) to service_role;
 
 -- mint-player rate limiting: one counter per (utc day, hashed ip). The hash
 -- is salted with the day, so rows can't be correlated across days — and the

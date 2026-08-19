@@ -4,8 +4,15 @@
  * Three functions write once-only columns on `players` — the clubhouse name
  * (submit-round posting a first card, link-account signing in, claim-name from
  * the trophy card) and the `user_id` that binds a row to an account. Both are
- * one-way, so every one of those writes carries an `is(..., null)` guard, and
- * the guards are correct. What is not obvious is that MISSING is not an error:
+ * one-way, so every one of those writes is guarded. link-account's guards are
+ * the JS-level `is(..., null)` pattern this file scans for directly.
+ * submit-round's and claim-name's anonymous name claims instead go through
+ * claim_name_if_free, an atomic RPC whose guard lives inside its own SQL
+ * statement (see schema.sql and _shared/names.ts) — invisible to a scan of
+ * this file's JS source, so it's checked here only by presence of the call,
+ * and its actual miss-vs-hit contract is tested directly in
+ * _shared/names.test.ts. What is not obvious about the JS-level pattern is
+ * that MISSING is not an error:
  * PostgREST reports an update that changed zero rows as a success, so
  * `{ error }` is null and the losing writer falls straight through to its
  * success path and reports something the database never did.
@@ -110,13 +117,29 @@ describe('a guarded update never trusts a silent miss', () => {
     }
   })
 
-  it('the writers the rules sweep are the ones we think they are', () => {
-    // if a future refactor moves these writes somewhere the scan can't see,
-    // the assertions above would pass by finding nothing at all
-    const guarded = sources
+  it('every writer of a once-only column is guarded — directly, or through the atomic claim RPC', () => {
+    // if a future refactor moves these writes somewhere neither scan can
+    // see, the assertions above would pass by finding nothing at all.
+    //
+    // link-account still writes `name`/`user_id` through the JS builder, so
+    // its guard (`.is(..., null)` + `.select()`) is visible here directly.
+    // submit-round's and claim-name's anonymous name claims moved into
+    // claim_name_if_free — an atomic RPC (see schema.sql and
+    // _shared/names.ts) that folds the guard INTO the write's own statement
+    // instead of a separate `.is()` filter, so this JS-source scan can't see
+    // it as a "guarded update" chain at all. Its own contract (a miss is
+    // always distinguishable from a hit) is covered directly by
+    // _shared/names.test.ts instead; here it's enough to confirm the call is
+    // still there.
+    const jsGuarded = sources
       .filter((s) => playerChains(s.code).some(isGuardedUpdate))
       .map((s) => s.name)
       .sort()
-    expect(guarded).toEqual(['claim-name', 'link-account', 'submit-round'])
+    const atomicClaim = sources
+      .filter((s) => /\bclaimName\(/.test(s.code))
+      .map((s) => s.name)
+      .sort()
+    expect(jsGuarded).toEqual(['link-account'])
+    expect(atomicClaim).toEqual(['claim-name', 'submit-round'])
   })
 })

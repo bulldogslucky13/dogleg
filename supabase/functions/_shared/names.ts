@@ -13,14 +13,22 @@
  * is for. Anonymous rows that already share a reserved name keep it; they
  * just stop being joined by new ones.
  *
- * The rule is enforced TWICE. `checkName` below is the courtesy layer — a
- * pre-flight read that turns a collision into a clean, specific error before
- * any write is attempted. The guarantee is `players_name_reserved_ci` in
- * schema.sql, a partial unique index over only the linked rows: it is what
- * actually stops two DIFFERENT accounts from both reserving one name when two
- * requests race past the courtesy check at once (see `isNameConflict` below,
- * which reads a write's 23505 back and tells that race apart from an
- * ordinary `user_id` collision).
+ * The rule is enforced in layers (see the long note in schema.sql).
+ * `checkName` below is the courtesy layer everywhere — a pre-flight read that
+ * turns a collision into a clean, specific error before any write is
+ * attempted. Two different guarantees back it, for two different write
+ * shapes:
+ *
+ * - link-account's claims always set `user_id` and `name` in the SAME
+ *   statement, so `players_name_reserved_ci` (a partial unique index over
+ *   linked rows) protects them for free — `isNameConflict` below tells that
+ *   index's 23505 apart from an ordinary `user_id` collision.
+ * - submit-round's and claim-name's claims are anonymous — they never touch
+ *   `user_id`, so no index applies. `claimName` below folds the check and the
+ *   write into ONE atomic statement (`claim_name_if_free` in schema.sql)
+ *   instead of `checkName` followed by a separate guarded update, closing the
+ *   round-trip gap a concurrent link-account reservation could otherwise land
+ *   in.
  */
 
 /** 2-18 chars, opens on a letter or digit. Identical in all three doors. */
@@ -78,4 +86,44 @@ const RESERVED_INDEX = 'players_name_reserved_ci'
  */
 export function isNameConflict(error: { code?: string; message?: string }): boolean {
   return error.code === '23505' && (error.message ?? '').includes(RESERVED_INDEX)
+}
+
+export type ClaimOutcome =
+  | { outcome: 'claimed'; name: string }
+  | { outcome: 'reserved' }
+  | { outcome: 'raced'; name: string }
+  | { outcome: 'unknown' }
+
+/**
+ * Atomically claim `name` onto a row already known to be nameless — callers
+ * must have already validated the row's identity (id + secret) and its
+ * current null name via a prior read; this only takes the id.
+ *
+ * One RPC call, one Postgres statement (`claim_name_if_free` in schema.sql).
+ * This is the anonymous-claim counterpart to the partial unique index: those
+ * writes never set `user_id`, so no index can protect them, and a separate
+ * `checkName()` read before a separate guarded write leaves a round-trip gap
+ * a concurrent reservation can land in. Folding the check into the write
+ * closes it.
+ *
+ * The function always returns the row's state AFTER the attempt, never
+ * nothing, so a single round trip distinguishes every outcome a caller needs:
+ * `claimed` (this call set it), `raced` (a DIFFERENT door named this exact
+ * row first — an ordinary race on the row, not a reservation — the caller
+ * should use the name that won), or `reserved` (the write was blocked because
+ * `name` belongs to a linked account).
+ */
+export async function claimName(
+  // deno-lint-ignore no-explicit-any
+  service: any,
+  id: string,
+  name: string,
+): Promise<ClaimOutcome> {
+  const { data, error } = await service.rpc('claim_name_if_free', { p_id: id, p_name: name })
+  if (error) return { outcome: 'unknown' }
+  const row = Array.isArray(data) ? data[0] : data
+  if (!row) return { outcome: 'unknown' }
+  if (row.claimed && row.name) return { outcome: 'claimed', name: row.name }
+  if (row.name) return { outcome: 'raced', name: row.name }
+  return { outcome: 'reserved' }
 }

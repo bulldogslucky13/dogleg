@@ -769,7 +769,25 @@ export function HoleMap(props: {
       return { x: pinPt.x + (dx / dl) * reach, y: pinPt.y + (dy / dl) * reach }
     }
     const anchored = b.zoneId ? places.get(b.zoneId) : null
-    if (anchored) return { x: anchored.anchor.x, y: anchored.anchor.y - 2 }
+    if (anchored) {
+      // A ribbon hazard is DRAWN along its whole length, so a ball in it sits at
+      // its OWN yardage — the zone anchor is the MIDPOINT, which on a 100-yd
+      // waste bunker is 50 yards from either end. That drew an approach from the
+      // sand further down the hole than the drive that put it there: the ball
+      // visibly went backwards while the yards-left badge counted down. Pots
+      // keep the anchor — they're drawn at one spot and the ball has to be in it,
+      // and at under LONG_BUNKER_YD the along-hole error is a few yards.
+      const r = anchored.ribbon
+      if (r) {
+        const lo = Math.min(r.from, r.to)
+        const hi = Math.max(r.from, r.to)
+        const y = Math.min(Math.max(b.pos, lo), hi)
+        const p = at(y)
+        const n = normalAt(Math.min(y, L - 1))
+        return { x: p.x + n.x * r.offYd * uPerYd, y: p.y + n.y * r.offYd * uPerYd - 2 }
+      }
+      return { x: anchored.anchor.x, y: anchored.anchor.y - 2 }
+    }
     if (b.pos > L) {
       // across the green — long side
       const sideX = b.side === 'left' ? -1 : b.side === 'right' ? 1 : 0.6

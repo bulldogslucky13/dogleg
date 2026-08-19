@@ -901,6 +901,45 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
     expect(document.querySelector('circle.ghost-ball')).toBeNull()
   })
 
+  it('a ball in a long side bunker is drawn at its own yardage, not the bunker midpoint', async () => {
+    const { HoleMap } = await import('./ui/HoleMap')
+    const { buildLayout } = await import('./engine/layout')
+    const { COURSES } = await import('./engine/courses')
+    const base = buildLayout(COURSES[0].slug, COURSES[0].holes[0])
+    // A dead-straight hole so the lateral offset is purely horizontal: the ball's
+    // y is then its along-hole position alone, and the assertion below is exact.
+    const L = base.length
+    const layout = {
+      ...base,
+      bend: undefined,
+      spec: { ...base.spec, dogleg: 'S' as const },
+      // a waste bunker down the whole back half — well past LONG_BUNKER_YD, so it
+      // draws as a ribbon and its midpoint sits ~0.2L short of the ball below
+      zones: [{ id: 'waste', kind: 'bunker' as const, from: L * 0.5, to: L * 0.9, side: 'right' as const }],
+    }
+    type B = { pos: number; lie: 'sand' | 'fairway'; side: 'left' | 'center' | 'right'; zoneId?: string }
+    const draw = (ball: B) => {
+      const { container, unmount } = render(
+        <HoleMap layout={layout} ball={ball} previewWindow={null} previewApproach={null} previewChoice={null} />,
+      )
+      const c = container.querySelector('circle.ball')!
+      const pt = { x: Number(c.getAttribute('cx')), y: Number(c.getAttribute('cy')) }
+      unmount()
+      return pt
+    }
+    // Same pos → same camera, so these two renders are directly comparable.
+    const pos = L * 0.88
+    const sand = draw({ pos, lie: 'sand', side: 'right', zoneId: 'waste' })
+    const grass = draw({ pos, lie: 'fairway', side: 'center' })
+    // Up the hole the sand ball sits exactly where a fairway ball at the same
+    // yardage does (bar the 2px lift). Anchoring to the zone midpoint instead put
+    // it ~0.2L — hundreds of pixels — further from the pin, which is how a 41-yard
+    // approach got drawn behind the drive that set it up.
+    expect(Math.abs(sand.y - grass.y)).toBeLessThan(4)
+    // ...and it is still out in the sand rather than back on the short grass
+    expect(sand.x - grass.x).toBeGreaterThan(20)
+  })
+
   it('GreenView places the cup at the real pin — every tier/side combo, no crash, no NaN geometry', async () => {
     const { GreenView } = await import('./ui/HoleMap')
     const sides = ['left', 'center', 'right'] as const

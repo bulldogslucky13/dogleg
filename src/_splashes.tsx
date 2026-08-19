@@ -63,7 +63,7 @@ window.fetch = (input: RequestInfo | URL, init?: RequestInit) => {
     // type "taken" into the field to see the failure path instead
     if (name.toLowerCase() === 'taken') {
       return after(
-        new Response(JSON.stringify({ error: 'that name is taken' }), {
+        new Response(JSON.stringify({ error: 'that name belongs to a synced player — try another' }), {
           status: 409,
           headers: { 'Content-Type': 'application/json' },
         }),

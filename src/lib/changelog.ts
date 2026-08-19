@@ -67,6 +67,12 @@ export const CHANGE_KIND_LABEL: Record<ChangeKind, string> = {
 
 export const CHANGELOG: ChangeEntry[] = [
   {
+    date: '2026-08-19',
+    kind: 'feature',
+    title: 'Somebody else can be called Jacob too',
+    note: 'Clubhouse names used to be one to a customer, which sounds fair until you meet it: the name it most often refused you was your own. Clear your browser, pick up a new phone, reinstall — this game has no password, so that device arrives as a stranger, and typing the name you have always played under got you "that name is taken" by your own old scorecard, with no way round it. Names are now shared. Take the one you want even if somebody already answers to it; the boards have always sorted players out by more than what they are called. The one exception is a name held by a player who has added an email address for cross-device sync — that is a claim we can actually honour, so we reserve it for them. If you would like your name held that way, add an email in the clubhouse panel and it is yours.',
+  },
+  {
     date: '2026-08-14',
     kind: 'odds',
     title: 'Safe no longer aims at the middle of a lake',

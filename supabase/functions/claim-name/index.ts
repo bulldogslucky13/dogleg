@@ -24,6 +24,7 @@
 // removes the requirement to play 18 holes first.
 // deno-lint-ignore-file no-explicit-any
 import { createClient } from 'npm:@supabase/supabase-js@2'
+import { checkName, NAME_CHECK_FAILED, NAME_RE, NAME_TAKEN } from '../_shared/names.ts'
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -32,9 +33,6 @@ const CORS = {
 }
 const json = (status: number, body: unknown) =>
   new Response(JSON.stringify(body), { status, headers: { ...CORS, 'content-type': 'application/json' } })
-
-// identical to submit-round / link-account — one grammar for clubhouse names
-const NAME_RE = /^[\p{L}\p{N}][\p{L}\p{N} .'_-]{1,17}$/u
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS })
@@ -62,6 +60,13 @@ Deno.serve(async (req) => {
   // read as a failure when the first one actually landed.
   if (player.name) return json(200, { player: { id: player.id, name: player.name } })
 
+  // Names are shared unless an email account holds this one — see
+  // _shared/names.ts. Checked here rather than left to the database: there is
+  // no unique index on names any more, so nothing downstream would refuse it.
+  const availability = await checkName(supabase, name)
+  if (availability === 'reserved') return json(409, { error: NAME_TAKEN })
+  if (availability === 'unknown') return json(503, { error: NAME_CHECK_FAILED })
+
   // `is('name', null)` is the race guard: two devices claiming onto the same
   // row at once, and only the first update matches. A miss is NOT an error —
   // PostgREST reports a zero-row update as a success — so the loser has to be
@@ -76,9 +81,11 @@ Deno.serve(async (req) => {
     .is('name', null)
     .select('id, name')
     .maybeSingle()
+  // 23505 can no longer come from the name (that unique index is gone) — kept
+  // as a belt-and-braces mapping in case a future constraint reintroduces one.
   if (error) {
     return json(error.code === '23505' ? 409 : 500, {
-      error: error.code === '23505' ? 'that name is taken' : 'could not claim that name',
+      error: error.code === '23505' ? NAME_TAKEN : 'could not claim that name',
     })
   }
   if (claimed?.name) return json(200, { player: { id: claimed.id, name: claimed.name } })

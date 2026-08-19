@@ -100,12 +100,12 @@ export function RoundsScreen(props: {
   const [ledger, setLedger] = useState(() => loadLedger())
   useEffect(() => {
     if (!backendEnabled) return
-    const myName = loadPlayer()?.name ?? null
-    if (!myName) return
+    const myId = loadPlayer()?.id ?? null
+    if (!myId) return
     let live = true
     void fetchCourseRecords().then((recs) => {
       if (!live || !recs) return
-      syncLedger(recs, myName)
+      syncLedger(recs, myId)
       // same as the home screen's pass: a record adopted or reclaimed elsewhere
       // moves the record achievements, and this lands after the app-start
       // reconcile. Quietly — finding out isn't earning. setLedger below

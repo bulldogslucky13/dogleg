@@ -95,10 +95,11 @@ export type ClaimResult = { ok: true; player: Player } | { ok: false; error: str
  *
  * The other two doors both demand something first — submit-round wants a
  * finished round, syncAccount wants an email session — so neither can serve
- * a player mid-round. Names are globally unique (`players_name_ci`), so this
- * cannot be faked locally and deferred: the claim has to reach the server at
- * the moment it's made, or the player gets told "taken" much later, having
- * already been promised the name.
+ * a player mid-round. The claim still has to reach the server at the moment
+ * it's made rather than being faked locally and flushed later: most names are
+ * shared and will simply take, but one held by a synced account will not, and
+ * a player told "taken" long after being promised the name is the failure
+ * this route exists to avoid.
  *
  * The name lands on the identity this device already holds, so the round in
  * flight keeps the dice it was dealt.
@@ -146,6 +147,10 @@ export async function claimClubhouseName(name: string): Promise<ClaimResult> {
 }
 
 export interface BoardRow {
+  /** the holder's identity. Clubhouse names are SHARED — two anonymous
+   * players may both be "Jacob" (see supabase/schema.sql) — so every "is this
+   * me?" test on a board row keys on this, never on the name. */
+  player_id: string
   player_name: string
   character: CharacterId | null
   to_par: number
@@ -158,7 +163,7 @@ export async function fetchDailyBoard(dateKey: string): Promise<BoardRow[] | nul
     const url =
       `${SUPABASE_URL}/rest/v1/daily_scores` +
       `?date_key=eq.${encodeURIComponent(dateKey)}` +
-      `&select=player_name,character,to_par,strokes&order=to_par.asc,created_at.asc&limit=100`
+      `&select=player_id,player_name,character,to_par,strokes&order=to_par.asc,created_at.asc&limit=100`
     const res = await fetch(url, { headers: REST_HEADERS })
     if (!res.ok) return null
     return (await res.json()) as BoardRow[]
@@ -169,6 +174,9 @@ export async function fetchDailyBoard(dateKey: string): Promise<BoardRow[] | nul
 
 export interface CourseRecord {
   course_slug: string
+  /** the holder's identity — the field every "is this mine?" test reads.
+   * Names are shared (see BoardRow.player_id). */
+  player_id: string
   player_name: string
   character: CharacterId | null
   to_par: number
@@ -188,7 +196,7 @@ export async function fetchSeasonRecords(seasonKey: string): Promise<Map<string,
     const url =
       `${SUPABASE_URL}/rest/v1/season_records` +
       `?scope=eq.global&season_key=eq.${encodeURIComponent(seasonKey)}` +
-      `&select=course_slug,player_name,character,to_par,mode,set_at`
+      `&select=course_slug,player_id,player_name,character,to_par,mode,set_at`
     const res = await fetch(url, { headers: REST_HEADERS })
     if (!res.ok) return null
     const rows = (await res.json()) as CourseRecord[]
@@ -251,7 +259,7 @@ export async function fetchSeasonRecordReplay(courseSlug: string, seasonKey: str
 export async function fetchCourseRecords(): Promise<Map<string, CourseRecord> | null> {
   if (!backendEnabled) return null
   try {
-    const url = `${SUPABASE_URL}/rest/v1/course_records?select=course_slug,player_name,character,to_par,mode,set_at`
+    const url = `${SUPABASE_URL}/rest/v1/course_records?select=course_slug,player_id,player_name,character,to_par,mode,set_at`
     const res = await fetch(url, { headers: REST_HEADERS })
     if (!res.ok) return null
     const rows = (await res.json()) as CourseRecord[]

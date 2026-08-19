@@ -21,9 +21,9 @@ export interface Hunt {
 }
 
 export function seasonHunt(
-  recs: Map<string, Pick<CourseRecord, 'player_name' | 'to_par'>> | null,
+  recs: Map<string, Pick<CourseRecord, 'player_id' | 'to_par'>> | null,
   courseSlugs: string[],
-  myName: string | null,
+  myId: string | null,
   attainableToPar: number,
 ): Hunt | null {
   if (!recs) return null
@@ -36,7 +36,9 @@ export function seasonHunt(
       open++
       continue
     }
-    if (myName && rec.player_name.toLowerCase() === myName.toLowerCase()) continue
+    // by id, not name — clubhouse names are shared (see supabase/schema.sql),
+    // and a namesake's trophy is still a target
+    if (myId && rec.player_id === myId) continue
     if (rec.to_par >= attainableToPar) {
       beatable++
       worst = worst === null ? rec.to_par : Math.max(worst, rec.to_par)

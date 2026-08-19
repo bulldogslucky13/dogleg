@@ -94,13 +94,15 @@ export function HomeScreen(props: {
   /** the season key currently being fetched, if any — de-dupes the retry
    * triggers rather than letting each one start its own read */
   const seasonFetch = useRef<string | null>(null)
-  /** the clubhouse this device posts under. STATE, not a read-per-render,
+  /** the identity this device posts under — the ID, because clubhouse names
+   * are shared (see supabase/schema.sql) and a namesake's record is not ours.
+   * STATE, not a read-per-render,
    * because signing in can adopt a different clubhouse while this screen sits
    * there — and every "is this one mine?" on it moves with the answer: the
    * hunt's trophy exclusion, the mine/not-mine filters, the YOU badge. The
    * panel at the bottom is the only thing that knows the adoption happened,
    * so it says so (onIdentity). */
-  const [myName, setMyName] = useState<string | null>(() => loadPlayer()?.name ?? null)
+  const [myId, setMyId] = useState<string | null>(() => loadPlayer()?.id ?? null)
   const [steals, setSteals] = useState(() => pendingSteals())
   /** the Fortune callout's ⓘ opens How to Play's Fortunes page on its own */
   const [fortuneInfo, setFortuneInfo] = useState(false)
@@ -195,9 +197,9 @@ export function HomeScreen(props: {
       setSeasonRecs(recs)
       // the name is read HERE, not at effect time: it can be claimed after
       // mount, and an unnamed device holds no records to reconcile anyway
-      const name = loadPlayer()?.name ?? null
-      if (!name) return
-      syncSeasonLedger(recs, key, name)
+      const id = loadPlayer()?.id ?? null
+      if (!id) return
+      syncSeasonLedger(recs, key, id)
       setSteals(pendingSteals())
     })
   }, [showCourses, recType, seasonRecsKey, season.key])
@@ -209,11 +211,11 @@ export function HomeScreen(props: {
   // other; a failed fetch stays null and that shelf isn't reconciled this visit.
   useEffect(() => {
     if (!backendEnabled) return
-    const myName = loadPlayer()?.name ?? null
-    if (!myName) return
+    const myId = loadPlayer()?.id ?? null
+    if (!myId) return
     void fetchCourseRecords().then((recs) => {
       if (!recs) return
-      syncLedger(recs, myName)
+      syncLedger(recs, myId)
       // the sync can adopt records set on another device, or learn that one was
       // taken back there — both move achievements (Name on the Wall, the record
       // ladders, Repo Man), and this fetch lands long after the app-start
@@ -263,7 +265,7 @@ export function HomeScreen(props: {
   const hunt = seasonHunt(
     seasonRecs,
     browsable.map((c) => c.slug),
-    myName,
+    myId,
     ATTAINABLE_RECORD_TO_PAR,
   )
   const visibleCourses = browsable.filter((c) => {
@@ -279,8 +281,8 @@ export function HomeScreen(props: {
       const rec = activeRecs.get(c.slug)
       if (recordFilter === 'open' && rec) return false
       if (recordFilter === 'attainable' && (!rec || rec.to_par < ATTAINABLE_RECORD_TO_PAR)) return false
-      if (recordFilter === 'mine' && !(rec && myName && rec.player_name === myName)) return false
-      if (recordFilter === 'notmine' && rec && myName && rec.player_name === myName) return false
+      if (recordFilter === 'mine' && !(rec && myId && rec.player_id === myId)) return false
+      if (recordFilter === 'notmine' && rec && myId && rec.player_id === myId) return false
     }
     return true
   }).sort((a, b) => {
@@ -666,7 +668,7 @@ export function HomeScreen(props: {
               // the row shows the ACTIVE record type only, labeled, so nobody
               // misreads which record they're hunting — the toggle above flips it
               const rec = activeRecs?.get(c.slug)
-              const mine = Boolean(rec && myName && rec.player_name === myName)
+              const mine = Boolean(rec && myId && rec.player_id === myId)
               const recLabel = recType === 'season' ? 'Season' : 'All-time'
               return (
                 <div key={c.slug} className="course-row-wrap">
@@ -764,7 +766,7 @@ export function HomeScreen(props: {
         </button>
       )}
       <HandicapChip onTap={props.onStats} />
-      <AccountPanel onHistorySynced={props.onHistorySynced} onIdentity={(p) => setMyName(p.name)} />
+      <AccountPanel onHistorySynced={props.onHistorySynced} onIdentity={(p) => setMyId(p.id)} />
       {/* the quiet stuff lives at the foot of the screen: the rules, and the
           receipt showing what has changed since launch */}
       <div className="teebox-footer">

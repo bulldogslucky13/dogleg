@@ -9,6 +9,7 @@
 // happen with the service role.
 // deno-lint-ignore-file no-explicit-any
 import { createClient } from 'npm:@supabase/supabase-js@2'
+import { checkName, isNameConflict, NAME_CHECK_FAILED, NAME_RE, NAME_TAKEN } from '../_shared/names.ts'
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -17,8 +18,6 @@ const CORS = {
 }
 const json = (status: number, body: unknown) =>
   new Response(JSON.stringify(body), { status, headers: { ...CORS, 'content-type': 'application/json' } })
-
-const NAME_RE = /^[\p{L}\p{N}][\p{L}\p{N} .'_-]{1,17}$/u
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS })
@@ -61,8 +60,19 @@ Deno.serve(async (req) => {
    * `is('user_id', null)` is what makes the read-then-write atomic. As with
    * the name guard, a miss is reported as success by PostgREST, so the row
    * has to come back for a miss to be visible at all.
+   *
+   * This is the one write in the file that never calls `checkName` first —
+   * intentionally, because a player syncing the name they ALREADY hold must
+   * always be able to (see the name guard below). But it CAN still 23505 on
+   * `players_name_reserved_ci` — not on this row's own name changing (it
+   * isn't), but on `user_id` going non-null while the name stays what it
+   * already was: if two anonymous rows independently landed on the same
+   * shared name before either synced, and the other one linked first, this
+   * row's link now collides with an account that already reserved that name.
+   * `isNameConflict` is what tells that apart from an ordinary `user_id` race
+   * so the right error reaches the player.
    */
-  const attach = async (id: string): Promise<'linked' | 'taken' | 'error'> => {
+  const attach = async (id: string): Promise<'linked' | 'taken' | 'nametaken' | 'error'> => {
     const { data, error } = await service
       .from('players')
       .update({ user_id: uid })
@@ -70,7 +80,7 @@ Deno.serve(async (req) => {
       .is('user_id', null)
       .select('user_id')
       .maybeSingle()
-    if (error) return 'error'
+    if (error) return isNameConflict(error) ? 'nametaken' : 'error'
     if (data) return 'linked'
     // no row changed: another account signed in against this same identity
     // between the read and the write, and the first one to land keeps it
@@ -78,10 +88,12 @@ Deno.serve(async (req) => {
     if (!row) return 'error'
     return row.user_id === uid ? 'linked' : 'taken'
   }
-  const attachFailure = (outcome: 'taken' | 'error') =>
-    outcome === 'taken'
-      ? json(409, { error: 'that name is synced to another email' })
-      : json(500, { error: 'could not link' })
+  const attachFailure = (outcome: 'taken' | 'nametaken' | 'error') =>
+    outcome === 'nametaken'
+      ? json(409, { error: NAME_TAKEN })
+      : outcome === 'taken'
+        ? json(409, { error: 'that name is synced to another email' })
+        : json(500, { error: 'could not link' })
 
   // fresh account + this device's player → attach it
   if (playerId && playerSecret) {
@@ -95,6 +107,17 @@ Deno.serve(async (req) => {
       // belonging to them
       if (!name) return json(200, { status: 'needsname' })
       if (!NAME_RE.test(name)) return json(400, { error: 'pick a clubhouse name (2-18 letters/numbers)' })
+      // This row is about to become an ACCOUNT, so the name it takes has to be
+      // free of other accounts (see _shared/names.ts). checkName here is the
+      // courtesy layer only — it catches the common case with a clean error
+      // before any write. The guarantee is players_name_reserved_ci (partial
+      // unique index, linked rows only): two requests racing past this check
+      // for the same not-yet-reserved name both get 'free' here, but only one
+      // of the writes below can land — isNameConflict is what tells the
+      // loser's 23505 apart from an ordinary user_id collision.
+      const availability = await checkName(service, name)
+      if (availability === 'reserved') return json(409, { error: NAME_TAKEN })
+      if (availability === 'unknown') return json(503, { error: NAME_CHECK_FAILED })
       // Both guards are race guards, and a MISS is not an error — PostgREST
       // reports a zero-row update as a success. This one statement writes the
       // name AND the link, so a silent miss dropped BOTH: the caller was told
@@ -110,7 +133,7 @@ Deno.serve(async (req) => {
         .maybeSingle()
       if (error) {
         return json(error.code === '23505' ? 409 : 500, {
-          error: error.code === '23505' ? 'that name is taken' : 'could not link',
+          error: error.code !== '23505' ? 'could not link' : isNameConflict(error) ? NAME_TAKEN : 'that name is synced to another email',
         })
       }
       if (linked) return json(200, { status: 'linked', player: linked })
@@ -136,6 +159,9 @@ Deno.serve(async (req) => {
   // fresh account, fresh device → create a named player pre-linked
   if (name) {
     if (!NAME_RE.test(name)) return json(400, { error: 'pick a clubhouse name (2-18 letters/numbers)' })
+    const availability = await checkName(service, name)
+    if (availability === 'reserved') return json(409, { error: NAME_TAKEN })
+    if (availability === 'unknown') return json(503, { error: NAME_CHECK_FAILED })
     const { data, error } = await service
       .from('players')
       .insert({ name, user_id: uid })
@@ -143,7 +169,7 @@ Deno.serve(async (req) => {
       .single()
     if (error) {
       return json(error.code === '23505' ? 409 : 500, {
-        error: error.code === '23505' ? 'that name is taken' : 'could not create player',
+        error: error.code !== '23505' ? 'could not create player' : isNameConflict(error) ? NAME_TAKEN : 'that name is synced to another email',
       })
     }
     return json(200, { status: 'created', player: data })

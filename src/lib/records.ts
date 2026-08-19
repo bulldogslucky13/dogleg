@@ -32,6 +32,12 @@ export interface HeldRecord {
 export interface StolenRecord {
   /** the thief's clubhouse name */
   by: string
+  /** the thief's player id. Optional only because a ledger written before
+   * this field existed has none on disk — loadLedger() doesn't backfill it,
+   * so old entries carry it as undefined until the next sync overwrites them.
+   * Never compare thieves by `by` alone: names are shared (see
+   * supabase/schema.sql), so two different players can hold this same name. */
+  byId?: string
   theirToPar: number
   /** what the record was when it was ours */
   myToPar: number
@@ -148,19 +154,28 @@ export function seasonRecordWon(
 
 /** The server's view of one record, as the leaderboard fetchers return it. */
 export interface ServerRecord {
+  player_id: string
   player_name: string
   to_par: number
 }
 
-/** Clubhouse names are case-insensitively unique (players_name_ci), and the
- * boards deliberately publish names, never player ids — so the name IS the
- * public identity this ledger keys on. */
-function sameName(a: string | null | undefined, b: string | null | undefined): boolean {
-  return !!a && !!b && a.toLowerCase() === b.toLowerCase()
+/**
+ * Is this record ours?
+ *
+ * Keyed on the player id, NOT the name. Names used to be globally unique, so
+ * the name could stand in for the identity here — that stopped being true
+ * when clubhouse names became shareable (see supabase/schema.sql). Comparing
+ * names now would hand every "Jacob" every other Jacob's records: their
+ * trophies would appear on our shelf, and a genuine theft by a same-named
+ * player would read as "still ours" and never surface. The boards publish
+ * player_id alongside the name for exactly this test.
+ */
+function isMine(rec: ServerRecord, myId: string | null | undefined): boolean {
+  return !!myId && rec.player_id === myId
 }
 
 /**
- * The reconcile pass both boards share: adopt server records bearing our
+ * The reconcile pass both boards share: adopt server records standing in our
  * name, turn a held record under a new holder into a steal event, and keep a
  * stolen record's facts fresh while only re-surfacing it on a new day.
  *
@@ -178,19 +193,19 @@ function reconcile(
   held: Record<string, HeldRecord & Stamp>,
   stolen: Record<string, StolenRecord & Stamp>,
   server: Map<string, ServerRecord>,
-  myName: string,
+  myId: string,
   now: number,
   today: string,
   stamp: Stamp,
-  /** fires when a stolen entry flips back to our name — the all-time caller
-   * counts it into the forever reclaim tally; the season shelf passes nothing
+  /** fires when a stolen entry flips back to us — the all-time caller counts
+   * it into the forever reclaim tally; the season shelf passes nothing
    * (Repo Man's semantics predate seasons and stay all-time) */
   onReclaim?: (slug: string) => void,
 ): void {
-  // adopt records bearing our name this device doesn't know about yet
+  // adopt records standing in our name this device doesn't know about yet
   // (set on another device, or set before the ledger existed)
   for (const [slug, rec] of server) {
-    if (sameName(rec.player_name, myName) && !held[slug]) {
+    if (isMine(rec, myId) && !held[slug]) {
       held[slug] = { toPar: rec.to_par, since: now, ...stamp }
     }
   }
@@ -198,7 +213,7 @@ function reconcile(
   for (const [slug, heldRec] of Object.entries(held)) {
     const rec = server.get(slug)
     if (!rec) continue // record vanished server-side; keep our claim
-    if (sameName(rec.player_name, myName)) {
+    if (isMine(rec, myId)) {
       // still ours — track our own improvements
       held[slug] = { ...heldRec, toPar: rec.to_par }
       continue
@@ -208,6 +223,7 @@ function reconcile(
     delete held[slug]
     stolen[slug] = {
       by: rec.player_name,
+      byId: rec.player_id,
       theirToPar: rec.to_par,
       myToPar: heldRec.toPar,
       at: now,
@@ -222,7 +238,7 @@ function reconcile(
   for (const [slug, stolenRec] of Object.entries(stolen)) {
     const rec = server.get(slug)
     if (!rec) continue
-    if (sameName(rec.player_name, myName)) {
+    if (isMine(rec, myId)) {
       // reclaimed under our name (a win posted on another device) — the
       // adoption pass above already put it back in `held`; drop the stale
       // steal so chasing()/pendingSteals() stop flagging a record we hold
@@ -230,11 +246,12 @@ function reconcile(
       delete stolen[slug]
       continue
     }
-    if (rec.player_name !== stolenRec.by || rec.to_par !== stolenRec.theirToPar) {
+    if (rec.player_id !== stolenRec.byId || rec.to_par !== stolenRec.theirToPar) {
       const newDay = stolenRec.notifiedOn !== today
       stolen[slug] = {
         ...stolenRec,
         by: rec.player_name,
+        byId: rec.player_id,
         theirToPar: rec.to_par,
         dismissed: newDay ? false : stolenRec.dismissed,
         notifiedOn: newDay ? today : stolenRec.notifiedOn,
@@ -249,13 +266,13 @@ function reconcile(
  */
 export function syncLedger(
   server: Map<string, ServerRecord>,
-  myName: string | null,
+  myId: string | null,
   now = Date.now(),
   today = localDateKey(),
 ): RecordLedger {
   const ledger = loadLedger()
-  if (!myName) return ledger
-  reconcile(ledger.held, ledger.stolen, server, myName, now, today, {}, (slug) => {
+  if (!myId) return ledger
+  reconcile(ledger.held, ledger.stolen, server, myId, now, today, {}, (slug) => {
     // reclaimed under our name on ANOTHER device — this diff is the other
     // device's recordWon() reaching us, and the last moment the take-back is
     // visible. Count it into the forever-tally (Repo Man reads it).
@@ -274,19 +291,19 @@ export function syncLedger(
 export function syncSeasonLedger(
   server: Map<string, ServerRecord>,
   seasonKey: string,
-  myName: string | null,
+  myId: string | null,
   now = Date.now(),
   today = localDateKey(),
 ): RecordLedger {
   const ledger = loadLedger()
-  if (!myName) return ledger
+  if (!myId) return ledger
   for (const [slug, rec] of Object.entries(ledger.heldSeason)) {
     if (rec.seasonKey !== seasonKey) delete ledger.heldSeason[slug]
   }
   for (const [slug, rec] of Object.entries(ledger.stolenSeason)) {
     if (rec.seasonKey !== seasonKey) delete ledger.stolenSeason[slug]
   }
-  reconcile(ledger.heldSeason, ledger.stolenSeason, server, myName, now, today, { seasonKey })
+  reconcile(ledger.heldSeason, ledger.stolenSeason, server, myId, now, today, { seasonKey })
   saveLedger(ledger)
   return ledger
 }
@@ -322,8 +339,15 @@ export function pendingSteals(ledger = loadLedger(), seasonKey = seasonForDate()
   // is one theft, not two cards
   const merged: PendingSteal[] = []
   for (const a of alltime) {
+    // By id, like every other identity test in this file — names are shared
+    // (see supabase/schema.sql), so two different players can steal both
+    // boards on the same course with the same score, and merging THAT into
+    // one card would drop a real theft on the floor. `byId` is missing only
+    // on an entry written before this field existed; such an entry can't be
+    // proven to be the same thief, so it is never merged — it stays two
+    // cards until the next sync backfills the id and lets them merge safely.
     const twin = season.find(
-      (s) => s.courseSlug === a.courseSlug && sameName(s.by, a.by) && s.theirToPar === a.theirToPar,
+      (s) => s.courseSlug === a.courseSlug && !!s.byId && s.byId === a.byId && s.theirToPar === a.theirToPar,
     )
     merged.push(twin ? { ...a, scope: 'both' } : a)
   }

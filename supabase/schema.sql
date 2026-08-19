@@ -20,9 +20,82 @@ create table if not exists players (
   user_id uuid unique references auth.users (id),
   created_at timestamptz not null default now()
 );
-create unique index if not exists players_name_ci on players (lower(name));
 alter table players add column if not exists user_id uuid unique references auth.users (id);
 alter table players alter column name drop not null;
+
+-- ---------------------------------------------------------------------------
+-- Clubhouse names: SHARED by default, RESERVED only by an email account.
+-- ---------------------------------------------------------------------------
+-- Names used to be globally unique (`players_name_ci`, a unique index on
+-- lower(name)), and that index was the whole rule. It cost more than it
+-- bought. Identity here is a device-held secret with no login, so the common
+-- way to meet "that name is taken" was not squatting — it was YOUR OWN old
+-- row, orphaned by a cleared browser, a new phone, or a reinstall. The game
+-- answered a player typing their own name with a flat refusal and no way
+-- forward, because names are permanent and there is no rename door.
+--
+-- So the rule is now: two anonymous players may both be "Jacob". A name stops
+-- being available only once a player who has linked an email account holds it
+-- — an account is a real, recoverable claim on a name, and reserving it is
+-- what that account is FOR. Anonymous rows that already share a reserved name
+-- keep it (grandfathered); they simply stop being joined by new ones.
+--
+-- Enforced TWICE, on purpose, because the two enforcement points guard
+-- different things:
+--
+-- 1. name_reserved() below, called by all three claim doors (submit-round,
+--    claim-name, link-account) BEFORE they write, is what turns a collision
+--    into a clean "that name belongs to a synced player" instead of a raw
+--    23505. It is a courtesy, not a guarantee — checked, then written, two
+--    round trips apart.
+--
+-- 2. players_name_reserved_ci below is the guarantee: a PARTIAL unique index
+--    over only the linked rows (`where user_id is not null`), so it enforces
+--    "at most one linked row per name" at the one layer nothing can race
+--    around. It does NOT touch anonymous rows — two anonymous "Jacob"s are
+--    still fine, unindexed, exactly as the design intends.
+--
+-- An earlier version of this file rejected a reserved-name index entirely,
+-- reasoning that it would refuse the one flow that must never fail: an
+-- anonymous player linking an email while ALREADY holding the name they play
+-- under. That reasoning missed the difference between two cases a plain
+-- unique index can't tell apart but a PARTIAL one can: linking your own
+-- unclaimed name (nobody else has linked it — the index permits this, same
+-- row, nothing to collide with) versus linking a name a DIFFERENT account
+-- already linked first (two anonymous rows landed on the same shared name
+-- before either synced, and both later add email — the index is exactly
+-- right to refuse the second one, because letting it through is what breaks
+-- "an account is a real, recoverable claim on a name": two different accounts
+-- would both read as reserving "Jacob", and neither recovery flow could tell
+-- them apart). That second case has no rename door to fall back to and reads
+-- to the losing player as the name being taken with no recourse — a real,
+-- accepted rough edge, not a bug: it is what the failed race SHOULD produce,
+-- because the alternative is a silent, undetectable double-reservation.
+--
+-- The plain (non-partial) lookup index remains for name_reserved()'s read.
+drop index if exists players_name_ci;
+create index if not exists players_name_ci_lookup on players (lower(name));
+create unique index if not exists players_name_reserved_ci on players (lower(name)) where user_id is not null;
+
+-- True when an EMAIL-LINKED player already holds this clubhouse name. The
+-- comparison is case-insensitive and trims, exactly as the edge functions do
+-- before they write, so "Jacob ", "jacob" and "JACOB" cannot slip past a
+-- reservation on "Jacob". SECURITY DEFINER + a service_role-only grant: this
+-- is an existence oracle over the players table, which is otherwise unreadable
+-- from the client, and it stays that way.
+create or replace function name_reserved(p_name text) returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1 from players
+    where user_id is not null and lower(name) = lower(btrim(p_name))
+  );
+$$;
+revoke all on function name_reserved(text) from public, anon, authenticated;
+grant execute on function name_reserved(text) to service_role;
 
 -- mint-player rate limiting: one counter per (utc day, hashed ip). The hash
 -- is salted with the day, so rows can't be correlated across days — and the

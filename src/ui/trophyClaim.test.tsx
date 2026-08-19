@@ -83,13 +83,13 @@ describe('the unclaimed-trophy card', () => {
 
   it('surfaces a taken name instead of pretending it worked', async () => {
     savePlayerIdentity(ANON)
-    vi.stubGlobal('fetch', fetchOnce(409, { error: 'that name is taken' }))
+    vi.stubGlobal('fetch', fetchOnce(409, { error: 'that name belongs to a synced player — try another' }))
 
     render(<TrophyClaim kind="albatross" holeNumber={9} courseName="Copper Canyon" mode="practice" onClose={() => {}} />)
     fireEvent.change(screen.getByLabelText('Clubhouse name'), { target: { value: 'Rob' } })
     fireEvent.click(screen.getByText('Claim it'))
 
-    await waitFor(() => expect(screen.getByText('that name is taken')).toBeTruthy())
+    await waitFor(() => expect(screen.getByText('that name belongs to a synced player — try another')).toBeTruthy())
     expect(loadPlayer()).toBeNull()
     expect(track).not.toHaveBeenCalledWith('clubhouse_name_claimed', expect.anything())
   })
@@ -162,13 +162,13 @@ describe('the unclaimed-trophy card', () => {
   it('gives the door back when the claim fails, so a refusal is not a trap', async () => {
     savePlayerIdentity(ANON)
     const onClose = vi.fn()
-    vi.stubGlobal('fetch', fetchOnce(409, { error: 'that name is taken' }))
+    vi.stubGlobal('fetch', fetchOnce(409, { error: 'that name belongs to a synced player — try another' }))
 
     render(<TrophyClaim kind="ace" holeNumber={7} courseName="Pine Valley" mode="daily" onClose={onClose} />)
     fireEvent.change(screen.getByLabelText('Clubhouse name'), { target: { value: 'Jace' } })
     fireEvent.click(screen.getByText('Claim it'))
 
-    await waitFor(() => expect(screen.getByText('that name is taken')).toBeTruthy())
+    await waitFor(() => expect(screen.getByText('that name belongs to a synced player — try another')).toBeTruthy())
     expect((screen.getByText('Not now') as HTMLButtonElement).disabled).toBe(false)
     fireEvent.click(screen.getByText('Not now'))
     expect(onClose).toHaveBeenCalled()

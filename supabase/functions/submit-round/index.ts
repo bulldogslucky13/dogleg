@@ -22,6 +22,7 @@ import {
 } from './engine.mjs'
 import { buildStealEmail, sendViaResend } from './email.ts'
 import { SITE_URL } from '../_shared/email-chassis.ts'
+import { checkName, NAME_CHECK_FAILED, NAME_RE, NAME_TAKEN } from '../_shared/names.ts'
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -31,8 +32,6 @@ const CORS = {
 
 const json = (status: number, body: unknown) =>
   new Response(JSON.stringify(body), { status, headers: { ...CORS, 'content-type': 'application/json' } })
-
-const NAME_RE = /^[\p{L}\p{N}][\p{L}\p{N} .'_-]{1,17}$/u
 
 /** The calendar day before a YYYY-MM-DD key (pure date math, no timezone). */
 function dayBefore(key: string): string {
@@ -235,6 +234,12 @@ Deno.serve(async (req) => {
       // an anonymous minted identity posting its first card: the name is
       // claimed onto THIS row, the one the round's dice were salted for
       if (!name || !NAME_RE.test(name)) return json(400, { error: 'pick a clubhouse name (2-18 letters/numbers)' })
+      // Shared unless an email account holds it (see _shared/names.ts). This
+      // runs BEFORE the card is written, so a refused name never leaves a
+      // posted score behind it.
+      const availability = await checkName(supabase, name)
+      if (availability === 'reserved') return json(409, { error: NAME_TAKEN })
+      if (availability === 'unknown') return json(503, { error: NAME_CHECK_FAILED })
       // `is('name', null)` is the race guard, and a MISS is not an error —
       // PostgREST reports a zero-row update as a success. That matters more
       // here than anywhere: `player_name` is denormalised onto daily_scores
@@ -250,7 +255,7 @@ Deno.serve(async (req) => {
         .maybeSingle()
       if (error) {
         return json(error.code === '23505' ? 409 : 500, {
-          error: error.code === '23505' ? 'that name is taken' : 'could not claim that name',
+          error: error.code === '23505' ? NAME_TAKEN : 'could not claim that name',
         })
       }
       if (claimed?.name) data.name = claimed.name
@@ -281,10 +286,13 @@ Deno.serve(async (req) => {
       }
     }
     if (!name || !NAME_RE.test(name)) return json(400, { error: 'pick a clubhouse name (2-18 letters/numbers)' })
+    const availability = await checkName(supabase, name)
+    if (availability === 'reserved') return json(409, { error: NAME_TAKEN })
+    if (availability === 'unknown') return json(503, { error: NAME_CHECK_FAILED })
     const { data, error } = await supabase.from('players').insert({ name }).select('id, name, secret').single()
     if (error) {
       return json(error.code === '23505' ? 409 : 500, {
-        error: error.code === '23505' ? 'that name is taken' : 'could not create player',
+        error: error.code === '23505' ? NAME_TAKEN : 'could not create player',
       })
     }
     player = { id: data.id, name: data.name, secret: data.secret }

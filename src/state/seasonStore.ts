@@ -39,11 +39,17 @@ export function ackSeason(now: Date = new Date()): void {
 
 export interface SeasonHolderRow {
   courseSlug: string
+  /** the holder's identity. Clubhouse names are SHARED (see
+   * supabase/schema.sql), so two different players can both be "Jacob" —
+   * every grouping and every "is this me?" below keys on the id, and the name
+   * comes along only to be displayed. */
+  playerId: string
   playerName: string
   toPar: number
 }
 
 export interface PodiumEntry {
+  playerId: string
   playerName: string
   records: number
   /** 1-based placement */
@@ -69,6 +75,7 @@ export async function fetchSeasonBoard(seasonKey: string): Promise<SeasonHolderR
   if (!map) return null
   return [...map.entries()].map(([courseSlug, r]) => ({
     courseSlug,
+    playerId: r.player_id,
     playerName: r.player_name,
     toPar: r.to_par,
   }))
@@ -76,18 +83,19 @@ export async function fetchSeasonBoard(seasonKey: string): Promise<SeasonHolderR
 
 /** most records held wins; best single round breaks ties */
 export function podium(rows: SeasonHolderRow[], top = 3): PodiumEntry[] {
-  const byPlayer = new Map<string, { name: string; records: number; best: number }>()
+  // grouped by id, not name: two namesakes are two players, and pooling their
+  // records would invent a podium finish neither of them earned
+  const byPlayer = new Map<string, { id: string; name: string; records: number; best: number }>()
   for (const r of rows) {
-    const key = r.playerName.toLowerCase()
-    const cur = byPlayer.get(key) ?? { name: r.playerName, records: 0, best: 99 }
+    const cur = byPlayer.get(r.playerId) ?? { id: r.playerId, name: r.playerName, records: 0, best: 99 }
     cur.records += 1
     cur.best = Math.min(cur.best, r.toPar)
-    byPlayer.set(key, cur)
+    byPlayer.set(r.playerId, cur)
   }
   return [...byPlayer.values()]
     .sort((a, b) => b.records - a.records || a.best - b.best)
     .slice(0, top)
-    .map((p, i) => ({ playerName: p.name, records: p.records, place: i + 1 }))
+    .map((p, i) => ({ playerId: p.id, playerName: p.name, records: p.records, place: i + 1 }))
 }
 
 export interface SeasonAward {
@@ -101,8 +109,10 @@ export interface SeasonAward {
 
 interface AwardCache {
   v: 1
-  /** the clubhouse name (lowercased) these awards were folded for — a device
-   * that adopts a different synced identity must not inherit them */
+  /** the player ID these awards were folded for — a device that adopts a
+   * different synced identity must not inherit them. (It held a lowercased
+   * clubhouse name until names became shareable; an old cache simply fails
+   * the equality check below and is rebuilt, which is the intended outcome.) */
   player: string | null
   /** last PAST season folded into the cache */
   through: string | null
@@ -136,7 +146,7 @@ function readAwards(me: string): AwardCache {
  * take a past award away.
  */
 export async function seasonAwards(now: Date = new Date()): Promise<SeasonAward[]> {
-  const me = loadPlayer()?.name?.toLowerCase() ?? null
+  const me = loadPlayer()?.id ?? null
   // no clubhouse name → no awards are attributable to this device
   if (!me) return []
   const cache = readAwards(me)
@@ -145,8 +155,8 @@ export async function seasonAwards(now: Date = new Date()): Promise<SeasonAward[
   for (const season of pending) {
     const rows = await fetchSeasonBoard(season.key)
     if (!rows) return cache.awards // offline — retry next open, cache unchanged
-    const mine = rows.filter((r) => r.playerName.toLowerCase() === me)
-    const placeEntry = podium(rows).find((p) => p.playerName.toLowerCase() === me)
+    const mine = rows.filter((r) => r.playerId === me)
+    const placeEntry = podium(rows).find((p) => p.playerId === me)
     if (mine.length > 0) {
       cache.awards.push({
         seasonKey: season.key,

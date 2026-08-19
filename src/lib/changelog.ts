@@ -68,6 +68,12 @@ export const CHANGE_KIND_LABEL: Record<ChangeKind, string> = {
 export const CHANGELOG: ChangeEntry[] = [
   {
     date: '2026-08-19',
+    kind: 'fix',
+    title: 'The map stopped walking your ball backwards',
+    note: 'On holes with a long bunker running down the side — a waste bunker, the Church Pews — the map drew your ball at the middle of the sand no matter where along it you actually were. Catch the front end with 40 yards left and the ball appeared halfway back down the hole, behind the drive that put it there, while the yardage beside it counted down correctly. Nothing about the shot itself was wrong: the lie you were in, the yardage you had left and the odds you were offered were all the real ones. It was the picture that lied, which is worst in a replay, where you watch the ball travel the wrong way. A ball in a long bunker now sits at its own yardage, on the side it is really on.',
+  },
+  {
+    date: '2026-08-19',
     kind: 'feature',
     title: 'Somebody else can be called Jacob too',
     note: 'Clubhouse names used to be one to a customer, which sounds fair until you meet it: the name it most often refused you was your own. Clear your browser, pick up a new phone, reinstall — this game has no password, so that device arrives as a stranger, and typing the name you have always played under got you "that name is taken" by your own old scorecard, with no way round it. Names are now shared. Take the one you want even if somebody already answers to it; the boards have always sorted players out by more than what they are called. The one exception is a name held by a player who has added an email address for cross-device sync — that is a claim we can actually honour, so we reserve it for them. If you would like your name held that way, add an email in the clubhouse panel and it is yours.',

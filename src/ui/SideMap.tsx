@@ -20,9 +20,36 @@ function zoneX(zone: HazardZone, xFor: (yards: number) => number, greenFrontX: n
   return zone.side === 'cross' ? Math.min(mid, greenFrontX - 8) : Math.min(X1 - 10, mid)
 }
 
+/** Drawn half-width — single source for the hazard's ellipse and the ball in it. */
+function zoneRx(zone: HazardZone, xFor: (yards: number) => number): number {
+  return Math.max(13, Math.min(34, (xFor(zone.to) - xFor(zone.from)) / 2))
+}
+
+/**
+ * Drawn x for the ball. A ball in a mapped hazard sits at its OWN yardage, not
+ * the hazard's MIDPOINT: on a long waste bunker the midpoint is tens of yards
+ * from where the ball stopped, so catching the front end drew the ball further
+ * from the pin than the shot that put it there — going visibly backwards while
+ * the yards-left badge counted down. Clamped to the drawn ellipse, because this
+ * strip caps a hazard's width and the ball still has to sit in the sand the
+ * caption says it is in.
+ */
+function ballXFor(
+  ball: BallState,
+  zone: HazardZone | undefined,
+  xFor: (yards: number) => number,
+  greenFrontX: number,
+): number {
+  const x = xFor(ball.pos)
+  if (!zone) return x
+  const cx = zoneX(zone, xFor, greenFrontX)
+  const rx = zoneRx(zone, xFor)
+  return Math.min(Math.max(x, cx - rx), cx + rx)
+}
+
 function Zone(props: { zone: HazardZone; cx: number; xFor: (yards: number) => number; behind: boolean }) {
   const { zone, cx, xFor, behind } = props
-  const rx = Math.max(13, Math.min(34, (xFor(zone.to) - xFor(zone.from)) / 2))
+  const rx = zoneRx(zone, xFor)
   const gy = groundY(cx)
   // no exact lateral geometry shown — hazards sit alongside the strip, crossing water sits on it
   const above = zone.side === 'left'
@@ -60,9 +87,9 @@ export function SideMap(props: { layout: HoleLayout; ball: BallState }) {
   const greenFrontX = greenX - greenRx
   const gy = groundY(greenX)
 
-  // a ball sitting in a mapped hazard anchors to where that hazard is drawn
+  // a ball sitting in a mapped hazard stays within where that hazard is drawn
   const ballZone = ball.zoneId ? layout.zones.find((z) => z.id === ball.zoneId) : undefined
-  const ballX = ballZone ? zoneX(ballZone, xFor, greenFrontX) : xFor(ball.pos)
+  const ballX = ballXFor(ball, ballZone, xFor, greenFrontX)
   const by = groundY(ballX)
   const yardsLeft = Math.max(0, Math.round(L - ball.pos))
   const labelX = Math.max(X0 + 40, Math.min(X1 - 60, (ballX + greenX) / 2))

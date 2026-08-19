@@ -138,11 +138,11 @@ describe('Sign your scorecard', () => {
   })
 
   it('a taken name is retryable, and offers no way past the gate', async () => {
-    stubClaim(() => new Response(JSON.stringify({ error: 'that name is taken' }), { status: 409 }))
+    stubClaim(() => new Response(JSON.stringify({ error: 'that name belongs to a synced player — try another' }), { status: 409 }))
     const props = mount()
     fireEvent.change(screen.getByLabelText('Clubhouse name'), { target: { value: 'Rob' } })
     fireEvent.click(screen.getByRole('button', { name: /sign and tee off/i }))
-    await waitFor(() => expect(screen.getByText(/that name is taken/i)).toBeTruthy())
+    await waitFor(() => expect(screen.getByText(/that name belongs to a synced player — try another/i)).toBeTruthy())
     expect(props.onSigned).not.toHaveBeenCalled()
     // crucially NOT an escape hatch — the player can simply pick another name
     expect(screen.queryByRole('button', { name: /without signing/i })).toBeNull()

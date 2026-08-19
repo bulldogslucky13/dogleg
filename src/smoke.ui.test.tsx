@@ -940,6 +940,34 @@ describe('smoke: the app boots and the daily flow works end to end', () => {
     expect(sand.x - grass.x).toBeGreaterThan(20)
   })
 
+  it('classic view walks a ball up a long bunker instead of pinning it to the middle', async () => {
+    const { SideMap } = await import('./ui/SideMap')
+    const { buildLayout } = await import('./engine/layout')
+    const { COURSES } = await import('./engine/courses')
+    const base = buildLayout(COURSES[0].slug, COURSES[0].holes[0])
+    const L = base.length
+    const layout = {
+      ...base,
+      zones: [{ id: 'waste', kind: 'bunker' as const, from: L * 0.5, to: L * 0.9, side: 'right' as const }],
+    }
+    // the strip always shows the whole hole, so x is comparable across renders
+    const ballX = (pos: number) => {
+      const { container, unmount } = render(
+        <SideMap layout={layout} ball={{ pos, lie: 'sand', side: 'center', zoneId: 'waste' }} />,
+      )
+      const x = Number(container.querySelector('circle.ball')!.getAttribute('cx'))
+      unmount()
+      return x
+    }
+    const xs = [0.55, 0.65, 0.75, 0.85, 0.9].map((f) => ballX(L * f))
+    // Never backwards: further up the hole is never drawn further from the pin.
+    // The midpoint anchor returned the same x for all five, so a player watching
+    // a replay saw the ball sit still, then jump.
+    for (let i = 1; i < xs.length; i++) expect(xs[i]).toBeGreaterThanOrEqual(xs[i - 1])
+    // and it genuinely travels the bunker rather than parking at one spot
+    expect(xs[xs.length - 1]).toBeGreaterThan(xs[0] + 20)
+  })
+
   it('GreenView places the cup at the real pin — every tier/side combo, no crash, no NaN geometry', async () => {
     const { GreenView } = await import('./ui/HoleMap')
     const sides = ['left', 'center', 'right'] as const

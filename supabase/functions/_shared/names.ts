@@ -16,19 +16,20 @@
  * The rule is enforced in layers (see the long note in schema.sql).
  * `checkName` below is the courtesy layer everywhere — a pre-flight read that
  * turns a collision into a clean, specific error before any write is
- * attempted. Two different guarantees back it, for two different write
- * shapes:
- *
- * - link-account's claims always set `user_id` and `name` in the SAME
- *   statement, so `players_name_reserved_ci` (a partial unique index over
- *   linked rows) protects them for free — `isNameConflict` below tells that
- *   index's 23505 apart from an ordinary `user_id` collision.
- * - submit-round's and claim-name's claims are anonymous — they never touch
- *   `user_id`, so no index applies. `claimName` below folds the check and the
- *   write into ONE atomic statement (`claim_name_if_free` in schema.sql)
- *   instead of `checkName` followed by a separate guarded update, closing the
- *   round-trip gap a concurrent link-account reservation could otherwise land
- *   in.
+ * attempted, but on its own is check-then-act, not a guarantee. The real
+ * guarantee is `pg_advisory_xact_lock(hashtext(lower(name)))`, taken by every
+ * writer of `name` right before it checks-and-writes: submit-round's and
+ * claim-name's anonymous claims via `claimName` below
+ * (`claim_name_if_free`), and link-account's three writers via their own
+ * locked RPCs (`reserve_name_and_link`, `attach_account`,
+ * `create_linked_player`). The lock is what makes an anonymous claim and a
+ * concurrent linked reservation for the same name actually wait on each
+ * other — `players_name_reserved_ci` (the partial unique index over linked
+ * rows) still exists and still fires on a genuine conflict, but a plain
+ * index can't serialize a writer that never sets `user_id` against one that
+ * does, which is exactly the anonymous side of this race. `isNameConflict`
+ * below tells that index's 23505 apart from an ordinary `user_id` collision
+ * for the writers that could hit either.
  */
 
 /** 2-18 chars, opens on a letter or digit. Identical in all three doors. */
@@ -99,12 +100,13 @@ export type ClaimOutcome =
  * must have already validated the row's identity (id + secret) and its
  * current null name via a prior read; this only takes the id.
  *
- * One RPC call, one Postgres statement (`claim_name_if_free` in schema.sql).
- * This is the anonymous-claim counterpart to the partial unique index: those
- * writes never set `user_id`, so no index can protect them, and a separate
- * `checkName()` read before a separate guarded write leaves a round-trip gap
- * a concurrent reservation can land in. Folding the check into the write
- * closes it.
+ * One RPC call, one Postgres statement (`claim_name_if_free` in schema.sql),
+ * which takes `pg_advisory_xact_lock(hashtext(lower(name)))` before checking
+ * or writing anything — the actual fix for the gap a separate `checkName()`
+ * read before a separate guarded write leaves open: two transactions can each
+ * take a snapshot showing a name free before either commits, and no
+ * single-statement check closes that on its own. The lock makes this call
+ * and link-account's locked writers (same key) wait on each other instead.
  *
  * The function always returns the row's state AFTER the attempt, never
  * nothing, so a single round trip distinguishes every outcome a caller needs:

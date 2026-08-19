@@ -161,14 +161,18 @@ describe('every door that writes a name asks first', () => {
   const allDirs = readdirSync(resolve(here, '..'), { withFileTypes: true })
     .filter((e) => e.isDirectory() && !e.name.startsWith('_'))
     .map((e) => e.name)
-  // Two write shapes now: a direct `.from('players').update/insert({ name`
-  // (link-account, submit-round's legacy insert), and the atomic RPC that
-  // claimName() wraps (submit-round's claim, claim-name) — the RPC call
-  // itself lives in _shared/names.ts, not the door, so a door using it is
-  // detected by the call to claimName(), not by the SQL function's name.
+  // Three write shapes now: a direct `.from('players').update/insert({ name`
+  // (submit-round's legacy insert only, at this point), the shared atomic
+  // RPC that claimName() wraps (submit-round's claim, claim-name — the RPC
+  // call itself lives in _shared/names.ts, not the door, so it's detected by
+  // the call to claimName() rather than the SQL function's name), and
+  // link-account's own two name-writing RPCs (reserve_name_and_link,
+  // create_linked_player — see guarded-updates.test.ts for the third,
+  // attach_account, which writes user_id only and so isn't "writes a name").
   const writesPlayerName = (code: string) =>
     [...code.matchAll(/\.from\('players'\)[\s\S]{0,400}?\.(update|insert)\(\{[\s\S]{0,200}?\bname\b/g)].length > 0 ||
-    /\bclaimName\(/.test(code)
+    /\bclaimName\(/.test(code) ||
+    /\.rpc\('reserve_name_and_link'|\.rpc\('create_linked_player'/.test(code)
   const doors = allDirs.filter((dir) =>
     writesPlayerName(readFileSync(resolve(here, '..', dir, 'index.ts'), 'utf8')),
   )

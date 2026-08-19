@@ -48,7 +48,7 @@ export function SeasonSplash(props: { onClose: () => void; now?: Date }) {
             <div className="kicker season-recap-kicker">How {ended.label} ended</div>
             <div className="season-podium">
               {recap.podium.map((p) => (
-                <div key={p.playerName} className={`podium-spot place-${p.place}`}>
+                <div key={p.playerId} className={`podium-spot place-${p.place}`}>
                   <span className="podium-medal">{medal[p.place - 1]}</span>
                   <b>{p.playerName}</b>
                   <span>

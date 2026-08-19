@@ -60,8 +60,11 @@ class ResizeObserverStub {
 }
 vi.stubGlobal('ResizeObserver', ResizeObserverStub)
 
-const record = (slug: string, player: string, toPar: number): CourseRecord => ({
+// holders are identified by id — names are shared, so a fixture that means
+// "this very player" has to say so with the id, not the clubhouse name
+const record = (slug: string, player: string, toPar: number, playerId?: string): CourseRecord => ({
   course_slug: slug,
+  player_id: playerId ?? `id-${player.toLowerCase()}`,
   player_name: player,
   character: null,
   to_par: toPar,
@@ -238,7 +241,7 @@ describe('adopting a clubhouse mid-screen stops hunting your own records', () =>
 
   it('recounts when a fresh device turns out to be the record holder', async () => {
     // one standing record, soft enough to hunt
-    fetchSeasonRecords.mockResolvedValue(new Map([[COURSES[0].slug, record(COURSES[0].slug, HOLDER.name, 2)]]))
+    fetchSeasonRecords.mockResolvedValue(new Map([[COURSES[0].slug, record(COURSES[0].slug, HOLDER.name, 2, HOLDER.id)]]))
     // the session is held open so the board lands FIRST: the bug is a card
     // that already counted, then never recounted. An adoption that beats the
     // board home is the easy case — the first count is simply correct.

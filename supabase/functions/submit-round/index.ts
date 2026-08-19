@@ -22,6 +22,7 @@ import {
 } from './engine.mjs'
 import { buildStealEmail, sendViaResend } from './email.ts'
 import { SITE_URL } from '../_shared/email-chassis.ts'
+import { checkName, claimName, NAME_CHECK_FAILED, NAME_RE, NAME_TAKEN } from '../_shared/names.ts'
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -31,8 +32,6 @@ const CORS = {
 
 const json = (status: number, body: unknown) =>
   new Response(JSON.stringify(body), { status, headers: { ...CORS, 'content-type': 'application/json' } })
-
-const NAME_RE = /^[\p{L}\p{N}][\p{L}\p{N} .'_-]{1,17}$/u
 
 /** The calendar day before a YYYY-MM-DD key (pure date math, no timezone). */
 function dayBefore(key: string): string {
@@ -235,33 +234,20 @@ Deno.serve(async (req) => {
       // an anonymous minted identity posting its first card: the name is
       // claimed onto THIS row, the one the round's dice were salted for
       if (!name || !NAME_RE.test(name)) return json(400, { error: 'pick a clubhouse name (2-18 letters/numbers)' })
-      // `is('name', null)` is the race guard, and a MISS is not an error —
-      // PostgREST reports a zero-row update as a success. That matters more
-      // here than anywhere: `player_name` is denormalised onto daily_scores
-      // and both record boards, so a claim that quietly lost would post this
-      // card under a name the row does not have (and mail a record-steal
-      // notice signed with it). Ask for the row back and use what it says.
-      const { data: claimed, error } = await supabase
-        .from('players')
-        .update({ name })
-        .eq('id', data.id)
-        .is('name', null)
-        .select('name')
-        .maybeSingle()
-      if (error) {
-        return json(error.code === '23505' ? 409 : 500, {
-          error: error.code === '23505' ? 'that name is taken' : 'could not claim that name',
-        })
-      }
-      if (claimed?.name) data.name = claimed.name
-      else {
-        // no row changed: another door (claim-name, link-account, a second
-        // tab) named this id between the read above and this write. The name
-        // it holds now is the real one — the card posts under that.
-        const { data: winner } = await supabase.from('players').select('name').eq('id', data.id).single()
-        if (!winner?.name) return json(500, { error: 'could not claim that name' })
-        data.name = winner.name
-      }
+      // Shared unless an email account holds it (see _shared/names.ts).
+      // claimName folds the reservation check and the guarded write into one
+      // atomic statement — this is an anonymous claim (never sets user_id),
+      // so no unique index backs it, and `player_name` is denormalised onto
+      // daily_scores and both record boards: a claim that quietly lost the
+      // race to a concurrent reservation would post this card under a name
+      // the row doesn't actually own.
+      const claim = await claimName(supabase, data.id, name)
+      if (claim.outcome === 'reserved') return json(409, { error: NAME_TAKEN })
+      if (claim.outcome === 'unknown') return json(503, { error: NAME_CHECK_FAILED })
+      // 'raced': another door (claim-name, link-account, a second tab) named
+      // this id between the read above and this call — the card posts under
+      // whichever name actually won.
+      data.name = claim.name
     }
     player = { id: data.id, name: data.name }
   } else {
@@ -281,10 +267,21 @@ Deno.serve(async (req) => {
       }
     }
     if (!name || !NAME_RE.test(name)) return json(400, { error: 'pick a clubhouse name (2-18 letters/numbers)' })
+    // This path is a fresh INSERT (no id yet to hand claim_name_if_free), so
+    // unlike the claim above it stays check-then-insert — a courtesy check,
+    // not an atomic one. Deliberately not worth an insert-shaped atomic RPC:
+    // this is the LEGACY branch for clients that predate mint-player, a
+    // shrinking population that keeps shrinking every deploy (see the
+    // engine-version/freshness handshake), so the very narrow race window
+    // this leaves is lower cost here than the extra surface area of a second
+    // atomic primitive would be.
+    const availability = await checkName(supabase, name)
+    if (availability === 'reserved') return json(409, { error: NAME_TAKEN })
+    if (availability === 'unknown') return json(503, { error: NAME_CHECK_FAILED })
     const { data, error } = await supabase.from('players').insert({ name }).select('id, name, secret').single()
     if (error) {
       return json(error.code === '23505' ? 409 : 500, {
-        error: error.code === '23505' ? 'that name is taken' : 'could not create player',
+        error: error.code === '23505' ? NAME_TAKEN : 'could not create player',
       })
     }
     player = { id: data.id, name: data.name, secret: data.secret }

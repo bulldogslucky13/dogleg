@@ -24,6 +24,7 @@
 // removes the requirement to play 18 holes first.
 // deno-lint-ignore-file no-explicit-any
 import { createClient } from 'npm:@supabase/supabase-js@2'
+import { claimName, NAME_CHECK_FAILED, NAME_RE, NAME_TAKEN } from '../_shared/names.ts'
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -32,9 +33,6 @@ const CORS = {
 }
 const json = (status: number, body: unknown) =>
   new Response(JSON.stringify(body), { status, headers: { ...CORS, 'content-type': 'application/json' } })
-
-// identical to submit-round / link-account — one grammar for clubhouse names
-const NAME_RE = /^[\p{L}\p{N}][\p{L}\p{N} .'_-]{1,17}$/u
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS })
@@ -62,32 +60,17 @@ Deno.serve(async (req) => {
   // read as a failure when the first one actually landed.
   if (player.name) return json(200, { player: { id: player.id, name: player.name } })
 
-  // `is('name', null)` is the race guard: two devices claiming onto the same
-  // row at once, and only the first update matches. A miss is NOT an error —
-  // PostgREST reports a zero-row update as a success — so the loser has to be
-  // told apart from the winner by asking for the row back. Without the
-  // `select`, both taps would be answered with their own name while the
-  // database kept only one, and the losing device would persist a name it
-  // does not own.
-  const { data: claimed, error } = await supabase
-    .from('players')
-    .update({ name })
-    .eq('id', player.id)
-    .is('name', null)
-    .select('id, name')
-    .maybeSingle()
-  if (error) {
-    return json(error.code === '23505' ? 409 : 500, {
-      error: error.code === '23505' ? 'that name is taken' : 'could not claim that name',
-    })
-  }
-  if (claimed?.name) return json(200, { player: { id: claimed.id, name: claimed.name } })
-
-  // Zero rows changed: someone named this row between the read above and the
-  // update. Answer with the name that actually landed, exactly as the
-  // already-named path does — the caller wanted an identity with a name on
-  // it, and it has one.
-  const { data: winner } = await supabase.from('players').select('id, name').eq('id', player.id).single()
-  if (winner?.name) return json(200, { player: { id: winner.id, name: winner.name } })
-  return json(500, { error: 'could not claim that name' })
+  // Names are shared unless an email account holds this one — see
+  // _shared/names.ts. claimName folds the reservation check and the guarded
+  // write into one atomic statement: this is an anonymous claim (never sets
+  // user_id), so no unique index backs it, and a separate check-then-write
+  // would leave a round-trip gap a concurrent reservation could land in.
+  const claim = await claimName(supabase, player.id, name)
+  if (claim.outcome === 'reserved') return json(409, { error: NAME_TAKEN })
+  if (claim.outcome === 'unknown') return json(503, { error: NAME_CHECK_FAILED })
+  // 'raced': two taps of this card, or another door, named the row first —
+  // answer with the name that actually landed, exactly as the already-named
+  // path above does. The caller wanted an identity with a name on it, and
+  // it has one.
+  return json(200, { player: { id: player.id, name: claim.name } })
 })

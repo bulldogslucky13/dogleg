@@ -31,6 +31,11 @@ const realFetch = window.fetch.bind(window)
 window.fetch = (input: RequestInfo | URL, init?: RequestInit) => {
   const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
   if (/season_records/.test(url)) {
+    // player_id is a stable per-NAME id, not per-row — Scrambler_Sue holds two
+    // of these on purpose (the podium's multi-record tie-break needs a real
+    // multi-holder), and podium() groups by id, so two different ids for the
+    // same demo player would split her into two separate (and wrong) entries.
+    const idFor = (playerName: string) => `demo-${playerName.toLowerCase()}`
     const rows = [
       { course_slug: 'pebble-beach', player_name: 'Scrambler_Sue', to_par: -7, character: 'dart', set_at: '2026-06-02T12:00:00Z' },
       { course_slug: 'st-andrews', player_name: 'BigDog_Duffer', to_par: -5, character: 'fairway', set_at: '2026-05-11T12:00:00Z' },
@@ -38,7 +43,7 @@ window.fetch = (input: RequestInfo | URL, init?: RequestInit) => {
       { course_slug: 'carnoustie', player_name: 'MulliganMike', to_par: -3, character: 'dart', set_at: '2026-06-18T12:00:00Z' },
       { course_slug: 'royal-portrush', player_name: 'Jackson_C', to_par: -2, character: 'greens', set_at: '2026-05-30T12:00:00Z' },
       { course_slug: 'harbour-town', player_name: 'PuttPuttPam', to_par: -1, character: 'fairway', set_at: '2026-04-02T12:00:00Z' },
-    ]
+    ].map((r) => ({ ...r, player_id: idFor(r.player_name) }))
     return Promise.resolve(
       new Response(JSON.stringify(rows), { status: 200, headers: { 'Content-Type': 'application/json' } }),
     )
@@ -63,7 +68,7 @@ window.fetch = (input: RequestInfo | URL, init?: RequestInit) => {
     // type "taken" into the field to see the failure path instead
     if (name.toLowerCase() === 'taken') {
       return after(
-        new Response(JSON.stringify({ error: 'that name is taken' }), {
+        new Response(JSON.stringify({ error: 'that name belongs to a synced player — try another' }), {
           status: 409,
           headers: { 'Content-Type': 'application/json' },
         }),

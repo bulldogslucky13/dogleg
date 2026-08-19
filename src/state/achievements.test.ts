@@ -173,13 +173,16 @@ describe('computeProgress', () => {
    */
   it('counts every reclaim the records ledger actually records', async () => {
     const { recordWon, syncLedger, loadLedger } = await import('../lib/records')
+    // holders are ids (names are shared) — one stable id per fixture name
+    const idOf = (name: string) => `id-${name.toLowerCase()}`
+    const ME = idOf('Jackson')
     const server = (holder: string, toPar: number) =>
-      new Map([['pebble-beach', { player_name: holder, to_par: toPar }]])
+      new Map([['pebble-beach', { player_id: idOf(holder), player_name: holder, to_par: toPar }]])
 
     recordWon('pebble-beach', -4, 1000) // ours
     expect(computeProgress([], [], loadLedger()).oneOffs.reclaim).toBe(0)
 
-    syncLedger(server('Hank', -6), 'Jackson', 2000, '2026-07-20') // stolen
+    syncLedger(server('Hank', -6), ME, 2000, '2026-07-20') // stolen
     expect(computeProgress([], [], loadLedger()).oneOffs.reclaim).toBe(0)
 
     recordWon('pebble-beach', -7, 3000) // taken back, on this device
@@ -189,12 +192,12 @@ describe('computeProgress', () => {
 
     // a later sync agreeing the record is ours must not re-count the same
     // take-back — the steal entry is already gone
-    syncLedger(server('Jackson', -7), 'Jackson', 4000, '2026-07-21')
+    syncLedger(server('Jackson', -7), ME, 4000, '2026-07-21')
     expect(computeProgress([], [], loadLedger()).oneOffs.reclaim).toBe(1)
 
     // stolen again, then reclaimed on ANOTHER device — sync learns it as a diff
-    syncLedger(server('Marge', -8), 'Jackson', 5000, '2026-07-22')
-    syncLedger(server('Jackson', -9), 'Jackson', 6000, '2026-07-23')
+    syncLedger(server('Marge', -8), ME, 5000, '2026-07-22')
+    syncLedger(server('Jackson', -9), ME, 6000, '2026-07-23')
     expect(computeProgress([], [], loadLedger()).oneOffs.reclaim).toBe(2)
     expect(loadLedger().stolen['pebble-beach']).toBeUndefined()
   })

@@ -20,9 +20,231 @@ create table if not exists players (
   user_id uuid unique references auth.users (id),
   created_at timestamptz not null default now()
 );
-create unique index if not exists players_name_ci on players (lower(name));
 alter table players add column if not exists user_id uuid unique references auth.users (id);
 alter table players alter column name drop not null;
+
+-- ---------------------------------------------------------------------------
+-- Clubhouse names: SHARED by default, RESERVED only by an email account.
+-- ---------------------------------------------------------------------------
+-- Names used to be globally unique (`players_name_ci`, a unique index on
+-- lower(name)), and that index was the whole rule. It cost more than it
+-- bought. Identity here is a device-held secret with no login, so the common
+-- way to meet "that name is taken" was not squatting — it was YOUR OWN old
+-- row, orphaned by a cleared browser, a new phone, or a reinstall. The game
+-- answered a player typing their own name with a flat refusal and no way
+-- forward, because names are permanent and there is no rename door.
+--
+-- So the rule is now: two anonymous players may both be "Jacob". A name stops
+-- being available only once a player who has linked an email account holds it
+-- — an account is a real, recoverable claim on a name, and reserving it is
+-- what that account is FOR. Anonymous rows that already share a reserved name
+-- keep it (grandfathered); they simply stop being joined by new ones.
+--
+-- Enforced in layers, because different writers need different guarantees:
+--
+-- 1. name_reserved() below, called by all three claim doors (submit-round,
+--    claim-name, link-account) BEFORE they write, is what turns a collision
+--    into a clean "that name belongs to a synced player" instead of a raw
+--    23505. On its own it's a courtesy, not a guarantee — checked, then
+--    written, a round trip apart.
+--
+-- 2. players_name_reserved_ci below is a real, race-proof guarantee, but only
+--    for writes that set user_id and name TOGETHER: a PARTIAL unique index
+--    over only the linked rows (`where user_id is not null`) enforces "at
+--    most one linked row per name" the same way any unique index enforces
+--    anything — Postgres serializes concurrent writers of the same key
+--    regardless of which row they're on. It does NOT touch anonymous rows —
+--    two anonymous "Jacob"s are still fine, unindexed, exactly as the design
+--    intends. But a write that sets user_id WITHOUT changing name (attaching
+--    an account to a row that was already named) isn't "inserting the
+--    conflicting value" from the index's point of view in the usual sense —
+--    it still trips the index (the row's existing name, now paired with a
+--    non-null user_id, is what collides), so this layer alone still leaves a
+--    gap against anonymous writers of the SAME name racing the SAME instant.
+--
+-- 3. Every remaining writer of `name` — submit-round's and claim-name's
+--    anonymous claims (claim_name_if_free), and link-account's three
+--    name/user_id writers (reserve_name_and_link, attach_account,
+--    create_linked_player) below — takes pg_advisory_xact_lock(name) FIRST,
+--    before its own check-and-write. This is the actual cross-transaction
+--    guarantee: the partial index only serializes writers against EACH
+--    OTHER, not against an anonymous claim that never touches user_id and so
+--    never hits the index at all. The lock closes that gap by making every
+--    writer of a given name — indexed or not — wait its turn, the one thing
+--    a single-statement NOT EXISTS check can't do on its own (two
+--    independent transactions can each take a snapshot showing the name
+--    free before either commits). Keyed on hashtext(lower(name)), released
+--    automatically at transaction end (each RPC call is its own
+--    transaction), so nothing here can leak a held lock past its request.
+-- An earlier version of this file rejected a reserved-name index entirely,
+-- reasoning that it would refuse the one flow that must never fail: an
+-- anonymous player linking an email while ALREADY holding the name they play
+-- under. That reasoning missed the difference between two cases a plain
+-- unique index can't tell apart but a PARTIAL one can: linking your own
+-- unclaimed name (nobody else has linked it — the index permits this, same
+-- row, nothing to collide with) versus linking a name a DIFFERENT account
+-- already linked first (two anonymous rows landed on the same shared name
+-- before either synced, and both later add email — the index is exactly
+-- right to refuse the second one, because letting it through is what breaks
+-- "an account is a real, recoverable claim on a name": two different accounts
+-- would both read as reserving "Jacob", and neither recovery flow could tell
+-- them apart). That second case has no rename door to fall back to and reads
+-- to the losing player as the name being taken with no recourse — a real,
+-- accepted rough edge, not a bug: it is what the failed race SHOULD produce,
+-- because the alternative is a silent, undetectable double-reservation.
+--
+-- The plain (non-partial) lookup index remains for name_reserved()'s read.
+drop index if exists players_name_ci;
+create index if not exists players_name_ci_lookup on players (lower(name));
+create unique index if not exists players_name_reserved_ci on players (lower(name)) where user_id is not null;
+
+-- True when an EMAIL-LINKED player already holds this clubhouse name. The
+-- comparison is case-insensitive and trims, exactly as the edge functions do
+-- before they write, so "Jacob ", "jacob" and "JACOB" cannot slip past a
+-- reservation on "Jacob". SECURITY DEFINER + a service_role-only grant: this
+-- is an existence oracle over the players table, which is otherwise unreadable
+-- from the client, and it stays that way.
+create or replace function name_reserved(p_name text) returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1 from players
+    where user_id is not null and lower(name) = lower(btrim(p_name))
+  );
+$$;
+revoke all on function name_reserved(text) from public, anon, authenticated;
+grant execute on function name_reserved(text) to service_role;
+
+-- Atomically claims p_name onto a row that is already known nameless — the
+-- write path for submit-round's and claim-name's anonymous claims.
+--
+-- Those two doors never set user_id, so players_name_reserved_ci (linked
+-- rows only) never applies to their write — an anonymous claim has no unique
+-- index backing it at all, by design, since anonymous rows must be free to
+-- share any name. pg_advisory_xact_lock is what actually closes the race
+-- against a concurrent link-account reservation for the same name (see the
+-- long note above); the NOT EXISTS check that follows it is what turns a
+-- blocked claim into a clean answer rather than an unexplained hang.
+--
+-- Always returns exactly one row (the row's state AFTER the attempt) rather
+-- than nothing-on-failure, so the caller can tell apart, in one round trip:
+-- claimed=true (this call set it), claimed=false with a name (someone else
+-- named this exact row first — an ordinary race, not a reservation), and
+-- claimed=false with no name (blocked — p_name is reserved).
+create or replace function claim_name_if_free(p_id uuid, p_name text)
+returns table(id uuid, name text, claimed boolean)
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_name text := btrim(p_name);
+  v_claimed boolean := false;
+begin
+  perform pg_advisory_xact_lock(hashtext(lower(v_name)));
+  update players
+  set name = v_name
+  where players.id = p_id
+    and players.name is null
+    and not exists (
+      select 1 from players r where r.user_id is not null and lower(r.name) = lower(v_name)
+    )
+  returning true into v_claimed;
+
+  return query
+    select players.id, players.name, coalesce(v_claimed, false)
+    from players
+    where players.id = p_id;
+end;
+$$;
+revoke all on function claim_name_if_free(uuid, text) from public, anon, authenticated;
+grant execute on function claim_name_if_free(uuid, text) to service_role;
+
+-- link-account's three name/user_id writers — the atomic, locked
+-- counterparts of the same statements the JS builder used to issue directly.
+-- Each takes the SAME pg_advisory_xact_lock(name) as claim_name_if_free
+-- before it touches the row, which is what makes the two sides of the
+-- anonymous-vs-reservation race actually wait on each other instead of both
+-- reading a stale "free" snapshot. A real 23505 (players_name_reserved_ci or
+-- players_user_id_key) still propagates naturally as a PostgREST error
+-- exactly as it did from a direct builder call — these functions don't catch
+-- it, so isNameConflict() in the edge function keeps working unchanged.
+
+-- atomic form of `.update({user_id, name}).is('name', null).is('user_id', null)`
+create or replace function reserve_name_and_link(p_id uuid, p_uid uuid, p_name text)
+returns table(id uuid, secret uuid, name text)
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_name text := btrim(p_name);
+begin
+  perform pg_advisory_xact_lock(hashtext(lower(v_name)));
+  return query
+    update players
+    set user_id = p_uid, name = v_name
+    where players.id = p_id
+      and players.name is null
+      and players.user_id is null
+    returning players.id, players.secret, players.name;
+end;
+$$;
+revoke all on function reserve_name_and_link(uuid, uuid, text) from public, anon, authenticated;
+grant execute on function reserve_name_and_link(uuid, uuid, text) to service_role;
+
+-- atomic form of attach()'s `.update({user_id}).is('user_id', null)`. This
+-- row's name is already set (or null) BEFORE this call — the lock has to key
+-- on whatever it already is, since attaching user_id to an unchanged name is
+-- exactly the write players_name_reserved_ci evaluates against, and it's the
+-- one write in this file that can trip that index without this statement
+-- changing `name` at all.
+create or replace function attach_account(p_id uuid, p_uid uuid)
+returns table(user_id uuid)
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_name text;
+begin
+  select name into v_name from players where id = p_id;
+  if v_name is not null then
+    perform pg_advisory_xact_lock(hashtext(lower(v_name)));
+  end if;
+  return query
+    update players
+    set user_id = p_uid
+    where players.id = p_id
+      and players.user_id is null
+    returning players.user_id;
+end;
+$$;
+revoke all on function attach_account(uuid, uuid) from public, anon, authenticated;
+grant execute on function attach_account(uuid, uuid) to service_role;
+
+-- atomic form of `.insert({name, user_id})` — fresh account, fresh device
+create or replace function create_linked_player(p_uid uuid, p_name text)
+returns table(id uuid, secret uuid, name text)
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_name text := btrim(p_name);
+begin
+  perform pg_advisory_xact_lock(hashtext(lower(v_name)));
+  return query
+    insert into players (name, user_id)
+    values (v_name, p_uid)
+    returning players.id, players.secret, players.name;
+end;
+$$;
+revoke all on function create_linked_player(uuid, text) from public, anon, authenticated;
+grant execute on function create_linked_player(uuid, text) to service_role;
 
 -- mint-player rate limiting: one counter per (utc day, hashed ip). The hash
 -- is salted with the day, so rows can't be correlated across days — and the

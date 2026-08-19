@@ -9,6 +9,7 @@
 // happen with the service role.
 // deno-lint-ignore-file no-explicit-any
 import { createClient } from 'npm:@supabase/supabase-js@2'
+import { checkName, isNameConflict, NAME_CHECK_FAILED, NAME_RE, NAME_TAKEN } from '../_shared/names.ts'
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -17,8 +18,6 @@ const CORS = {
 }
 const json = (status: number, body: unknown) =>
   new Response(JSON.stringify(body), { status, headers: { ...CORS, 'content-type': 'application/json' } })
-
-const NAME_RE = /^[\p{L}\p{N}][\p{L}\p{N} .'_-]{1,17}$/u
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS })
@@ -57,31 +56,45 @@ Deno.serve(async (req) => {
    * `user_id` is unique across rows, which stops one account holding two
    * players — it does NOT stop a second account overwriting the column on the
    * same row. Reaching here means the lookup above found no player for this
-   * account, so the row must still be unlinked when the write lands, and
-   * `is('user_id', null)` is what makes the read-then-write atomic. As with
-   * the name guard, a miss is reported as success by PostgREST, so the row
-   * has to come back for a miss to be visible at all.
+   * account, so the row must still be unlinked when the write lands.
+   * attach_account (schema.sql) is the atomic form of the old
+   * `.update({user_id}).is('user_id', null)`: it takes the SAME
+   * pg_advisory_xact_lock(name) every other name-touching writer takes,
+   * keyed on this row's OWN existing name, before writing — a lock, not just
+   * the guard column, because a concurrent ANONYMOUS claim for that same
+   * name never sets user_id and so never trips players_name_reserved_ci on
+   * its own; only the lock makes the two sides wait on each other. A miss is
+   * reported as success by PostgREST, so the row has to come back for a miss
+   * to be visible at all.
+   *
+   * This is the one write in the file that never calls `checkName` first —
+   * intentionally, because a player syncing the name they ALREADY hold must
+   * always be able to (see the name guard below). But it CAN still 23505 on
+   * `players_name_reserved_ci` — not on this row's own name changing (it
+   * isn't), but on `user_id` going non-null while the name stays what it
+   * already was: if two anonymous rows independently landed on the same
+   * shared name before either synced, and the other one linked first, this
+   * row's link now collides with an account that already reserved that name.
+   * `isNameConflict` is what tells that apart from an ordinary `user_id` race
+   * so the right error reaches the player.
    */
-  const attach = async (id: string): Promise<'linked' | 'taken' | 'error'> => {
-    const { data, error } = await service
-      .from('players')
-      .update({ user_id: uid })
-      .eq('id', id)
-      .is('user_id', null)
-      .select('user_id')
-      .maybeSingle()
-    if (error) return 'error'
-    if (data) return 'linked'
+  const attach = async (id: string): Promise<'linked' | 'taken' | 'nametaken' | 'error'> => {
+    const { data, error } = await service.rpc('attach_account', { p_id: id, p_uid: uid })
+    if (error) return isNameConflict(error) ? 'nametaken' : 'error'
+    const row = Array.isArray(data) ? data[0] : data
+    if (row?.user_id) return 'linked'
     // no row changed: another account signed in against this same identity
     // between the read and the write, and the first one to land keeps it
-    const { data: row } = await service.from('players').select('user_id').eq('id', id).single()
-    if (!row) return 'error'
-    return row.user_id === uid ? 'linked' : 'taken'
+    const { data: check } = await service.from('players').select('user_id').eq('id', id).single()
+    if (!check) return 'error'
+    return check.user_id === uid ? 'linked' : 'taken'
   }
-  const attachFailure = (outcome: 'taken' | 'error') =>
-    outcome === 'taken'
-      ? json(409, { error: 'that name is synced to another email' })
-      : json(500, { error: 'could not link' })
+  const attachFailure = (outcome: 'taken' | 'nametaken' | 'error') =>
+    outcome === 'nametaken'
+      ? json(409, { error: NAME_TAKEN })
+      : outcome === 'taken'
+        ? json(409, { error: 'that name is synced to another email' })
+        : json(500, { error: 'could not link' })
 
   // fresh account + this device's player → attach it
   if (playerId && playerSecret) {
@@ -95,24 +108,34 @@ Deno.serve(async (req) => {
       // belonging to them
       if (!name) return json(200, { status: 'needsname' })
       if (!NAME_RE.test(name)) return json(400, { error: 'pick a clubhouse name (2-18 letters/numbers)' })
-      // Both guards are race guards, and a MISS is not an error — PostgREST
-      // reports a zero-row update as a success. This one statement writes the
-      // name AND the link, so a silent miss dropped BOTH: the caller was told
-      // "linked" while the account stayed unlinked. Ask for the row back so a
-      // miss can be told from a hit.
-      const { data: linked, error } = await service
-        .from('players')
-        .update({ user_id: uid, name })
-        .eq('id', p.id)
-        .is('name', null)
-        .is('user_id', null)
-        .select('id, secret, name')
-        .maybeSingle()
+      // This row is about to become an ACCOUNT, so the name it takes has to be
+      // free of other accounts (see _shared/names.ts). checkName here is the
+      // courtesy layer only — it catches the common case with a clean error
+      // before any write. The actual guarantee is reserve_name_and_link
+      // (schema.sql): the atomic form of the old direct update, now behind
+      // pg_advisory_xact_lock(name) — the same lock claim_name_if_free takes,
+      // so this write and a concurrent anonymous claim for the same name
+      // wait on each other instead of both reading "free" from a stale
+      // snapshot. isNameConflict still tells a genuine 23505 apart from an
+      // ordinary user_id collision.
+      const availability = await checkName(service, name)
+      if (availability === 'reserved') return json(409, { error: NAME_TAKEN })
+      if (availability === 'unknown') return json(503, { error: NAME_CHECK_FAILED })
+      // A MISS is not an error — PostgREST reports a zero-row update as a
+      // success. This one call writes the name AND the link, so a silent
+      // miss dropped BOTH: the caller was told "linked" while the account
+      // stayed unlinked. Ask for the row back so a miss can be told from a hit.
+      const { data: linkedRows, error } = await service.rpc('reserve_name_and_link', {
+        p_id: p.id,
+        p_uid: uid,
+        p_name: name,
+      })
       if (error) {
         return json(error.code === '23505' ? 409 : 500, {
-          error: error.code === '23505' ? 'that name is taken' : 'could not link',
+          error: error.code !== '23505' ? 'could not link' : isNameConflict(error) ? NAME_TAKEN : 'that name is synced to another email',
         })
       }
+      const linked = Array.isArray(linkedRows) ? linkedRows[0] : linkedRows
       if (linked) return json(200, { status: 'linked', player: linked })
 
       // No row changed, so something moved between the read and the write —
@@ -136,16 +159,20 @@ Deno.serve(async (req) => {
   // fresh account, fresh device → create a named player pre-linked
   if (name) {
     if (!NAME_RE.test(name)) return json(400, { error: 'pick a clubhouse name (2-18 letters/numbers)' })
-    const { data, error } = await service
-      .from('players')
-      .insert({ name, user_id: uid })
-      .select('id, secret, name')
-      .single()
+    const availability = await checkName(service, name)
+    if (availability === 'reserved') return json(409, { error: NAME_TAKEN })
+    if (availability === 'unknown') return json(503, { error: NAME_CHECK_FAILED })
+    // create_linked_player (schema.sql): atomic insert behind the same
+    // pg_advisory_xact_lock(name) as every other writer here — this row is
+    // brand new, but the name it's born with is exactly as contestable as
+    // any other write in this file.
+    const { data: createdRows, error } = await service.rpc('create_linked_player', { p_uid: uid, p_name: name })
     if (error) {
       return json(error.code === '23505' ? 409 : 500, {
-        error: error.code === '23505' ? 'that name is taken' : 'could not create player',
+        error: error.code !== '23505' ? 'could not create player' : isNameConflict(error) ? NAME_TAKEN : 'that name is synced to another email',
       })
     }
+    const data = Array.isArray(createdRows) ? createdRows[0] : createdRows
     return json(200, { status: 'created', player: data })
   }
 

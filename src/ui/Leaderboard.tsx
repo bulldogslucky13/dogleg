@@ -431,7 +431,7 @@ export function ScoreBoard(props: {
       {shown.length > 0 && (
         <ol className="board-list">
           {shown.map((row, i) => (
-            <li key={`${row.player_name}:${i}`} className={player && row.player_name === player.name ? 'me' : ''}>
+            <li key={`${row.player_id}:${i}`} className={player && row.player_id === player.id ? 'me' : ''}>
               <span className={`board-pos${ranks[i] <= 3 ? ` medal-${ranks[i]}` : ''}`}>{ranks[i]}</span>
               <span className="board-name">
                 {row.player_name}
@@ -494,7 +494,7 @@ export function DailyBoardView(props: { dateKey: string }) {
       {shown.length > 0 && (
         <ol className="board-list">
           {shown.map((row, i) => (
-            <li key={`${row.player_name}:${i}`} className={player && row.player_name === player.name ? 'me' : ''}>
+            <li key={`${row.player_id}:${i}`} className={player && row.player_id === player.id ? 'me' : ''}>
               <span className={`board-pos${ranks[i] <= 3 ? ` medal-${ranks[i]}` : ''}`}>{ranks[i]}</span>
               <span className="board-name">
                 {row.player_name}

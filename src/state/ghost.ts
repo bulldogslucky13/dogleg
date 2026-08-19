@@ -52,8 +52,10 @@ export interface Ghost {
  * stored round (or the round doesn't replay) */
 function recordGhost(rec: RecordReplay | null, excludeSeed: string | undefined, board: GhostBoard): Ghost | null {
   if (!rec?.seed || !rec.decisions || rec.seed === excludeSeed) return null
-  const myName = loadPlayer()?.name ?? null
-  const mine = !!myName && rec.player_name.toLowerCase() === myName.toLowerCase()
+  // by id: a namesake's record is somebody else's, and labelling it "yours"
+  // would hide whose round you're racing (names are shared — see schema.sql)
+  const myId = loadPlayer()?.id ?? null
+  const mine = !!myId && rec.player_id === myId
   return buildGhost(rec.seed, rec.character ?? undefined, rec.decisions, {
     kind: 'record',
     board,

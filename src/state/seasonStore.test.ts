@@ -42,7 +42,13 @@ describe('past seasons and the podium', () => {
   })
 
   it('ranks by records held, best round breaking ties, top three only', () => {
-    const row = (playerName: string, courseSlug: string, toPar: number) => ({ playerName, courseSlug, toPar })
+    // players are ids; the name rides along for display only
+    const row = (playerName: string, courseSlug: string, toPar: number) => ({
+      playerId: `id-${playerName.toLowerCase()}`,
+      playerName,
+      courseSlug,
+      toPar,
+    })
     const rows = [
       row('Hank', 'a', -6),
       row('Hank', 'b', -2),
@@ -54,9 +60,9 @@ describe('past seasons and the podium', () => {
     const p = podium(rows)
     expect(p).toHaveLength(3)
     // Jackson and Hank both hold 2 — Jackson's −8 beats Hank's −6 for the tie
-    expect(p[0]).toEqual({ playerName: 'Jackson', records: 2, place: 1 })
-    expect(p[1]).toEqual({ playerName: 'Hank', records: 2, place: 2 })
-    expect(p[2]).toEqual({ playerName: 'Marge', records: 1, place: 3 })
+    expect(p[0]).toEqual({ playerId: 'id-jackson', playerName: 'Jackson', records: 2, place: 1 })
+    expect(p[1]).toEqual({ playerId: 'id-hank', playerName: 'Hank', records: 2, place: 2 })
+    expect(p[2]).toEqual({ playerId: 'id-marge', playerName: 'Marge', records: 1, place: 3 })
   })
 })
 
@@ -84,7 +90,7 @@ describe('the awards shelf is scoped to the player who earned it', () => {
     // Fall 2026: exactly one finished season (Summer, the launch season)
     const august = new Date('2026-08-05T12:00:00Z')
     mockBoard.current = new Map([
-      ['pebble-beach', { course_slug: 'pebble-beach', player_name: 'Hank', character: null, to_par: -4 }],
+      ['pebble-beach', { course_slug: 'pebble-beach', player_id: 'p1', player_name: 'Hank', character: null, to_par: -4 }],
     ])
     mockPlayer.current = { id: 'p1', secret: 's1', name: 'Hank' }
     const hanks = await seasonAwards(august)
